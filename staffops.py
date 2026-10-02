@@ -16,7 +16,7 @@ from database import db
 from i18n import tr, use_lang
 from keyboards import coordinator_menu
 from notifier import safe_send
-from tenancy import central, course_title, reload_registry
+from tenancy import central, course_title, is_super, reload_registry
 from utils import group_key
 
 log = logging.getLogger("staff")
@@ -124,7 +124,7 @@ async def course_groups(key: str) -> dict:
               "owner_label": _coord_label(coords, owner[k]) if k in owner else None}
              for k, v in sorted(groups.items(), key=lambda kv: kv[1]["name"].lower())]
     return {"groups": items, "coordinators": [
-        {"user_id": c["user_id"], "label": _coord_label(coords, c["user_id"]),
+        {"user_id": c["user_id"], "label": _coord_label(coords, c["user_id"]), "is_super": is_super(c["user_id"]),
          "groups": [g["name"] for g in items if g["owner"] == c["user_id"]]} for c in coords]}
 
 

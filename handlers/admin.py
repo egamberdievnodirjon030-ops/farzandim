@@ -28,7 +28,7 @@ from config import ADMIN_IDS, HEMIS_STATS_HOURS_PER_UNIT, PAY_REMIND_DAYS, HOURS
 from database import db
 from family import adopt_parents
 from tenancy import (central, coordinator_groups, course_title, current_course, current_user, group_scope, in_scope,
-                     scope_students, viewer_scope)
+                     scope_label, scope_students, viewer_scope)
 from importer import (COMPATIBLE, KIND_TITLES, detect_kinds, load_rows, parse_rows, resolve_by_name,
                       resolve_students)
 from guard import recheck_parents
@@ -1902,8 +1902,9 @@ async def _panel_students(f: str) -> list[dict]:
 
 async def _panel_text(f: str) -> str:
     sts = await status.all_statuses(await _panel_students(f))
+    who = esc(scope_label(current_user.get()))
     if not sts:
-        return "Talabalar topilmadi" + (f" ({esc(f)})" if f else "") + "."
+        return "Talabalar topilmadi" + (f" ({esc(f)})" if f else "") + ".\n" + who
     ids = {x["student"]["id"] for x in sts}
     linked = {r["student_id"] for r in await db.fetchall("""SELECT DISTINCT ps.student_id FROM parent_students ps
                   JOIN parents p ON p.tg_id = ps.parent_id WHERE p.active = 1""")} & ids
@@ -1914,7 +1915,7 @@ async def _panel_text(f: str) -> str:
     many = sum(1 for x in sts if sum(x["flags"].values()) >= 3)
     ts = await last_update(*UPDATE_KEYS["all"])
     return "\n".join([
-        f"📊 <b>Kurs holati</b>{' — ' + esc(f) if f else ''}", "",
+        f"📊 <b>Kurs holati</b>{' — ' + esc(f) if f else ''}", who, "",
         f"👨‍🎓 Jami talabalar: <b>{len(sts)}</b>",
         f"👨‍👩‍👧 Ulangan ota-onalar: <b>{parents}</b> (ota-onasi ulangan talabalar: {len(linked)} — "
         f"{round(100 * len(linked) / len(sts))}%)",

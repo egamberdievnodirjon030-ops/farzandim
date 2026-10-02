@@ -39,7 +39,7 @@ from database import db
 from family import all_children, ensure_parent_here, known_contact, parent_courses
 from i18n import tr, use_lang
 from tenancy import (central, coordinator_groups, course_keys, course_title, current_course, current_user, group_scope,
-                     in_scope, reload_registry,
+                     in_scope, reload_registry, scope_label,
                      scope_students, use_course, viewer_scope)
 from utils import (WEEKDAYS, doc_title, group_key, lesson_kind, name_score, normalize_text, parse_user_dates,
                    semester_start, today, week_bounds, week_type_of)
@@ -597,7 +597,7 @@ async def api_staff_panel(request):
                "multi": sum(1 for r in rows if r["problems"] >= 3),
                "unread": sum(i["unread"] for i in inbox), "link_requests": pending,
                "top": sorted([r for r in rows if r["problems"]], key=lambda r: (-r["problems"], r["name"]))[:30],
-               "updated": await _last_update()})
+               "updated": await _last_update(), "scope": scope_label(request["user"]["id"])})
 
 
 async def _student_rows(q: str = "", limit: int = 3000) -> list[dict]:

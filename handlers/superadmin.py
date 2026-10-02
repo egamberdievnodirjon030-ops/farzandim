@@ -264,6 +264,9 @@ async def _groups_screen(key: str, uid: int) -> tuple[str, object, list[dict]]:
             + "Fayl yuklaganda (davomat, baholar, buxgalteriya hisoboti va boshqalar) faqat shu guruhlar talabalari "
               "tanilinadi, boshqa guruhlar qatorlari o'tkazib yuboriladi.\n\n"
               "✅ — biriktirilgan · 🔒 — boshqa koordinatorniki · ▫️ — bo'sh. Bosib almashtiring.")
+    if is_super(uid):
+        text += ("\n\n⚠️ <b>Bu foydalanuvchi super-admin</b> (.env dagi SUPERADMIN_IDS) — u baribir butun kursni "
+                 "ko'radi, guruhlar unga amal qilmaydi. Sinab ko'rish uchun boshqa Telegram hisobini koordinator qiling.")
     if not info["groups"]:
         text += ("\n\nKursda hali talabalar yuklanmagan — guruh nomlarini «✍️ Guruh nomlarini yozish» orqali "
                  "kiriting (masalan: <code>XM-21, XM-22</code>).")

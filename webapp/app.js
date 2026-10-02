@@ -686,7 +686,7 @@ async function viewStaff() {
   S.staffUnread = d.unread;
   const pctLinked = d.total ? Math.round(100 * d.linked / d.total) : 0;
   const tile = (k, v, s, tone, href) => `<a class="tile ${tone}" href="${href}"><span class="k">${k}</span><span class="v num">${v}</span><span class="s">${s}</span></a>`;
-  const body = `${d.unread || d.link_requests ? `<div class="alert warn"><div class="bar"></div><div>${d.unread ? `<b>${d.unread} ta o‘qilmagan xabar</b> — <a href="#/staff/inbox">ochish</a><br>` : ''}${d.link_requests ? `<b>${d.link_requests} ta bog‘lash so‘rovi</b> — <a href="#/staff/requests">ko‘rib chiqish</a>` : ''}</div></div>` : ''}
+  const body = `${d.scope ? `<p class="small muted" style="margin:0 0 10px">${esc(d.scope)}</p>` : ''}${d.unread || d.link_requests ? `<div class="alert warn"><div class="bar"></div><div>${d.unread ? `<b>${d.unread} ta o‘qilmagan xabar</b> — <a href="#/staff/inbox">ochish</a><br>` : ''}${d.link_requests ? `<b>${d.link_requests} ta bog‘lash so‘rovi</b> — <a href="#/staff/requests">ko‘rib chiqish</a>` : ''}</div></div>` : ''}
     <div class="grid2" style="margin-top:12px">
       ${tile('Talabalar', d.total, `ota-onasi ulangan: ${pctLinked}%`, '', '#/staff/students')}
       ${tile('Davomat muammosi', d.att, 'chegaraga yetganlar', d.att ? 'bad' : 'ok', '#/staff/students?filter=att')}

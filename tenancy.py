@@ -13,6 +13,7 @@ rejalashtiruvchi) — `for key in course_keys(): with use_course(key): ...`.
 from __future__ import annotations
 
 import contextvars
+import logging
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -109,6 +110,19 @@ def group_coordinators(group, course: str | None = None) -> list[int]:
     """Shu guruh biriktirilgan kurs koordinator(lar)i (joriy kursda)."""
     course, gk = course or current_course(), group_key(group)
     return [u for u, gs in COORD_GROUPS.items() if gk and gk in gs and ADMIN_COURSE.get(u) == course]
+
+
+def scope_label(user_id: int | None) -> str:
+    """Kurs holati sarlavhasi uchun: bu foydalanuvchi qaysi talabalarni ko'ryapti (chalkashmaslik uchun aniq yoziladi)."""
+    if user_id is not None and is_super(user_id):
+        if COORD_GROUPS.get(user_id):
+            return ("🛡 Siz super-adminsiz — butun kurs ko'rinadi (sizga biriktirilgan guruhlar super-admin uchun "
+                    "amal qilmaydi; .env dagi SUPERADMIN_IDS)")
+        return "🛡 Super-admin — butun kurs ko'rinadi (koordinatorlar faqat o'z guruhlarini ko'radi)"
+    scope = group_scope(user_id)
+    if scope is None:
+        return "ℹ️ Sizga guruh biriktirilmagan — butun kurs ko'rinadi"
+    return "👥 Faqat guruhlaringiz: " + ", ".join(sorted(COORD_GROUPS[user_id].values(), key=str.lower))
 
 
 def is_super(user_id: int) -> bool:
@@ -475,3 +489,7 @@ async def reload_registry() -> None:
     for g in await central.all_coord_groups():  # faqat koordinatorning hozirgi kursidagi guruhlar amal qiladi
         if ADMIN_COURSE.get(g["user_id"]) == g["course_key"]:
             COORD_GROUPS.setdefault(g["user_id"], {})[g["group_key"]] = g["group_name"]
+    for uid in COORD_GROUPS:
+        if uid in SUPERADMIN_IDS:
+            logging.getLogger("tenancy").warning(
+                "Koordinator %s super-admin ham (SUPERADMIN_IDS) — unga biriktirilgan guruhlar amal qilmaydi", uid)

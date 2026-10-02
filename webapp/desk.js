@@ -141,6 +141,7 @@ function groupsDialog(name, uid, info) {
       <p>Fayl yuklaganda (davomat, baholar, buxgalteriya hisoboti…) faqat shu guruhlar talabalari tanilinadi. Hech biri belgilanmasa — butun kurs.</p>
       ${free.length ? `<div class="grp-list">${free.map(g => `<label><input type="checkbox" name="g" value="${esc(g.name)}" ${g.owner === uid ? 'checked' : ''}> ${esc(g.name)} <span class="hint">${g.students}</span></label>`).join('')}</div>`
         : '<p class="hint">Kursda biriktirilmagan guruh yo‘q.</p>'}
+      ${(info.coordinators.find(c => c.user_id === uid) || {}).is_super ? '<p class="hint" style="color:var(--bordo-700, #8a1c2b)"><b>Bu foydalanuvchi super-admin</b> (.env — SUPERADMIN_IDS): u baribir butun kursni ko‘radi, guruhlar unga amal qilmaydi.</p>' : ''}
       ${busy.length ? `<p class="hint">Boshqa koordinatorlarda: ${busy.map(g => `${esc(g.name)} (${esc(g.owner_label)})`).join(', ')}</p>` : ''}
       <label class="field"><span>Yana guruhlar (vergul bilan)</span><input class="input" name="extra" placeholder="Masalan: XM-21, XM-22" autocomplete="off">
         <small class="hint">Talabalar hali yuklanmagan guruhlar uchun.</small></label>
@@ -281,7 +282,7 @@ async function pPanel() {
   view(head('Kurs holati', courseSub()) + skel(110) + skel(360));
   const [d, ib, rq] = await Promise.all([api('/api/staff/panel'), api('/api/staff/inbox'), api('/api/staff/requests')]);
   const cover = pct(d.linked, d.total);
-  const band = `<section class="band" aria-label="Asosiy ko‘rsatkichlar">
+  const band = (d.scope ? `<p class="hint" style="margin:-10px 0 14px">${esc(d.scope)}</p>` : '') + `<section class="band" aria-label="Asosiy ko‘rsatkichlar">
     <a href="#/students"><div class="k">Talabalar</div><div class="v navy">${d.total}</div>
       <div class="s">ota-onasi ulangan: ${cover}%</div><div class="meter"><i style="width:${cover}%"></i></div></a>
     <a href="#/students?f=att"><div class="k">Davomat muammosi</div><div class="v ${tone(d.att)}">${d.att}</div><div class="s">chegaraga yetganlar</div></a>
