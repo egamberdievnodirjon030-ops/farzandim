@@ -30,9 +30,13 @@ def esc(v) -> str:
 async def decide_link(bot, rid: int, approve: bool, admin_id: int) -> tuple[bool, str]:
     """So'rovni tasdiqlaydi yoki rad etadi va ota-onaga (uning tilida) xabar yuboradi.
     Qaytaradi: (bajarildimi, kurs koordinatoriga ko'rsatiladigan qisqa natija)."""
+    from tenancy import in_scope, viewer_scope
     req = await db.get_link_request(rid)
     if not req or req["status"] != "pending":
         return False, "Bu so'rov allaqachon ko'rib chiqilgan."
+    st0 = await db.get_student(req["student_id"])
+    if st0 and not in_scope(st0.get("group_name"), viewer_scope()):
+        return False, "Bu talaba sizga biriktirilgan guruhlarda emas."
     if approve and await db.is_blocked(req["parent_id"]):
         return False, "Bu foydalanuvchi talaba deb bloklangan. Avval /bloklar orqali ruxsat bering."
     st = await db.get_student(req["student_id"])
@@ -162,9 +166,10 @@ async def notify_link_request(bot, rid: int, parent_name: str, st: dict, detaile
         kb = appmode.app_kb("/staff/requests", "📱 Ilovada ko'rib chiqish")
     else:
         text, kb = detailed, link_request_kb(rid)
-    for admin_id in course_admins():
+    admins = course_admins(groups=[st.get("group_name")])  # talaba guruhi biriktirilgan koordinator(lar)
+    for admin_id in admins:
         await safe_send(bot, admin_id, text, reply_markup=kb)
-    live.publish_many(course_admins(), {"type": "request", "course": course, "route": "/staff/requests",
+    live.publish_many(admins, {"type": "request", "course": course, "route": "/staff/requests",
                                         "text": f"{parent_name} → {st['full_name']}"})
 
 

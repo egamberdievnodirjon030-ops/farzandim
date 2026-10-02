@@ -162,7 +162,8 @@ const main = () => $('#main');
 function head(title, sub, actions = '') {
   return `<header class="ph"><div><h1>${esc(title)}</h1><p>${sub}</p></div><div class="ph-act">${actions}</div></header>`;
 }
-const courseSub = () => `${S.me.staff.title ? esc(S.me.staff.title) + ', ' : ''}${todayLabel()}`;
+const myGroups = () => (S.me.staff && S.me.staff.groups) || [];
+const courseSub = () => `${S.me.staff.title ? esc(S.me.staff.title) + ', ' : ''}${myGroups().length ? 'guruhlar: ' + esc(myGroups().join(', ')) + ', ' : ''}${todayLabel()}`;
 function view(html) { main().innerHTML = `<div class="wrap">${html}</div>`; }
 function clearTimers() { S.timers.forEach(clearInterval); S.timers = []; S.inboxRefresh = null; }
 async function download(path) {
@@ -566,7 +567,7 @@ async function pAnnounce() {
 Родительское собрание состоится в субботу в 10:00."></textarea>
         <small class="hint">Rus va ingliz tilidagi ota-onalar uchun alohida qatorga <b>---ru</b> yoki <b>---en</b> yozib, tarjimani qo‘shing — har bir ota-ona o‘z tilidagi qismni oladi.</small></label>
       ${S.me.role === 'super' ? `<div class="field"><span>Qaysi kurslarga</span><div class="seg" id="scopeA"><button data-a="0" class="on">«${esc(S.me.staff.title || 'Joriy kurs')}» kursi</button><button data-a="1">Barcha kurslar</button></div></div>` : ''}
-      <div class="field" id="grpField"><span>Kimga</span><div class="groups" id="grps"><button data-g="" class="on">Butun kurs</button>${groups.map(g => `<button data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div></div>
+      <div class="field" id="grpField"><span>Kimga</span><div class="groups" id="grps"><button data-g="" class="on">${myGroups().length ? 'Barcha guruhlarim' : 'Butun kurs'}</button>${groups.map(g => `<button data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div></div>
       <button class="btn primary" id="send">${ic('send')} E’lonni yuborish</button></div></section>
     <section class="sec"><header><h2>Ota-ona nimani ko‘radi</h2></header><div class="pad">
       <div class="tabs" id="tabs"><button data-l="uz" class="on">O‘zbekcha</button><button data-l="ru">Русский</button><button data-l="en">English</button></div>

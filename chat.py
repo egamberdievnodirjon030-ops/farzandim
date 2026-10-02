@@ -46,10 +46,11 @@ async def parent_send(bot: Bot, parent_id: int, parent_name: str, st: dict, text
         admin_text = (f"💬 <b>Yangi savol</b> — {esc(parent_name)} "
                       f"({esc(st['full_name'])}, {esc(st.get('group_name') or '')})")
     delivered = 0
-    for admin_id in course_admins():
+    admins = course_admins(groups=[st.get("group_name")])  # talaba guruhi biriktirilgan koordinator(lar)
+    for admin_id in admins:
         kb = appmode.app_kb(route, "📱 Ilovada javob berish") if appmode.APP_MODE else answer_kb(qid, st["id"], parent_id)
         delivered += await safe_send(bot, admin_id, admin_text, reply_markup=kb)
-    live.publish_many(course_admins(), {"type": "message", "course": course, "student_id": st["id"], "parent_id": parent_id,
+    live.publish_many(admins, {"type": "message", "course": course, "student_id": st["id"], "parent_id": parent_id,
                                         "text": f"{parent_name}: {text[:200]}", "route": route})
     return {"ok": True, "id": mid, "delivered": delivered, "question_id": qid}
 

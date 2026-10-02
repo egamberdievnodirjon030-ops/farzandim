@@ -38,7 +38,9 @@ from config import (ADMIN_COURSE, BOT_TOKEN, DATA_DIR, LOG_DIR, PAIR_TIMES, SUPE
 from database import db
 from family import all_children, ensure_parent_here, known_contact, parent_courses
 from i18n import tr, use_lang
-from tenancy import central, course_keys, course_title, current_course, reload_registry, use_course
+from tenancy import (central, coordinator_groups, course_keys, course_title, current_course, current_user, group_scope,
+                     in_scope, reload_registry,
+                     scope_students, use_course, viewer_scope)
 from utils import (WEEKDAYS, doc_title, group_key, lesson_kind, name_score, normalize_text, parse_user_dates,
                    semester_start, today, week_bounds, week_type_of)
 
@@ -99,14 +101,18 @@ async def auth_middleware(request: web.Request, handler):
     if uid in ADMIN_COURSE or uid in SUPERADMIN_IDS:
         lang = "uz"  # kurs koordinatori va super-admin interfeysi — o'zbek tilida (bot bilan bir xil)
     request["lang"] = lang or (user.get("language_code") if user.get("language_code") in LANGS else "uz")
-    with use_lang(request["lang"]):
-        try:
-            return await handler(request)
-        except web.HTTPException:
-            raise
-        except Exception:
-            log.exception("Web App API xatosi: %s %s (foydalanuvchi %s)", request.method, request.path, uid)
-            return web.json_response({"error": "server"}, status=500)
+    token = current_user.set(uid)  # kurs koordinatorining guruh doirasi (viewer_scope) va jurnallar uchun
+    try:
+        with use_lang(request["lang"]):
+            try:
+                return await handler(request)
+            except web.HTTPException:
+                raise
+            except Exception:
+                log.exception("Web App API xatosi: %s %s (foydalanuvchi %s)", request.method, request.path, uid)
+                return web.json_response({"error": "server"}, status=500)
+    finally:
+        current_user.reset(token)
 
 
 def ok(data) -> web.Response:
@@ -132,8 +138,7 @@ def _initials(name: str) -> str:
 
 async def child_card(st: dict, key: str) -> dict:
     name = loc.student_name(st)
-    tutor_name = st.get("tutor_name") or await db.get_setting("coordinator_name")
-    tutor_phone = st.get("tutor_phone") or await db.get_setting("coordinator_phone")
+    tutor_name, tutor_phone = await db.coordinator_contact(st, key)
     return {"id": st["id"], "course": key, "name": name, "short": " ".join(name.split()[:2]), "initials": _initials(name),
             "group": st.get("group_name") or "", "year": st.get("course"), "faculty": loc.term(st.get("faculty") or ""),
             "hemis_id": st.get("hemis_id") or "", "payment_form": tr(st["payment_form"]) if st.get("payment_form") else None,
@@ -224,7 +229,9 @@ async def api_me(request: web.Request) -> web.Response:
     staff = None
     if role in ("staff", "super"):
         key = await _staff_course(request)
+        mine = coordinator_groups(uid) if group_scope(uid) is not None else {}
         staff = {"course": key, "title": course_title(key) if key and key != "_" else "",
+                 "groups": sorted(mine.values(), key=str.lower),  # koordinatorga biriktirilgan guruhlar (bo'sh — butun kurs)
                  "courses": [{"key": k, "title": course_title(k)} for k in course_keys()] if role == "super" else []}
     return ok({"user": {"id": uid, "name": request["user"].get("first_name", "")}, "lang": request["lang"],
                "role": role, "children": cards, "unread": {"messages": unread_msgs, "notifications": unread_notes},
@@ -573,22 +580,22 @@ def _row(x: dict) -> dict:
 
 @staff_route
 async def api_staff_panel(request):
-    students = await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name")
+    students = scope_students(await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name"))
     sts = await status.all_statuses(students)
     linked = {r["student_id"] for r in await db.fetchall(
         "SELECT DISTINCT ps.student_id FROM parent_students ps JOIN parents p ON p.tg_id = ps.parent_id WHERE p.active = 1")}
     rows = [_row(x) for x in sts]
     k = [r for r in rows if r["kontrakt"]]
     t = [r for r in rows if r["trimestr"]]
-    inbox = await db.inbox(200)
-    pending = await db.fetchone("SELECT COUNT(*) AS n FROM link_requests WHERE status = 'pending'")
+    inbox = scope_students(await db.inbox(200))
+    pending = len(await _pending_requests())
     return ok({"course": course_title(request["course"]) if request["course"] != "_" else "",
                "total": len(rows), "linked": sum(1 for x in sts if x["student"]["id"] in linked),
                "att": sum(1 for r in rows if r["flags"]["att"]), "acad": sum(1 for r in rows if r["flags"]["acad"]),
                "kontrakt": {"count": len(k), "sum": sum(r["kontrakt"] for r in k)},
                "trimestr": {"count": len(t), "sum": sum(r["trimestr"] for r in t)},
                "multi": sum(1 for r in rows if r["problems"] >= 3),
-               "unread": sum(i["unread"] for i in inbox), "link_requests": pending["n"] if pending else 0,
+               "unread": sum(i["unread"] for i in inbox), "link_requests": pending,
                "top": sorted([r for r in rows if r["problems"]], key=lambda r: (-r["problems"], r["name"]))[:30],
                "updated": await _last_update()})
 
@@ -606,7 +613,7 @@ async def _student_rows(q: str = "", limit: int = 3000) -> list[dict]:
 async def api_staff_students(request):
     q = normalize_text(request.query.get("q", ""))
     flt = request.query.get("filter", "")
-    students = await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name")
+    students = scope_students(await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name"))
     if q:
         students = [s for s in students if q in (s.get("name_norm") or "") or q == normalize_text(s.get("hemis_id") or "")
                     or name_score(q, s.get("name_norm") or "") >= 0.8]
@@ -626,7 +633,7 @@ async def api_staff_students(request):
 @staff_route
 async def api_staff_student(request):
     st = await db.get_student(int(request.match_info["sid"]))
-    if not st:
+    if not _visible(st):
         return bad("not_found", 404)
     data = await overview(st, request["course"])
     parents = await db.fetchall("SELECT p.tg_id, p.tg_name, p.phone, p.active FROM parent_students ps "
@@ -639,7 +646,7 @@ async def api_staff_student(request):
 async def api_staff_inbox(request):
     return ok({"items": [{"sid": i["student_id"], "pid": i["parent_id"], "student": i["full_name"], "group": i["group_name"],
                           "parent": i["tg_name"] or i["phone"] or "", "last": i["last_text"], "last_sender": i["last_sender"],
-                          "at": i["last_at"], "unread": i["unread"]} for i in await db.inbox(200)]})
+                          "at": i["last_at"], "unread": i["unread"]} for i in scope_students(await db.inbox(200))]})
 
 
 @staff_route
@@ -647,7 +654,7 @@ async def api_staff_thread(request):
     sid, pid = int(request.match_info["sid"]), int(request.match_info["pid"])
     st = await db.get_student(sid)
     parent = await db.get_parent(pid)
-    if not st or not parent:
+    if not _visible(st) or not parent:
         return bad("not_found", 404)
     await db.mark_thread_read(sid, pid, "staff")
     return ok({"messages": [_msg(m) for m in await db.thread(sid, pid)], "student": st["full_name"],
@@ -658,7 +665,7 @@ async def api_staff_thread(request):
 @staff_route
 async def api_staff_reply(request):
     sid, pid = int(request.match_info["sid"]), int(request.match_info["pid"])
-    if not await db.linked_student(pid, sid):
+    if not await db.linked_student(pid, sid) or not _visible(await db.get_student(sid)):
         return bad("not_found", 404)
     body = await request.json()
     user = request["user"]
@@ -675,6 +682,11 @@ async def api_staff_announce(request):
     if not text:
         return bad("empty")
     groups = [group_key(g) for g in (body.get("groups") or []) if g] or None
+    scope = viewer_scope()
+    if scope is not None:  # koordinator — faqat o'z guruhlari ota-onalariga
+        groups = sorted(scope) if groups is None else [g for g in groups if g in scope]
+        if not groups:
+            return bad("groups")
     sent, total = await _announce_here(request.app["bot"], text, groups, request["user"]["id"])
     return ok({"sent": sent, "recipients": total, "course": course_title(request["course"]) if request["course"] != "_" else ""})
 
@@ -889,9 +901,9 @@ async def api_staff_doc_analyze(request):
     _DOC_JOBS[token] = {"uid": request["user"]["id"], "course": request["course"], "raw": raw, "an": an,
                         "name": fname, "at": time.time(), "copies": {}}
     found = []
-    for sid in an.mentioned[:30]:
+    for sid in an.mentioned[:60]:
         st = await db.get_student(sid)
-        if st:
+        if _visible(st) and len(found) < 30:
             found.append({"id": st["id"], "name": st["full_name"], "group": st.get("group_name") or "",
                           "hemis_id": st.get("hemis_id"), "select": True, "note": ""})
     # Ismdoshlar: hujjatda qaysi birining HEMIS ID si yoki guruhi borligi tekshiriladi. Dalili yo'q ismdosh ro'yxatda
@@ -936,6 +948,8 @@ async def api_staff_doc_copy(request):
     job = _doc_job(request, request.match_info["token"])
     if not job:
         return bad("expired", 410)
+    if not _visible(await db.get_student(int(request.match_info["sid"]))):
+        return bad("not_found", 404)
     data, info = await _job_copy(job, int(request.match_info["sid"]))
     return ok({**info, "pages": await asyncio.to_thread(docstore.page_count, data)})
 
@@ -947,6 +961,8 @@ async def api_staff_doc_page(request):
     job = _doc_job(request, token)
     if not job:
         return bad("expired", 410)
+    if not _visible(await db.get_student(sid)):
+        return bad("not_found", 404)
     data, _ = await _job_copy(job, sid)
     png = await docstore.page_png(f"job:{token}:{sid}", data, int(request.match_info["n"]),
                                   int(request.query.get("w", 1100) or 1100))
@@ -975,7 +991,7 @@ async def api_staff_doc_send(request):
     batch, out = uuid.uuid4().hex[:12], []
     for sid in sids:
         st = await db.get_student(sid)
-        if not st:
+        if not _visible(st):
             continue
         data, info = await _job_copy(job, sid)
         file_id = docstore.save_local(request["course"], data)
@@ -1044,10 +1060,23 @@ async def api_desk_logout(request):
     return resp
 
 
+async def _pending_requests() -> list[dict]:
+    """Kutilayotgan bog'lash so'rovlari; koordinator — faqat o'z guruhlari talabalari bo'yicha."""
+    scope = viewer_scope()
+    rows = await db.fetchall("SELECT r.*, s.group_name FROM link_requests r LEFT JOIN students s ON s.id = r.student_id "
+                             "WHERE r.status = 'pending' ORDER BY r.created_at")
+    return rows if scope is None else [r for r in rows if in_scope(r["group_name"], scope)]
+
+
+def _visible(st: dict | None) -> bool:
+    """Talaba bor va joriy kurs koordinatorining guruhlarida (guruhsiz koordinator va super-admin — butun kurs)."""
+    return bool(st) and in_scope(st.get("group_name"), viewer_scope())
+
+
 @staff_route
 async def api_staff_requests(request):
     out = []
-    for r in await db.fetchall("SELECT * FROM link_requests WHERE status = 'pending' ORDER BY created_at"):
+    for r in await _pending_requests():
         st = await db.get_student(r["student_id"])
         p = await db.fetchone("SELECT tg_name, phone FROM parents WHERE tg_id = ?", (r["parent_id"],)) or {}
         out.append({"id": r["id"], "parent_id": r["parent_id"], "parent_name": p.get("tg_name") or "",

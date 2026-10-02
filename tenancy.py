@@ -18,6 +18,7 @@ from pathlib import Path
 
 import aiosqlite
 
+from utils import group_key
 from config import (ADMIN_COURSE, ADMIN_IDS, COURSE_TITLES, COURSES, ENV_COURSE_TITLES, ENV_COURSES, SUPERADMIN_IDS,
                     _slug)
 
@@ -56,12 +57,18 @@ def course_title(key: str | None = None) -> str:
     return COURSE_TITLES.get(key, key or "")
 
 
-def course_admins(key: str | None = None) -> set[int]:
+def course_admins(key: str | None = None, groups=None) -> set[int]:
     """Joriy (yoki berilgan) kursning koordinatorlari. Kursda koordinator bo'lmasa — super-admin(lar)
-    (boshqa kurslarning koordinatorlariga emas: kurslar ma'lumotlari aralashmasin)."""
+    (boshqa kurslarning koordinatorlariga emas: kurslar ma'lumotlari aralashmasin).
+    groups — xabar qaysi talaba guruh(lar)iga tegishli: guruhlari biriktirilgan koordinator faqat o'z guruhi
+    xabarini oladi (guruhsiz koordinator — hammasini); guruh hech kimga biriktirilmagan bo'lsa — super-admin(lar)."""
     key = key or current_course()
     if key in COURSES:
-        return set(COURSES[key]) or set(SUPERADMIN_IDS)
+        admins = set(COURSES[key])
+        gks = {group_key(g) for g in (groups or []) if g and group_key(g)}
+        if gks:
+            admins = {u for u in admins if not COORD_GROUPS.get(u) or gks & set(COORD_GROUPS[u])}
+        return admins or set(SUPERADMIN_IDS) or set(COURSES[key])
     return set(SUPERADMIN_IDS) or set(ADMIN_IDS)
 
 
@@ -80,6 +87,28 @@ def group_scope(user_id: int | None) -> set[str] | None:
     if user_id is None or is_super(user_id) or not COORD_GROUPS.get(user_id):
         return None
     return set(COORD_GROUPS[user_id])
+
+
+def viewer_scope() -> set[str] | None:
+    """Joriy so'rov egasining (current_user) guruh doirasi — kurs koordinatori ko'radigan talabalar uchun."""
+    return group_scope(current_user.get())
+
+
+def in_scope(group, scope: set[str] | None) -> bool:
+    """Talaba (guruhi) doiraga kiradimi; scope None — butun kurs."""
+    return scope is None or group_key(group) in scope
+
+
+def scope_students(rows: list[dict], scope: set[str] | None = None, field: str = "group_name") -> list[dict]:
+    """Ro'yxatdan faqat joriy koordinator guruhlaridagi talabalar (scope berilmasa — viewer_scope())."""
+    scope = viewer_scope() if scope is None else scope
+    return rows if scope is None else [r for r in rows if group_key(r.get(field)) in scope]
+
+
+def group_coordinators(group, course: str | None = None) -> list[int]:
+    """Shu guruh biriktirilgan kurs koordinator(lar)i (joriy kursda)."""
+    course, gk = course or current_course(), group_key(group)
+    return [u for u, gs in COORD_GROUPS.items() if gk and gk in gs and ADMIN_COURSE.get(u) == course]
 
 
 def is_super(user_id: int) -> bool:

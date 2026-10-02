@@ -27,7 +27,8 @@ import individual
 from config import ADMIN_IDS, HEMIS_STATS_HOURS_PER_UNIT, PAY_REMIND_DAYS, HOURS_PER_PAIR, NOTIFY_MAX_AGE_DAYS
 from database import db
 from family import adopt_parents
-from tenancy import central, coordinator_groups, course_title, current_course, group_scope
+from tenancy import (central, coordinator_groups, course_title, current_course, current_user, group_scope, in_scope,
+                     scope_students, viewer_scope)
 from importer import (COMPATIBLE, KIND_TITLES, detect_kinds, load_rows, parse_rows, resolve_by_name,
                       resolve_students)
 from guard import recheck_parents
@@ -137,9 +138,15 @@ def _course_line() -> str:
 
 async def _course_line_full() -> str:
     """/admin uchun: kurs va ota-onalarga ko'rinadigan koordinator ismi (bo'lmasa — qanday kiritish)."""
-    name = await db.get_setting("coordinator_name")
-    who = (f"🧑‍🏫 Ota-onalarga: <b>{esc(name)}</b>\n\n" if name else
-           "🧑‍🏫 Ota-onalarga ko'rinadigan ismingiz kiritilmagan: <code>/koordinator N. Egamberdiyev +998 ...</code>\n\n")
+    uid = current_user.get()
+    mine = group_scope(uid) is not None
+    name = (await db.get_setting(f"coordinator_name:{uid}") if mine else None) or await db.get_setting("coordinator_name")
+    who = (f"🧑‍🏫 Ota-onalarga: <b>{esc(name)}</b>\n" if name else
+           "🧑‍🏫 Ota-onalarga ko'rinadigan ismingiz kiritilmagan: <code>/koordinator N. Egamberdiyev +998 ...</code>\n")
+    if mine:
+        who += ("👥 Guruhlaringiz: <b>" + esc(", ".join(sorted(coordinator_groups(uid).values(), key=str.lower)))
+                + "</b> — ro'yxatlar, hisobotlar va xabarlar faqat shu guruhlar bo'yicha\n")
+    who += "\n"
     return _course_line().rstrip("\n") + "\n" + who if _course_line() else who
 
 
@@ -811,11 +818,11 @@ async def cmd_fill(message: Message, command: CommandObject) -> None:
 # ---------------------------------------------------------------- statistika va qidiruv
 @router.message(Command("stat"))
 async def cmd_stat(message: Message) -> None:
-    s = await db.stats()
-    debt_k, debt_t = await db.debtors("kontrakt"), await db.debtors("trimestr")
+    s = await db.stats(viewer_scope())
+    debt_k, debt_t = scope_students(await db.debtors("kontrakt")), scope_students(await db.debtors("trimestr"))
     cover = f"{round(100 * s['students_linked'] / s['students'])}%" if s["students"] else "—"
     await message.answer(
-        _course_line() + "📊 <b>Statistika</b>\n\n"
+        await _course_line_full() + "📊 <b>Statistika</b>\n\n"
         f"Talabalar: {s['students']} (ota-ona raqami bor: {s['students_with_phone']})\n"
         f"Ro'yxatdan o'tgan ota-onalar: {s['parents']} (faol: {s['parents_active']})\n"
         f"Kamida bitta ota-onasi ulangan talabalar: {s['students_linked']} ({cover})\n"
@@ -844,7 +851,7 @@ async def cmd_find_student(message: Message, command: CommandObject) -> None:
     if not q:
         await message.answer("Foydalanish: /talaba <code>familiya ism</code>")
         return
-    scored = sorted(((name_score(q, s["name_norm"]), s) for s in await db.all_students_brief()),
+    scored = sorted(((name_score(q, s["name_norm"]), s) for s in await db.all_students_brief(viewer_scope())),
                     key=lambda x: -x[0])
     found = [s for sc, s in scored if sc >= 0.8][:10]
     if not found:
@@ -905,8 +912,10 @@ async def cmd_broadcast(message: Message, state: FSMContext) -> None:
 @router.callback_query(BcCb.filter(F.act == "all"))
 async def cb_bc_all(cb: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Bc.content)
-    await state.update_data(target=[])
-    await cb.message.edit_text("E'lon matnini yuboring (rasm, hujjat yoki video bilan ham bo'lishi mumkin).\n\n" + LANG_HINT)
+    scope = viewer_scope()
+    await state.update_data(target=sorted(scope) if scope else [])  # koordinator — faqat o'z guruhlariga
+    await cb.message.edit_text(("👥 E'lon guruhlaringiz ota-onalariga boradi.\n\n" if scope else "")
+                               + "E'lon matnini yuboring (rasm, hujjat yoki video bilan ham bo'lishi mumkin).\n\n" + LANG_HINT)
     await cb.answer()
 
 
@@ -924,16 +933,21 @@ async def on_bc_groups(message: Message, state: FSMContext) -> None:
         await message.answer("Guruh nomlari tushunilmadi, qaytadan yozing.")
         return
     known = {r["group_key"] for r in await db.fetchall("SELECT DISTINCT group_key FROM students")}
+    scope = viewer_scope()
+    if scope is not None:  # boshqa koordinatorning guruhlari — ro'yxatdan chiqariladi
+        known &= scope
     unknown = [g.strip() for g in message.text.replace(";", ",").split(",")
                if group_key(g) and group_key(g) not in known]
     keys = [k for k in keys if k in known]
     if not keys:
-        await message.answer("Bu guruhlar bazada topilmadi. Guruh nomlarini tekshirib, qaytadan yozing.")
+        await message.answer("Bu guruhlar bazada topilmadi" + (" yoki sizga biriktirilmagan" if scope is not None else "")
+                             + ". Guruh nomlarini tekshirib, qaytadan yozing.")
         return
     count = len(await db.parent_ids_for_groups(keys))
     await state.update_data(target=keys)
     await state.set_state(Bc.content)
-    warn = f"⚠️ Bazada topilmadi: {esc(', '.join(unknown))}\n" if unknown else ""
+    warn = (f"⚠️ Bazada topilmadi{' yoki sizga biriktirilmagan' if scope is not None else ''}: "
+            f"{esc(', '.join(unknown))}\n" if unknown else "")
     await message.answer(f"{warn}Tanlangan guruhlarda faol ota-onalar: {count}. Endi e'lon matnini yuboring.\n\n"
                          + LANG_HINT)
 
@@ -1030,6 +1044,9 @@ async def cb_answer(cb: CallbackQuery, callback_data: AnsCb, state: FSMContext) 
     if q["answer"]:
         await cb.answer("Bu savolga allaqachon javob berilgan.", show_alert=True)
         return
+    if not await _student_visible(q["student_id"]):
+        await cb.answer(NOT_YOURS, show_alert=True)
+        return
     await state.set_state(Ans.text)
     await state.update_data(qid=q["id"])
     await cb.answer()
@@ -1043,6 +1060,9 @@ async def on_answer_text(message: Message, state: FSMContext) -> None:
     q = await db.get_question(qid)
     if not q or q["answer"]:
         await message.answer("Bu savolga allaqachon javob berilgan.")
+        return
+    if not await _student_visible(q["student_id"]):
+        await message.answer(NOT_YOURS)
         return
     if not q["student_id"]:  # oldingi versiyadagi farzandsiz savol — avvalgidek
         ok = await safe_send(message.bot, q["parent_id"], f"💬 <b>Kurs koordinatori javobi</b>\n\n{esc(message.text)}")
@@ -1205,8 +1225,8 @@ def _doc_date(comment: str | None) -> str:
 
 
 async def _find_students(q: str, limit: int = 8) -> list[dict]:
-    """HEMIS ID bo'yicha aniq yoki F.I.Sh bo'yicha taxminiy qidiruv."""
-    rows = await db.all_students_brief()
+    """HEMIS ID bo'yicha aniq yoki F.I.Sh bo'yicha taxminiy qidiruv (koordinator — faqat o'z guruhlarida)."""
+    rows = await db.all_students_brief(viewer_scope())
     key = normalize_text(q).replace(" ", "")
     exact = [s for s in rows if key and normalize_text(s["hemis_id"]).replace(" ", "") == key]
     if exact:
@@ -1220,7 +1240,7 @@ async def _find_students(q: str, limit: int = 8) -> list[dict]:
 
 async def _guess_student(file_name: str, caption: str) -> tuple[dict | None, list[dict]]:
     """Fayl nomi/izohda HEMIS ID bo'lsa — aniq talaba; bo'lmasa fayl nomidagi ism bo'yicha takliflar."""
-    rows = await db.all_students_brief()
+    rows = await db.all_students_brief(viewer_scope())
     by_id = {normalize_text(s["hemis_id"]).replace(" ", ""): s for s in rows}
     for t in normalize_text(f"{file_name.rsplit('.', 1)[0]} {caption}").split():
         if len(t) >= 4 and t in by_id:
@@ -1237,7 +1257,21 @@ async def _guess_student(file_name: str, caption: str) -> tuple[dict | None, lis
 
 
 async def _students(ids) -> list[dict]:
-    return [st for st in [await db.get_student(i) for i in ids] if st]
+    """Talabalar (id bo'yicha); koordinator — faqat o'z guruhlaridagilari."""
+    scope = viewer_scope()
+    return [st for st in [await db.get_student(i) for i in ids] if st and in_scope(st.get("group_name"), scope)]
+
+
+NOT_YOURS = "Bu talaba sizga biriktirilgan guruhlarda emas."
+
+
+async def _student_visible(sid: int | None) -> bool:
+    """Talaba joriy koordinator guruhlarida (yoki koordinatorga guruh biriktirilmagan / super-admin)."""
+    scope = viewer_scope()
+    if scope is None:
+        return True
+    st = await db.get_student(sid) if sid else None
+    return bool(st) and in_scope(st.get("group_name"), scope)
 
 
 async def _read_pdf(bot, data: dict) -> tuple[str, dict]:
@@ -1263,10 +1297,15 @@ async def _read_pdf(bot, data: dict) -> tuple[str, dict]:
                 "bo'lmaydi.", {"an_ok": False})
     kind = {"text": "matnli PDF", "ocr": "skanerlangan, matn OCR orqali o'qildi",
             "mixed": "qisman skanerlangan, OCR ishlatildi"}[an.mode]
-    found = an.mentioned[:MAX_DOC_STUDENTS]
+    # Yopish uchun butun kurs ro'yxati ishlatiladi (boshqa guruh talabalari ham yopiladi), tanlash uchun esa —
+    # faqat koordinatorning o'z guruhlari talabalari
+    visible = [st["id"] for st in await _students(an.mentioned)]
+    found = visible[:MAX_DOC_STUDENTS]
+    others = len(an.mentioned) - len(visible)
     text = (f"📄 Hujjat o'qildi ({kind}, {len(an.pages)} sahifa). "
             + (f"Unda bazadagi <b>{len(found)}</b> ta talaba topildi." if found else
-               "Unda bazadagi talabalar topilmadi — talabani o'zingiz ko'rsating."))
+               "Unda bazadagi talabalar topilmadi — talabani o'zingiz ko'rsating.")
+            + (f" Boshqa guruhlardagi {others} ta talaba tanlanmaydi (ularning ma'lumotlari yopiladi)." if others else ""))
     return text, {"an_ok": True, "found": found}
 
 
@@ -1702,7 +1741,7 @@ async def cmd_documents(message: Message, command: CommandObject) -> None:
 # ---------------------------------------------------------------- dars qoldirish chegaralari
 @router.message(Command("chegaralar"))
 async def cmd_levels(message: Message) -> None:
-    rows = await db.fetchall("SELECT id, full_name, group_name FROM students ORDER BY group_name, full_name")
+    rows = scope_students(await db.fetchall("SELECT id, full_name, group_name FROM students ORDER BY group_name, full_name"))
     by_level: dict[int, list[tuple]] = {}
     for st in rows:
         sm = await absence.summary(st["id"])
@@ -1773,7 +1812,7 @@ async def cmd_debtors(message: Message, command: CommandObject) -> None:
     arg = " ".join(w for w in words if w.lower() not in ("kontrakt", "trimestr"))
     lines = []
     for kind in kinds:
-        rows = _filter_students(await db.debtors(kind), arg)
+        rows = _filter_students(scope_students(await db.debtors(kind)), arg)
         title = "Kontrakt" if kind == "kontrakt" else "Trimestr"
         if not rows:
             lines.append(f"💰 <b>{title} qarzdorlari</b>{' — ' + esc(arg) if arg else ''}: yo'q\n")
@@ -1794,9 +1833,9 @@ async def cmd_debtors(message: Message, command: CommandObject) -> None:
 @router.message(Command("akademik"))
 async def cmd_academic(message: Message, command: CommandObject) -> None:
     arg = (command.args or "").strip()
-    rows = _filter_students(await db.fetchall(
+    rows = _filter_students(scope_students(await db.fetchall(
         "SELECT id, full_name, group_name, course FROM students WHERE id IN (SELECT DISTINCT student_id FROM grades) "
-        "ORDER BY group_name, full_name"), arg)
+        "ORDER BY group_name, full_name")), arg)
     found = []
     for st in rows:
         sm = await academic.summary(st["id"])
@@ -1833,7 +1872,7 @@ async def cmd_deadline(message: Message, command: CommandObject) -> None:
             await message.answer("Sana tushunilmadi. Masalan: <code>/muddat kontrakt 30.09.2026</code>")
             return
         await db.set_setting(f"deadline:{kind}", dates[0].isoformat())
-        n = len([1 for p in (await db.bulk_latest_payments(kind)).values() if p["debt"] > 0])
+        n = len(scope_students(await db.debtors(kind)))
         await message.answer(
             f"✅ {titles[kind]} to'lov muddati: <b>{fmt_date(dates[0], False)}</b>.\n"
             f"Muddat ota-onalarga qarzdorlik ma'lumoti bilan ko'rsatiladi. Qarzi bor talabalarning ({n} ta) "
@@ -1853,7 +1892,7 @@ FLAG_ICON = {"att": "🚫", "acad": "📚", "kontrakt": "💰", "trimestr": "�
 
 
 async def _panel_students(f: str) -> list[dict]:
-    rows = await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name")
+    rows = scope_students(await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name"))
     if f:
         course = parse_course(f) if ("kurs" in f.lower() or f.strip().isdigit()) else None
         gk = group_key(f)
@@ -1993,11 +2032,15 @@ async def cmd_terms(message: Message) -> None:
 @router.message(Command("koordinator"))
 async def cmd_coordinator(message: Message, command: CommandObject) -> None:
     arg = (command.args or "").strip()
+    # Guruhlari biriktirilgan koordinator — o'z ismi (faqat o'z guruhlari ota-onalariga); aks holda — kurs bo'yicha
+    uid = message.from_user.id
+    sfx = f":{uid}" if group_scope(uid) is not None else ""
     if not arg:
-        name = await db.get_setting("coordinator_name")
-        phone = await db.get_setting("coordinator_phone")
+        name = await db.get_setting(f"coordinator_name{sfx}")
+        phone = await db.get_setting(f"coordinator_phone{sfx}")
         await message.answer(
-            "🧑‍🏫 <b>Ota-onalarga ko'rinadigan kurs koordinatori</b>\n"
+            "🧑‍🏫 <b>Ota-onalarga ko'rinadigan kurs koordinatori</b>"
+            + (" (guruhlaringiz ota-onalariga)" if sfx else "") + "\n"
             + (f"Hozir: {esc(name or '—')} {fmt_phone(phone) if phone else ''}\n\n" if name or phone else "Hozir kiritilmagan.\n\n")
             + "O'zgartirish: <code>/koordinator N. Egamberdiyev +998 90 123 45 67</code>\n"
               "Telefon ixtiyoriy. Talabalar faylida «Kurs koordinatori» ustuni bo'lsa, o'sha talabalar uchun fayldagisi "
@@ -2009,9 +2052,9 @@ async def cmd_coordinator(message: Message, command: CommandObject) -> None:
     if not name:
         await message.answer("Ism tushunilmadi. Masalan: <code>/koordinator N. Egamberdiyev +998 90 123 45 67</code>")
         return
-    await db.set_setting("coordinator_name", name)
-    await db.set_setting("coordinator_phone", phone or "")
+    await db.set_setting(f"coordinator_name{sfx}", name)
+    await db.set_setting(f"coordinator_phone{sfx}", phone or "")
     await message.answer(
-        f"✅ Endi kursingizdagi ota-onalar farzand sahifasida va «Foydali ma'lumot» bo'limida shunday ko'radi:\n"
+        f"✅ Endi {'guruhlaringizdagi' if sfx else 'kursingizdagi'} ota-onalar farzand sahifasida va «Foydali ma'lumot» bo'limida shunday ko'radi:\n"
         f"🧑‍🏫 Kurs koordinatori: <b>{esc(name)}</b> {fmt_phone(phone) if phone else ''}\n\n"
         f"Rus tilidagi ota-onalarga kirillda: {esc(loc.translit_ru(name))}")

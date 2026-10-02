@@ -1303,31 +1303,61 @@ class Database:
             (key, value),
         )
 
-    async def stats(self) -> dict:
+    async def stats(self, groups: set[str] | None = None) -> dict:
+        """Kurs statistikasi; groups — faqat shu guruhlar talabalari bo'yicha (koordinatorning o'z guruhlari)."""
         q = self.fetchone
+        if groups is None:
+            S, gp = "SELECT id FROM students", ()
+            G = ""
+        else:
+            marks = ",".join("?" * len(groups)) or "NULL"
+            S, gp = f"SELECT id FROM students WHERE group_key IN ({marks})", tuple(sorted(groups))
+            G = f" AND group_key IN ({marks})"
         return {
-            "students": (await q("SELECT COUNT(*) n FROM students"))["n"],
-            "students_with_phone": (await q("SELECT COUNT(DISTINCT student_id) n FROM student_phones"))["n"],
-            "parents": (await q("SELECT COUNT(*) n FROM parents"))["n"],
-            "parents_active": (await q("SELECT COUNT(*) n FROM parents WHERE active = 1"))["n"],
+            "students": (await q(f"SELECT COUNT(*) n FROM students WHERE 1{G}", gp))["n"],
+            "students_with_phone": (await q(f"SELECT COUNT(DISTINCT student_id) n FROM student_phones WHERE student_id IN ({S})", gp))["n"],
+            "parents": (await q(f"""SELECT COUNT(*) n FROM parents WHERE {'1' if groups is None else
+                                 f'tg_id IN (SELECT parent_id FROM parent_students WHERE student_id IN ({S}))'}""",
+                                () if groups is None else gp))["n"],
+            "parents_active": (await q(f"""SELECT COUNT(*) n FROM parents WHERE active = 1{'' if groups is None else
+                                        f' AND tg_id IN (SELECT parent_id FROM parent_students WHERE student_id IN ({S}))'}""",
+                                       () if groups is None else gp))["n"],
             "students_linked": (await q(
-                """SELECT COUNT(DISTINCT student_id) n FROM parent_students
-                   WHERE parent_id NOT IN (SELECT tg_id FROM access_blocks WHERE status = 'blocked')"""))["n"],
-            "attendance": (await q("SELECT COUNT(*) n FROM attendance"))["n"],
-            "attendance_last": (await q("SELECT MAX(date) d FROM attendance"))["d"],
-            "schedule_groups": (await q("SELECT COUNT(DISTINCT group_key) n FROM schedule"))["n"],
-            "grades": (await q("SELECT COUNT(*) n FROM grades"))["n"],
-            "pending_requests": (await q("SELECT COUNT(*) n FROM link_requests WHERE status = 'pending'"))["n"],
-            "open_questions": (await q("SELECT COUNT(*) n FROM questions WHERE answer IS NULL"))["n"],
-            "students_self_phone": (await q("SELECT COUNT(DISTINCT student_id) n FROM student_self_phones"))["n"],
+                f"""SELECT COUNT(DISTINCT student_id) n FROM parent_students
+                   WHERE parent_id NOT IN (SELECT tg_id FROM access_blocks WHERE status = 'blocked')
+                     AND student_id IN ({S})""", gp))["n"],
+            "attendance": (await q(f"SELECT COUNT(*) n FROM attendance WHERE student_id IN ({S})", gp))["n"],
+            "attendance_last": (await q(f"SELECT MAX(date) d FROM attendance WHERE student_id IN ({S})", gp))["d"],
+            "schedule_groups": (await q(f"SELECT COUNT(DISTINCT group_key) n FROM schedule WHERE 1{G}", gp))["n"],
+            "grades": (await q(f"SELECT COUNT(*) n FROM grades WHERE student_id IN ({S})", gp))["n"],
+            "pending_requests": (await q(f"SELECT COUNT(*) n FROM link_requests WHERE status = 'pending' "
+                                         f"AND student_id IN ({S})", gp))["n"],
+            "open_questions": (await q(f"SELECT COUNT(*) n FROM questions WHERE answer IS NULL"
+                                       + ("" if groups is None else f" AND student_id IN ({S})"),
+                                       () if groups is None else gp))["n"],
+            "students_self_phone": (await q(f"SELECT COUNT(DISTINCT student_id) n FROM student_self_phones "
+                                            f"WHERE student_id IN ({S})", gp))["n"],
             "tg_groups": (await q("SELECT COUNT(*) n FROM tg_groups WHERE active = 1"))["n"],
             "tg_groups_admin": (await q("SELECT COUNT(*) n FROM tg_groups WHERE active = 1 AND bot_admin = 1"))["n"],
             "tg_members": (await q("SELECT COUNT(DISTINCT tg_id) n FROM tg_group_members"))["n"],
             "blocked": (await q("SELECT COUNT(*) n FROM access_blocks WHERE status = 'blocked'"))["n"],
-            "documents": (await q("SELECT COUNT(*) n FROM documents WHERE revoked = 0"))["n"],
-            "grant": (await q("SELECT COUNT(*) n FROM students WHERE payment_form = 'Davlat granti'"))["n"],
-            "contract": (await q("SELECT COUNT(*) n FROM students WHERE payment_form = 'To''lov-shartnoma'"))["n"],
+            "documents": (await q(f"SELECT COUNT(*) n FROM documents WHERE revoked = 0 AND student_id IN ({S})", gp))["n"],
+            "grant": (await q(f"SELECT COUNT(*) n FROM students WHERE payment_form = 'Davlat granti'{G}", gp))["n"],
+            "contract": (await q(f"SELECT COUNT(*) n FROM students WHERE payment_form = 'To''lov-shartnoma'{G}", gp))["n"],
         }
+
+    async def coordinator_contact(self, st: dict, course_key: str | None) -> tuple[str | None, str | None]:
+        """Ota-onaga ko'rinadigan kurs koordinatori: talabalar faylidagi «Kurs koordinatori» → talaba guruhi
+        biriktirilgan koordinatorning /koordinator bilan kiritgani → kurs bo'yicha umumiy /koordinator."""
+        from tenancy import group_coordinators
+        name, phone = st.get("tutor_name"), st.get("tutor_phone")
+        if name or phone:
+            return name, phone
+        for uid in group_coordinators(st.get("group_name") or st.get("group_key"), course_key):
+            n, p = await self.get_setting(f"coordinator_name:{uid}"), await self.get_setting(f"coordinator_phone:{uid}")
+            if n or p:
+                return n, p
+        return await self.get_setting("coordinator_name"), await self.get_setting("coordinator_phone")
 
 
 

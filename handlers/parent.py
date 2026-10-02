@@ -218,8 +218,7 @@ async def menu_info(message: Message, state: FSMContext) -> None:
     by_tutor: dict[tuple[str, str], list[str]] = {}
     for c in await all_children(message.from_user.id):
         course_db = db.for_course(c["course_key"])  # talaba faylida bo'lmasa — /koordinator bilan kiritilgani
-        name = c.get("tutor_name") or await course_db.get_setting("coordinator_name")
-        phone = c.get("tutor_phone") or await course_db.get_setting("coordinator_phone")
+        name, phone = await course_db.coordinator_contact(c, c["course_key"])
         if name or phone:
             key = (name or "", phone or "")
             shown = loc.student_name(c).split()  # farzandning ismi (ota-ona tilida)

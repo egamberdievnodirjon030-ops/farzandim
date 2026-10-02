@@ -679,7 +679,8 @@ function staffRow(r, withCourse = false) {
 }
 async function viewStaff() {
   const title = S.me.staff && S.me.staff.title || 'Kurs koordinatori';
-  page({ title: 'Kurs holati', sub: title, active: '#/staff', body: loading() });
+  const mine = (S.me.staff && S.me.staff.groups) || [];
+  page({ title: 'Kurs holati', sub: title + (mine.length ? ' · ' + mine.join(', ') : ''), active: '#/staff', body: loading() });
   let d;
   try { d = await api('/api/staff/panel'); } catch (e) { return page({ title: 'Kurs holati', active: '#/staff', body: errorBox() }); }
   S.staffUnread = d.unread;
@@ -702,7 +703,7 @@ async function viewStaff() {
     <section class="section"><button class="card desk-card" type="button" data-act="desk"><span class="ic-badge">${ic('panel')}</span>
       <div style="flex:1;text-align:left"><b style="display:block">Kompyuter versiyasi</b><span class="muted small">Talabalar jadvali, xabarlar, e’lon va hisobotlar — kompyuter brauzerida</span></div>${ic('chev')}</button></section>
     ${d.updated ? `<p class="muted small" style="text-align:center;margin-top:18px">Yangilangan: ${when(d.updated)}</p>` : ''}`;
-  page({ title: 'Kurs holati', sub: title, active: '#/staff', body });
+  page({ title: 'Kurs holati', sub: title + (mine.length ? ' · ' + mine.join(', ') : ''), active: '#/staff', body });
 }
 async function viewStaffStudents(params) {
   const flt = params.get('filter') || '', q = params.get('q') || '';
@@ -799,7 +800,7 @@ function viewStaffAnnounce() {
   page({ title: 'E’lon yuborish', active: '#/staff/announce', body: `<form class="card" data-act="announce">
     <label class="field" style="margin-top:0"><span>E’lon matni</span><textarea class="input" name="text" rows="7" required placeholder="Ota-onalar yig‘ilishi shanba kuni soat 10:00 da.&#10;---ru&#10;Родительское собрание в субботу в 10:00."></textarea></label>
     <p class="small muted">Rus va ingliz tilidagi ota-onalar uchun alohida qatordan <b>---ru</b> va <b>---en</b> yozib, tarjimani qo‘shing — har bir ota-ona o‘z tilidagi qismni oladi.</p>
-    <label class="field"><span>Guruhlar (ixtiyoriy, vergul bilan; bo‘sh — butun kurs)</span><input class="input" name="groups" placeholder="3-1a-24, 3-2a-24"></label>
+    <label class="field"><span>Guruhlar (ixtiyoriy, vergul bilan; bo‘sh — ${(S.me.staff && S.me.staff.groups || []).length ? 'barcha guruhlaringiz: ' + esc(S.me.staff.groups.join(', ')) : 'butun kurs'})</span><input class="input" name="groups" placeholder="3-1a-24, 3-2a-24"></label>
     ${S.me.role === 'super' ? `<label class="row" style="margin-top:12px;cursor:pointer"><span class="switch"><input type="checkbox" name="all"><i></i></span>
       <div class="body"><div class="t">Barcha kurslarga yuborish</div><div class="d">Universitet miqyosidagi e’lon — har bir ota-onaga bir marta</div></div></label>` : ''}
     <p class="small muted" style="margin-top:12px">Kurs: <b>${esc(staffCourseTitle())}</b></p>
@@ -1126,7 +1127,9 @@ document.addEventListener('submit', async e => {
       const groups = String(fd.get('groups') || '').split(',').map(x => x.trim()).filter(Boolean);
       const course = staffCourseTitle();
       const msg = all ? 'E’lon BARCHA kurslarning ota-onalariga yuboriladi.'
-        : groups.length ? `E’lon «${course}» kursining ${groups.join(', ')} guruhi ota-onalariga yuboriladi.` : `E’lon «${course}» kursining butun ota-onalariga yuboriladi.`;
+        : groups.length ? `E’lon «${course}» kursining ${groups.join(', ')} guruhi ota-onalariga yuboriladi.`
+        : (S.me.staff && S.me.staff.groups || []).length ? `E’lon ${S.me.staff.groups.join(', ')} guruhlari ota-onalariga yuboriladi.`
+        : `E’lon «${course}» kursining butun ota-onalariga yuboriladi.`;
       if (!await confirmAsync(msg + ' Yuborilgan e’lonni qaytarib bo‘lmaydi.')) return;
       const r = all ? await api('/api/super/announce', { json: { text: fd.get('text') } })
         : await api('/api/staff/announce', { json: { text: fd.get('text'), groups } });

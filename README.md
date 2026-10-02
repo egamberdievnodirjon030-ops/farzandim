@@ -50,6 +50,16 @@ Bitta kursda bir nechta kurs koordinatori bo'lsa, ma'lumotlar chalkashmasligi uc
 
 Guruhlari bor koordinator fayl yuklaganda (talabalar, davomat, baholar, akademik qarzdorlar, **buxgalteriya hisoboti** va boshqalar) faqat o'z guruhlari talabalari tanilinadi: guruh ustuni bo'lsa — guruh bo'yicha, bo'lmasa (buxgalteriya) — talaba uning guruhlarida bormi, HEMIS ID yoki F.I.Sh. bo'yicha. Boshqa guruhlar qatorlari o'tkazib yuboriladi va natijada soni ko'rsatiladi; bir xil F.I.Sh. li talabalar boshqa guruhda bo'lsa ham to'g'ri topiladi. Guruh biriktirilmagan koordinator va super-admin — butun kurs bilan ishlaydi (avvalgidek). Tarjimalar va «Tanlov/2-til: jadval» guruhga bog'lanmagan — ular cheklanmaydi.
 
+Koordinator **ko'radigan va qiladigan hamma narsa** ham faqat o'z guruhlari bo'yicha (bot, ilova va kompyuter versiyasi):
+- kurs holati paneli, talabalar ro'yxati va qidiruv, statistika, qarzdorlar, akademik qarzdorlar, chegaralar, Excel/PDF hisobot;
+- talaba kartasi, ota-onalar bilan yozishma va bog'lash so'rovlari — boshqa guruh talabasi ochilmaydi va so'rovi tasdiqlanmaydi;
+- e'lon — «hammaga» degani koordinatorning guruhlari; boshqa guruhga yuborib bo'lmaydi;
+- rasmiy hujjat (PDF) — faqat o'z talabalari tanlanadi; boshqa guruh talabalari hujjatda bo'lsa, ularning ma'lumotlari baribir yopiladi.
+
+**Xabarlar to'g'ri koordinatorga boradi:** ota-ona savoli, bog'lash so'rovi va «talaba kirishga urindi» ogohlantirishi — talaba guruhi biriktirilgan koordinatorga (guruhsiz koordinatorlar ham oladi). Guruh hech kimga biriktirilmagan bo'lsa — super-adminga: bu biriktirish unutilganini bildiradi.
+
+**Ota-onaga ko'rinadigan koordinator:** guruhlari bor koordinator `/koordinator Ism +998…` bilan faqat o'z guruhlari ota-onalariga ko'rinadigan ismini kiritadi; kiritmagan bo'lsa — kurs bo'yicha umumiy ism ko'rsatiladi. Kurs bo'yicha sozlamalar (to'lov muddatlari, «Foydali ma'lumot» matni) — umumiy.
+
 ## Shablonlar: super-admin o'zgartiradi va qo'shadi
 
 Kurs koordinatorlari `/shablon` (yoki «📑 Shablonlar» tugmasi) orqali oladigan import namunalarini super-admin bot ichidan boshqaradi — «📑 Shablonlar (import namunalari)» yoki `/shablonlar`. Shablonlar barcha kurslar uchun umumiy.

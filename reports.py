@@ -12,6 +12,7 @@ import trends
 import academic
 import individual
 from database import db
+from tenancy import current_course
 from i18n import N_, tr
 from utils import (fmt_pairs, GRANT, fmt_dt, fmt_gpa, fmt_money, lesson_kind, STATUS_ICON, STATUS_TEXT, WEEKDAYS, doc_title, esc, fmt_date, fmt_num, fmt_phone, pair_time,
                    pct, semester_start, today)
@@ -75,8 +76,8 @@ async def student_card(st: dict) -> str:
     head.append(tr("🧾 To'lov shakli: <b>{v}</b>", v=esc(tr(st['payment_form']))) if st.get("payment_form")
                 else tr("🧾 To'lov shakli: ma'lumot yo'q"))
     parts = ["\n".join(head)]
-    tutor_name = st.get("tutor_name") or await db.get_setting("coordinator_name")  # /koordinator — kurs bo'yicha
-    tutor_phone = st.get("tutor_phone") or await db.get_setting("coordinator_phone")
+    # talabalar fayli → guruh koordinatorining /koordinator i → kurs bo'yicha /koordinator
+    tutor_name, tutor_phone = await db.coordinator_contact(st, current_course())
     if tutor_name or tutor_phone:
         parts.append(tr("🧑‍🏫 Kurs koordinatori: {v}",
                         v=f"{esc(loc.person(tutor_name))} {fmt_phone(tutor_phone)}".strip()))

@@ -134,7 +134,9 @@ async def block_user(bot: Bot, user_id: int, phone: str | None, name: str | None
                     "oilada umumiy raqam bo'lishi mumkin. Telefon orqali aniqlashtirish tavsiya etiladi.")
     text.append("\nKirish " + ("yopildi va xabarnomalar to'xtatildi" if registered else "rad etildi")
                 + ". Agar bu haqiqatan ota-ona bo'lsa, «Ruxsat berish» tugmasini bosing.")
-    for admin_id in course_admins():  # joriy kursning koordinator(lar)i
+    # talaba (raqami yoki Telegram guruhi bo'yicha) qaysi guruhda — o'sha guruh koordinator(lar)iga; aniqlanmasa — kursga
+    groups = [s.get("group_name") for s in ev["students"]] + [g.get("group_name") for g in ev["groups"]]
+    for admin_id in course_admins(groups=groups):
         await safe_send(bot, admin_id, "\n".join(text), reply_markup=guard_kb(user_id))
 
 

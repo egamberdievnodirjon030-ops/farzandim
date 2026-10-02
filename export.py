@@ -13,7 +13,7 @@ import absence
 import status
 from config import HOURS_PER_PAIR, UNIVERSITY_NAME
 from database import db
-from tenancy import course_title, current_course
+from tenancy import course_title, current_course, scope_students
 from utils import fmt_date, fmt_dt, fmt_money, fmt_num, group_key, now, now_iso, parse_course
 
 SECTIONS = {
@@ -28,7 +28,7 @@ SECTIONS = {
 # ---------------------------------------------------------------- ma'lumotlar
 async def collect(f: str = "") -> dict:
     """Hisobot uchun barcha ma'lumotlar (panel bilan bir xil manba); f — kurs yoki guruh filtri."""
-    students = await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name")
+    students = scope_students(await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name"))
     if f:
         course = parse_course(f) if ("kurs" in f.lower() or f.strip().isdigit()) else None
         gk = group_key(f)
