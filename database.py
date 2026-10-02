@@ -562,14 +562,22 @@ class Database:
             (phone,),
         )
 
-    async def all_students_brief(self) -> list[dict]:
-        return await self.fetchall(
+    async def all_students_brief(self, groups: set[str] | None = None) -> list[dict]:
+        """groups — guruh kalitlari: berilsa, faqat shu guruhlar talabalari (koordinatorning o'z guruhlari)."""
+        rows = await self.fetchall(
             "SELECT id, hemis_id, full_name, name_norm, group_name, group_key, birth_date, course FROM students"
         )
+        return rows if groups is None else [r for r in rows if (r["group_key"] or "") in groups]
 
-    async def student_lookup(self) -> dict:
-        """Davomat/baho fayllaridagi qatorlarni talabaga bog'lash uchun lug'atlar."""
-        rows = await self.all_students_brief()
+    async def group_counts(self) -> dict[str, dict]:
+        """Kursdagi guruhlar: kalit → {name, students}."""
+        rows = await self.fetchall("SELECT group_key, MAX(group_name) AS name, COUNT(*) AS n FROM students "
+                                   "WHERE COALESCE(group_key, '') != '' GROUP BY group_key ORDER BY name")
+        return {r["group_key"]: {"name": r["name"], "students": r["n"]} for r in rows}
+
+    async def student_lookup(self, groups: set[str] | None = None) -> dict:
+        """Davomat/baho fayllaridagi qatorlarni talabaga bog'lash uchun lug'atlar (groups — faqat shu guruhlar)."""
+        rows = await self.all_students_brief(groups)
         by_hemis, by_name_group, by_name = {}, {}, {}
         for r in rows:
             by_hemis[normalize_text(r["hemis_id"]).replace(" ", "")] = r["id"]

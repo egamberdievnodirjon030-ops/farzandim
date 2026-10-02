@@ -507,9 +507,10 @@ def super_menu() -> ReplyKeyboardMarkup:
 
 
 class SupCb(CallbackData, prefix="su"):
-    a: str            # course | enter | addc | delc | delc_ok | rename | list
+    a: str            # course | enter | addc | delc | delc_ok | rename | list | grp | gt | gw | gc
     k: str = ""       # kurs kaliti
     u: int = 0        # foydalanuvchi (koordinator) ID
+    g: int = -1       # guruh tartib raqami (koordinator guruhlari ekranida)
 
 
 def courses_kb(courses: list[dict], action: str = "course") -> InlineKeyboardMarkup:
@@ -524,11 +525,26 @@ def course_card_kb(key: str, admins: list[dict]) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="👤 Koordinator qo'shish", callback_data=SupCb(a="addc", k=key))
     for a in admins:
+        kb.button(text=f"👥 {a['label']}: guruhlar", callback_data=SupCb(a="grp", k=key, u=a["user_id"]))
+    for a in admins:
         kb.button(text=f"🗑 {a['label']}", callback_data=SupCb(a="delc", k=key, u=a["user_id"]))
     kb.button(text="✏️ Kurs nomini o'zgartirish", callback_data=SupCb(a="rename", k=key))
     kb.button(text="🔀 Shu kursga kirish", callback_data=SupCb(a="enter", k=key))
     kb.button(text="⬅️ Kurslar", callback_data=SupCb(a="list"))
     kb.adjust(1)
+    return kb.as_markup()
+
+
+def coord_groups_kb(key: str, uid: int, groups: list[dict]) -> InlineKeyboardMarkup:
+    """Koordinator guruhlari: ✅ — unga biriktirilgan, 🔒 — boshqa koordinatorniki, ▫️ — bo'sh (bosib almashtiriladi)."""
+    kb = InlineKeyboardBuilder()
+    for i, g in enumerate(groups):
+        mark = "✅" if g["owner"] == uid else ("🔒" if g["owner"] else "▫️")
+        kb.button(text=f"{mark} {g['name']} ({g['students']})", callback_data=SupCb(a="gt", k=key, u=uid, g=i))
+    kb.adjust(2)
+    kb.row(InlineKeyboardButton(text="✍️ Guruh nomlarini yozish", callback_data=SupCb(a="gw", k=key, u=uid).pack()))
+    kb.row(InlineKeyboardButton(text="🧹 Hammasini olib tashlash", callback_data=SupCb(a="gc", k=key, u=uid).pack()))
+    kb.row(InlineKeyboardButton(text="⬅️ Kurs", callback_data=SupCb(a="course", k=key).pack()))
     return kb.as_markup()
 
 

@@ -27,7 +27,7 @@ import individual
 from config import ADMIN_IDS, HEMIS_STATS_HOURS_PER_UNIT, PAY_REMIND_DAYS, HOURS_PER_PAIR, NOTIFY_MAX_AGE_DAYS
 from database import db
 from family import adopt_parents
-from tenancy import central, course_title, current_course
+from tenancy import central, coordinator_groups, course_title, current_course, group_scope
 from importer import (COMPATIBLE, KIND_TITLES, detect_kinds, load_rows, parse_rows, resolve_by_name,
                       resolve_students)
 from guard import recheck_parents
@@ -144,6 +144,14 @@ async def _course_line_full() -> str:
 
 
 # ---------------------------------------------------------------- import
+def _scope_note(user_id: int) -> str:
+    groups = coordinator_groups(user_id) if group_scope(user_id) is not None else {}
+    if not groups:
+        return ""
+    return ("\n\n👥 <b>Sizning guruhlaringiz:</b> " + esc(", ".join(sorted(groups.values(), key=str.lower)))
+            + ". Fayllarda faqat shu guruhlar talabalari tanilinadi, boshqalari o'tkazib yuboriladi.")
+
+
 @router.message(Command("import"))
 async def cmd_import(message: Message, state: FSMContext) -> None:
     await state.clear()
@@ -161,7 +169,8 @@ async def cmd_import(message: Message, state: FSMContext) -> None:
         "• <b>Tanlov/2-til: jadval</b> — bu fanlarning darslari (fan, oqim, kun, juftlik), guruhga bog'lanmagan. "
         "Ular faqat biriktirilgan talabalarning shaxsiy jadvalida ko'rinadi.\n"
         "• <b>Kontrakt qarzdorligi</b> — buxgalteriya hisoboti (kontrakt qarzdorlar ro'yxati yoki aylanma vedomost).\n"
-        "«📱 Talaba telefonlari» — talabalarning o'z raqamlari (talaba ota-ona sifatida kira olmasligi uchun).",
+        "«📱 Talaba telefonlari» — talabalarning o'z raqamlari (talaba ota-ona sifatida kira olmasligi uchun)."
+        + _scope_note(message.from_user.id),
         reply_markup=import_kb(),
     )
 
@@ -254,7 +263,7 @@ async def on_import_file(message: Message, state: FSMContext) -> None:
                 reply_markup=imp_confirm_kb(KIND_TITLES[detected[0]], tok, KIND_TITLES[kind]))
             return
         shutil.rmtree(tmpdir, ignore_errors=True)
-        ok = await _process_import(message.bot, progress, kind, rows, caption, name, n=n)
+        ok = await _process_import(message.bot, progress, kind, rows, caption, name, n=n, user_id=message.from_user.id)
         await _session_add(state, "done" if ok else "skipped", name, kind)
 
 
@@ -295,7 +304,8 @@ async def _resolve_pending(cb: CallbackQuery, state: FSMContext, tok: str, kind:
             shutil.rmtree(item["tmpdir"], ignore_errors=True)
         await cb.message.edit_text(f"⏳ {item['n']}-fayl «{esc(item['file_name'])}» — <b>{KIND_TITLES[kind]}</b> sifatida "
                                    "yuklanmoqda…")
-        ok = await _process_import(cb.bot, cb.message, kind, rows, item["caption"], item["file_name"], n=item["n"])
+        ok = await _process_import(cb.bot, cb.message, kind, rows, item["caption"], item["file_name"], n=item["n"],
+                                 user_id=cb.from_user.id)
         await _session_add(state, "done" if ok else "skipped", item["file_name"], kind)
 
 
@@ -341,9 +351,35 @@ async def _finish_session(message: Message, state: FSMContext, note: str = "") -
     await message.answer("\n".join(lines))
 
 
+# Guruhga bog'lanmagan import turlari: tarjimalar (umumiy) va tanlov/2-til jadvali (fan va oqim bo'yicha)
+UNSCOPED_KINDS = {"translations", "elsched"}
+
+
+async def _scope_rows(rows: list[dict], scope: set[str]) -> tuple[list[dict], int]:
+    """Faqat kurs koordinatorining guruhlariga tegishli qatorlar: guruh ustuni bo'lsa — guruh bo'yicha, bo'lmasa
+    (masalan, buxgalteriya hisoboti) — talaba shu guruhlarda bormi (HEMIS ID yoki F.I.Sh. bo'yicha).
+    Qaytaradi: (qolgan qatorlar, o'tkazib yuborilganlar soni)."""
+    own = await db.all_students_brief(scope)
+    hemis = {normalize_text(r["hemis_id"]).replace(" ", "") for r in own}
+    names = {r["name_norm"] for r in own}
+    kept = []
+    for r in rows:
+        g = r.get("group_name")
+        if g:
+            mine = group_key(g) in scope
+        else:
+            h = normalize_text(r.get("hemis_id") or "").replace(" ", "")
+            mine = (h and h in hemis) or normalize_text(r.get("full_name") or "") in names
+        if mine:
+            kept.append(r)
+    return kept, len(rows) - len(kept)
+
+
 async def _process_import(bot, progress: Message, kind: str, rows: list, caption: str, file_name: str,
-                          n: int | None = None) -> bool:
+                          n: int | None = None, user_id: int | None = None) -> bool:
     silent = "jim" in caption.lower()
+    # Kurs koordinatoriga guruhlar biriktirilgan bo'lsa — faylda faqat uning guruhlari talabalari tanilinadi
+    scope = group_scope(user_id) if kind not in UNSCOPED_KINDS else None
     tag = f"{n}-fayl «{esc(file_name)}» — " if n else ""
     try:
         result = await asyncio.to_thread(parse_rows, rows, kind)
@@ -360,6 +396,19 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
     lines = [f"✅ {tag}<b>{KIND_TITLES.get(result.kind, KIND_TITLES[kind])}</b> importi yakunlandi"]
     lines += [esc(n) for n in result.notes]
     errors = list(result.errors)
+    pf = result.meta.get("payment_forms") if isinstance(result.meta, dict) else None
+    if scope is not None:
+        total = len(result.rows)
+        result.rows, outside = await _scope_rows(result.rows, scope)
+        if pf:
+            pf, _ = await _scope_rows(pf, scope)
+        real = await db.group_counts()  # qo'lda yozilgan nom o'rniga bazadagi asl yozuvi
+        names = sorted((real[k]["name"] if k in real else v for k, v in coordinator_groups(user_id).items()), key=str.lower)
+        lines.append(f"👥 Faqat sizning guruhlaringiz ({esc(', '.join(names))}) bo'yicha: {total - outside} ta qator"
+                     + (f"; boshqa guruhlarga tegishli {outside} ta qator o'tkazib yuborildi" if outside else ""))
+        if total and not result.rows:
+            lines.append("⚠️ Faylda guruhlaringizga tegishli talaba topilmadi — hech narsa saqlanmadi. Guruhlar "
+                         "noto'g'ri biriktirilgan bo'lsa, super-adminga murojaat qiling.")
 
     if kind in ("students", "phones"):
         cols = result.columns
@@ -383,7 +432,7 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
             lines.append(f"Avtomatik bog'langan ota-onalar: {len(new_links)} (xabar yuborildi: {n})")
 
     elif kind == "phones":
-        rows, unknown = resolve_students(result.rows, await db.student_lookup())
+        rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
         errors += unknown
         n = await db.set_self_phones(rows)
         lines.append(f"Talabalarning o'z raqamlari yangilandi: {n} ta talaba "
@@ -391,7 +440,7 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
         lines += await _after_phone_import(bot)
 
     elif kind == "attendance" and result.kind == "attendance_stats":
-        rows, unknown = resolve_students(result.rows, await db.student_lookup())
+        rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
         errors += unknown
         as_of = _stats_date(caption, file_name)
         before = {r["student_id"]: await absence.summary(r["student_id"]) for r in rows}
@@ -420,7 +469,7 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
         lines += _drops_lines(drops, dec_sent, silent)
 
     elif kind == "attendance":
-        rows, unknown = resolve_students(result.rows, await db.student_lookup())
+        rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
         errors += unknown
         cutoff = (today() - timedelta(days=NOTIFY_MAX_AGE_DAYS)).isoformat()
         tuples = [
@@ -469,7 +518,7 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
                          "kim o'qiydi» faylini yuklang): " + esc(", ".join(idle)))
 
     elif kind == "enroll":
-        rows, unknown = resolve_students(result.rows, await db.student_lookup())
+        rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
         errors += unknown
         n_st, n_pairs = await db.replace_enrollment(rows)
         lines.append(f"Talabalar: {n_st}, shaxsiy fanlar (tanlov, 2-til): {n_pairs} ta yozuv")
@@ -484,7 +533,7 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
                          "farq qilishi yoki jadval hali yuklanmagan bo'lishi mumkin: " + esc(", ".join(miss)))
 
     elif kind == "grades":
-        rows, unknown = resolve_students(result.rows, await db.student_lookup())
+        rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
         errors += unknown
         for r in rows:
             r.pop("_row", None)
@@ -510,20 +559,22 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
 
     elif kind == "acad_debts":  # HEMIS «Akadem qarzdorlar»: talaba necha marta kelsa — shuncha qarzdor fan
         from notifier import hemis_debt_keys, notify_acad_list
-        rows, unknown = resolve_students(result.rows, await db.student_lookup())
+        rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
         missing = sorted({u.split("(")[-1].rstrip(")") for u in unknown if "(" in u})
         if not rows:
             lines.append("❌ Fayldagi talabalarning birortasi ham bu kurs bazasida topilmadi — ro'yxat saqlanmadi. "
                          "Fayl boshqa kursga tegishli emasligini va «Talabalar» fayli yuklanganini tekshiring.")
         else:
             groups = {group_key(r["group_name"]) for r in result.rows if r.get("group_name")}
+            if scope is not None:  # koordinator — faqat o'z guruhlarining ro'yxati almashtiriladi
+                groups = (groups & scope) or set(scope)
             everyone = await db.fetchall("SELECT id, group_key FROM students")
-            scope = {x["id"] for x in everyone if not groups or x["group_key"] in groups}
-            before = {sid: hemis_debt_keys(v) for sid, v in (await db.bulk_academic_debts()).items() if sid in scope}
+            in_scope = {x["id"] for x in everyone if not groups or x["group_key"] in groups}
+            before = {sid: hemis_debt_keys(v) for sid, v in (await db.bulk_academic_debts()).items() if sid in in_scope}
             clean = [{"student_id": r["student_id"], "subject": r["subject"], "semester": r["semester"],
                       "credits": r["credits"], "year": r.get("year")} for r in rows]
-            await db.replace_academic_debts(clean, scope if groups else None)
-            after = {sid: hemis_debt_keys(v) for sid, v in (await db.bulk_academic_debts()).items() if sid in scope}
+            await db.replace_academic_debts(clean, in_scope if groups else None)
+            after = {sid: hemis_debt_keys(v) for sid, v in (await db.bulk_academic_debts()).items() if sid in in_scope}
             n_new = sum(len([k for k in a if k not in before.get(sid, {})]) for sid, a in after.items())
             n_closed = sum(len([k for k in b if k not in after.get(sid, {})]) for sid, b in before.items())
             lines.append(f"📚 HEMIS akademik qarzdorlar ro'yxati: {len(after)} ta talaba, "
@@ -541,7 +592,7 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
 
     elif kind in ("debts", "debts_t"):
         pay_kind = "trimestr" if kind == "debts_t" else "kontrakt"
-        rows, unknown = resolve_by_name(result.rows, await db.all_students_brief())
+        rows, unknown = resolve_by_name(result.rows, await db.all_students_brief(scope))
         errors += unknown
         cap_dates = parse_user_dates(caption or "")
         as_of = (cap_dates[0].isoformat() if cap_dates else result.meta.get("as_of")
@@ -580,9 +631,8 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
         else:
             lines.append(f"Ota-onalarga xabar: {await notify_payments(bot, changes)}")
 
-    pf = result.meta.get("payment_forms") if isinstance(result.meta, dict) else None
     if pf:  # «O'rtacha ball» jadvalidagi «To'lov shakli» ustuni
-        ok_pf, _ = resolve_students(pf, await db.student_lookup())
+        ok_pf, _ = resolve_students(pf, await db.student_lookup(scope))
         forms = {r["student_id"]: r["payment_form"] for r in ok_pf}
         await db.set_payment_forms(forms)
         n_g = sum(1 for f in forms.values() if f == GRANT)

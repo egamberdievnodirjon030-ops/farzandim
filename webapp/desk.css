@@ -320,6 +320,10 @@ svg.i { width: 18px; height: 18px; flex: none; }
 pre.log { margin: 0; padding: 14px 16px; background: #0C1526; color: #D5DEEE; border-radius: 12px; font: 12.5px/1.55 ui-monospace, 'Cascadia Mono', Consolas, monospace;
   max-height: 520px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .coords { display: flex; gap: 6px; flex-wrap: wrap; }
+.coord { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.grp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px 12px; max-height: 260px; overflow: auto; margin: 0 0 14px; }
+.grp-list label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.grp-list input { width: 18px; height: 18px; accent-color: var(--navy-700); }
 
 /* ---------------------------------------------------------------- dialog, bildirishnoma, kirish */
 dialog { border: 0; padding: 0; border-radius: 18px; width: min(480px, 92vw); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-l); }

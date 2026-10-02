@@ -132,6 +132,28 @@ function dialog({ title, text = '', fields = [], ok = 'Saqlash', danger = false 
     (d.querySelector('input') || d.querySelector('.btn.primary, .btn.solid'))?.focus();
   });
 }
+/* Kurs koordinatoriga guruhlar biriktirish: belgilanganlar va qo'lda yozilganlar saqlanadi (null — bekor qilindi) */
+function groupsDialog(name, uid, info) {
+  return new Promise(res => {
+    const d = $('#dlg');
+    const free = info.groups.filter(g => !g.owner || g.owner === uid), busy = info.groups.filter(g => g.owner && g.owner !== uid);
+    d.innerHTML = `<form method="dialog" class="grp-dlg"><h3>${esc(name)} — guruhlar</h3>
+      <p>Fayl yuklaganda (davomat, baholar, buxgalteriya hisoboti…) faqat shu guruhlar talabalari tanilinadi. Hech biri belgilanmasa — butun kurs.</p>
+      ${free.length ? `<div class="grp-list">${free.map(g => `<label><input type="checkbox" name="g" value="${esc(g.name)}" ${g.owner === uid ? 'checked' : ''}> ${esc(g.name)} <span class="hint">${g.students}</span></label>`).join('')}</div>`
+        : '<p class="hint">Kursda biriktirilmagan guruh yo‘q.</p>'}
+      ${busy.length ? `<p class="hint">Boshqa koordinatorlarda: ${busy.map(g => `${esc(g.name)} (${esc(g.owner_label)})`).join(', ')}</p>` : ''}
+      <label class="field"><span>Yana guruhlar (vergul bilan)</span><input class="input" name="extra" placeholder="Masalan: XM-21, XM-22" autocomplete="off">
+        <small class="hint">Talabalar hali yuklanmagan guruhlar uchun.</small></label>
+      <div class="row"><button class="btn" value="cancel" formnovalidate>Bekor qilish</button><button class="btn primary" value="ok">Saqlash</button></div></form>`;
+    d.returnValue = '';
+    d.onclose = () => {
+      if (d.returnValue !== 'ok') return res(null);
+      const f = new FormData(d.querySelector('form'));
+      res([...f.getAll('g'), ...String(f.get('extra') || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean)]);
+    };
+    d.showModal();
+  });
+}
 const confirmDlg = (title, text, ok, danger = false) => dialog({ title, text, ok, danger }).then(Boolean);
 const emptyBox = (icon, title, text = '', action = '') =>
   `<div class="empty">${ic(icon)}<b>${esc(title)}</b>${text ? `<div>${text}</div>` : ''}${action ? `<div style="margin-top:14px">${action}</div>` : ''}</div>`;
@@ -844,10 +866,11 @@ async function pSuperCourses() {
   document.title = 'Kurslar va koordinatorlar — Boshqaruv paneli';
   const d = await api('/api/super/courses');
   view(head('Kurslar va koordinatorlar', todayLabel(), `<button class="btn primary" data-act="new-course">${ic('plus')} Yangi kurs</button>`) + `
-    <p class="hint" style="margin:-10px 0 18px">Har bir kurs — alohida ma’lumotlar bazasi. Kurs koordinatori faqat o‘z kursini ko‘radi. O‘zgarishlar botni qayta ishga tushirmasdan kuchga kiradi.</p>
+    <p class="hint" style="margin:-10px 0 18px">Har bir kurs — alohida ma’lumotlar bazasi. Kurs koordinatori faqat o‘z kursini ko‘radi. Kursda bir nechta koordinator bo‘lsa, har biriga guruhlarini biriktiring — fayl yuklaganda (buxgalteriya hisoboti ham) faqat o‘z guruhlari talabalari tanilinadi. O‘zgarishlar botni qayta ishga tushirmasdan kuchga kiradi.</p>
     <section class="sec">${d.courses.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Kurs</th><th class="r">Talabalar</th><th class="r">Ota-onalar</th><th>Kurs koordinatorlari</th><th></th></tr></thead><tbody>
       ${d.courses.map(c => `<tr><td class="name"><b>${esc(c.title)}</b><span>data/${esc(c.key)}/</span></td><td class="r">${c.students}</td><td class="r">${c.parents}</td>
-        <td><div class="coords">${c.admins.map(a => `<span class="chip">${esc(a.label)}<button data-act="del-coord" data-uid="${a.user_id}" data-name="${esc(a.label)}" data-course="${esc(c.title)}" title="Olib tashlash" aria-label="Olib tashlash">${ic('x')}</button></span>`).join('')
+        <td><div class="coords">${c.admins.map(a => `<div class="coord"><span class="chip">${esc(a.label)}<button data-act="del-coord" data-uid="${a.user_id}" data-name="${esc(a.label)}" data-course="${esc(c.title)}" title="Olib tashlash" aria-label="Olib tashlash">${ic('x')}</button></span>
+            <button class="btn sm ghost" data-act="coord-groups" data-uid="${a.user_id}" data-key="${esc(c.key)}" data-name="${esc(a.label)}">${ic('users')} ${a.groups.length ? esc(a.groups.join(', ')) : 'Guruhlar: butun kurs'}</button></div>`).join('')
           || '<span class="chip warn">tayinlanmagan — xabarlar super-adminga boradi</span>'}</div></td>
         <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="add-coord" data-key="${esc(c.key)}" data-title="${esc(c.title)}">${ic('plus')} Koordinator qo‘shish</button>
           <button class="btn sm ghost" data-act="rename" data-key="${esc(c.key)}" data-title="${esc(c.title)}" title="Nomini o‘zgartirish" aria-label="Nomini o‘zgartirish">${ic('edit')}</button></td></tr>`).join('')}
@@ -964,6 +987,17 @@ document.addEventListener('click', async e => {
       if (r.old) toast(`Oldin «${r.old}» kursida edi — endi shu kursda`);
       route();
     } catch (err) { toast('Tayinlanmadi: ' + (err.data?.error || err.message), true); }
+  } else if (act === 'coord-groups') {
+    const uid = Number(b.dataset.uid);
+    let info; try { info = await api(`/api/super/courses/${encodeURIComponent(b.dataset.key)}/groups`); } catch (err) { toast('Guruhlar yuklanmadi', true); return; }
+    const groups = await groupsDialog(b.dataset.name, uid, info);
+    if (!groups) return;
+    try {
+      const r = await api(`/api/super/coordinators/${uid}/groups`, { method: 'POST', json: { groups } });
+      toast(r.saved.length ? `Biriktirildi: ${r.saved.join(', ')}` : 'Guruhlar olib tashlandi — butun kurs');
+      if (r.taken.length) toast('Boshqa koordinatorniki, qo‘shilmadi: ' + r.taken.map(x => `${x.name} (${x.owner})`).join(', '), true);
+      route();
+    } catch (err) { toast('Saqlanmadi', true); }
   } else if (act === 'del-coord') {
     if (!await confirmDlg('Kurs koordinatorini olib tashlaysizmi?', `<b>${esc(b.dataset.name)}</b> «${esc(b.dataset.course)}» kurs koordinatorlari ro‘yxatidan chiqariladi. Kurs ma’lumotlari o‘chmaydi.`, 'Olib tashlash', true)) return;
     try { await api(`/api/super/coordinators/${b.dataset.uid}`, { method: 'DELETE' }); toast('Olib tashlandi'); route(); } catch (err) { toast('Bajarilmadi', true); }

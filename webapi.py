@@ -801,7 +801,8 @@ async def api_staff_import(request):
         return ok({"state": "confirm", "detected": detected[0], "detected_title": KIND_TITLES[detected[0]],
                    "kind_title": KIND_TITLES[kind]})
     col = _Collector()
-    done = await _process_import(request.app["bot"], col, kind, rows, fields.get("caption", ""), file_name)
+    done = await _process_import(request.app["bot"], col, kind, rows, fields.get("caption", ""), file_name,
+                                user_id=request["user"]["id"])
     return ok({"state": "done" if done else "failed", "kind": kind, "kind_title": KIND_TITLES.get(kind, kind),
                "report": "\n".join(col.parts)})
 
@@ -1147,6 +1148,31 @@ async def api_super_coordinator_remove(request):
 
 
 @super_route
+async def api_super_course_groups(request):
+    from staffops import course_groups
+    key = request.match_info["key"]
+    if key not in course_keys():
+        return bad("not_found", 404)
+    return ok(await course_groups(key))
+
+
+@super_route
+async def api_super_coordinator_groups(request):
+    """Koordinatorga guruhlar biriktirish: {"groups": ["XM-21", ...]} — ro'yxat to'liq almashtiriladi."""
+    from staffops import save_coord_groups
+    uid, body = int(request.match_info["uid"]), await request.json()
+    key = next((c["course_key"] for c in (await central.registry())[1] if c["user_id"] == uid), None)
+    if key is None:
+        return bad("not_found", 404)
+    names = body.get("groups")
+    if not isinstance(names, list):
+        return bad("groups", 400)
+    r = await save_coord_groups(uid, key, [str(x).strip()[:40] for x in names if str(x).strip()][:300],
+                                request["user"]["id"])
+    return ok({"saved": r["saved"], "taken": [{"name": n, "owner": o} for n, o in r["taken"]]})
+
+
+@super_route
 async def api_super_errors(request):
     from logsetup import errors_since, tail
     return ok({"count_24h": errors_since(24), "tail": tail(LOG_DIR / "errors.log", 60)[-12000:]})
@@ -1214,6 +1240,8 @@ def setup_routes(app: web.Application) -> None:
     r.add_post("/api/super/courses/{key}", api_super_course_rename)
     r.add_post("/api/super/courses/{key}/coordinators", api_super_coordinator_add)
     r.add_delete("/api/super/coordinators/{uid:\\d+}", api_super_coordinator_remove)
+    r.add_get("/api/super/courses/{key}/groups", api_super_course_groups)
+    r.add_post("/api/super/coordinators/{uid:\\d+}/groups", api_super_coordinator_groups)
     r.add_get("/api/super/errors", api_super_errors)
     r.add_post("/api/super/backup", api_super_backup)
 

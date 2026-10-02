@@ -28,7 +28,7 @@ import export
 from config import ADMIN_COURSE, DATA_DIR, LOG_DIR
 from database import db
 from keyboards import (BTN_S_BACKUP, BTN_S_COURSES, BTN_S_ENTER, BTN_S_ERRORS, BTN_S_MENU, BTN_S_NEW, BTN_S_OVERVIEW,
-                       BTN_S_TEMPLATES, SupCb, TplCb, TplMapCb, coordinator_menu, course_card_kb, courses_kb,
+                       BTN_S_TEMPLATES, SupCb, TplCb, TplMapCb, coord_groups_kb, coordinator_menu, course_card_kb, courses_kb,
                        map_field_kb, pick_user_kb, super_menu, template_card_kb, template_save_kb, templates_kb)
 from logsetup import errors_since, tail
 from tenancy import central, course_title, is_super, reload_registry, use_course
@@ -45,6 +45,7 @@ class Sup(StatesGroup):
     rename = State()
     pick_user = State()
     name = State()
+    groups = State()    # koordinator guruhlari nomlari kutilmoqda
 
 
 class Tpl(StatesGroup):
@@ -64,7 +65,9 @@ async def courses_info() -> list[dict]:
     courses, coords = await central.registry()
     out = []
     for c in courses:
-        admins = [{"user_id": x["user_id"], "label": f"{x['name'] or 'ID ' + str(x['user_id'])}"}
+        groups = await central.course_coord_groups(c["key"])
+        admins = [{"user_id": x["user_id"], "label": f"{x['name'] or 'ID ' + str(x['user_id'])}",
+                   "groups": [g["group_name"] for g in groups if g["user_id"] == x["user_id"]]}
                   for x in coords if x["course_key"] == c["key"]]
         s = {"students": 0, "parents_active": 0}
         if c["key"] in db.keys():
@@ -94,8 +97,14 @@ async def course_card(key: str) -> tuple[str, object]:
     lines = [f"🏫 <b>{esc(c['title'])}</b>", f"Ma'lumotlar: <code>data/{esc(key)}/</code>",
              f"👨‍🎓 Talabalar: {c['students']} · 👨‍👩‍👧 ota-onalar: {c['parents']}", "",
              "👤 <b>Kurs koordinatorlari:</b>"]
-    lines += [f"   • {esc(a['label'])} (ID <code>{a['user_id']}</code>)" for a in c["admins"]] or [
-        "   hali yo'q — xabarlar super-adminga boradi"]
+    from staffops import course_groups
+    owned = {x["user_id"]: x["groups"] for x in (await course_groups(key))["coordinators"]}
+    lines += [f"   • {esc(a['label'])} (ID <code>{a['user_id']}</code>)\n      👥 "
+              + (esc(", ".join(owned.get(a["user_id"]) or [])) or "guruhlar biriktirilmagan — butun kurs")
+              for a in c["admins"]] or ["   hali yo'q — xabarlar super-adminga boradi"]
+    if len(c["admins"]) > 1:
+        lines.append("\nℹ️ Kursda bir nechta koordinator bo'lsa, har biriga guruhlarini biriktiring: fayl yuklaganda "
+                     "(buxgalteriya hisoboti ham) faqat o'z guruhlari talabalari tanilinadi.")
     return "\n".join(lines), course_card_kb(key, c["admins"])
 
 
@@ -242,6 +251,87 @@ async def _save_coordinator(message: Message, state: FSMContext, name: str | Non
     await message.answer("Kurs:", reply_markup=kb)
 
 
+# ---------------------------------------------------------------- kurs koordinatoriga guruhlar biriktirish
+async def _groups_screen(key: str, uid: int) -> tuple[str, object, list[dict]]:
+    from staffops import course_groups
+    info = await course_groups(key)
+    me = next((c for c in info["coordinators"] if c["user_id"] == uid), None)
+    label = me["label"] if me else f"ID {uid}"
+    mine = me["groups"] if me else []
+    text = (f"👥 <b>{esc(label)}</b> — «{esc(course_title(key))}» kursidagi guruhlari\n\n"
+            + (f"Biriktirilgan: <b>{esc(', '.join(mine))}</b>\n\n" if mine else
+               "Guruh biriktirilmagan — koordinator butun kurs talabalari bilan ishlaydi.\n\n")
+            + "Fayl yuklaganda (davomat, baholar, buxgalteriya hisoboti va boshqalar) faqat shu guruhlar talabalari "
+              "tanilinadi, boshqa guruhlar qatorlari o'tkazib yuboriladi.\n\n"
+              "✅ — biriktirilgan · 🔒 — boshqa koordinatorniki · ▫️ — bo'sh. Bosib almashtiring.")
+    if not info["groups"]:
+        text += ("\n\nKursda hali talabalar yuklanmagan — guruh nomlarini «✍️ Guruh nomlarini yozish» orqali "
+                 "kiriting (masalan: <code>XM-21, XM-22</code>).")
+    return text, coord_groups_kb(key, uid, info["groups"]), info["groups"]
+
+
+@router.callback_query(SupCb.filter(F.a == "grp"))
+async def cb_groups(cb: CallbackQuery, callback_data: SupCb, state: FSMContext) -> None:
+    await state.clear()
+    await cb.answer()
+    text, kb, _ = await _groups_screen(callback_data.k, callback_data.u)
+    await cb.message.edit_text(text, reply_markup=kb)
+
+
+@router.callback_query(SupCb.filter(F.a == "gt"))
+async def cb_group_toggle(cb: CallbackQuery, callback_data: SupCb) -> None:
+    from staffops import save_coord_groups
+    key, uid = callback_data.k, callback_data.u
+    _, _, groups = await _groups_screen(key, uid)
+    if not 0 <= callback_data.g < len(groups):
+        await cb.answer("Ro'yxat o'zgargan — qaytadan oching.", show_alert=True)
+        return
+    g = groups[callback_data.g]
+    if g["owner"] not in (None, uid):
+        await cb.answer(f"«{g['name']}» — {g['owner_label']} ga biriktirilgan. Avval undan olib tashlang.", show_alert=True)
+        return
+    mine = [x["name"] for x in groups if x["owner"] == uid]
+    mine = [x for x in mine if x != g["name"]] if g["owner"] == uid else mine + [g["name"]]
+    await save_coord_groups(uid, key, mine, cb.from_user.id)
+    await cb.answer("Olib tashlandi" if g["owner"] == uid else "Biriktirildi")
+    text, kb, _ = await _groups_screen(key, uid)
+    await cb.message.edit_text(text, reply_markup=kb)
+
+
+@router.callback_query(SupCb.filter(F.a == "gc"))
+async def cb_groups_clear(cb: CallbackQuery, callback_data: SupCb) -> None:
+    from staffops import save_coord_groups
+    await save_coord_groups(callback_data.u, callback_data.k, [], cb.from_user.id)
+    await cb.answer("Guruhlar olib tashlandi")
+    text, kb, _ = await _groups_screen(callback_data.k, callback_data.u)
+    await cb.message.edit_text(text, reply_markup=kb)
+
+
+@router.callback_query(SupCb.filter(F.a == "gw"))
+async def cb_groups_write(cb: CallbackQuery, callback_data: SupCb, state: FSMContext) -> None:
+    await cb.answer()
+    await state.set_state(Sup.groups)
+    await state.update_data(k=callback_data.k, u=callback_data.u)
+    await cb.message.answer("✍️ Guruh nomlarini vergul bilan yozing, masalan: <code>XM-21, XM-22, XM-23</code>\n"
+                            "Ular koordinatorning hozirgi guruhlariga <b>qo'shiladi</b>. Bekor qilish: /bekor")
+
+
+@router.message(Sup.groups, F.text, ~F.text.startswith("/"))
+async def on_groups_text(message: Message, state: FSMContext) -> None:
+    from staffops import course_groups, save_coord_groups, split_group_names
+    data = await state.get_data()
+    await state.clear()
+    key, uid = data["k"], data["u"]
+    mine = next((c["groups"] for c in (await course_groups(key))["coordinators"] if c["user_id"] == uid), [])
+    r = await save_coord_groups(uid, key, mine + split_group_names(message.text), message.from_user.id)
+    note = ""
+    if r["taken"]:
+        note = ("⚠️ Boshqa koordinatorga biriktirilgani uchun qo'shilmadi: "
+                + esc(", ".join(f"{n} ({o})" for n, o in r["taken"])) + "\n\n")
+    text, kb, _ = await _groups_screen(key, uid)
+    await message.answer(note + text, reply_markup=kb)
+
+
 # ---------------------------------------------------------------- kurs koordinatorini olib tashlash
 @router.callback_query(SupCb.filter(F.a == "delc"))
 async def cb_del(cb: CallbackQuery, callback_data: SupCb) -> None:
@@ -342,7 +432,7 @@ async def s_errors(message: Message, state: FSMContext) -> None:
                                   caption="To'liq jurnal (ogohlantirish va xatolar). Barcha yozuvlar: logs/bot.log")
 
 
-@router.message(StateFilter(Sup.new_course, Sup.rename, Sup.name, Tpl.title, Tpl.file, Tpl.map, Tpl.confirm, Tpl.edit),
+@router.message(StateFilter(Sup.new_course, Sup.rename, Sup.name, Sup.groups, Tpl.title, Tpl.file, Tpl.map, Tpl.confirm, Tpl.edit),
                 F.text.startswith("/bekor"))
 async def s_cancel(message: Message, state: FSMContext) -> None:
     await state.clear()

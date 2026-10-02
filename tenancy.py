@@ -66,6 +66,22 @@ def course_admins(key: str | None = None) -> set[int]:
 
 
 # ---------------------------------------------------------------- rollar
+# Kurs koordinatori → unga biriktirilgan guruhlar (guruh kaliti → nomi); reload_registry() yangilaydi
+COORD_GROUPS: dict[int, dict[str, str]] = {}
+
+
+def coordinator_groups(user_id: int | None) -> dict[str, str]:
+    return dict(COORD_GROUPS.get(user_id, {})) if user_id is not None else {}
+
+
+def group_scope(user_id: int | None) -> set[str] | None:
+    """Import va talabani tanish doirasi: kurs koordinatoriga guruhlar biriktirilgan bo'lsa — faqat shu guruhlar
+    (kalitlari); super-admin yoki guruh biriktirilmagan koordinator — None (butun kurs)."""
+    if user_id is None or is_super(user_id) or not COORD_GROUPS.get(user_id):
+        return None
+    return set(COORD_GROUPS[user_id])
+
+
 def is_super(user_id: int) -> bool:
     return user_id in SUPERADMIN_IDS
 
@@ -161,6 +177,17 @@ CREATE TABLE IF NOT EXISTS column_aliases (
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT
+);
+-- Kurs koordinatoriga biriktirilgan akademik guruhlar: bitta kursda bir nechta koordinator bo'lsa, har biri
+-- faqat o'z guruhlari talabalarini yuklaydi va taniydi (buxgalteriya va boshqa umumiy hisobotlar ham)
+CREATE TABLE IF NOT EXISTS coordinator_groups (
+    user_id    INTEGER NOT NULL,
+    course_key TEXT NOT NULL,
+    group_key  TEXT NOT NULL,
+    group_name TEXT NOT NULL,
+    added_by   INTEGER,
+    added_at   TEXT,
+    PRIMARY KEY (user_id, course_key, group_key)
 );
 -- Telegram guruh qaysi kursga biriktirilgan (/guruh buyrug'ini bergan koordinatorning kursi)
 CREATE TABLE IF NOT EXISTS group_courses (
@@ -288,7 +315,9 @@ class Central:
                  added_at = excluded.added_at""", (user_id, course_key, name, by))
 
     async def remove_coordinator(self, user_id: int) -> None:
-        await self._write("UPDATE coordinators SET active = 0 WHERE user_id = ?", (user_id,))
+        await self.conn.execute("UPDATE coordinators SET active = 0 WHERE user_id = ?", (user_id,))
+        await self.conn.execute("DELETE FROM coordinator_groups WHERE user_id = ?", (user_id,))
+        await self.conn.commit()
 
     # --- shablonlar
     async def _all(self, sql: str, args: tuple = ()) -> list[dict]:
@@ -356,6 +385,22 @@ class Central:
         await self._write("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                           (key, value))
 
+    # --- koordinatorlarga biriktirilgan guruhlar
+    async def course_coord_groups(self, course_key: str) -> list[dict]:
+        return await self._all("SELECT user_id, group_key, group_name FROM coordinator_groups WHERE course_key = ? "
+                               "ORDER BY group_name", (course_key,))
+
+    async def set_coord_groups(self, user_id: int, course_key: str, groups: dict[str, str], by: int | None) -> None:
+        """Koordinatorning shu kursdagi guruhlarini almashtiradi (groups: guruh kaliti → nomi)."""
+        await self.conn.execute("DELETE FROM coordinator_groups WHERE user_id = ? AND course_key = ?", (user_id, course_key))
+        await self.conn.executemany(
+            "INSERT INTO coordinator_groups (user_id, course_key, group_key, group_name, added_by, added_at) "
+            "VALUES (?, ?, ?, ?, ?, datetime('now'))", [(user_id, course_key, k, n, by) for k, n in groups.items()])
+        await self.conn.commit()
+
+    async def all_coord_groups(self) -> list[dict]:
+        return await self._all("SELECT user_id, course_key, group_key, group_name FROM coordinator_groups", ())
+
     # --- Telegram guruhlar
     async def group_course(self, chat_id: int) -> str | None:
         row = await self._one("SELECT course FROM group_courses WHERE chat_id = ?", (chat_id,))
@@ -397,3 +442,7 @@ async def reload_registry() -> None:
     ADMIN_IDS.clear()
     ADMIN_IDS.update(ADMIN_COURSE)
     ADMIN_IDS.update(SUPERADMIN_IDS)  # super-admin ham admin buyruqlaridan foydalanadi (tanlangan kursda)
+    COORD_GROUPS.clear()
+    for g in await central.all_coord_groups():  # faqat koordinatorning hozirgi kursidagi guruhlar amal qiladi
+        if ADMIN_COURSE.get(g["user_id"]) == g["course_key"]:
+            COORD_GROUPS.setdefault(g["user_id"], {})[g["group_key"]] = g["group_name"]

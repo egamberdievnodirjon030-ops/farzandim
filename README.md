@@ -41,6 +41,15 @@ Serverga kirish va botni qayta ishga tushirish shart emas — o'zgarish darhol i
 
 `.env` dagi `ADMIN_IDS` va `KURSLAR` — faqat boshlang'ich sozlama: bot birinchi ishga tushganda umumiy ro'yxatga (`central.db`) yoziladi, keyin hamma narsa bot ichidan boshqariladi. Bot ichidan olib tashlangan koordinator `.env` da qolib ketsa ham qayta qo'shilmaydi. Koordinatori yo'q kursning xabarlari (savollar, bog'lash so'rovlari) super-adminga boradi — boshqa kurslarning koordinatorlariga emas.
 
+### Koordinatorlarga guruh biriktirish
+
+Bitta kursda bir nechta kurs koordinatori bo'lsa, ma'lumotlar chalkashmasligi uchun har biriga o'z guruhlari biriktiriladi:
+- **Bot**: kurs kartasida «👥 <koordinator>: guruhlar» → guruhlarni bosib belgilang (✅ — biriktirilgan, 🔒 — boshqa koordinatorniki) yoki «✍️ Guruh nomlarini yozish» (talabalar hali yuklanmagan bo'lsa: `XM-21, XM-22`).
+- **Kompyuter versiyasi**: «Kurslar va koordinatorlar» → koordinator yonidagi «Guruhlar» tugmasi.
+- Bitta guruh faqat bitta koordinatorga biriktiriladi.
+
+Guruhlari bor koordinator fayl yuklaganda (talabalar, davomat, baholar, akademik qarzdorlar, **buxgalteriya hisoboti** va boshqalar) faqat o'z guruhlari talabalari tanilinadi: guruh ustuni bo'lsa — guruh bo'yicha, bo'lmasa (buxgalteriya) — talaba uning guruhlarida bormi, HEMIS ID yoki F.I.Sh. bo'yicha. Boshqa guruhlar qatorlari o'tkazib yuboriladi va natijada soni ko'rsatiladi; bir xil F.I.Sh. li talabalar boshqa guruhda bo'lsa ham to'g'ri topiladi. Guruh biriktirilmagan koordinator va super-admin — butun kurs bilan ishlaydi (avvalgidek). Tarjimalar va «Tanlov/2-til: jadval» guruhga bog'lanmagan — ular cheklanmaydi.
+
 ## Shablonlar: super-admin o'zgartiradi va qo'shadi
 
 Kurs koordinatorlari `/shablon` (yoki «📑 Shablonlar» tugmasi) orqali oladigan import namunalarini super-admin bot ichidan boshqaradi — «📑 Shablonlar (import namunalari)» yoki `/shablonlar`. Shablonlar barcha kurslar uchun umumiy.

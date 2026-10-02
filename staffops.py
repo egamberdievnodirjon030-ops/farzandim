@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import logging
+import re
 
 import appmode
 import live
@@ -16,6 +17,7 @@ from i18n import tr, use_lang
 from keyboards import coordinator_menu
 from notifier import safe_send
 from tenancy import central, course_title, reload_registry
+from utils import group_key
 
 log = logging.getLogger("staff")
 
@@ -94,6 +96,58 @@ async def unassign_coordinator(bot, uid: int, key: str) -> None:
     except Exception:
         pass
     log.info("Kurs koordinatori olib tashlandi: %s (%s)", uid, key)
+
+
+# ---------------------------------------------------------------- koordinatorlarga guruh biriktirish (super-admin)
+def _coord_label(coords: list[dict], uid: int) -> str:
+    return next((c["name"] for c in coords if c["user_id"] == uid and c.get("name")), None) or f"ID {uid}"
+
+
+async def course_groups(key: str) -> dict:
+    """Kursdagi guruhlar (talabalar bazasidagi va hali yuklanmagan, lekin biriktirilgan) va ularning egasi.
+    Qaytaradi: {"groups": [{key, name, students, owner, owner_label}], "coordinators": [{user_id, label, groups}]}"""
+    _, coords = await central.registry()
+    coords = [c for c in coords if c["course_key"] == key]
+    groups = await db.for_course(key).group_counts() if key in db.keys() else {}
+    assigned = await central.course_coord_groups(key)
+    active = {c["user_id"] for c in coords}
+    owner: dict[str, int] = {}
+    for g in assigned:
+        if g["user_id"] in active:
+            owner[g["group_key"]] = g["user_id"]
+            groups.setdefault(g["group_key"], {"name": g["group_name"], "students": 0})
+    items = [{"key": k, "name": v["name"], "students": v["students"], "owner": owner.get(k),
+              "owner_label": _coord_label(coords, owner[k]) if k in owner else None}
+             for k, v in sorted(groups.items(), key=lambda kv: kv[1]["name"].lower())]
+    return {"groups": items, "coordinators": [
+        {"user_id": c["user_id"], "label": _coord_label(coords, c["user_id"]),
+         "groups": [g["name"] for g in items if g["owner"] == c["user_id"]]} for c in coords]}
+
+
+def split_group_names(text: str) -> list[str]:
+    return [x.strip() for x in re.split(r"[,;\n]+", text or "") if x.strip()]
+
+
+async def save_coord_groups(uid: int, key: str, names: list[str], by: int | None) -> dict:
+    """Koordinatorning guruhlarini almashtiradi. Boshqa koordinatorga biriktirilgan guruh olinmaydi (bitta guruh —
+    bitta koordinator: ma'lumotlar chalkashmasin). Qaytaradi: {"saved": [nomlar], "taken": [(nom, egasi)]}"""
+    info = await course_groups(key)
+    known = {g["key"]: g for g in info["groups"]}
+    chosen: dict[str, str] = {}
+    taken: list[tuple[str, str]] = []
+    for name in names:
+        k = group_key(name)
+        if not k or k in chosen:
+            continue
+        g = known.get(k)
+        if g and g["owner"] not in (None, uid):
+            taken.append((g["name"], g["owner_label"]))
+            continue
+        chosen[k] = g["name"] if g else name.strip()
+    await central.set_coord_groups(uid, key, chosen, by)
+    await reload_registry()
+    log.info("Koordinator guruhlari: %s (%s) → %s", uid, key, ", ".join(chosen.values()) or "-")
+    return {"saved": sorted(chosen.values(), key=str.lower), "taken": taken}
 
 
 # ---------------------------------------------------------------- yangi bog'lash so'rovi — kurs koordinatorlariga
