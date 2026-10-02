@@ -200,7 +200,7 @@ async def overview(st: dict, key: str) -> dict:
             "academic": {"count": len(s["debts"]), "debts": [_debt(d) for d in s["debts"]]},
             "gpa": _gpa(s["gpa"]), "gpa_low": s["flags"]["gpa"], "gpa_min": GPA_MIN,
             "pays": await _payments(st, s["pays"], dl), "issues": s["issues"],
-            "trend": await trends.short_line(st), "today": [_lesson(x) for x in lessons],
+            "trend": await trends.short_line(st), "dynamics": await trends.mini(st), "today": [_lesson(x) for x in lessons],
             "updated": await _last_update()}
 
 

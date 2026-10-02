@@ -181,6 +181,39 @@ async def short_line(st: dict) -> str | None:
     return "📈 " + tr("Dinamika: {v}", v=", ".join(parts)) if parts else None
 
 
+async def mini(st: dict) -> list[dict]:
+    """Ota-ona bosh sahifasi uchun ixcham dinamika: har bir ko'rsatkich — oxirgi qiymat, oldingisiga nisbatan
+    o'zgarish va kichik grafik nuqtalari. Ma'lumot bitta bo'lsa ham ko'rsatiladi (o'zgarishsiz)."""
+    items = []
+
+    def item(key, title, unit, points, better, caption):
+        vals = [p["value"] for p in points]
+        return {"key": key, "title": title, "unit": unit, "points": points, "value": vals[-1],
+                "delta": round(vals[-1] - vals[-2], 2) if len(vals) > 1 else None, "better": better, "caption": caption}
+
+    mode, periods = await attendance_periods(st)
+    if periods:
+        pts = [{"label": p["start"].strftime("%d.%m") if mode == "weekly" else p["end"].strftime("%d.%m"),
+                "value": round(p["pct"], 1)} for p in periods[-WEEKS:]]
+        items.append(item("att", tr("Davomat"), "%", pts, "up",
+                          tr("o'tgan haftaga nisbatan") if mode == "weekly" else tr("oldingi HEMIS ma'lumotiga nisbatan")))
+    g = await grade_changes(st)
+    if g["gpa_new"] is not None:
+        pts = ([{"label": date.fromisoformat(g["ref"][:10]).strftime("%d.%m"), "value": round(g["gpa_old"], 2)}]
+               if g["gpa_old"] is not None and g["ref"] else []) + [{"label": tr("bugun"), "value": round(g["gpa_new"], 2)}]
+        items.append(item("gpa", tr("GPA"), "gpa", pts, "up",
+                          tr("bir oy oldingiga nisbatan") if g["month"] else tr("oldingi baholarga nisbatan")))
+    if not (st.get("payment_form") or "").lower().startswith("davlat"):
+        hist = await db.payment_history(st["id"], "kontrakt", limit=6)
+        cur = await db.latest_payment(st["id"], "kontrakt")
+        if cur and cur.get("absent"):
+            hist = hist + [cur]  # keyingi hisobotda ro'yxatda yo'q — qarzdorlik mavjud emas
+        if hist:
+            pts = [{"label": date.fromisoformat(h["as_of"]).strftime("%d.%m"), "value": round(h["debt"] or 0)} for h in hist]
+            items.append(item("kontrakt", tr("Kontrakt qarzi"), "money", pts, "down", tr("oldingi hisobotga nisbatan")))
+    return items
+
+
 def chart_png(mode: str, periods: list[dict], g: dict) -> bytes | None:
     pairs = [(o, r) for o, r in g.get("compared", []) if o]
     if len(periods) < 2 and not pairs:

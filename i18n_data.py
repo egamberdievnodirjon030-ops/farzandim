@@ -1090,4 +1090,12 @@ TR: dict[str, dict[str, str]] = {
     "📜 Universitet ichki nizomlari hali joylanmagan.": {
         'ru': '📜 Внутренние положения университета ещё не размещены.', 'en': '📜 University regulations have not been published yet.'},
     "📜 <b>Universitet ichki nizomlari</b>": {'ru': '📜 <b>Внутренние положения университета</b>', 'en': '📜 <b>University regulations</b>'},
+    # Ota-ona bosh sahifasidagi dinamika
+    'Davomat': {'ru': 'Посещаемость', 'en': 'Attendance'},
+    'GPA': {'ru': 'GPA', 'en': 'GPA'},
+    'Kontrakt qarzi': {'ru': 'Долг по контракту', 'en': 'Tuition debt'},
+    "oldingi HEMIS ma'lumotiga nisbatan": {'ru': 'по сравнению с прошлыми данными HEMIS', 'en': 'vs previous HEMIS data'},
+    'bir oy oldingiga nisbatan': {'ru': 'по сравнению с прошлым месяцем', 'en': 'vs a month ago'},
+    'oldingi baholarga nisbatan': {'ru': 'по сравнению с прошлыми оценками', 'en': 'vs earlier grades'},
+    'oldingi hisobotga nisbatan': {'ru': 'по сравнению с прошлым отчётом', 'en': 'vs previous report'},
 }

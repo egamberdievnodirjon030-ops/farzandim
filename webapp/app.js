@@ -23,6 +23,7 @@ const T = {
     gpa_low: '{min} dan past — kursdan kursga o‘tmaydi',
     back: 'Ortga',
     surveys: 'So‘rovnomalar', survey: 'So‘rovnoma', regs: 'Ichki nizomlar', regs_sub: 'Universitet ichki tartib qoidalari va nizomlari', answer_now: 'Javob berish', q_n: '{n} ta savol', closes: '{d} gacha', submit_survey: 'Yuborish', survey_thanks: 'Rahmat! Javobingiz qabul qilindi.', survey_closed: 'So‘rovnoma yopilgan', required_q: 'Iltimos, belgilangan savollarga javob bering', your_answer: 'Javobingiz…', answered: 'Javob berilgan', no_surveys: 'Hozircha so‘rovnoma yo‘q', no_regs: 'Nizomlar hali joylanmagan', edit_answer: 'Javobni o‘zgartirish', anon: 'Anonim: ismingiz va farzandingiz ko‘rsatilmaydi', scale_lo: 'yomon', scale_hi: 'a’lo', choose_many: 'bir nechtasini tanlash mumkin', waiting_you: 'Fikringizni kutyapmiz', open_link: 'Ochish', new_note: 'Yangi bildirishnoma', poll_done: 'Javob berganlar',
+    dyn_first: 'birinchi ma’lumot', dyn_same: 'o‘zgarmadi', more: 'Batafsil',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -61,6 +62,7 @@ const T = {
     gpa_low: 'ниже {min} — не переводится на следующий курс',
     back: 'Назад',
     surveys: 'Опросы', survey: 'Опрос', regs: 'Внутренние положения', regs_sub: 'Правила внутреннего распорядка и положения университета', answer_now: 'Ответить', q_n: 'вопросов: {n}', closes: 'до {d}', submit_survey: 'Отправить', survey_thanks: 'Спасибо! Ваш ответ принят.', survey_closed: 'Опрос закрыт', required_q: 'Пожалуйста, ответьте на отмеченные вопросы', your_answer: 'Ваш ответ…', answered: 'Ответ отправлен', no_surveys: 'Пока опросов нет', no_regs: 'Положения ещё не размещены', edit_answer: 'Изменить ответ', anon: 'Анонимно: ваше имя и имя ребёнка не показываются', scale_lo: 'плохо', scale_hi: 'отлично', choose_many: 'можно выбрать несколько', waiting_you: 'Ждём вашего мнения', open_link: 'Открыть', new_note: 'Новое уведомление', poll_done: 'Ответили',
+    dyn_first: 'первые данные', dyn_same: 'без изменений', more: 'Подробнее',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -99,6 +101,7 @@ const T = {
     gpa_low: 'below {min} — will not advance to the next year',
     back: 'Back',
     surveys: 'Surveys', survey: 'Survey', regs: 'University regulations', regs_sub: 'Internal rules and regulations of the university', answer_now: 'Answer', q_n: '{n} question(s)', closes: 'until {d}', submit_survey: 'Submit', survey_thanks: 'Thank you! Your answer has been received.', survey_closed: 'The survey is closed', required_q: 'Please answer the marked questions', your_answer: 'Your answer…', answered: 'Answered', no_surveys: 'No surveys yet', no_regs: 'No regulations published yet', edit_answer: 'Change answer', anon: 'Anonymous: your and your child’s names are not shown', scale_lo: 'poor', scale_hi: 'excellent', choose_many: 'you can choose several', waiting_you: 'We’d like your opinion', open_link: 'Open', new_note: 'New notification', poll_done: 'Answered',
+    dyn_first: 'first data', dyn_same: 'no change', more: 'Details',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -356,10 +359,9 @@ async function viewHome() {
   const body = switcher() + idCard(c) + sv.pending.slice(0, 2).map(surveyCta).join('') + quickLinks(sv.pending.length) + verdict(o) + `
     <div class="grid2" style="margin-top:14px">${attTile}${gpaTile}${acadTile}${payTile('kontrakt', o.pays.kontrakt)}</div>
     ${o.pays.trimestr && o.pays.trimestr.state === 'debt' ? `<div style="margin-top:12px">${payTile('trimestr', o.pays.trimestr)}</div>` : ''}
+    ${parentDyn(o.dynamics)}
     <section class="section"><div class="section-head"><h2>${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
       <div class="list">${o.today.length ? o.today.map(l => lessonRow(l)).join('') : `<div class="empty" style="padding:22px">${t('no_lessons_today')}</div>`}</div></section>
-    ${o.trend ? `<section class="section"><a class="card" href="#/trends" style="display:flex;gap:12px;align-items:center;color:inherit">
-      <span class="ic-badge">${ic('trend')}</span><div style="flex:1"><b style="display:block;margin-bottom:2px">${t('trends')}</b>${esc(o.trend.replace(/^📈\s*/, '').replace(/^[^:]{1,24}:\s*/, ''))}</div>${ic('chev', 'chev')}</a></section>` : ''}
     ${tutor.name || tutor.phone ? `<section class="section"><div class="section-head"><h2>${t('coordinator')}</h2></div>
       <div class="card" style="display:flex;align-items:center;gap:12px"><div class="chat-head" style="padding:0;box-shadow:none;flex:1;background:none">
       <div class="av">${esc((tutor.name || '?').trim().charAt(0))}</div><div><b>${esc(tutor.name || '')}</b><div class="muted small">${esc(fmtPhone(tutor.phone))}</div></div></div>
@@ -730,14 +732,28 @@ function spark(points, cls) {
   return `<svg class="spark ${cls}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${points.map(p => p.label + ': ' + p.value).join(', ')}">
     <path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lx}" cy="${ly}" r="3" fill="currentColor"/></svg>`;
 }
-function dynVal(it, v) { return v == null ? '—' : it.unit === '%' ? `${v}%` : it.unit === 'so\'m' ? money(v) : `${v} ta`; }
+function dynVal(it, v) {
+  if (v == null) return '—';
+  if (it.unit === '%') return `${num(v)}%`;
+  if (it.unit === 'gpa') return gpaNum(v);
+  if (it.unit === 'so\'m' || it.unit === 'money') return v ? money(v) : t('no_debt');
+  return `${v} ta`;
+}
 function dynDelta(it) {
   const d = it.delta;
-  if (d == null) return { cls: 'flat', txt: 'taqqoslash uchun ma’lumot kam' };
-  if (!d) return { cls: 'flat', txt: 'o‘zgarmadi' };
+  if (d == null) return { cls: 'flat', txt: t('dyn_first') };
+  if (!d) return { cls: 'flat', txt: t('dyn_same') };
   const good = (d > 0) === (it.better === 'up');
-  const mag = it.unit === '%' ? `${Math.abs(Math.round(d * 10) / 10)} p.p.` : dynVal(it, Math.abs(d));
+  const mag = it.unit === '%' ? `${num(Math.abs(d))} p.p.` : it.unit === 'gpa' ? gpaNum(Math.abs(d)) : it.unit === 'money' || it.unit === 'so\'m' ? money(Math.abs(d)) : dynVal(it, Math.abs(d));
   return { cls: good ? 'good' : 'bad', txt: `${d > 0 ? '▲' : '▼'} ${mag}` };
+}
+function parentDyn(items) {
+  // ota-ona bosh sahifasi: davomat, GPA, kontrakt qarzi — qiymat, o'zgarish va kichik grafik; bosilsa — batafsil
+  return `<section class="section"><div class="section-head"><h2>${t('trends')}</h2><a href="#/trends">${t('more')}</a></div>
+    ${items && items.length ? `<a class="card dyn" href="#/trends" style="display:block;color:inherit;text-decoration:none">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">
+      <div class="body"><div class="t">${esc(it.title)}</div><div class="d">${esc(it.caption)}</div></div>
+      ${spark(it.points, dl.cls)}<div class="val"><b class="num">${esc(dynVal(it, it.value))}</b><span class="${dl.cls}">${esc(dl.txt)}</span></div></div>`; }).join('')}</a>`
+      : `<div class="card muted small">${t('no_trends')}</div>`}</section>`;
 }
 function dynCard(items) {
   if (!items || !items.length) return '';
