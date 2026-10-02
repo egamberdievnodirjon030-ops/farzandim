@@ -21,6 +21,7 @@ const T = {
     since_start: 'Semestr boshidan', next_level: 'Keyingi chegara: {a} — yana {left}', max_level: 'Eng yuqori chegaraga yetgan',
     hemis_missed: 'HEMIS ma’lumoti bo‘yicha', hemis_missed_note: 'HEMIS umumiy statistikasida har bir darsning sanasi va fani bo‘lmaydi. Kurs koordinatori kunlik davomatni yuklasa, darslar sana va fan bo‘yicha shu yerda ko‘rinadi.', until: '{d} gacha', unexcused_n: 'Sababsiz: {a}', excused_n: 'sababli: {b}',
     gpa_low: '{min} dan past — kursdan kursga o‘tmaydi',
+    back: 'Ortga',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -57,6 +58,7 @@ const T = {
     since_start: 'С начала семестра', next_level: 'Следующий порог: {a} — ещё {left}', max_level: 'Достигнут высший порог',
     hemis_missed: 'По данным HEMIS', hemis_missed_note: 'В общей статистике HEMIS нет даты и предмета каждого занятия. Когда координатор загрузит ежедневную посещаемость, занятия появятся здесь по датам и предметам.', until: 'до {d}', unexcused_n: 'Без причины: {a}', excused_n: 'по уваж. причине: {b}',
     gpa_low: 'ниже {min} — не переводится на следующий курс',
+    back: 'Назад',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -93,6 +95,7 @@ const T = {
     since_start: 'Since the start of the semester', next_level: 'Next threshold: {a} — {left} more', max_level: 'Highest threshold reached',
     hemis_missed: 'According to HEMIS', hemis_missed_note: 'HEMIS summary statistics do not include the date and subject of each class. Once the coordinator uploads daily attendance, classes will appear here by date and subject.', until: 'until {d}', unexcused_n: 'Unexcused: {a}', excused_n: 'excused: {b}',
     gpa_low: 'below {min} — will not advance to the next year',
+    back: 'Back',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -235,12 +238,24 @@ async function api(path, opts = {}) {
 const childPath = (c, tail) => `/api/c/${encodeURIComponent(c.course)}/${c.id}/${tail}`;
 
 /* ================================================================ tuzilma: yuqori panel, navigatsiya */
+// Ortga: ilova ichida oldingi sahifa bo'lsa — unga, aks holda (havola orqali to'g'ridan-to'g'ri ochilgan) — mantiqiy ota sahifaga
+function backTarget() {
+  const h = location.hash;
+  if (h.startsWith('#/staff/chat')) return '#/staff/inbox';
+  if (h.startsWith('#/staff/')) return '#/staff';
+  if (h.startsWith('#/doc/')) return '#/documents';
+  return '#/';
+}
+function goBack() {
+  if (S.navDepth > 0) { S.navDepth -= 2; history.back(); } else location.hash = backTarget();
+}
+window.addEventListener('hashchange', () => { S.navDepth = (S.navDepth || 0) + 1; });
 function topbar(title, sub = '') {
   const unread = (S.me && S.me.unread) || {};
   const isStaff = S.me && (S.me.role === 'staff' || S.me.role === 'super');
   const courses = S.me && S.me.staff && S.me.staff.courses || [];
   return `<header class="topbar">
-    <div class="brand"><div class="seal" aria-hidden="true">J</div><div><h1>${esc(title)}</h1>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>
+    <div class="brand">${S.chrome && S.chrome.noNav ? `<button class="icon-btn back" data-act="back" aria-label="${t('back')}" title="${t('back')}">${ic('left')}</button>` : '<div class="seal" aria-hidden="true">J</div>'}<div><h1>${esc(title)}</h1>${sub ? `<small>${esc(sub)}</small>` : ''}</div></div>
     ${courses.length ? `<select class="course-select" data-act="course" aria-label="Kurs">${courses.map(c => `<option value="${esc(c.key)}" ${c.key === (S.me.staff.course) ? 'selected' : ''}>${esc(c.title)}</option>`).join('')}</select>` : ''}
     <button class="icon-btn" data-act="theme" aria-label="${t('theme')}: ${t('th_' + themePref())}" title="${t('theme')}: ${t('th_' + themePref())}">${ic({ auto: 'auto', light: 'sun', dark: 'moon' }[themePref()])}</button>
     ${isStaff ? '' : `<a class="icon-btn" href="#/notifications" aria-label="${t('notifications')}">${ic('bell')}${unread.notifications ? `<span class="dot">${unread.notifications > 9 ? '9+' : unread.notifications}</span>` : ''}</a>
@@ -286,7 +301,7 @@ const animateRings = () => requestAnimationFrame(() => document.querySelectorAll
 function idCard(c) {
   const rows = [[t('group'), c.group], [t('year'), c.year ? t('yearN', { n: c.year }) : ''], [t('faculty'), c.faculty]].filter(r => r[1]);
   return `<section class="idcard" aria-label="${t('student')}">
-    <div class="stamp" aria-hidden="true">JIDU</div>
+    <picture class="stamp" aria-hidden="true"><source srcset="static/jidu-seal.webp" type="image/webp"><img src="static/jidu-seal.png" alt="" width="56" height="56" decoding="async"></picture>
     <p class="role">${esc(S.me.university)}</p>
     <h2 class="name">${esc(c.name)}</h2>
     <dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
@@ -1065,7 +1080,7 @@ async function route() {
   const params = new URLSearchParams(qs || '');
   const parts = path.split('/').filter(Boolean);
   const role = S.me.role;
-  if (tg && tg.BackButton) { (['', 'schedule', 'attendance', 'grades', 'chat', 'staff'].includes(parts[0] || '') && parts.length <= 1) ? tg.BackButton.hide() : tg.BackButton.show(); }
+  if (tg && tg.BackButton) { (['', 'schedule', 'attendance', 'grades', 'staff'].includes(parts[0] || '') && parts.length <= 1) ? tg.BackButton.hide() : tg.BackButton.show(); }
   if (role === 'staff' || role === 'super') {
     if (parts[0] !== 'staff') return viewStaff();
     if (parts[1] === 'students') return viewStaffStudents(params);
@@ -1249,9 +1264,10 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act]');
   if (!el) return;
   const act = el.dataset.act;
-  const mine = ['theme', 'theme-set', 'req', 'doc-preview', 'doc-type', 'doc-send', 'doc-reset', 'doc-add', 'scope'];
+  const mine = ['back', 'theme', 'theme-set', 'req', 'doc-preview', 'doc-type', 'doc-send', 'doc-reset', 'doc-add', 'scope'];
   if (!mine.includes(act)) return;
   e.preventDefault(); e.stopImmediatePropagation();
+  if (act === 'back') { goBack(); return; }
   if (act === 'theme') {
     const order = ['auto', 'light', 'dark'], next = order[(order.indexOf(themePref()) + 1) % 3];
     setTheme(next); haptic('light'); toast(`${t('theme')}: ${t('th_' + next)}`);
@@ -1375,7 +1391,7 @@ async function boot(again) {
 if (tg) {
   tg.ready(); tg.expand();
   tg.onEvent && tg.onEvent('themeChanged', applyTheme);
-  tg.BackButton && tg.BackButton.onClick(() => history.length > 1 ? history.back() : (location.hash = '#/'));
+  tg.BackButton && tg.BackButton.onClick(goBack);
 }
 applyTheme();
 boot();
