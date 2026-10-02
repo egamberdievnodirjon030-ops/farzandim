@@ -263,6 +263,18 @@ async def absences_report(st: dict) -> str:
     absences = await db.absences_between(st["id"], d1, d2)
     head = f"{student_header(st)}\n\n" + tr("🗓 Semestr boshidan ({d} dan)", d=fmt_date(d1, False))
     if not absences:
+        # Kunlik davomat yo'q, lekin HEMIS statistikasida qoldirishlar bo'lishi mumkin — «qayd etilmagan» demaymiz
+        periods = absence.hemis_periods(await db.att_stats_history(st["id"], d1, limit=12))
+        if periods:
+            lines = [tr("❗ <b>Qoldirilgan darslar — HEMIS ma'lumoti</b>")]
+            for p in periods:
+                when = (tr("{a} — {b}", a=fmt_date(p["from"], False), b=fmt_date(p["as_of"], False)) if p["from"]
+                        else tr("{b} gacha", b=fmt_date(p["as_of"], False)))
+                lines.append(f"• {when}: " + tr("sababsiz {a}", a=fmt_pairs(p["unexcused"]))
+                             + (", " + tr("sababli {b}", b=fmt_pairs(p["excused"])) if p["excused"] else ""))
+            lines.append("\n" + tr("ℹ️ HEMIS umumiy statistikasida har bir darsning sanasi va fani bo'lmaydi. Kurs "
+                                   "koordinatori kunlik davomatni yuklasa, darslar sana va fan bo'yicha ko'rinadi."))
+            return f"{head}\n\n" + "\n".join(lines)
         return f"{head}\n\n" + tr("✅ Qoldirilgan yoki kechikilgan dars qayd etilmagan.")
     tot = await db.attendance_totals(st["id"], d1, d2)
     return (f"{head}\n\n{_absence_list(absences)}\n\n"

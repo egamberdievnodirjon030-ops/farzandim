@@ -61,6 +61,19 @@ def summary_from(row: dict | None, tot: dict | None) -> dict | None:
             "percent": 100 * (tot["keldi"] + tot["kechikdi"]) / tot["total"]}
 
 
+def hemis_periods(hist: list[dict]) -> list[dict]:
+    """HEMIS statistikasi yuklashlari (eskidan yangiga) → har bir davrda qo'shilgan qoldirishlar (soat), yangidan eskiga.
+    HEMIS umumiy statistikasida dars sanasi va fani yo'q — shuning uchun qoldirishlar davrlar bo'yicha ko'rsatiladi."""
+    out, prev = [], None
+    for r in hist:
+        cur = stats_hours(r)
+        inc = {k: max(cur[k] - (prev[k] if prev else 0), 0.0) for k in ("absent", "excused", "unexcused", "counted")}
+        if inc["absent"] > 0:
+            out.append({"from": prev_as_of if prev else None, "as_of": r["as_of"], **inc})
+        prev, prev_as_of = cur, r["as_of"]
+    return out[::-1]
+
+
 def source_note(sm: dict) -> str:
     return (tr("HEMIS ma'lumoti, {d} holatiga", d=fmt_date(sm['as_of'], False)) if sm["source"] == "hemis"
             else tr("kunlik davomat bo'yicha"))

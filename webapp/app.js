@@ -19,6 +19,7 @@ const T = {
     no_data: 'Ma’lumot yo‘q', unexcused: 'sababsiz', excused: 'sababli', today_lessons: 'Bugungi darslar', no_lessons_today: 'Bugun dars yo‘q',
     all: 'Hammasi', coordinator: 'Kurs koordinatori', write: 'Yozish', call: 'Qo‘ng‘iroq', updated: 'Yangilangan: {t}',
     since_start: 'Semestr boshidan', next_level: 'Keyingi chegara: {a} — yana {left}', max_level: 'Eng yuqori chegaraga yetgan',
+    hemis_missed: 'HEMIS ma’lumoti bo‘yicha', hemis_missed_note: 'HEMIS umumiy statistikasida har bir darsning sanasi va fani bo‘lmaydi. Kurs koordinatori kunlik davomatni yuklasa, darslar sana va fan bo‘yicha shu yerda ko‘rinadi.', until: '{d} gacha', unexcused_n: 'Sababsiz: {a}', excused_n: 'sababli: {b}',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -53,6 +54,7 @@ const T = {
     no_data: 'Нет данных', unexcused: 'без уважит. причины', excused: 'по уважит. причине', today_lessons: 'Занятия сегодня', no_lessons_today: 'Сегодня занятий нет',
     all: 'Все', coordinator: 'Куратор курса', write: 'Написать', call: 'Позвонить', updated: 'Обновлено: {t}',
     since_start: 'С начала семестра', next_level: 'Следующий порог: {a} — ещё {left}', max_level: 'Достигнут высший порог',
+    hemis_missed: 'По данным HEMIS', hemis_missed_note: 'В общей статистике HEMIS нет даты и предмета каждого занятия. Когда координатор загрузит ежедневную посещаемость, занятия появятся здесь по датам и предметам.', until: 'до {d}', unexcused_n: 'Без причины: {a}', excused_n: 'по уваж. причине: {b}',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -87,6 +89,7 @@ const T = {
     no_data: 'No data', unexcused: 'unexcused', excused: 'excused', today_lessons: 'Today’s classes', no_lessons_today: 'No classes today',
     all: 'All', coordinator: 'Course coordinator', write: 'Write', call: 'Call', updated: 'Updated: {t}',
     since_start: 'Since the start of the semester', next_level: 'Next threshold: {a} — {left} more', max_level: 'Highest threshold reached',
+    hemis_missed: 'According to HEMIS', hemis_missed_note: 'HEMIS summary statistics do not include the date and subject of each class. Once the coordinator uploads daily attendance, classes will appear here by date and subject.', until: 'until {d}', unexcused_n: 'Unexcused: {a}', excused_n: 'excused: {b}',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -374,6 +377,7 @@ async function viewAttendance() {
   const next = a.next ? t('next_level', { a: a.next.action, left: pairs(a.next.left_hours) }) : t('max_level');
   const byDate = {};
   d.absences.forEach(x => { (byDate[x.date] = byDate[x.date] || []).push(x); });
+  const hp = d.absences.length ? [] : (d.hemis_periods || []);  // kunlik ro'yxat yo'q — HEMIS davrlari bo'yicha
   const body = switcher() + `
     <div class="card"><div style="display:flex;gap:16px;align-items:center">${ring(a.percent, 96, 10)}
       <div><div class="bigstat"><b class="num">${a.percent != null ? a.percent + '%' : '—'}</b></div><div class="muted">${t('since_start')}</div></div></div>
@@ -387,6 +391,12 @@ async function viewAttendance() {
       ${d.absences.length ? `<div class="list">${Object.entries(byDate).slice(0, 30).map(([day, items]) => `<div class="row" style="cursor:default;align-items:flex-start">
         <div class="body"><div class="t">${esc(items[0].weekday)}, ${dateLabel(day)}</div>${items.map(x => `<div class="d">${t('pairN', { n: x.pair })} — ${esc(x.subject)}</div>`).join('')}</div>
         <div class="end">${items.map(x => `<div><span class="pill ${x.status === 'kelmadi' ? 'bordo' : 'warn'}">${t(x.status)}</span></div>`).join('')}</div></div>`).join('')}</div>`
+        : hp.length ? `<div class="list">${hp.map(p => `<div class="row" style="cursor:default"><div class="body">
+            <div class="t">${p.from ? `${dateLabel(p.from)} — ${dateLabel(p.as_of)}` : t('until', { d: dateLabel(p.as_of) })}</div>
+            <div class="d">${t('hemis_missed')}</div></div>
+            <div class="end"><div><span class="pill ${p.unexcused ? 'bordo' : 'warn'}">${t('unexcused_n', { a: pairs(p.unexcused) })}</span></div>
+              ${p.excused ? `<div class="small muted" style="margin-top:4px">${t('excused_n', { b: pairs(p.excused) })}</div>` : ''}</div></div>`).join('')}</div>
+            <p class="small muted" style="margin:8px 4px 0">${t('hemis_missed_note')}</p>`
         : `<div class="list">${empty('ok', t('nothing_missed'))}</div>`}</section>
     ${d.subjects.length ? `<section class="section"><div class="section-head"><h2>${t('by_subject')}</h2></div><div class="list">${d.subjects.map(s => {
       const pct = s.total ? Math.round(100 * (s.keldi + s.kechikdi) / s.total) : 0;

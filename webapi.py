@@ -282,6 +282,7 @@ async def api_attendance(request):
     return ok({"summary": _attendance(sm), "absences": absences[:120],
                "subjects": sorted(subjects.values(), key=lambda x: -(x["kelmadi"] + x["sababli"])),
                "hemis": [{"as_of": h["as_of"], **absence.stats_hours(h)} for h in hist],
+               "hemis_periods": absence.hemis_periods(hist),  # kunlik ro'yxat bo'lmaganda — davrlar bo'yicha
                "weeks": [{"start": p["start"].isoformat(), "end": p["end"].isoformat(), "pct": round(p["pct"]),
                           "unexc": p["unexc"]} for p in periods], "mode": mode})
 
