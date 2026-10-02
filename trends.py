@@ -205,6 +205,23 @@ async def mini(st: dict) -> list[dict]:
     return items
 
 
+async def by_semester(st: dict) -> list[dict]:
+    """Semestrlar bo'yicha: GPA, o'rtacha 100 ballik baho, fanlar va «2» lar soni — semestrdan semestrga taqqoslash
+    (bir necha semestr baholari birga yuklansa ham dinamika ko'rinadi)."""
+    res = (await academic.summary(st["id"]))["results"]
+    groups: dict[str, list[dict]] = {}
+    for r in res:
+        groups.setdefault(str(r["semester"] or ""), []).append(r)
+    def key(sem: str):
+        return (0, int(sem)) if sem.isdigit() else (1, sem)
+    out = []
+    for sem in sorted(groups, key=key):
+        items = groups[sem]
+        out.append({"semester": sem, "gpa": academic.gpa(items)[0], "avg": round(sum(i["score"] for i in items) / len(items), 1),
+                    "subjects": len(items), "debts": sum(1 for i in items if i["debt"])})
+    return out
+
+
 def chart_png(mode: str, periods: list[dict], g: dict) -> bytes | None:
     pairs = [(o, r) for o, r in g.get("compared", []) if o]
     if len(periods) < 2 and not pairs:

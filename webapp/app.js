@@ -25,6 +25,7 @@ const T = {
     surveys: 'So‘rovnomalar', survey: 'So‘rovnoma', regs: 'Ichki nizomlar', regs_sub: 'Universitet ichki tartib qoidalari va nizomlari', answer_now: 'Javob berish', q_n: '{n} ta savol', closes: '{d} gacha', submit_survey: 'Yuborish', survey_thanks: 'Rahmat! Javobingiz qabul qilindi.', survey_closed: 'So‘rovnoma yopilgan', required_q: 'Iltimos, belgilangan savollarga javob bering', your_answer: 'Javobingiz…', answered: 'Javob berilgan', no_surveys: 'Hozircha so‘rovnoma yo‘q', no_regs: 'Nizomlar hali joylanmagan', edit_answer: 'Javobni o‘zgartirish', anon: 'Anonim: ismingiz va farzandingiz ko‘rsatilmaydi', scale_lo: 'yomon', scale_hi: 'a’lo', choose_many: 'bir nechtasini tanlash mumkin', waiting_you: 'Fikringizni kutyapmiz', open_link: 'Ochish', new_note: 'Yangi bildirishnoma', poll_done: 'Javob berganlar',
     dyn_first: 'birinchi ma’lumot', dyn_same: 'o‘zgarmadi', more: 'Batafsil',
     dyn_none: 'Oxirgi yuklashlarda o‘zgarish bo‘lmadi — o‘zgarish bo‘lsa, shu yerda ko‘rinadi.',
+    by_upload: 'Yuklangan ma’lumotlar bo‘yicha', by_semester: 'Semestrlar bo‘yicha', avg_score: 'o‘rtacha ball',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -65,6 +66,7 @@ const T = {
     surveys: 'Опросы', survey: 'Опрос', regs: 'Внутренние положения', regs_sub: 'Правила внутреннего распорядка и положения университета', answer_now: 'Ответить', q_n: 'вопросов: {n}', closes: 'до {d}', submit_survey: 'Отправить', survey_thanks: 'Спасибо! Ваш ответ принят.', survey_closed: 'Опрос закрыт', required_q: 'Пожалуйста, ответьте на отмеченные вопросы', your_answer: 'Ваш ответ…', answered: 'Ответ отправлен', no_surveys: 'Пока опросов нет', no_regs: 'Положения ещё не размещены', edit_answer: 'Изменить ответ', anon: 'Анонимно: ваше имя и имя ребёнка не показываются', scale_lo: 'плохо', scale_hi: 'отлично', choose_many: 'можно выбрать несколько', waiting_you: 'Ждём вашего мнения', open_link: 'Открыть', new_note: 'Новое уведомление', poll_done: 'Ответили',
     dyn_first: 'первые данные', dyn_same: 'без изменений', more: 'Подробнее',
     dyn_none: 'В последних загрузках изменений не было — при изменениях они появятся здесь.',
+    by_upload: 'По загруженным данным', by_semester: 'По семестрам', avg_score: 'средний балл',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -105,6 +107,7 @@ const T = {
     surveys: 'Surveys', survey: 'Survey', regs: 'University regulations', regs_sub: 'Internal rules and regulations of the university', answer_now: 'Answer', q_n: '{n} question(s)', closes: 'until {d}', submit_survey: 'Submit', survey_thanks: 'Thank you! Your answer has been received.', survey_closed: 'The survey is closed', required_q: 'Please answer the marked questions', your_answer: 'Your answer…', answered: 'Answered', no_surveys: 'No surveys yet', no_regs: 'No regulations published yet', edit_answer: 'Change answer', anon: 'Anonymous: your and your child’s names are not shown', scale_lo: 'poor', scale_hi: 'excellent', choose_many: 'you can choose several', waiting_you: 'We’d like your opinion', open_link: 'Open', new_note: 'New notification', poll_done: 'Answered',
     dyn_first: 'first data', dyn_same: 'no change', more: 'Details',
     dyn_none: 'No changes in the latest uploads — changes will appear here.',
+    by_upload: 'By uploaded data', by_semester: 'By semester', avg_score: 'average score',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -641,7 +644,7 @@ async function viewTrends() {
   let d;
   try { d = await api(childPath(c, 'trends')); } catch (e) { return page({ title: t('trends'), body: errorBox() }); }
   const g = d.grades;
-  const comp = (g.compared || []).filter(x => x.old != null);
+  const comp = g.items.length ? (g.compared || []).filter(x => x.old != null) : [];  // ball o'zgarmagan — grafik shart emas
   const cmpChart = comp.length ? `<svg class="chart" viewBox="0 0 320 ${comp.length * 46 + 10}" role="img" aria-label="${t('by_subject')}">${comp.map((x, i) => {
     const y = i * 46 + 6, wOld = x.old * 1.8, wNew = x.new * 1.8;
     return `<text x="0" y="${y + 10}">${esc(x.subject.slice(0, 34))}</text>
@@ -649,14 +652,27 @@ async function viewTrends() {
       <rect x="0" y="${y + 27}" width="${wNew}" height="9" rx="4" fill="${x.new < 60 ? 'var(--bordo-500)' : 'var(--navy-500)'}"/><text x="${wNew + 6}" y="${y + 35}">${num(x.new)}</text>`;
   }).join('')}<line x1="108" x2="108" y1="0" y2="${comp.length * 46 + 10}" stroke="var(--bordo-500)" stroke-dasharray="3 3"/></svg>
     <div class="chips small muted" style="margin-top:8px"><span><span class="pill" style="background:var(--line);color:var(--muted)">${g.month ? t('month_ago') : dateLabel(g.ref)}</span></span><span class="pill">${t('now')}</span><span class="small muted">60 — «3»</span></div>` : '';
+  const ups = d.uploads || [], sems = (d.semesters || []).filter(x => x.gpa != null);
+  S.gpaMin = d.gpa_min;
+  // yuklangan fayllar bo'yicha: har bir ko'rsatkich — qiymat, o'zgarish, grafik va barcha nuqtalar (sana: qiymat)
+  const upHtml = ups.length ? `<section class="section"><div class="section-head"><h2>${t('by_upload')}</h2></div><div class="card dyn">${ups.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">
+      <div class="body"><div class="t">${esc(it.title)}</div><div class="d">${it.points.map(p => `${esc(p.label)}: ${esc(dynVal(it, p.value))}`).join(' → ')}</div></div>
+      ${spark(it.points, dl.cls)}<div class="val"><b class="num">${esc(dynVal(it, it.value))}</b><span class="${dl.cls}">${esc(dl.txt)}</span></div></div>`; }).join('')}</div></section>` : '';
+  // semestrlar bo'yicha: GPA ustunlari va har bir semestr — oldingisiga nisbatan
+  const semHtml = sems.length ? `<section class="section"><div class="section-head"><h2>${t('by_semester')}</h2></div><div class="card">
+      ${sems.length > 1 ? `<div class="sem-bars">${sems.map(x => `<div class="sem-bar"><b class="num">${gpaNum(x.gpa)}</b><i style="height:${Math.max(6, Math.round(x.gpa / 5 * 90))}px" class="${x.gpa < (S.gpaMin || 2.6) ? 'low' : ''}"></i><span>${esc(semLabel(x.semester))}</span></div>`).join('')}</div>` : ''}
+      ${sems.map((x, i) => { const p = sems[i - 1]; const dg = p ? Math.round((x.gpa - p.gpa) * 100) / 100 : null;
+        return `<div class="kv" style="margin-top:${i ? 8 : 12}px"><span><b>${esc(semLabel(x.semester))}</b> · ${t('avg_score')} ${num(x.avg)}${x.debts ? ` · <span style="color:var(--bordo-fg)">«2»: ${x.debts}</span>` : ''}</span>
+          <b class="num">GPA ${gpaNum(x.gpa)}${dg ? ` <span style="color:${dg > 0 ? 'var(--ok)' : 'var(--bordo-fg)'}">${dg > 0 ? '▲' : '▼'} ${gpaNum(Math.abs(dg))}</span>` : ''}</b></div>`; }).join('')}</div></section>` : '';
   page({ title: t('trends'), sub: c.short, active: '', body: switcher() + `<h2 class="screen-title">${t('trends')}</h2>
+    ${upHtml}${semHtml}
     ${d.periods.length > 1 ? `<section class="section"><div class="section-head"><h2>${t('by_week')}</h2></div><div class="card">${weekChart(d.periods)}</div></section>` : ''}
     ${g.items.length ? `<section class="section"><div class="section-head"><h2>${t('by_subject')}</h2>${g.gpa_old != null && g.gpa_new != null ? `<span class="muted num">GPA ${gpaNum(g.gpa_old)} → <b>${gpaNum(g.gpa_new)}</b></span>` : ''}</div>
       <div class="list">${g.items.map(x => `<div class="row" style="cursor:default"><div class="ic ${x.delta < 0 ? 'bordo' : ''}">${ic('trend')}</div><div class="body"><div class="t">${esc(x.subject)}</div>
         <div class="d num">${num(x.old)} → ${num(x.new)}${x.old_grade !== x.new_grade ? ` · «${x.old_grade}» → «${x.new_grade}»` : ''}</div></div>
         <b class="num" style="color:${x.delta < 0 ? 'var(--bordo-fg)' : 'var(--ok)'}">${x.delta > 0 ? '+' : '−'}${num(Math.abs(x.delta))}</b></div>`).join('')}</div></section>` : ''}
     ${cmpChart ? `<section class="section"><div class="card">${cmpChart}</div></section>` : ''}
-    ${d.periods.length < 2 && !g.items.length ? `<div class="list">${empty('trend', t('no_trends'))}</div>` : ''}` });
+    ${d.periods.length < 2 && !g.items.length && !ups.length && !sems.length ? `<div class="list">${empty('trend', t('no_trends'))}</div>` : ''}` });
 }
 
 /* ================================================================ menyu, sozlamalar, ma'lumot */
@@ -752,6 +768,7 @@ function dynDelta(it) {
   const mag = it.unit === '%' ? `${num(Math.abs(d))} p.p.` : it.unit === 'gpa' ? gpaNum(Math.abs(d)) : it.unit === 'pairs' ? pairs(Math.abs(d)) : it.unit === 'subjects' ? t('subjectsN', { n: Math.abs(d) }) : it.unit === 'money' || it.unit === 'so\'m' ? money(Math.abs(d)) : dynVal(it, Math.abs(d));
   return { cls: good ? 'good' : 'bad', txt: `${d > 0 ? '▲' : '▼'} ${mag}` };
 }
+const semLabel = s => /^\d+$/.test(String(s)) ? t('semN', { n: s }) : String(s || '—');
 function parentDyn(items) {
   // ota-ona bosh sahifasi: davomat, GPA, kontrakt qarzi — qiymat, o'zgarish va kichik grafik; bosilsa — batafsil
   return `<section class="section"><div class="section-head"><h2>${t('trends')}</h2><a href="#/trends">${t('more')}</a></div>

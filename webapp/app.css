@@ -474,3 +474,10 @@ fieldset.q.missing { box-shadow: 0 0 0 2px var(--bordo-500); }
 .scale input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
 .scale input:focus-visible + span { outline: 3px solid var(--navy-500); outline-offset: 2px; }
 .scale-ends { display: flex; justify-content: space-between; margin-top: 6px; }
+
+/* dinamika: semestrlar bo'yicha GPA ustunlari */
+.sem-bars { display: flex; align-items: flex-end; justify-content: space-around; gap: 10px; height: 140px; padding-top: 6px; border-bottom: 1px solid var(--line); }
+.sem-bar { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; max-width: 70px; font-size: 12px; }
+.sem-bar i { display: block; width: 100%; max-width: 38px; border-radius: 8px 8px 0 0; background: var(--navy-500); }
+.sem-bar i.low { background: var(--bordo-500); }
+.sem-bar span { color: var(--muted); white-space: nowrap; }

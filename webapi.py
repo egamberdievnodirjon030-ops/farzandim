@@ -368,8 +368,12 @@ async def api_trends(request):
     st = request["student"]
     mode, periods = await trends.attendance_periods(st)
     g = await trends.grade_changes(st)
+    sems = await trends.by_semester(st)
     return ok({"mode": mode, "periods": [{"label": trends._period_label(p), "pct": round(p["pct"]), "unexc": p["unexc"]}
                                          for p in periods],
+               "uploads": await trends.mini(st),  # har bir yuklangan fayl bo'yicha o'zgarishlar
+               "gpa_min": GPA_MIN,
+               "semesters": [{**x, "gpa": _gpa(x["gpa"])} for x in sems],
                "grades": {"ref": g["ref"], "month": g["month"], "gpa_old": _gpa(g["gpa_old"]), "gpa_new": _gpa(g["gpa_new"]),
                           "items": [{"subject": loc.term(i["subject"]), "old": i["old"], "new": i["new"],
                                      "delta": i["delta"], "old_grade": i["old_grade"], "new_grade": i["new_grade"]}
