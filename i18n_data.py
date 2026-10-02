@@ -1053,4 +1053,24 @@ TR: dict[str, dict[str, str]] = {
     'Bugun yakshanba — kelasi hafta jadvali.': {
         'ru': 'Сегодня воскресенье — расписание на следующую неделю.',
         'en': "Today is Sunday — next week's timetable."},
+    # GPA chegarasi (kursdan kursga o'tish)
+    "🎓 GPA {v} — {min} dan past: kursdan kursga o'tmaydi": {
+        'ru': '🎓 GPA {v} — ниже {min}: не переводится на следующий курс',
+        'en': '🎓 GPA {v} — below {min}: will not advance to the next year'},
+    "🔴 GPA {min} dan past — talaba kursdan kursga o'tkazilmaydi.": {
+        'ru': '🔴 GPA ниже {min} — студент не переводится на следующий курс.',
+        'en': '🔴 GPA is below {min} — the student will not advance to the next year.'},
+    "Umumiy GPA {min} dan past bo'lsa, talaba kursdan kursga o'tkazilmaydi (GPA yaxlitlanmaydi).": {
+        'ru': 'Если общий GPA ниже {min}, студент не переводится на следующий курс (GPA не округляется).',
+        'en': 'If the overall GPA is below {min}, the student does not advance to the next year (GPA is not rounded).'},
+    # Qoldirilgan darslar — faqat HEMIS statistikasi bo'lsa
+    "❗ <b>Qoldirilgan darslar — HEMIS ma'lumoti</b>": {
+        'ru': '❗ <b>Пропущенные занятия — данные HEMIS</b>', 'en': '❗ <b>Missed classes — HEMIS data</b>'},
+    "{a} — {b}": {'ru': '{a} — {b}', 'en': '{a} — {b}'},
+    "{b} gacha": {'ru': 'до {b}', 'en': 'until {b}'},
+    "sababsiz {a}": {'ru': 'без причины {a}', 'en': 'unexcused {a}'},
+    "sababli {b}": {'ru': 'по уважительной причине {b}', 'en': 'excused {b}'},
+    "ℹ️ HEMIS umumiy statistikasida har bir darsning sanasi va fani bo'lmaydi. Kurs koordinatori kunlik davomatni yuklasa, darslar sana va fan bo'yicha ko'rinadi.": {
+        'ru': 'ℹ️ В общей статистике HEMIS нет даты и предмета каждого занятия. Когда координатор загрузит ежедневную посещаемость, занятия будут видны по датам и предметам.',
+        'en': 'ℹ️ HEMIS summary statistics do not include the date and subject of each class. Once the coordinator uploads daily attendance, classes will be shown by date and subject.'},
 }

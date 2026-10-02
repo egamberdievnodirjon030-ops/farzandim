@@ -52,7 +52,9 @@ const num = (x, d = 1) => Number(x || 0).toLocaleString('ru-RU', { maximumFracti
 const money = x => `${Math.round(Number(x || 0)).toLocaleString('ru-RU')}\u00a0so‘m`;
 const mln = x => Number(x || 0) >= 1e6 ? `${num(Number(x) / 1e6, 1)}<small> mln so‘m</small>` : `${num(x, 0)}<small> so‘m</small>`;
 const mlnPlain = x => Number(x || 0) >= 1e6 ? `${num(Number(x) / 1e6, 1)} mln` : num(x, 0);
-const gpaFmt = g => Number(g).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// GPA yaxlitlanmaydi — 2 xonagacha kesiladi (2,599 → 2,59)
+const limNum = x => String(x).replace('.', ',');  // chegara aynan: 2.6 → 2,6
+const gpaFmt = g => (Math.floor(Number(g) * 100 + 1e-6) / 100).toFixed(2).replace('.', ',');
 const pairs = h => `${num(Number(h || 0) / 2)} para (${num(h)} soat)`;
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
 function fmtPhone(p) {
@@ -282,11 +284,12 @@ async function pPanel() {
   view(head('Kurs holati', courseSub()) + skel(110) + skel(360));
   const [d, ib, rq] = await Promise.all([api('/api/staff/panel'), api('/api/staff/inbox'), api('/api/staff/requests')]);
   const cover = pct(d.linked, d.total);
-  const band = (d.scope ? `<p class="hint" style="margin:-10px 0 14px">${esc(d.scope)}</p>` : '') + `<section class="band" aria-label="Asosiy ko‘rsatkichlar">
+  const band = (d.scope ? `<p class="hint" style="margin:-10px 0 14px">${esc(d.scope)}</p>` : '') + `<section class="band" style="--cols:7" aria-label="Asosiy ko‘rsatkichlar">
     <a href="#/students"><div class="k">Talabalar</div><div class="v navy">${d.total}</div>
       <div class="s">ota-onasi ulangan: ${cover}%</div><div class="meter"><i style="width:${cover}%"></i></div></a>
     <a href="#/students?f=att"><div class="k">Davomat muammosi</div><div class="v ${tone(d.att)}">${d.att}</div><div class="s">chegaraga yetganlar</div></a>
     <a href="#/students?f=acad"><div class="k">Akademik qarz</div><div class="v ${tone(d.acad)}">${d.acad}</div><div class="s">kamida bitta «2»</div></a>
+    <a href="#/students?f=gpa"><div class="k">GPA past</div><div class="v ${tone(d.gpa)}">${d.gpa}</div><div class="s">${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi</div></a>
     <a href="#/students?f=prob"><div class="k">3+ masalali</div><div class="v ${tone(d.multi)}">${d.multi}</div><div class="s">birinchi navbatda</div></a>
     <a href="#/students?f=kontrakt"><div class="k">Kontrakt qarzi</div><div class="v ${tone(d.kontrakt.count, 'warn')}">${d.kontrakt.count}</div><div class="s num">${money(d.kontrakt.sum)}</div></a>
     <a href="#/students?f=trimestr"><div class="k">Trimestr qarzi</div><div class="v ${tone(d.trimestr.count, 'warn')}">${d.trimestr.count}</div><div class="s num">${money(d.trimestr.sum)}</div></a>
@@ -347,13 +350,14 @@ function issueChips(r) {
   const out = [];
   if (r.flags.att) out.push(`<span class="chip bordo">${esc(r.action || 'Davomat')}</span>`);
   if (r.flags.acad) out.push(`<span class="chip bordo" title="${esc(r.debts.join(', '))}">Akademik: ${r.debts.length} fan</span>`);
+  if (r.flags.gpa) out.push(`<span class="chip bordo" title="Kursdan kursga o‘tmaydi">GPA ${gpaFmt(r.gpa)}</span>`);
   if (r.flags.kontrakt) out.push(`<span class="chip warn">Kontrakt: ${money(r.kontrakt)}</span>`);
   if (r.flags.trimestr) out.push(`<span class="chip warn">Trimestr: ${money(r.trimestr)}</span>`);
   return out.join('') || '<span class="dash">—</span>';
 }
 
 /* ================================================================ talabalar */
-const FILTERS = [['', 'Hammasi'], ['prob', 'Muammoli'], ['att', 'Davomat'], ['acad', 'Akademik qarz'], ['kontrakt', 'Kontrakt'], ['trimestr', 'Trimestr']];
+const FILTERS = [['', 'Hammasi'], ['prob', 'Muammoli'], ['att', 'Davomat'], ['acad', 'Akademik qarz'], ['gpa', 'GPA past'], ['kontrakt', 'Kontrakt'], ['trimestr', 'Trimestr']];
 const COLS = [['name', 'Talaba'], ['group', 'Guruh'], ['percent', 'Davomat'], ['action', 'Chora'],
   ['debts', 'Akademik qarz'], ['gpa', 'GPA', 'r'], ['kontrakt', 'Kontrakt', 'r'], ['trimestr', 'Trimestr', 'r'], ['problems', 'Masala', 'r']];
 const norm = s => String(s || '').toLowerCase().replace(/[‘’ʻʼ'`]/g, '').replace(/\s+/g, ' ').trim();
@@ -467,7 +471,7 @@ async function openStudent(id, course = null) {
       : `<div class="note ok">${ic('ok')}<span>Hammasi joyida — davomat, baholar va to‘lovlar bo‘yicha masala yo‘q.</span></div>`}
     <div class="mini">
       <div><div class="k">Davomat</div><div class="v">${a && a.percent != null ? a.percent + '%' : '—'}</div><div class="s">${a ? 'sababsiz: ' + pairs(a.counted_hours) : 'ma’lumot yo‘q'}</div></div>
-      <div><div class="k">GPA</div><div class="v">${d.gpa != null ? gpaFmt(d.gpa) : '—'}<small style="font-size:14px;color:var(--muted)"> / 5</small></div><div class="s">${d.academic.count ? d.academic.count + ' ta akademik qarz' : 'akademik qarz yo‘q'}</div></div>
+      <div><div class="k">GPA${d.gpa_low ? ` <span class="chip bordo" style="height:20px">${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi</span>` : ''}</div><div class="v">${d.gpa != null ? gpaFmt(d.gpa) : '—'}<small style="font-size:14px;color:var(--muted)"> / 5</small></div><div class="s">${d.academic.count ? d.academic.count + ' ta akademik qarz' : 'akademik qarz yo‘q'}</div></div>
     </div>
     ${a ? `<div class="box"><h4>Dars qoldirish chegaralari</h4><div class="kv"><span>Sababsiz</span><b>${pairs(a.counted_hours)}</b>
       <span>Sababli</span><b>${pairs(a.excused_hours)}</b>${a.next ? `<span>Keyingi chegaragacha</span><b>${pairs(a.next.left_hours)}</b>` : ''}</div>${ladder}</div>` : ''}

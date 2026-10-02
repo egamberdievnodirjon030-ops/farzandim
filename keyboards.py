@@ -412,13 +412,13 @@ class PanelCb(CallbackData, prefix="pn"):
 
 def panel_kb(f: str = "") -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    for text, v in (("🔴 Muammoli talabalar", "prob"), ("📚 Akademik qarzdorlar", "acad"),
+    for text, v in (("🔴 Muammoli talabalar", "prob"), ("📚 Akademik qarzdorlar", "acad"), ("🎓 GPA past", "gpa"),
                     ("💰 Kontrakt qarzdorlar", "kontrakt"), ("💳 Trimestr qarzdorlar", "trimestr"),
                     ("🚫 Davomat muammosi", "att"), ("🔁 Yangilash", "home")):
         kb.button(text=text, callback_data=PanelCb(v=v, f=f[:30]))
     kb.button(text="📥 Excel hisobot", callback_data=ExpCb(fmt="x", s="all", f=f[:30]))
     kb.button(text="📄 PDF hisobot", callback_data=ExpCb(fmt="p", s="all", f=f[:30]))
-    kb.adjust(1, 2, 2, 1, 2)
+    kb.adjust(1, 2, 2, 2, 2)
     return kb.as_markup()
 
 

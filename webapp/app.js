@@ -20,6 +20,7 @@ const T = {
     all: 'Hammasi', coordinator: 'Kurs koordinatori', write: 'Yozish', call: 'Qo‘ng‘iroq', updated: 'Yangilangan: {t}',
     since_start: 'Semestr boshidan', next_level: 'Keyingi chegara: {a} — yana {left}', max_level: 'Eng yuqori chegaraga yetgan',
     hemis_missed: 'HEMIS ma’lumoti bo‘yicha', hemis_missed_note: 'HEMIS umumiy statistikasida har bir darsning sanasi va fani bo‘lmaydi. Kurs koordinatori kunlik davomatni yuklasa, darslar sana va fan bo‘yicha shu yerda ko‘rinadi.', until: '{d} gacha', unexcused_n: 'Sababsiz: {a}', excused_n: 'sababli: {b}',
+    gpa_low: '{min} dan past — kursdan kursga o‘tmaydi',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -55,6 +56,7 @@ const T = {
     all: 'Все', coordinator: 'Куратор курса', write: 'Написать', call: 'Позвонить', updated: 'Обновлено: {t}',
     since_start: 'С начала семестра', next_level: 'Следующий порог: {a} — ещё {left}', max_level: 'Достигнут высший порог',
     hemis_missed: 'По данным HEMIS', hemis_missed_note: 'В общей статистике HEMIS нет даты и предмета каждого занятия. Когда координатор загрузит ежедневную посещаемость, занятия появятся здесь по датам и предметам.', until: 'до {d}', unexcused_n: 'Без причины: {a}', excused_n: 'по уваж. причине: {b}',
+    gpa_low: 'ниже {min} — не переводится на следующий курс',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -90,6 +92,7 @@ const T = {
     all: 'All', coordinator: 'Course coordinator', write: 'Write', call: 'Call', updated: 'Updated: {t}',
     since_start: 'Since the start of the semester', next_level: 'Next threshold: {a} — {left} more', max_level: 'Highest threshold reached',
     hemis_missed: 'According to HEMIS', hemis_missed_note: 'HEMIS summary statistics do not include the date and subject of each class. Once the coordinator uploads daily attendance, classes will appear here by date and subject.', until: 'until {d}', unexcused_n: 'Unexcused: {a}', excused_n: 'excused: {b}',
+    gpa_low: 'below {min} — will not advance to the next year',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -129,6 +132,9 @@ const SHORT_WD = { uz: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh'], ru: ['Пн', 'Вт'
 
 /* ================================================================ yordamchilar */
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/* GPA yaxlitlanmaydi: 2 xonagacha kesiladi (2,599 → 2,59 — 2,6 deb ko'rsatilsa, chegaradan o'tgandek ko'rinadi) */
+const limNum = x => S.lang === 'en' ? String(x) : String(x).replace('.', ',');  // chegara aynan: 2.6 → 2,6
+const gpaNum = x => { const s = (Math.floor(Number(x) * 100 + 1e-6) / 100).toFixed(2); return S.lang === 'en' ? s : s.replace('.', ','); };
 const num = x => { const v = Math.round(Number(x || 0) * 10) / 10; return (Number.isInteger(v) ? String(v) : String(v).replace('.', S.lang === 'en' ? '.' : ',')); };
 const money = x => t('money', { n: Math.round(Number(x || 0)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') }).replace(/ /g, '\u00a0');
 function subjUnit(n) {  // «1 ta fan» / «1 предмет, 2 предмета, 5 предметов» / «1 subject»
@@ -319,7 +325,7 @@ async function viewHome() {
       <div class="ring-wrap">${ring(a.percent, 54, 7)}<span class="v num">${a.percent != null ? a.percent + '%' : '—'}</span></div>
       <span class="s">${t('unexcused')}<br><b class="nowrap">${pairs(a.counted_hours)}</b></span></a>`
     : `<a class="tile" href="#/attendance"><span class="k">${t('attendance')}</span><span class="v muted" style="font-size:18px">${t('no_data')}</span></a>`;
-  const gpaTile = `<a class="tile" href="#/grades"><span class="k">${t('gpa')}</span><span class="v num">${o.gpa != null ? num(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${t('gpa_hint')}</span></a>`;
+  const gpaTile = `<a class="tile ${o.gpa_low ? 'bad' : ''}" href="#/grades"><span class="k">${t('gpa')}</span><span class="v num">${o.gpa != null ? gpaNum(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${o.gpa_low ? t('gpa_low', { min: limNum(o.gpa_min) }) : t('gpa_hint')}</span></a>`;
   const acadTile = `<a class="tile ${o.academic.count ? 'bad' : 'ok'}" href="${o.academic.count ? '#/debts' : '#/grades'}"><span class="k">${t('acad')}</span>
       <span class="v" style="font-size:${o.academic.count ? 26 : 22}px">${o.academic.count ? `${o.academic.count}<small class="of"> ${esc(subjUnit(o.academic.count))}</small>` : t('none')}</span>
       <span class="s clamp3">${o.academic.count ? esc(o.academic.debts.map(d => d.subject).join(', ')) : ''}</span></a>`;
@@ -444,9 +450,9 @@ async function viewGrades() {
       <div style="flex:1;text-align:left"><b style="display:block">${t('acad')}: ${d.debts}</b><span class="muted small">${t('open')}</span></div>${ic('chev')}</a>` : '')
     + empty('grade', t('no_data')) });
   const body = switcher() + `<div class="card" style="display:flex;justify-content:space-between;align-items:center">
-      <div><div class="muted small">${t('gpa_long')}</div><div class="bigstat"><b class="num">${d.gpa != null ? num(d.gpa) : '—'}</b><span class="muted">/ 5</span></div></div>
+      <div><div class="muted small">${t('gpa_long')}</div><div class="bigstat"><b class="num">${d.gpa != null ? gpaNum(d.gpa) : '—'}</b><span class="muted">/ 5</span></div>${d.gpa_low ? `<div class="small" style="color:var(--bordo-fg);font-weight:600;margin-top:2px">${t('gpa_low', { min: limNum(d.gpa_min) })}</div>` : ''}</div>
       ${d.debts ? `<a class="pill bordo" href="#/debts" style="font-size:14px;padding:8px 12px">${t('acad')}: ${d.debts} ${ic('chev')}</a>` : `<span class="pill ok" style="font-size:14px;padding:8px 12px">${t('acad')}: ${t('none')}</span>`}</div>
-    ${d.semesters.map(s => `<section class="section"><div class="section-head"><h2>${t('semN', { n: s.semester })}</h2>${s.gpa != null ? `<span class="muted num">GPA ${num(s.gpa)}</span>` : ''}</div>
+    ${d.semesters.map(s => `<section class="section"><div class="section-head"><h2>${t('semN', { n: s.semester })}</h2>${s.gpa != null ? `<span class="muted num">GPA ${gpaNum(s.gpa)}</span>` : ''}</div>
       <div class="list">${s.subjects.map(g => `<div class="subject ${g.debt ? 'debt' : ''}"><div><div style="font-weight:600">${esc(g.subject)}</div>
         <div class="small muted num">${num(g.score)} / 100${g.credits ? ' · ' + num(g.credits) + ' ' + t('credits') : ''}${g.debt ? ' · <span style="color:var(--bordo-fg)">' + t('debt_subject') + '</span>' : ''}</div></div>
         <div class="grade g${g.grade}">${g.grade}</div><div class="meter"><i style="width:${Math.min(100, g.score)}%"></i></div></div>`).join('')}</div></section>`).join('')}
@@ -616,7 +622,7 @@ async function viewTrends() {
     <div class="chips small muted" style="margin-top:8px"><span><span class="pill" style="background:var(--line);color:var(--muted)">${g.month ? t('month_ago') : dateLabel(g.ref)}</span></span><span class="pill">${t('now')}</span><span class="small muted">60 — «3»</span></div>` : '';
   page({ title: t('trends'), sub: c.short, active: '', body: switcher() + `<h2 class="screen-title">${t('trends')}</h2>
     ${d.periods.length > 1 ? `<section class="section"><div class="section-head"><h2>${t('by_week')}</h2></div><div class="card">${weekChart(d.periods)}</div></section>` : ''}
-    ${g.items.length ? `<section class="section"><div class="section-head"><h2>${t('by_subject')}</h2>${g.gpa_old != null && g.gpa_new != null ? `<span class="muted num">GPA ${num(g.gpa_old)} → <b>${num(g.gpa_new)}</b></span>` : ''}</div>
+    ${g.items.length ? `<section class="section"><div class="section-head"><h2>${t('by_subject')}</h2>${g.gpa_old != null && g.gpa_new != null ? `<span class="muted num">GPA ${gpaNum(g.gpa_old)} → <b>${gpaNum(g.gpa_new)}</b></span>` : ''}</div>
       <div class="list">${g.items.map(x => `<div class="row" style="cursor:default"><div class="ic ${x.delta < 0 ? 'bordo' : ''}">${ic('trend')}</div><div class="body"><div class="t">${esc(x.subject)}</div>
         <div class="d num">${num(x.old)} → ${num(x.new)}${x.old_grade !== x.new_grade ? ` · «${x.old_grade}» → «${x.new_grade}»` : ''}</div></div>
         <b class="num" style="color:${x.delta < 0 ? 'var(--bordo-fg)' : 'var(--ok)'}">${x.delta > 0 ? '+' : '−'}${num(Math.abs(x.delta))}</b></div>`).join('')}</div></section>` : ''}
@@ -681,6 +687,7 @@ function staffRow(r, withCourse = false) {
   const tags = [];
   if (r.flags.att) tags.push(`<span class="pill bordo">${esc(r.action || 'Davomat')}</span>`);
   if (r.flags.acad) tags.push(`<span class="pill bordo">Akademik: ${r.debts.length}</span>`);
+  if (r.flags.gpa) tags.push(`<span class="pill bordo">GPA ${gpaNum(r.gpa)}</span>`);
   if (r.kontrakt) tags.push(`<span class="pill warn">Kontrakt: ${money(r.kontrakt)}</span>`);
   if (r.trimestr) tags.push(`<span class="pill warn">Trimestr: ${money(r.trimestr)}</span>`);
   return `<a class="row" href="#/staff/student/${r.id}${withCourse ? '?c=' + encodeURIComponent(r.course) : ''}"><div class="ic cnt ${r.problems >= 3 ? 'bordo' : ''}" title="${r.problems} ta masala" aria-label="${r.problems} ta masala"><b>${r.problems}</b><small>masala</small></div>
@@ -728,6 +735,7 @@ async function viewStaff() {
       ${tile('Davomat muammosi', d.att, 'chegaraga yetganlar', d.att ? 'bad' : 'ok', '#/staff/students?filter=att')}
       ${tile('Akademik qarz', d.acad, 'kamida bitta «2»', d.acad ? 'bad' : 'ok', '#/staff/students?filter=acad')}
       ${tile('3+ muammoli', d.multi, 'birinchi navbatda', d.multi ? 'bad' : 'ok', '#/staff/students?filter=prob')}
+      ${tile('GPA past', d.gpa, `${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi`, d.gpa ? 'bad' : 'ok', '#/staff/students?filter=gpa')}
       ${tile('Kontrakt qarzi', d.kontrakt.count, money(d.kontrakt.sum), d.kontrakt.count ? 'warn' : 'ok', '#/staff/students?filter=kontrakt')}
       ${tile('Trimestr qarzi', d.trimestr.count, money(d.trimestr.sum), d.trimestr.count ? 'warn' : 'ok', '#/staff/students?filter=trimestr')}</div>
     ${dynCard(d.dynamics)}
@@ -746,7 +754,7 @@ async function viewStaffStudents(params) {
   const flt = params.get('filter') || '', q = params.get('q') || '';
   const all = S.me.role === 'super' && params.get('all') === '1';
   const qs = k => `#/staff/students?${new URLSearchParams(Object.assign({}, all ? { all: '1' } : {}, k ? { filter: k } : {}))}`;
-  const filters = [['', 'Hammasi'], ['prob', 'Muammoli'], ['att', 'Davomat'], ['acad', 'Akademik'], ['kontrakt', 'Kontrakt'], ['trimestr', 'Trimestr']];
+  const filters = [['', 'Hammasi'], ['prob', 'Muammoli'], ['att', 'Davomat'], ['acad', 'Akademik'], ['gpa', 'GPA past'], ['kontrakt', 'Kontrakt'], ['trimestr', 'Trimestr']];
   const scope = S.me.role === 'super' ? `<div class="seg" style="margin-bottom:12px"><button data-act="scope" data-all="0" aria-pressed="${!all}">Joriy kurs</button><button data-act="scope" data-all="1" aria-pressed="${all}">Barcha kurslar</button></div>` : '';
   const head = scope + `<form data-act="search" style="display:flex;gap:8px">${all ? '<input type="hidden" name="all" value="1">' : ''}<input class="input" name="q" value="${esc(q)}" placeholder="Familiya, ism yoki HEMIS ID" aria-label="Qidirish"><button class="btn" aria-label="Qidirish">${ic('search')}</button></form>
     <div class="chips" style="margin:12px 0">${filters.map(([k, l]) => `<a class="chip" href="${qs(k)}" aria-pressed="${k === flt}">${l}</a>`).join('')}</div>`;
@@ -773,7 +781,7 @@ async function viewStaffStudent(sid) {
   const c = o.child, a = o.attendance;
   const body = idCard(c) + verdict(o) + `<div class="grid2" style="margin-top:14px">
       <div class="tile"><span class="k">Davomat</span><span class="v num">${a && a.percent != null ? a.percent + '%' : '—'}</span><span class="s">${a ? `sababsiz<br><b class="nowrap">${pairs(a.counted_hours)}</b>` : ''}</span></div>
-      <div class="tile"><span class="k">GPA</span><span class="v num">${o.gpa != null ? num(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">akademik qarz: ${o.academic.count ? o.academic.count + ' ta fan' : 'yo‘q'}</span></div>
+      <div class="tile"><span class="k">GPA</span><span class="v num">${o.gpa != null ? gpaNum(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${o.gpa_low ? `<b>${limNum(o.gpa_min)} dan past — kursdan kursga o‘tmaydi</b><br>` : ''}akademik qarz: ${o.academic.count ? o.academic.count + ' ta fan' : 'yo‘q'}</span></div>
       ${payTile('kontrakt', o.pays.kontrakt)}${payTile('trimestr', o.pays.trimestr)}</div>
     ${o.academic.count ? `<section class="section"><div class="section-head"><h2>Akademik qarzdorlik</h2><span class="muted small">${o.academic.count} ta fan</span></div>
       <div class="list">${o.academic.debts.map(debtRow).join('')}</div></section>` : ''}

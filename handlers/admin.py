@@ -24,7 +24,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, FSInputFile, InputMe
 import absence
 import academic
 import individual
-from config import ADMIN_IDS, HEMIS_STATS_HOURS_PER_UNIT, PAY_REMIND_DAYS, HOURS_PER_PAIR, NOTIFY_MAX_AGE_DAYS
+from config import ADMIN_IDS, GPA_MIN, HEMIS_STATS_HOURS_PER_UNIT, PAY_REMIND_DAYS, HOURS_PER_PAIR, NOTIFY_MAX_AGE_DAYS
 from database import db
 from family import adopt_parents
 from tenancy import (central, coordinator_groups, course_title, current_course, current_user, group_scope, in_scope,
@@ -48,7 +48,7 @@ import status
 from reports import UPDATE_KEYS, last_update, schedule_report
 from utils import (CONTRACT, GRANT, normalize_phone, fmt_pairs, fmt_dt, now_iso, detect_doc_type, fmt_money, doc_keywords, doc_title, esc, fmt_date, fmt_num, fmt_phone, fmt_size,
                    group_key, name_score, normalize_text, parse_course, parse_date, parse_user_dates, split_message,
-                   today,
+                   today, fmt_gpa, fmt_limit,
                    week_bounds)
 
 log = logging.getLogger(__name__)
@@ -1888,7 +1888,7 @@ async def cmd_deadline(message: Message, command: CommandObject) -> None:
 
 
 # ---------------------------------------------------------------- kurs holati (panel)
-FLAG_ICON = {"att": "🚫", "acad": "📚", "kontrakt": "💰", "trimestr": "💳"}
+FLAG_ICON = {"att": "🚫", "acad": "📚", "gpa": "🎓", "kontrakt": "💰", "trimestr": "💳"}
 
 
 async def _panel_students(f: str) -> list[dict]:
@@ -1920,6 +1920,7 @@ async def _panel_text(f: str) -> str:
         f"👨‍👩‍👧 Ulangan ota-onalar: <b>{parents}</b> (ota-onasi ulangan talabalar: {len(linked)} — "
         f"{round(100 * len(linked) / len(sts))}%)",
         f"⚠️ Akademik qarzdorlar: <b>{cnt['acad']}</b>",
+        f"🎓 GPA {fmt_limit(GPA_MIN)} dan past (kursdan kursga o'tmaydi): <b>{cnt['gpa']}</b>",
         f"💰 Kontrakt qarzdorlar: <b>{cnt['kontrakt']}</b>" + (f" (jami {fmt_money(total['kontrakt'])})" if cnt["kontrakt"] else ""),
         f"💳 Trimestr qarzdorlar: <b>{cnt['trimestr']}</b>" + (f" (jami {fmt_money(total['trimestr'])})" if cnt["trimestr"] else ""),
         f"🚫 Davomat muammosi borlar: <b>{cnt['att']}</b> ({fmt_pairs(absence.LEVELS[0])} va undan ko'p, {absence.COUNTED_LABEL})",
@@ -1970,7 +1971,10 @@ async def cb_panel(cb: CallbackQuery, callback_data: PanelCb) -> None:
             items.sort(key=lambda x: -x["attendance"]["counted"])
         elif v == "acad":
             items.sort(key=lambda x: -len(x["debts"]))
-        title = {"acad": "📚 Akademik qarzdorlar", "kontrakt": "💰 Kontrakt qarzdorlar",
+        elif v == "gpa":
+            items.sort(key=lambda x: x["gpa"])
+        title = {"acad": "📚 Akademik qarzdorlar", "gpa": f"🎓 GPA {fmt_limit(GPA_MIN)} dan past (kursdan kursga o'tmaydi)",
+                 "kontrakt": "💰 Kontrakt qarzdorlar",
                  "trimestr": "💳 Trimestr qarzdorlar", "att": "🚫 Davomat muammosi borlar"}[v]
     if not items:
         await cb.message.answer(f"{title}: yo'q ✅")
@@ -1985,6 +1989,8 @@ async def cb_panel(cb: CallbackQuery, callback_data: PanelCb) -> None:
             det.append(f"📚 {len(x['debts'])} fan" + (f" ({esc(', '.join(d['subject'] for d in x['debts'][:2]))}"
                                                       + (", …" if len(x["debts"]) > 2 else "") + ")"
                                                       if v == "acad" else ""))
+        if fl["gpa"]:
+            det.append(f"🎓 GPA {fmt_gpa(x['gpa'])}")
         for k in ("kontrakt", "trimestr"):
             if fl[k]:
                 det.append(f"{FLAG_ICON[k]} {fmt_money(x['pays'][k]['debt'])}")

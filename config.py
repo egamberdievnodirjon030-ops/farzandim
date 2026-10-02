@@ -112,6 +112,8 @@ ABSENCE_COUNT_EXCUSED = os.getenv("ABSENCE_COUNT_EXCUSED", "0").strip() == "1"
 HEMIS_STATS_HOURS_PER_UNIT = float(os.getenv("HEMIS_STATS_HOURS_PER_UNIT", "2"))
 # Bitta fan bo'yicha sababsiz qoldirilgan darslar ulushi (foizda) shundan oshsa ogohlantirish
 SUBJECT_WARN_PERCENT = float(os.getenv("SUBJECT_WARN_PERCENT", "25"))
+# Umumiy GPA shundan past bo'lsa — talaba kursdan kursga o'tmaydi (GPA yaxlitlanmaydi: 2,599 — o'tmaydi)
+GPA_MIN = float(os.getenv("GPA_MIN", "2.6"))
 SUBJECT_WARN_MIN_LESSONS = int(os.getenv("SUBJECT_WARN_MIN_LESSONS", "4"))
 
 # Faylda "soat" ustuni bo'lmasa, bitta juftlik necha akademik soat hisoblanadi

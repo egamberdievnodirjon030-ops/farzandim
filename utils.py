@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+from decimal import ROUND_DOWN, Decimal
 import re
 import unicodedata
 from datetime import date, datetime, time, timedelta
@@ -464,11 +465,24 @@ def fmt_day_month(d) -> str:
 
 
 
+def truncate2(value: float) -> Decimal:
+    """GPA yaxlitlanmaydi — 2 xonagacha kesiladi: 2.5999 → 2.59 (2,60 deb ko'rsatilsa, chegaradan o'tgandek ko'rinadi).
+    Suzuvchi nuqta shovqini (2.5999999999999996 = 2.6) olib tashlanadi."""
+    return Decimal(repr(round(value, 9))).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+
+
+def fmt_limit(value: float) -> str:
+    """Chegara qiymati aynan: 2.6 → «2,6», 2.75 → «2,75» (yaxlitlanmaydi, ortiqcha nollarsiz)."""
+    s = format(Decimal(repr(value)).normalize(), "f")
+    return s if get_lang() == "en" else s.replace(".", ",")
+
+
 def fmt_gpa(value) -> str:
-    """3.6667 → «3,67» (o'zbek va rus tilida vergul bilan)."""
+    """3.6667 → «3,66» (yaxlitlanmaydi; o'zbek va rus tilida vergul bilan)."""
     if value is None:
         return "—"
-    return f"{value:.2f}" if get_lang() == "en" else f"{value:.2f}".replace(".", ",")
+    s = f"{truncate2(value):.2f}"
+    return s if get_lang() == "en" else s.replace(".", ",")
 
 
 

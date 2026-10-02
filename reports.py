@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, timedelta
 
-from config import SUBJECT_WARN_MIN_LESSONS, SUBJECT_WARN_PERCENT
+from config import GPA_MIN, SUBJECT_WARN_MIN_LESSONS, SUBJECT_WARN_PERCENT
 import absence
 import loc
 import status
@@ -14,7 +14,7 @@ import individual
 from database import db
 from tenancy import current_course
 from i18n import N_, tr
-from utils import (fmt_pairs, GRANT, fmt_dt, fmt_gpa, fmt_money, lesson_kind, STATUS_ICON, STATUS_TEXT, WEEKDAYS, doc_title, esc, fmt_date, fmt_num, fmt_phone, pair_time,
+from utils import (fmt_pairs, GRANT, fmt_dt, fmt_gpa, fmt_limit, fmt_money, lesson_kind, STATUS_ICON, STATUS_TEXT, WEEKDAYS, doc_title, esc, fmt_date, fmt_num, fmt_phone, pair_time,
                    pct, semester_start, today)
 
 LEGEND = N_("✅ qatnashdi · ❌ sababsiz · 🟡 sababli · ⏰ kechikdi · ⚪ ma'lumot kiritilmagan")
@@ -529,6 +529,8 @@ async def academic_report(st: dict) -> str:
     total_gpa, weighted = academic.gpa(sm["results"])
     parts.append("\n" + tr("🎓 <b>O'zlashtirish ko'rsatkichi (GPA): {v} / 5</b>", v=fmt_gpa(total_gpa))
                  + (" " + tr("(kreditlar bo'yicha)") if weighted else ""))
+    if academic.gpa_low(total_gpa):
+        parts.append(tr("🔴 GPA {min} dan past — talaba kursdan kursga o'tkazilmaydi.", min=fmt_limit(GPA_MIN)))
     sem_gpa = academic.semester_gpa(sm["results"])
     parts.append("\n" + tr("📊 <b>Baholar (5 baholik tizimda):</b>"))
     for sem, items in sorted(academic.by_semester(sm["results"]).items(), reverse=True):
@@ -538,5 +540,6 @@ async def academic_report(st: dict) -> str:
         for r in items:
             mark = "❗" if r["debt"] else "▫️"
             parts.append(f"{mark} {esc(loc.term(r['subject']))} — {fmt_num(r['score'])} → «{r['grade']}»")
-    parts.append(f"\n<i>{tr(academic.RULES_TEXT)} {tr(academic.GPA_TEXT)}</i>")
+    parts.append(f"\n<i>{tr(academic.RULES_TEXT)} {tr(academic.GPA_TEXT)} "
+                 f"{tr(academic.GPA_RULE, min=fmt_limit(GPA_MIN))}</i>")
     return "\n".join(parts) + await updated_note("acad")

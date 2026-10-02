@@ -41,6 +41,13 @@ Serverga kirish va botni qayta ishga tushirish shart emas — o'zgarish darhol i
 
 `.env` dagi `ADMIN_IDS` va `KURSLAR` — faqat boshlang'ich sozlama: bot birinchi ishga tushganda umumiy ro'yxatga (`central.db`) yoziladi, keyin hamma narsa bot ichidan boshqariladi. Bot ichidan olib tashlangan koordinator `.env` da qolib ketsa ham qayta qo'shilmaydi. Koordinatori yo'q kursning xabarlari (savollar, bog'lash so'rovlari) super-adminga boradi — boshqa kurslarning koordinatorlariga emas.
 
+### GPA chegarasi (kursdan kursga o'tish)
+
+Talabaning **umumiy GPA** si (barcha semestrlar bo'yicha) `GPA_MIN` dan (standart **2,6**) past bo'lsa — u kursdan kursga o'tkazilmaydi. GPA **yaxlitlanmaydi**: 2,599 — o'tmaydi va «2,59» deb ko'rsatiladi (hamma joyda GPA 2 xonagacha kesiladi, yaxlitlanmaydi); aynan 2,6 — o'tadi.
+- Ota-ona: farzand sahifasida «e'tibor talab qiladigan masala», GPA kartasi bordo rangda, «Baholar»da ogohlantirish (uz/ru/en).
+- Kurs koordinatori: «Kurs holati»da «GPA past» ko'rsatkichi, talabalar ro'yxatida «GPA past» filtri, Excel/PDF hisobotda «GPA past talabalar» varag'i va «Muammoli talabalar»da GPA ustuni.
+- Chegarani `.env` dagi `GPA_MIN` bilan o'zgartirish mumkin.
+
 ### Kurs dinamikasi (Kurs holati)
 
 «Kurs holati» (bot, ilova va kompyuter versiyasi) ostida ixcham **Dinamika**: har bir ko'rsatkichning hozirgi qiymati, oldingi davrga nisbatan o'zgarishi (▲/▼; yaxshilansa — yashil, yomonlashsa — bordo) va kichik grafik:

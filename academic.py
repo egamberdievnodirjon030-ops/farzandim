@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import ROUND_HALF_UP, Decimal
 
+from config import GPA_MIN
 from database import db
 from i18n import N_
 from utils import normalize_text
@@ -71,6 +72,12 @@ def gpa(results: list[dict]) -> tuple[float | None, bool]:
     return sum(r["grade"] * k for r, k in zip(results, w)) / sum(w), weighted
 
 
+def gpa_low(value: float | None) -> bool:
+    """Umumiy GPA chegaradan (GPA_MIN, standart 2,6) past — talaba kursdan kursga o'tmaydi.
+    Yaxlitlanmaydi: 2,599 < 2,6 — o'tmaydi (faqat suzuvchi nuqta shovqini olib tashlanadi)."""
+    return value is not None and round(value, 9) < GPA_MIN
+
+
 def semester_gpa(results: list[dict]) -> dict[str, float]:
     return {sem: gpa(items)[0] for sem, items in by_semester(results).items()}
 
@@ -113,5 +120,6 @@ def by_semester(results: list[dict]) -> dict[str, list[dict]]:
 
 GPA_TEXT = N_("GPA — o'rtacha o'zlashtirish ko'rsatkichi: fanlar bo'yicha 5 baholik baholarning o'rtachasi "
             "(kreditlar bo'lsa — kreditlar bo'yicha tortilgan).")
+GPA_RULE = N_("Umumiy GPA {min} dan past bo'lsa, talaba kursdan kursga o'tkazilmaydi (GPA yaxlitlanmaydi).")
 RULES_TEXT = N_("Baholash: 90–100 ball — «5», 70–89 — «4», 60–69 — «3», 0–59 — «2» (akademik qarz). "
               "Ball 0,5 dan boshlab yuqoriga yaxlitlanadi (69,5 → 70 → «4»).")

@@ -13,7 +13,8 @@ import academic
 import loc
 from database import db
 from i18n import tr
-from utils import fmt_date, fmt_money, fmt_pairs, parse_date, semester_start, today
+from config import GPA_MIN
+from utils import fmt_date, fmt_gpa, fmt_limit, fmt_money, fmt_pairs, parse_date, semester_start, today
 
 PAY_KINDS = ("kontrakt", "trimestr")
 PAY_LABEL = {"kontrakt": "Kontrakt", "trimestr": "Trimestr"}
@@ -54,9 +55,12 @@ def build(st: dict, att_row, att_tot, grades: list[dict], pays: dict, dl: dict, 
                            else "💳 " + tr("Trimestr qarzi: {v}", v=fmt_money(p['debt'])))
                           + (" — " + tr("muddat ({d}) o'tgan", d=fmt_date(dl[k], False)) if late else ""))
     g, weighted = academic.gpa(results)
+    low = academic.gpa_low(g)
+    if low:
+        issues.append(tr("🎓 GPA {v} — {min} dan past: kursdan kursga o'tmaydi", v=fmt_gpa(g), min=fmt_limit(GPA_MIN)))
     return {"student": st, "attendance": sm, "level": level, "results": results, "debts": debts,
             "average": _average(results), "gpa": g, "gpa_weighted": weighted, "pays": pays, "issues": issues,
-            "flags": {"att": level >= 0, "acad": bool(debts),
+            "flags": {"att": level >= 0, "acad": bool(debts), "gpa": low,
                       "kontrakt": bool(pays.get("kontrakt") and pays["kontrakt"]["debt"] > 0),
                       "trimestr": bool(pays.get("trimestr") and pays["trimestr"]["debt"] > 0)}}
 

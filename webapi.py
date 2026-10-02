@@ -34,7 +34,7 @@ import loc
 import status
 import trends
 import course_trends
-from config import (ADMIN_COURSE, BOT_TOKEN, DATA_DIR, LOG_DIR, PAIR_TIMES, SUPERADMIN_IDS, UNIVERSITY_NAME,
+from config import (ADMIN_COURSE, GPA_MIN, BOT_TOKEN, DATA_DIR, LOG_DIR, PAIR_TIMES, SUPERADMIN_IDS, UNIVERSITY_NAME,
                     WEBAPP_AUTH_TTL, WEBAPP_DEV_USER, WEBAPP_URL)
 from database import db
 from family import all_children, ensure_parent_here, known_contact, parent_courses
@@ -42,7 +42,7 @@ from i18n import tr, use_lang
 from tenancy import (central, coordinator_groups, course_keys, course_title, current_course, current_user, group_scope,
                      in_scope, reload_registry, scope_label,
                      scope_students, use_course, viewer_scope)
-from utils import (WEEKDAYS, doc_title, group_key, lesson_kind, name_score, normalize_text, parse_user_dates,
+from utils import (WEEKDAYS, truncate2, doc_title, group_key, lesson_kind, name_score, normalize_text, parse_user_dates,
                    semester_start, today, week_bounds, week_type_of)
 
 log = logging.getLogger("webapp")
@@ -132,6 +132,11 @@ def _course_arg(key: str) -> str | None:
 
 
 # ================================================================ ma'lumotlar (ota-ona tilida)
+def _gpa(v: float | None) -> float | None:
+    """GPA yaxlitlanmaydi — 2 xonagacha kesilgan holda yuboriladi (ilova uni boshqa yaxlitlamaydi)."""
+    return None if v is None else float(truncate2(v))
+
+
 def _initials(name: str) -> str:
     parts = [p for p in (name or "").split() if p]
     return "".join(p[0] for p in parts[:2]).upper() or "?"
@@ -193,7 +198,8 @@ async def overview(st: dict, key: str) -> dict:
     lessons = await individual.lessons_on(st, today())
     return {"child": await child_card(st, key), "attendance": _attendance(s["attendance"]),
             "academic": {"count": len(s["debts"]), "debts": [_debt(d) for d in s["debts"]]},
-            "gpa": s["gpa"], "pays": await _payments(st, s["pays"], dl), "issues": s["issues"],
+            "gpa": _gpa(s["gpa"]), "gpa_low": s["flags"]["gpa"], "gpa_min": GPA_MIN,
+            "pays": await _payments(st, s["pays"], dl), "issues": s["issues"],
             "trend": await trends.short_line(st), "today": [_lesson(x) for x in lessons],
             "updated": await _last_update()}
 
@@ -332,7 +338,8 @@ async def api_grades(request):
                                          "items": detail.get((sem, normalize_text(r["subject"])), [])})
     gpa, weighted = academic.gpa(results)
     by_sem = academic.semester_gpa(results)
-    return ok({"gpa": gpa, "weighted": weighted, "semesters": [{"semester": k, "gpa": by_sem.get(k), "subjects": v}
+    return ok({"gpa": _gpa(gpa), "gpa_low": academic.gpa_low(gpa), "gpa_min": GPA_MIN, "weighted": weighted,
+               "semesters": [{"semester": k, "gpa": _gpa(by_sem.get(k)), "subjects": v}
                                                               for k, v in sorted(sems.items(), reverse=True)],
                "debts": len(summary["debts"]), "debt_list": [_debt(d) for d in summary["debts"]]})
 
@@ -363,7 +370,7 @@ async def api_trends(request):
     g = await trends.grade_changes(st)
     return ok({"mode": mode, "periods": [{"label": trends._period_label(p), "pct": round(p["pct"]), "unexc": p["unexc"]}
                                          for p in periods],
-               "grades": {"ref": g["ref"], "month": g["month"], "gpa_old": g["gpa_old"], "gpa_new": g["gpa_new"],
+               "grades": {"ref": g["ref"], "month": g["month"], "gpa_old": _gpa(g["gpa_old"]), "gpa_new": _gpa(g["gpa_new"]),
                           "items": [{"subject": loc.term(i["subject"]), "old": i["old"], "new": i["new"],
                                      "delta": i["delta"], "old_grade": i["old_grade"], "new_grade": i["new_grade"]}
                                     for i in g["items"]],
@@ -575,7 +582,7 @@ def _row(x: dict) -> dict:
             "flags": x["flags"], "problems": sum(x["flags"].values()), "counted_hours": att.get("counted"),
             "percent": round(att["percent"]) if att.get("percent") is not None else None,
             "action": absence.action_for(x["level"]) if x["flags"]["att"] else None,
-            "debts": [d["subject"] for d in x["debts"]], "gpa": x["gpa"],
+            "debts": [d["subject"] for d in x["debts"]], "gpa": _gpa(x["gpa"]),
             "kontrakt": (x["pays"]["kontrakt"] or {}).get("debt") if x["flags"]["kontrakt"] else None,
             "trimestr": (x["pays"]["trimestr"] or {}).get("debt") if x["flags"]["trimestr"] else None}
 
@@ -594,6 +601,7 @@ async def api_staff_panel(request):
     return ok({"course": course_title(request["course"]) if request["course"] != "_" else "",
                "total": len(rows), "linked": sum(1 for x in sts if x["student"]["id"] in linked),
                "att": sum(1 for r in rows if r["flags"]["att"]), "acad": sum(1 for r in rows if r["flags"]["acad"]),
+               "gpa": sum(1 for r in rows if r["flags"]["gpa"]), "gpa_min": GPA_MIN,
                "kontrakt": {"count": len(k), "sum": sum(r["kontrakt"] for r in k)},
                "trimestr": {"count": len(t), "sum": sum(r["trimestr"] for r in t)},
                "multi": sum(1 for r in rows if r["problems"] >= 3),
@@ -626,7 +634,7 @@ async def api_staff_students(request):
         limit = 200
     sts = await status.all_statuses(students[:max(400, limit)])
     rows = [_row(x) for x in sts]
-    if flt in ("att", "acad", "kontrakt", "trimestr"):
+    if flt in ("att", "acad", "gpa", "kontrakt", "trimestr"):
         rows = [r for r in rows if r["flags"][flt]]
     elif flt == "prob":
         rows = sorted([r for r in rows if r["problems"]], key=lambda r: -r["problems"])

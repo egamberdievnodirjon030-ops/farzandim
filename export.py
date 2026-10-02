@@ -14,12 +14,14 @@ import status
 from config import HOURS_PER_PAIR, UNIVERSITY_NAME
 from database import db
 from tenancy import course_title, current_course, scope_students
-from utils import fmt_date, fmt_dt, fmt_money, fmt_num, group_key, now, now_iso, parse_course
+from config import GPA_MIN
+from utils import fmt_date, fmt_dt, fmt_gpa, fmt_limit, fmt_money, fmt_num, group_key, now, now_iso, parse_course, truncate2
 
 SECTIONS = {
     "prob": "Muammoli talabalar",
     "att": "Davomati past talabalar",
     "acad": "Akademik qarzdorlar",
+    "gpa": "GPA past talabalar",
     "kontrakt": "Kontrakt qarzdorlari",
     "trimestr": "Trimestr qarzdorlari",
 }
@@ -54,6 +56,7 @@ async def collect(f: str = "") -> dict:
                   "pairs": (x["attendance"]["counted"] if x["flags"]["att"] else None),
                   "action": absence.action_for(x["level"]) if x["flags"]["att"] else "",
                   "acad": ", ".join(d["subject"] for d in x["debts"]),
+                  "gpa": float(truncate2(x["gpa"])) if x["flags"]["gpa"] else None,
                   "kontrakt": x["pays"]["kontrakt"]["debt"] if x["flags"]["kontrakt"] else None,
                   "trimestr": x["pays"]["trimestr"]["debt"] if x["flags"]["trimestr"] else None} for x in prob],
         "att": [{**base(x), "hours": x["attendance"]["counted"], "percent": x["attendance"].get("percent"),
@@ -65,6 +68,9 @@ async def collect(f: str = "") -> dict:
                   "subjects": "; ".join(f"{d['subject']} ({fmt_num(d['score'])} → «2», {d['semester']}-sem.)"
                                         for d in x["debts"])}
                  for x in sorted((x for x in sts if x["flags"]["acad"]), key=lambda x: -len(x["debts"]))],
+        # GPA yaxlitlanmaydi — 2 xonagacha kesiladi (2,599 → 2,59)
+        "gpa": [{**base(x), "gpa": float(truncate2(x["gpa"])), "n": len(x["results"]), "debts": len(x["debts"])}
+                for x in sorted((x for x in sts if x["flags"]["gpa"]), key=lambda x: x["gpa"])],
     }
     for kind in ("kontrakt", "trimestr"):
         data[kind] = [{**base(x), "contract": x["pays"][kind].get("contract"), "paid": x["pays"][kind].get("paid"),
@@ -75,7 +81,7 @@ async def collect(f: str = "") -> dict:
 
 
 def file_name(data: dict, ext: str, only: str | None = None) -> str:
-    part = {"prob": "muammoli", "att": "davomat", "acad": "akademik", "kontrakt": "kontrakt",
+    part = {"prob": "muammoli", "att": "davomat", "acad": "akademik", "gpa": "gpa", "kontrakt": "kontrakt",
             "trimestr": "trimestr"}.get(only, "kurs_holati")
     course = (current_course() or "kurs").replace("/", "_")
     tail = f"_{group_key(data['meta']['filter'])}" if data["meta"]["filter"] else ""
@@ -154,11 +160,12 @@ def build_xlsx(data: dict, only: str | None = None) -> bytes:
         sheet("prob", [("№", 5), ("F.I.Sh.", 34), ("Guruh", 11), ("HEMIS ID", 15), ("Muammolar soni", 10),
                        ("Sababsiz qoldirilgan, para", 12), ("Sababsiz qoldirilgan, soat", 12), ("Chora (chegara)", 26),
                        ("Akademik qarz (fanlar)", 30), ("Kontrakt qarzi", 15), ("Trimestr qarzi", 15),
-                       ("Ota-ona botda", 10)],
+                       ("GPA (past)", 9), ("Ota-ona botda", 10)],
               [[i, r["name"], r["group"], r["hemis"], r["count"],
                 None if r["pairs"] is None else f"=G{4 + i}/{fmt_num(HOURS_PER_PAIR)}", r["pairs"], r["action"], r["acad"],
-                r["kontrakt"], r["trimestr"], "ha" if r["linked"] else "yo'q"] for i, r in enumerate(data["prob"], 1)],
-              {6: "0.#", 7: "0.#", 10: money, 11: money}, totals=(10, 11))
+                r["kontrakt"], r["trimestr"], r["gpa"], "ha" if r["linked"] else "yo'q"]
+               for i, r in enumerate(data["prob"], 1)],
+              {6: "0.#", 7: "0.#", 10: money, 11: money, 12: "0.00"}, totals=(10, 11))
     if "att" in want:
         sheet("att", [("№", 5), ("F.I.Sh.", 34), ("Guruh", 11), ("HEMIS ID", 15), ("Sababsiz qoldirilgan, para", 12),
                       ("Sababsiz qoldirilgan, soat", 12), ("Davomat", 10), ("Chora (chegara)", 28), ("Manba", 16),
@@ -172,6 +179,11 @@ def build_xlsx(data: dict, only: str | None = None) -> bytes:
                        ("Fanlar (ball → baho, semestr)", 60), ("Ota-ona botda", 10)],
               [[i, r["name"], r["group"], r["hemis"], r["n"], r["subjects"], "ha" if r["linked"] else "yo'q"]
                for i, r in enumerate(data["acad"], 1)], totals=(5,))
+    if "gpa" in want:
+        sheet("gpa", [("№", 5), ("F.I.Sh.", 34), ("Guruh", 11), ("HEMIS ID", 15), ("Umumiy GPA", 11),
+                      ("Fanlar soni", 10), ("Akademik qarz (fanlar)", 12), ("Ota-ona botda", 10)],
+              [[i, r["name"], r["group"], r["hemis"], r["gpa"], r["n"], r["debts"], "ha" if r["linked"] else "yo'q"]
+               for i, r in enumerate(data["gpa"], 1)], {5: "0.00"})
     for kind in ("kontrakt", "trimestr"):
         if kind in want:
             dl = data["meta"]["deadlines"].get(kind)
@@ -204,6 +216,8 @@ def build_xlsx(data: dict, only: str | None = None) -> bytes:
             ("Davomati past (chegaraga yetgan)", f"=COUNTA({ref('att', 'B')})", None,
              f"Sababsiz qoldirilgan ≥ {fmt_num(absence.LEVELS[0] / HOURS_PER_PAIR)} para ({absence.LEVELS[0]} soat)"),
             ("Akademik qarzdorlar", f"=COUNTA({ref('acad', 'B')})", None, "Kamida bitta fandan «2» (0–59 ball)"),
+            ("GPA past talabalar", f"=COUNTA({ref('gpa', 'B')})", None,
+             f"Umumiy GPA {fmt_limit(GPA_MIN)} dan past — kursdan kursga o'tmaydi (yaxlitlanmaydi)"),
             ("Kontrakt qarzdorlari", f"=COUNTA({ref('kontrakt', 'B')})", f"=SUM({ref('kontrakt', 'H')})", "Oxirgi buxgalteriya hisoboti"),
             ("Trimestr qarzdorlari", f"=COUNTA({ref('trimestr', 'B')})", f"=SUM({ref('trimestr', 'H')})", "Oxirgi buxgalteriya hisoboti"),
         ]
@@ -219,8 +233,8 @@ def build_xlsx(data: dict, only: str | None = None) -> bytes:
                 c.font = Font(name=F, size=10, color="595959" if j == 4 else "000000")
                 c.border = border
             ws.cell(row=i, column=3).number_format = money
-        ws.cell(row=15, column=1, value="Ota-onasi ulangan talabalar ulushi").font = Font(name=F, size=10)
-        c = ws.cell(row=15, column=2, value="=IF(B6=0,0,B7/B6)")
+        ws.cell(row=16, column=1, value="Ota-onasi ulangan talabalar ulushi").font = Font(name=F, size=10)
+        c = ws.cell(row=16, column=2, value="=IF(B6=0,0,B7/B6)")
         c.number_format = "0%"
         c.font = Font(name=F, size=10)
     buf = io.BytesIO()
@@ -304,16 +318,22 @@ def build_pdf(data: dict, only: str | None = None) -> bytes:
                [f"Davomati past (≥ {fmt_num(absence.LEVELS[0] / HOURS_PER_PAIR)} para / {absence.LEVELS[0]} soat sababsiz)",
                 len(data["att"]), ""],
                ["Akademik qarzdorlar", len(data["acad"]), ""],
+               [f"GPA {fmt_limit(GPA_MIN)} dan past (kursdan kursga o'tmaydi)", len(data["gpa"]), ""],
                ["Kontrakt qarzdorlari", len(k), fmt_money(sum(r["debt"] for r in k))],
                ["Trimestr qarzdorlari", len(t), fmt_money(sum(r["debt"] for r in t))]]
         story += [Paragraph("Umumiy ko'rsatkichlar", st_h), table(["Ko'rsatkich", "Talabalar", "Summa / ulush"], kpi, [120, 30, 50])]
     want = [only] if only else list(SECTIONS)
     specs = {
         "prob": (["№", "F.I.Sh.", "Guruh", "Muammo", "Sababsiz qoldirilgan", "Chora", "Akademik qarz", "Kontrakt",
-                  "Trimestr"], [8, 50, 22, 20, 32, 36, 50, 27, 27],
+                  "Trimestr", "GPA"], [8, 46, 20, 18, 30, 34, 46, 26, 26, 18],
                  lambda i, r: [i, r["name"], r["group"], r["count"],
                                "" if r["pairs"] is None else f"{fmt_num(r['pairs'] / HOURS_PER_PAIR)} para ({fmt_num(r['pairs'])} soat)",
-                               r["action"], r["acad"], money(r["kontrakt"]), money(r["trimestr"])]),
+                               r["action"], r["acad"], money(r["kontrakt"]), money(r["trimestr"]),
+                               fmt_gpa(r["gpa"]) if r["gpa"] is not None else ""]),
+        "gpa": (["№", "F.I.Sh.", "Guruh", "HEMIS ID", "Umumiy GPA", "Fanlar soni", "Akademik qarz", "Ota-ona botda"],
+                [8, 70, 24, 32, 28, 26, 30, 26],
+                lambda i, r: [i, r["name"], r["group"], r["hemis"], fmt_gpa(r["gpa"]), r["n"], r["debts"] or "",
+                              "ha" if r["linked"] else "yo'q"]),
         "att": (["№", "F.I.Sh.", "Guruh", "HEMIS ID", "Sababsiz qoldirilgan", "Davomat", "Chora (chegara)", "Manba",
                  "Ota-ona botda"], [8, 56, 22, 28, 34, 20, 50, 32, 22],
                 lambda i, r: [i, r["name"], r["group"], r["hemis"],
