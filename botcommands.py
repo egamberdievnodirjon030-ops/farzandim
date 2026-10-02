@@ -15,6 +15,8 @@ PUBLIC_COMMANDS = [
     BotCommand(command="yordam", description="Botdan foydalanish"),
     BotCommand(command="bekor", description="Joriy amalni bekor qilish"),
     BotCommand(command="nizomlar", description="📜 Universitet ichki nizomlari"),
+    BotCommand(command="ilova", description="📲 Telefon ilovasini yuklab olish"),
+    BotCommand(command="qurilmalar", description="🔐 Ilovaga kirgan qurilmalar"),
 ]
 ADMIN_COMMANDS = PUBLIC_COMMANDS + [
     BotCommand(command="admin", description="Kurs koordinatori buyruqlari"),
@@ -51,11 +53,14 @@ SUPER_COMMANDS = [
     BotCommand(command="shablonlar", description="📑 Shablonlar: o'zgartirish va qo'shish"),
     BotCommand(command="zaxira", description="💾 Zaxira nusxa hozir"),
     BotCommand(command="xatolar", description="🧾 Xatolar jurnali"),
+    BotCommand(command="ilova_ios", description="🍏 iPhone ilovasi havolasi (App Store/TestFlight)"),
 ] + [c for c in ADMIN_COMMANDS if c.command not in ("start",)]
 
 
 APP_PUBLIC_COMMANDS = [BotCommand(command="start", description="📱 Ilovani ochish"),
-                       BotCommand(command="nizomlar", description="📜 Universitet ichki nizomlari")]
+                       BotCommand(command="nizomlar", description="📜 Universitet ichki nizomlari"),
+                       BotCommand(command="ilova", description="📲 Telefon ilovasini yuklab olish"),
+                       BotCommand(command="qurilmalar", description="🔐 Ilovaga kirgan qurilmalar")]
 APP_STAFF_COMMANDS = APP_PUBLIC_COMMANDS + [BotCommand(command="kompyuter", description="💻 Kompyuter versiyasi")]
 
 

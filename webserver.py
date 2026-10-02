@@ -58,6 +58,59 @@ async def index(request: web.Request) -> web.Response:
     return _html("index.html")
 
 
+# ---------------------------------------------------------------- telefon ilovasi: PWA va yuklab olish sahifasi
+async def manifest(request: web.Request) -> web.Response:
+    return web.json_response({
+        "name": "JIDU — Ota-onalar", "short_name": "JIDU Ota-ona", "lang": "uz", "start_url": "/", "scope": "/",
+        "display": "standalone", "background_color": "#0E2240", "theme_color": "#0E2240",
+        "icons": [{"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+                  {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+                  {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]},
+        content_type="application/manifest+json")
+
+
+async def download_page(request: web.Request) -> web.Response:
+    """Ilovani yuklab olish: Android — APK (super-admin botga yuklagan), iPhone — App Store/TestFlight yoki Safari."""
+    from handlers.mobileapp import APK_NAME, apk_path
+    from tenancy import central
+    version = await central.get_meta("android_apk_version") or ""
+    ios_url = await central.get_meta("ios_url") or ""
+    try:
+        bot_name = (await request.app["bot"].me()).username
+    except Exception:
+        bot_name = ""
+    has_apk = apk_path().exists()
+    android = (f'<a class="btn" href="/ilova/{APK_NAME}">🤖 Android uchun yuklab olish{f" ({html.escape(version)})" if version else ""}</a>'
+               '<p class="hint">Faylni oching → «O\'rnatish». Telefon ruxsat so\'rasa — brauzer uchun «noma\'lum manbalar»ga '
+               'bir marta ruxsat bering.</p>' if has_apk else
+               f'<p class="hint">Android fayli botda: <b>/ilova</b> buyrug\'ini yuboring.</p>')
+    ios = (f'<a class="btn" href="{html.escape(ios_url)}">🍏 iPhone uchun o\'rnatish</a>' if ios_url else
+           '<p class="hint">🍏 <b>iPhone</b>: shu sahifani <b>Safari</b>da oching → «Ulashish» belgisi → '
+           '«Bosh ekranga qo\'shish». So\'ng belgini bosib, <b>«Telegram orqali kirish»</b> ni tanlang.</p>'
+           '<a class="btn ghost" href="/">Ilovani ochish</a>')
+    bot = (f'<p class="hint">Kirish va bildirishnomalar — Telegram botda: '
+           f'<a href="https://t.me/{html.escape(bot_name)}">@{html.escape(bot_name)}</a></p>' if bot_name else "")
+    body = (f"<h1>Telefon ilovasi</h1><p>Farzandingizning davomati, baholari va to'lovlari — telefoningizda.</p>"
+            f"{android}<hr>{ios}{bot}")
+    page = _LOGIN_PAGE.format(body=body).replace(
+        "</style>", ".btn{display:block;text-align:center;text-decoration:none;border-radius:14px;padding:14px 18px;"
+        "font-weight:600;color:#fff;background:#0E2240;margin:8px 0}.btn.ghost{background:#F3F5F9;color:#0E2240}"
+        ".hint{font-size:14px;color:#5B6781}hr{border:0;border-top:1px solid #E6EAF1;margin:18px 0}</style>"
+        '<link rel="icon" href="/static/icon-192.png">').replace("<title>Kirish — Boshqaruv paneli</title>",
+                                                               "<title>JIDU — Telefon ilovasi</title>")
+    return web.Response(text=page, content_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+async def download_apk(request: web.Request) -> web.StreamResponse:
+    from handlers.mobileapp import APK_NAME, apk_path
+    p = apk_path()
+    if not p.exists():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Content-Type": "application/vnd.android.package-archive",
+                                        "Content-Disposition": f'attachment; filename="{APK_NAME}"',
+                                        "Cache-Control": "no-cache"})
+
+
 # ---------------------------------------------------------------- kompyuter versiyasi (boshqaruv paneli)
 _LOGIN_PAGE = """<!doctype html><html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Kirish — Boshqaruv paneli</title><link rel="stylesheet" href="/static/fonts.css"><style>
@@ -122,6 +175,9 @@ def create_app(bot: Bot) -> web.Application:
     app.router.add_get("/", index)
     app.router.add_get("/healthz", lambda r: web.Response(text="ok"))
     app.on_shutdown.append(live.close_all)  # real vaqt ulanishlari server to'xtaganda darhol yopilsin
+    app.router.add_get("/manifest.webmanifest", manifest)
+    app.router.add_get("/ilova", download_page)
+    app.router.add_get("/ilova/{name}", download_apk)
     app.router.add_get("/desk", desk)
     app.router.add_get("/desk/login", desk_login_page)
     app.router.add_post("/desk/login", desk_login)

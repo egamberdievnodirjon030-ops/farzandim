@@ -244,6 +244,18 @@ Ixtiyoriy: @BotFather → `/newapp` bilan ilovani ro'yxatdan o'tkazsangiz, `http
 
 **To'liq Mini App sifatida.** @BotFather → botingiz → *Bot Settings → Configure Mini App → Enable Mini App* ga `WEBAPP_URL` ni kiriting: shunda bot profilida «Ilovani ochish» tugmasi chiqadi va `https://t.me/<bot_nomi>?startapp` havolasi ilovani to'g'ridan-to'g'ri ochadi (chatga kirmasdan). Ilova Telegram mavzusi, «Orqaga» tugmasi, tebranish (haptic) bilan ishlaydi, pastga surilganda tasodifan yopilmaydi (Telegram 7.7+).
 
+## Telefon ilovasi (Android va iOS)
+
+Telegram ichidagi ilovaning o'zi — alohida telefon ilovasi sifatida. Ota-ona uni **botdan yuklab oladi** (`/ilova` yoki
+/start dagi «📲 Telefon ilovasini yuklab olish»). Ilovada «Telegram orqali kirish» → ekranda 2 xonali raqam chiqadi va bot
+ochiladi → botda shu raqam tanlanadi (yangi foydalanuvchi avval telefon raqamini botda tasdiqlaydi). **Ro'yxatdan o'tish,
+kirish tasdig'i va bildirishnomalar — Telegram'da**, qolgan hamma narsa ilovada. Ilovaga kirgan qurilmalar — `/qurilmalar`.
+
+- **Android:** APK GitHub Actions'da avtomatik yig'iladi; super-admin uni botga yuboradi — ota-onalar shu fayldan o'rnatadi.
+- **iPhone:** App Store/TestFlight orqali (Apple Developer hisobi kerak) yoki Safari'da «Bosh ekranga qo'shish».
+
+Sozlash va yig'ish — [mobile/README.md](mobile/README.md).
+
 ## Kompyuter versiyasi (boshqaruv paneli)
 
 Kurs koordinatori va super-admin uchun kompyuter brauzerida ishlaydigan to'liq boshqaruv paneli. U bot va ilova bilan bitta serverda, bitta ma'lumotlar bazasi bilan ishlaydi — panelda qilingan har bir amal (javob, e'lon, so'rovni tasdiqlash, fayl yuklash) botdagidek natija beradi va ota-onalarga bot orqali yetkaziladi.

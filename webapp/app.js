@@ -2,8 +2,13 @@
    Hech qanday tashqi kutubxonasiz: hash-router, uch tilli matnlar, ekranlar funksiyalar ko'rinishida. */
 (() => {
 'use strict';
-const tg = window.Telegram && window.Telegram.WebApp;
+// Telegram ichida (Mini App) — initData bor; aks holda telefon ilovasi (Android/iOS) yoki oddiy brauzer:
+// kirish Telegram botda tasdiqlanadi va seans kaliti qurilmada saqlanadi (Authorization: Bearer)
+const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData ? window.Telegram.WebApp : null;
 const DEV = new URLSearchParams(location.search).has('dev');
+const NATIVE = /JiduApp/.test(navigator.userAgent);  // Android/iOS ilovasi (Capacitor) foydalanuvchi agentiga qo'shadi
+const store = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } },
+  set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (_) { /* */ } } };
 const $app = document.getElementById('app');
 const S = { me: null, lang: 'uz', child: null, cache: {}, timer: null, staffCourse: localStorage.getItem('staffCourse') || '' };
 
@@ -26,7 +31,7 @@ const T = {
     dyn_first: 'birinchi ma’lumot', dyn_same: 'o‘zgarmadi', more: 'Batafsil',
     dyn_none: 'Oxirgi yuklashlarda o‘zgarish bo‘lmadi — o‘zgarish bo‘lsa, shu yerda ko‘rinadi.',
     by_upload: 'Yuklangan ma’lumotlar bo‘yicha', by_semester: 'Semestrlar bo‘yicha', avg_score: 'o‘rtacha ball',
-    step_phone: 'Telefon', step_child: 'Farzand', step_confirm: 'Tasdiqlash', phone_safe: 'Raqamingizni Telegram o‘zi tasdiqlaydi — uni qo‘lda yozish shart emas. Raqam universitet ro‘yxatida bo‘lsa, farzandingiz darhol ulanadi.', child_title: 'Farzandingizni toping', child_sub: 'Raqamingiz universitet ro‘yxatida topilmadi. Farzandingiz ma’lumotlarini hujjatdagidek kiriting.', birth_date: 'Tug‘ilgan sanasi', or_hemis: 'yoki talaba ID (HEMIS) bilan', hemis_id: 'Talaba ID (HEMIS)', find_child: 'Davom etish', confirm_title: 'Oxirgi qadam — tasdiqlash', confirm_student_sub: 'Havolani farzandingizga yuboring: u o‘z telefon raqami bilan sizni tasdiqlaydi, so‘ng kurs koordinatori yakuniy tasdiqlaydi. Shunda begona odam sizning farzandingizga ulana olmaydi.', send_to_child: 'Farzandimga yuborish', copy_link: 'Havolani nusxalash', link_copied: 'Havola nusxalandi', wait_coord: 'Farzandingiz tasdiqlagach, so‘rov kurs koordinatoriga boradi', no_phone_hint: 'Raqamni bilmasangiz — so‘rovni kurs koordinatori o‘zi tekshirib tasdiqlaydi.', child_phone: 'Farzandingizning telefon raqami', child_phone_sub: 'Farzandingiz raqami universitet bazasida yo‘q. Uning Telegram’dagi raqamini kiriting — keyin farzandingiz shu raqam bilan sizni tasdiqlaydi.', phone_err_bad_phone: 'Raqam noto‘g‘ri. Masalan: +998 90 123 45 67', phone_err_own_phone: 'Bu sizning raqamingiz. Farzandingizning o‘z raqamini kiriting.', phone_err_phone_taken: 'Bu raqam boshqa odamga tegishli. Farzandingizning o‘z raqamini kiriting.', phone_err_not_found: 'So‘rov topilmadi yoki allaqachon ko‘rib chiqilgan.', phone_err_has_phone: 'Farzandingiz raqami bazada bor — havolani yuboring.', student_ok_wait: 'Farzandingiz sizni tasdiqladi. Endi kurs koordinatorining yakuniy tasdig‘i kutilmoqda — tasdiqlangach, shu yerda ochiladi.', coord_only: 'So‘rovingizni kurs koordinatori tekshirib tasdiqlaydi — tasdiqlangach, shu yerda ochiladi.', add_child: 'Boshqa farzandni qo‘shish', too_many_tries: 'Urinishlar soni tugadi. Ertaga qayta urinib ko‘ring yoki kurs koordinatori bilan bog‘laning.', share_text: 'Assalomu alaykum! Ota-onalar botida sizni tasdiqlashim kerak — havolani oching va «Ha» ni bosing:', waiting: 'kutilmoqda', done_step: 'bajarildi',
+    login_sub: 'Ilovaga kirish Telegram orqali tasdiqlanadi — parol kerak emas.', login_tg: 'Telegram orqali kirish', login_note: 'Bildirishnomalar Telegram’dagi botga keladi.', login_pin: 'Telegram’da botni oching va shu raqamni tanlang:', login_open_tg: 'Telegram’ni ochish', login_wait: 'Tasdiqlashingiz kutilmoqda…', login_expired: 'Kirish vaqti tugadi. Qaytadan urinib ko‘ring.', login_cancelled: 'Kirish bekor qilindi.', cancel: 'Bekor qilish', app_word: 'ilova', browser_word: 'brauzer', logout: 'Shu qurilmadan chiqish', logout_q: 'Ilovadan chiqasizmi? Qayta kirish Telegram orqali tasdiqlanadi.', devices_hint: 'Barcha qurilmalar ro‘yxati — botda /qurilmalar', step_phone: 'Telefon', step_child: 'Farzand', step_confirm: 'Tasdiqlash', phone_safe: 'Raqamingizni Telegram o‘zi tasdiqlaydi — uni qo‘lda yozish shart emas. Raqam universitet ro‘yxatida bo‘lsa, farzandingiz darhol ulanadi.', child_title: 'Farzandingizni toping', child_sub: 'Raqamingiz universitet ro‘yxatida topilmadi. Farzandingiz ma’lumotlarini hujjatdagidek kiriting.', birth_date: 'Tug‘ilgan sanasi', or_hemis: 'yoki talaba ID (HEMIS) bilan', hemis_id: 'Talaba ID (HEMIS)', find_child: 'Davom etish', confirm_title: 'Oxirgi qadam — tasdiqlash', confirm_student_sub: 'Havolani farzandingizga yuboring: u o‘z telefon raqami bilan sizni tasdiqlaydi, so‘ng kurs koordinatori yakuniy tasdiqlaydi. Shunda begona odam sizning farzandingizga ulana olmaydi.', send_to_child: 'Farzandimga yuborish', copy_link: 'Havolani nusxalash', link_copied: 'Havola nusxalandi', wait_coord: 'Farzandingiz tasdiqlagach, so‘rov kurs koordinatoriga boradi', no_phone_hint: 'Raqamni bilmasangiz — so‘rovni kurs koordinatori o‘zi tekshirib tasdiqlaydi.', child_phone: 'Farzandingizning telefon raqami', child_phone_sub: 'Farzandingiz raqami universitet bazasida yo‘q. Uning Telegram’dagi raqamini kiriting — keyin farzandingiz shu raqam bilan sizni tasdiqlaydi.', phone_err_bad_phone: 'Raqam noto‘g‘ri. Masalan: +998 90 123 45 67', phone_err_own_phone: 'Bu sizning raqamingiz. Farzandingizning o‘z raqamini kiriting.', phone_err_phone_taken: 'Bu raqam boshqa odamga tegishli. Farzandingizning o‘z raqamini kiriting.', phone_err_not_found: 'So‘rov topilmadi yoki allaqachon ko‘rib chiqilgan.', phone_err_has_phone: 'Farzandingiz raqami bazada bor — havolani yuboring.', student_ok_wait: 'Farzandingiz sizni tasdiqladi. Endi kurs koordinatorining yakuniy tasdig‘i kutilmoqda — tasdiqlangach, shu yerda ochiladi.', coord_only: 'So‘rovingizni kurs koordinatori tekshirib tasdiqlaydi — tasdiqlangach, shu yerda ochiladi.', add_child: 'Boshqa farzandni qo‘shish', too_many_tries: 'Urinishlar soni tugadi. Ertaga qayta urinib ko‘ring yoki kurs koordinatori bilan bog‘laning.', share_text: 'Assalomu alaykum! Ota-onalar botida sizni tasdiqlashim kerak — havolani oching va «Ha» ni bosing:', waiting: 'kutilmoqda', done_step: 'bajarildi',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -68,7 +73,7 @@ const T = {
     dyn_first: 'первые данные', dyn_same: 'без изменений', more: 'Подробнее',
     dyn_none: 'В последних загрузках изменений не было — при изменениях они появятся здесь.',
     by_upload: 'По загруженным данным', by_semester: 'По семестрам', avg_score: 'средний балл',
-    step_phone: 'Телефон', step_child: 'Ребёнок', step_confirm: 'Подтверждение', phone_safe: 'Номер подтверждает сам Telegram — вводить вручную не нужно. Если номер есть в списке университета, ребёнок подключится сразу.', child_title: 'Найдите ребёнка', child_sub: 'Ваш номер не найден в списке университета. Введите данные ребёнка как в документе.', birth_date: 'Дата рождения', or_hemis: 'или по ID студента (HEMIS)', hemis_id: 'ID студента (HEMIS)', find_child: 'Продолжить', confirm_title: 'Последний шаг — подтверждение', confirm_student_sub: 'Отправьте ссылку ребёнку: он подтвердит вас своим номером телефона, затем координатор курса даст окончательное подтверждение. Так посторонний не сможет подключиться к вашему ребёнку.', send_to_child: 'Отправить ребёнку', copy_link: 'Скопировать ссылку', link_copied: 'Ссылка скопирована', wait_coord: 'После подтверждения ребёнка запрос уйдёт координатору курса', no_phone_hint: 'Если не знаете номер — координатор курса проверит запрос сам.', child_phone: 'Телефон ребёнка', child_phone_sub: 'Номера ребёнка нет в базе университета. Введите его номер в Telegram — затем ребёнок подтвердит вас с этого номера.', phone_err_bad_phone: 'Неверный номер. Например: +998 90 123 45 67', phone_err_own_phone: 'Это ваш номер. Введите собственный номер ребёнка.', phone_err_phone_taken: 'Этот номер принадлежит другому человеку. Введите номер ребёнка.', phone_err_not_found: 'Запрос не найден или уже рассмотрен.', phone_err_has_phone: 'Номер ребёнка уже есть в базе — отправьте ссылку.', student_ok_wait: 'Ребёнок подтвердил вас. Теперь ожидается окончательное подтверждение координатора курса — после этого всё откроется здесь.', coord_only: 'Запрос проверит и подтвердит координатор курса — после этого всё откроется здесь.', add_child: 'Добавить другого ребёнка', too_many_tries: 'Попытки закончились. Попробуйте завтра или свяжитесь с координатором.', share_text: 'Здравствуйте! Подтвердите меня в боте для родителей — откройте ссылку и нажмите «Да»:', waiting: 'ожидается', done_step: 'выполнено',
+    login_sub: 'Вход в приложение подтверждается через Telegram — пароль не нужен.', login_tg: 'Войти через Telegram', login_note: 'Уведомления приходят в бот в Telegram.', login_pin: 'Откройте бота в Telegram и выберите это число:', login_open_tg: 'Открыть Telegram', login_wait: 'Ожидаем подтверждения…', login_expired: 'Время входа истекло. Попробуйте ещё раз.', login_cancelled: 'Вход отменён.', cancel: 'Отмена', app_word: 'приложение', browser_word: 'браузер', logout: 'Выйти на этом устройстве', logout_q: 'Выйти из приложения? Повторный вход подтверждается через Telegram.', devices_hint: 'Все устройства — в боте: /qurilmalar', step_phone: 'Телефон', step_child: 'Ребёнок', step_confirm: 'Подтверждение', phone_safe: 'Номер подтверждает сам Telegram — вводить вручную не нужно. Если номер есть в списке университета, ребёнок подключится сразу.', child_title: 'Найдите ребёнка', child_sub: 'Ваш номер не найден в списке университета. Введите данные ребёнка как в документе.', birth_date: 'Дата рождения', or_hemis: 'или по ID студента (HEMIS)', hemis_id: 'ID студента (HEMIS)', find_child: 'Продолжить', confirm_title: 'Последний шаг — подтверждение', confirm_student_sub: 'Отправьте ссылку ребёнку: он подтвердит вас своим номером телефона, затем координатор курса даст окончательное подтверждение. Так посторонний не сможет подключиться к вашему ребёнку.', send_to_child: 'Отправить ребёнку', copy_link: 'Скопировать ссылку', link_copied: 'Ссылка скопирована', wait_coord: 'После подтверждения ребёнка запрос уйдёт координатору курса', no_phone_hint: 'Если не знаете номер — координатор курса проверит запрос сам.', child_phone: 'Телефон ребёнка', child_phone_sub: 'Номера ребёнка нет в базе университета. Введите его номер в Telegram — затем ребёнок подтвердит вас с этого номера.', phone_err_bad_phone: 'Неверный номер. Например: +998 90 123 45 67', phone_err_own_phone: 'Это ваш номер. Введите собственный номер ребёнка.', phone_err_phone_taken: 'Этот номер принадлежит другому человеку. Введите номер ребёнка.', phone_err_not_found: 'Запрос не найден или уже рассмотрен.', phone_err_has_phone: 'Номер ребёнка уже есть в базе — отправьте ссылку.', student_ok_wait: 'Ребёнок подтвердил вас. Теперь ожидается окончательное подтверждение координатора курса — после этого всё откроется здесь.', coord_only: 'Запрос проверит и подтвердит координатор курса — после этого всё откроется здесь.', add_child: 'Добавить другого ребёнка', too_many_tries: 'Попытки закончились. Попробуйте завтра или свяжитесь с координатором.', share_text: 'Здравствуйте! Подтвердите меня в боте для родителей — откройте ссылку и нажмите «Да»:', waiting: 'ожидается', done_step: 'выполнено',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -110,7 +115,7 @@ const T = {
     dyn_first: 'first data', dyn_same: 'no change', more: 'Details',
     dyn_none: 'No changes in the latest uploads — changes will appear here.',
     by_upload: 'By uploaded data', by_semester: 'By semester', avg_score: 'average score',
-    step_phone: 'Phone', step_child: 'Child', step_confirm: 'Confirm', phone_safe: 'Telegram itself confirms your number — no need to type it. If it is in the university list, your child is connected at once.', child_title: 'Find your child', child_sub: 'Your number was not found in the university list. Enter your child’s details as in official documents.', birth_date: 'Date of birth', or_hemis: 'or by student ID (HEMIS)', hemis_id: 'Student ID (HEMIS)', find_child: 'Continue', confirm_title: 'Last step — confirmation', confirm_student_sub: 'Send the link to your child: they confirm you with their own phone number, then the course coordinator gives final approval. This way a stranger cannot connect to your child.', send_to_child: 'Send to my child', copy_link: 'Copy link', link_copied: 'Link copied', wait_coord: 'After your child confirms, the request goes to the course coordinator', no_phone_hint: 'If you don’t know the number, the course coordinator will check the request.', child_phone: 'Your child’s phone number', child_phone_sub: 'Your child’s number is not in the university database. Enter their Telegram number — then your child confirms you from that number.', phone_err_bad_phone: 'Invalid number. Example: +998 90 123 45 67', phone_err_own_phone: 'This is your own number. Enter your child’s number.', phone_err_phone_taken: 'This number belongs to someone else. Enter your child’s number.', phone_err_not_found: 'Request not found or already reviewed.', phone_err_has_phone: 'Your child’s number is already on file — send the link.', student_ok_wait: 'Your child has confirmed you. Now waiting for the course coordinator’s final approval — then everything opens here.', coord_only: 'The course coordinator will check and approve your request — then everything opens here.', add_child: 'Add another child', too_many_tries: 'No attempts left. Try again tomorrow or contact the coordinator.', share_text: 'Hello! Please confirm me in the parents’ bot — open the link and tap “Yes”:', waiting: 'waiting', done_step: 'done',
+    login_sub: 'Sign-in is confirmed via Telegram — no password needed.', login_tg: 'Sign in with Telegram', login_note: 'Notifications arrive in the Telegram bot.', login_pin: 'Open the bot in Telegram and choose this number:', login_open_tg: 'Open Telegram', login_wait: 'Waiting for your confirmation…', login_expired: 'Sign-in timed out. Please try again.', login_cancelled: 'Sign-in was cancelled.', cancel: 'Cancel', app_word: 'app', browser_word: 'browser', logout: 'Sign out on this device', logout_q: 'Sign out of the app? Signing in again is confirmed via Telegram.', devices_hint: 'All devices — in the bot: /qurilmalar', step_phone: 'Phone', step_child: 'Child', step_confirm: 'Confirm', phone_safe: 'Telegram itself confirms your number — no need to type it. If it is in the university list, your child is connected at once.', child_title: 'Find your child', child_sub: 'Your number was not found in the university list. Enter your child’s details as in official documents.', birth_date: 'Date of birth', or_hemis: 'or by student ID (HEMIS)', hemis_id: 'Student ID (HEMIS)', find_child: 'Continue', confirm_title: 'Last step — confirmation', confirm_student_sub: 'Send the link to your child: they confirm you with their own phone number, then the course coordinator gives final approval. This way a stranger cannot connect to your child.', send_to_child: 'Send to my child', copy_link: 'Copy link', link_copied: 'Link copied', wait_coord: 'After your child confirms, the request goes to the course coordinator', no_phone_hint: 'If you don’t know the number, the course coordinator will check the request.', child_phone: 'Your child’s phone number', child_phone_sub: 'Your child’s number is not in the university database. Enter their Telegram number — then your child confirms you from that number.', phone_err_bad_phone: 'Invalid number. Example: +998 90 123 45 67', phone_err_own_phone: 'This is your own number. Enter your child’s number.', phone_err_phone_taken: 'This number belongs to someone else. Enter your child’s number.', phone_err_not_found: 'Request not found or already reviewed.', phone_err_has_phone: 'Your child’s number is already on file — send the link.', student_ok_wait: 'Your child has confirmed you. Now waiting for the course coordinator’s final approval — then everything opens here.', coord_only: 'The course coordinator will check and approve your request — then everything opens here.', add_child: 'Add another child', too_many_tries: 'No attempts left. Try again tomorrow or contact the coordinator.', share_text: 'Hello! Please confirm me in the parents’ bot — open the link and tap “Yes”:', waiting: 'waiting', done_step: 'done',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -246,6 +251,7 @@ const ic = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" fill="no
 async function api(path, opts = {}) {
   const headers = Object.assign({ 'X-Telegram-Init-Data': (tg && tg.initData) || '' }, opts.headers || {});
   if (DEV) headers['X-Dev-User'] = '1';
+  if (!tg && store.get('appToken')) headers.Authorization = 'Bearer ' + store.get('appToken');
   if (S.staffCourse) headers['X-Course'] = S.staffCourse;
   if (opts.json !== undefined) { headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.json); }
   const r = await fetch(path, { method: opts.method || (opts.body ? 'POST' : 'GET'), headers, body: opts.body });
@@ -697,7 +703,12 @@ async function viewSettings() {
     <section class="section"><div class="section-head"><h2>${t('theme')}</h2></div><div class="seg">${['auto', 'light', 'dark'].map(k =>
       `<button data-act="theme-set" data-v="${k}" aria-pressed="${themePref() === k}">${t('th_' + k)}</button>`).join('')}</div></section>
     <section class="section"><div class="section-head"><h2>${t('flags')}</h2></div><div class="list">${Object.entries(d.flags).map(([k, v]) =>
-      `<label class="row"><div class="body"><div class="t">${t(k)}</div></div><span class="switch"><input type="checkbox" data-act="flag" data-key="${k}" ${v ? 'checked' : ''}><i></i></span></label>`).join('')}</div></section>` });
+      `<label class="row"><div class="body"><div class="t">${t(k)}</div></div><span class="switch"><input type="checkbox" data-act="flag" data-key="${k}" ${v ? 'checked' : ''}><i></i></span></label>`).join('')}</div></section>
+    ${logoutBlock()}` });
+}
+function logoutBlock() {  // telefon ilovasi / brauzer: shu qurilmadan chiqish (Telegram ichida kerak emas)
+  return S.me && S.me.app_session ? `<section class="section"><button class="btn ghost block" data-act="logout">${t('logout')}</button>
+    <p class="small muted" style="text-align:center">${t('devices_hint')}</p></section>` : '';
 }
 async function viewInfo() {
   page({ title: t('info'), body: loading(), active: '' });
@@ -720,6 +731,71 @@ function steps(n) {
   const L = [t('step_phone'), t('step_child'), t('step_confirm')];
   return `<ol class="steps">${L.map((l, i) => `<li class="${i + 1 < n ? 'done' : i + 1 === n ? 'on' : ''}"><span>${i + 1 < n ? ic('ok') : i + 1}</span>${esc(l)}</li>`).join('')}</ol>`;
 }
+/* ================================================================ telefon ilovasi / brauzer: Telegram orqali kirish */
+function openExternal(url) {
+  if (tg && tg.openTelegramLink && /^https:\/\/t\.me\//.test(url)) return tg.openTelegramLink(url);
+  if (NATIVE) { location.href = url; return; }  // ilova tashqi havolani Telegram'da (yoki brauzerda) ochadi
+  if (!window.open(url, '_blank', 'noopener')) location.href = url;
+}
+function deviceName() {
+  const ua = navigator.userAgent;
+  const os = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Brauzer';
+  return `${os} — ${NATIVE ? t('app_word') : t('browser_word')}`;
+}
+const LOGIN = { code: null, timer: null };
+function viewLogin(msg) {
+  clearTimeout(LOGIN.timer); LOGIN.code = null;
+  S.lang = store.get('lang') || ((navigator.language || '').startsWith('ru') ? 'ru' : 'uz');
+  document.documentElement.lang = S.lang;
+  const langs = [['uz', 'O‘zbekcha'], ['ru', 'Русский'], ['en', 'English']];
+  $app.innerHTML = `<main class="no-nav"><div class="hero-center"><img class="hero-seal" src="static/jidu-seal.webp" alt="" width="72" height="72"><h2>${t('welcome')}</h2><p class="muted">${t('welcome_sub')}</p></div>
+    <div class="seg" style="margin-bottom:16px">${langs.map(([k, l]) => `<button data-act="login-lang" data-lang="${k}" aria-pressed="${S.lang === k}">${l}</button>`).join('')}</div>
+    <div class="card" id="login-box">${msg ? `<p class="small" style="margin-top:0;color:var(--bordo-fg)">${esc(msg)}</p>` : ''}<p style="margin-top:0">${t('login_sub')}</p>
+      <button class="btn block" data-act="login">${ic('send')}${t('login_tg')}</button>
+      <p class="small muted" style="margin-bottom:0">${t('login_note')}</p></div></main>`;
+}
+async function startLogin() {
+  const box = document.getElementById('login-box');
+  let d;
+  try { d = await api('/api/app/login', { json: { device: deviceName() } }); }
+  catch (e) { toast(e.status === 429 ? t('too_many_tries') : t('error')); return; }
+  LOGIN.code = d.code;
+  box.innerHTML = `<p style="margin-top:0">${t('login_pin')}</p><div class="login-pin num">${d.pin}</div>
+    <button class="btn block" data-act="login-open" data-url="${esc(d.url)}">${ic('send')}${t('login_open_tg')}</button>
+    <p class="small muted" style="text-align:center;margin-bottom:0">${t('login_wait')}</p>
+    <p style="text-align:center;margin:12px 0 0"><a href="#" data-act="login-cancel" class="small">${t('cancel')}</a></p>`;
+  openExternal(d.url);
+  pollLogin(d.code, Date.now() + d.expires_in * 1000);
+}
+async function pollLogin(code, until) {
+  clearTimeout(LOGIN.timer);
+  if (LOGIN.code !== code) return;
+  if (Date.now() > until) return viewLogin(t('login_expired'));
+  let r = { state: 'pending' };
+  try { r = await api('/api/app/login/' + encodeURIComponent(code)); } catch (_) { /* tarmoq — qayta urinamiz */ }
+  if (LOGIN.code !== code) return;
+  if (r.state === 'approved') { LOGIN.code = null; store.set('appToken', r.token); haptic('success'); return boot(); }
+  if (r.state === 'cancelled') return viewLogin(t('login_cancelled'));
+  if (r.state === 'expired' || r.state === 'used') return viewLogin(t('login_expired'));
+  LOGIN.timer = setTimeout(() => pollLogin(code, until), document.hidden ? 4000 : 1500);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && LOGIN.code) pollLogin(LOGIN.code, Date.now() + 600000); });
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act="login"],[data-act="login-open"],[data-act="login-cancel"],[data-act="login-lang"],[data-act="logout"]');
+  if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const act = b.dataset.act;
+  if (act === 'login') { b.disabled = true; await startLogin(); b.disabled = false; }
+  else if (act === 'login-open') openExternal(b.dataset.url);
+  else if (act === 'login-cancel') viewLogin();
+  else if (act === 'login-lang') { store.set('lang', b.dataset.lang); viewLogin(); }
+  else if (act === 'logout') {
+    if (!(await confirmSafe(t('logout_q')))) return;
+    try { await api('/api/app/logout', { method: 'POST', json: {} }); } catch (_) { /* */ }
+    store.set('appToken', null); if (LIVE.ctrl) LIVE.ctrl.abort(); S.me = null; location.hash = ''; viewLogin();
+  }
+}, true);
+
 function viewWelcome() {
   const langs = [['uz', 'O‘zbekcha'], ['ru', 'Русский'], ['en', 'English']];
   $app.innerHTML = `<main class="no-nav"><div class="hero-center"><img class="hero-seal" src="static/jidu-seal.webp" alt="" width="72" height="72"><h2>${t('welcome')}</h2><p class="muted">${esc(S.me.university)}</p></div>
@@ -727,7 +803,7 @@ function viewWelcome() {
     ${steps(1)}
     <div class="card"><p style="margin-top:0">${t('phone_safe')}</p>
       <button class="btn block" data-act="contact">${ic('phone')}${t('confirm_phone')}</button>
-      ${tg && tg.initData ? '' : `<p class="small muted" style="margin-bottom:0">${t('open_in_tg')}</p>`}</div></main>`;
+      ${tg || S.me.bot ? '' : `<p class="small muted" style="margin-bottom:0">${t('open_in_tg')}</p>`}</div></main>`;
 }
 async function viewPending(addMore = false) {
   let reqs = [];
@@ -859,7 +935,7 @@ async function viewStaff() {
     </div></section>
     <section class="section"><button class="card desk-card" type="button" data-act="desk"><span class="ic-badge">${ic('panel')}</span>
       <div style="flex:1;text-align:left"><b style="display:block">Kompyuter versiyasi</b><span class="muted small">Talabalar jadvali, xabarlar, e’lon va hisobotlar — kompyuter brauzerida</span></div>${ic('chev')}</button></section>
-    ${d.updated ? `<p class="muted small" style="text-align:center;margin-top:18px">Yangilangan: ${when(d.updated)}</p>` : ''}`;
+    ${d.updated ? `<p class="muted small" style="text-align:center;margin-top:18px">Yangilangan: ${when(d.updated)}</p>` : ''}${logoutBlock()}`;
   page({ title: 'Kurs holati', sub: title + (mine.length ? ' · ' + mine.join(', ') : ''), active: '#/staff', body });
 }
 async function viewStaffStudents(params) {
@@ -1092,6 +1168,7 @@ async function connectLive() {
   try {
     const headers = { 'X-Telegram-Init-Data': (tg && tg.initData) || '' };
     if (DEV) headers['X-Dev-User'] = '1';
+    if (!tg && store.get('appToken')) headers.Authorization = 'Bearer ' + store.get('appToken');
     const r = await fetch('/api/events', { headers, signal: ctrl.signal, cache: 'no-store' });
     if (!r.ok || !r.body) throw new Error('http ' + r.status);
     LIVE.retry = 2000;
@@ -1461,7 +1538,7 @@ document.addEventListener('click', async e => {
     haptic(); S.lang = el.dataset.lang; document.documentElement.lang = S.lang;
     try { await api('/api/settings', { json: { lang: S.lang } }); await boot(true); } catch (_) { route(); }
   } else if (act === 'contact') {
-    if (!tg || !tg.requestContact) { toast(t('open_in_tg')); return; }
+    if (!tg || !tg.requestContact) { if (S.me.bot) openExternal(`https://t.me/${S.me.bot}?start`); else toast(t('open_in_tg')); return; }
     tg.requestContact(async okShared => {
       if (!okShared) return;
       el.disabled = true; el.textContent = t('confirming');
@@ -1704,6 +1781,7 @@ function applyTheme() {
 async function boot(again) {
   try { S.me = await api('/api/me'); }
   catch (e) {
+    if (e.status === 401 && !tg && !DEV) { store.set('appToken', null); return viewLogin(); }
     $app.innerHTML = `<main class="no-nav">${empty('alert', t('error'), e.status === 401 ? t('open_in_tg') : '')}${e.status === 401 ? '' : `<p style="text-align:center"><button class="btn ghost" data-act="reload-boot">${t('retry')}</button></p>`}</main>`;
     const b = document.querySelector('[data-act="reload-boot"]'); if (b) b.onclick = () => boot();
     return;

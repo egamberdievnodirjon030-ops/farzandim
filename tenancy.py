@@ -252,6 +252,27 @@ CREATE TABLE IF NOT EXISTS link_attempts (
     at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_link_attempts ON link_attempts(tg_id, at);
+-- Telefon ilovasi (Android/iOS): kirish so'rovi Telegram botda tasdiqlanadi, ilova uzoq muddatli seans oladi
+CREATE TABLE IF NOT EXISTS app_logins (
+    code        TEXT PRIMARY KEY,
+    pin         INTEGER NOT NULL,
+    device      TEXT,
+    created_at  TEXT NOT NULL,
+    expires_at  TEXT NOT NULL,
+    tg_id       INTEGER,
+    approved_at TEXT,
+    state       TEXT NOT NULL DEFAULT 'pending'
+);
+CREATE TABLE IF NOT EXISTS app_sessions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash  TEXT NOT NULL UNIQUE,
+    tg_id       INTEGER NOT NULL,
+    device      TEXT,
+    created_at  TEXT NOT NULL,
+    last_seen   TEXT,
+    revoked_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_app_sessions_user ON app_sessions(tg_id);
 -- Telegram guruh qaysi kursga biriktirilgan (/guruh buyrug'ini bergan koordinatorning kursi)
 CREATE TABLE IF NOT EXISTS group_courses (
     chat_id    INTEGER PRIMARY KEY,

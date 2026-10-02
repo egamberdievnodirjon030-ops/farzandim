@@ -96,8 +96,11 @@ async def _start_app(message: Message, user: User) -> None:
     if not await all_children(uid) and not await central.get_pending(uid):
         text += "\n\n" + tr("Ro'yxatdan o'tish uchun ilovani oching — telefon raqamingiz Telegram orqali tasdiqlanadi.")
     await message.answer(text, reply_markup=ReplyKeyboardRemove())
-    await message.answer(tr("Barcha ma'lumotlar va amallar — ilovada 👇"),
-                         reply_markup=appmode.app_kb("/", tr("📱 Ilovani ochish")))
+    from handlers.mobileapp import download_kb
+    kb = appmode.app_kb("/", tr("📱 Ilovani ochish"))
+    kb.inline_keyboard.append(download_kb().inline_keyboard[0])
+    await message.answer(tr("Barcha ma'lumotlar va amallar — ilovada 👇\nTelefoningizga alohida ilova sifatida ham "
+                            "o'rnatishingiz mumkin:"), reply_markup=kb)
 
 
 async def _start(message: Message, state: FSMContext, user: User) -> None:
@@ -121,6 +124,9 @@ async def _start(message: Message, state: FSMContext, user: User) -> None:
             await message.answer(tr("Sizga hali farzand bog'lanmagan."), reply_markup=add_child_kb())
             return
         await state.set_state(Reg.contact)
+        from handlers.mobileapp import download_kb
+        await message.answer(tr("📲 Telefoningiz uchun ilova — Android va iPhone. Yuklab olib, «Telegram orqali "
+                                "kirish» ni bosing:"), reply_markup=download_kb())
         await message.answer(tr(WELCOME, uni=esc(loc.term(UNIVERSITY_NAME))), reply_markup=contact_kb())
         return
     for key in await parent_courses(user.id):
@@ -198,16 +204,18 @@ async def cmd_help(message: Message) -> None:
 
 # ---------------------------------------------------------------- telefon raqam
 @router.message(F.contact)
-async def on_contact(message: Message, state: FSMContext) -> None:
+async def on_contact(message: Message, state: FSMContext, silent: bool = False) -> bool:
+    """Telefon raqami orqali ro'yxatdan o'tish. silent=True — telefon ilovasiga kirish paytida (handlers/mobileapp.py):
+    xabarlarsiz faqat ro'yxatga oladi. Qaytaradi: ro'yxatdan o'tdimi (talaba deb rad etilmadimi)."""
     contact = message.contact
     if contact.user_id != message.from_user.id:
         await message.answer(tr("Iltimos, o'zingizning raqamingizni pastdagi tugma orqali yuboring."),
                              reply_markup=contact_kb())
-        return
+        return False
     phone = normalize_phone(contact.phone_number)
     if not phone:
         await message.answer(tr("Telefon raqamni o'qib bo'lmadi. Qaytadan urinib ko'ring."), reply_markup=contact_kb())
-        return
+        return False
     uid = message.from_user.id
     user = message.from_user
     # Talaba emasligini tekshirish — BARCHA kurslar bo'yicha: raqam biror kursning talabalar bazasida yoki
@@ -220,7 +228,7 @@ async def on_contact(message: Message, state: FSMContext) -> None:
                 await block_user(message.bot, uid, phone, user.full_name, user.username, ev,
                                  "Ro'yxatdan o'tishga urinish (telefon raqam yuborildi)")
                 await message.answer(tr(REJECT_TEXT), reply_markup=ReplyKeyboardRemove())
-                return
+                return False
     # Farzand(lar) qaysi kurs bazasida bo'lsa — ota-ona o'sha kurs(lar)da ro'yxatga olinadi
     for key in db.keys():
         with use_course(key):
@@ -231,6 +239,12 @@ async def on_contact(message: Message, state: FSMContext) -> None:
                     await db.link_parent(uid, st["id"], "phone")
     children = await all_children(uid)
     await state.clear()
+    if silent:
+        if children:
+            await central.clear_pending(uid)
+        elif not await known_contact(uid):
+            await central.set_pending(uid, phone, message.from_user.full_name)
+        return True
     if appmode.APP_MODE:  # ilova rejimi: qisqa javob, qolgani ilovada
         if children:
             await central.clear_pending(uid)
@@ -242,7 +256,7 @@ async def on_contact(message: Message, state: FSMContext) -> None:
         await message.answer(text, reply_markup=ReplyKeyboardRemove())
         await message.answer(tr("Barcha ma'lumotlar va amallar — ilovada 👇"),
                              reply_markup=appmode.app_kb("/", tr("📱 Ilovani ochish")))
-        return
+        return True
     if children:
         await central.clear_pending(uid)
         names = "\n".join(f"• {esc(loc.student_name(c))} ({esc(c.get('group_name') or '—')})" for c in children)
@@ -258,7 +272,7 @@ async def on_contact(message: Message, state: FSMContext) -> None:
                 await message.answer(await student_card(children[0]), reply_markup=child_card_kb(children[0]["id"]))
         else:
             await message.answer(tr("Farzandni tanlang:"), reply_markup=children_kb(children))
-        return
+        return True
     await central.set_pending(uid, phone, message.from_user.full_name)  # hech qaysi kursga yozilmaydi
     await message.answer(
         tr("Raqamingiz ({phone}) universitet bazasida farzandingizga biriktirilmagan ekan.\n"
@@ -266,6 +280,7 @@ async def on_contact(message: Message, state: FSMContext) -> None:
         reply_markup=main_menu(),
     )
     await start_manual_link(message, state)
+    return True
 
 
 # ---------------------------------------------------------------- farzandni qo'lda bog'lash

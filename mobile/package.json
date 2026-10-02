@@ -1,0 +1,21 @@
+{
+  "name": "jidu-ota-ona-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JIDU ota-onalar ilovasi — Android va iOS (Capacitor). Ilova serverdagi Web App ni ochadi; kirish va bildirishnomalar — Telegram botda.",
+  "scripts": {
+    "configure": "node scripts/configure.mjs",
+    "assets": "capacitor-assets generate --assetPath assets --iconBackgroundColor '#0E2240' --iconBackgroundColorDark '#0E2240' --splashBackgroundColor '#0E2240' --splashBackgroundColorDark '#0E2240'",
+    "android": "npm run configure && npx cap add android && npm run assets -- --android && node scripts/android-version.mjs && npx cap sync android",
+    "ios": "npm run configure && npx cap add ios && npm run assets -- --ios && npx cap sync ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2"
+  }
+}

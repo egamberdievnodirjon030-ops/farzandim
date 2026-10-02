@@ -117,6 +117,8 @@ async def block_user(bot: Bot, user_id: int, phone: str | None, name: str | None
     """Kirishni yopadi va kurs koordinatorlariga tugmali xabar yuboradi."""
     lines = _evidence_lines(ev)
     await db.add_block(user_id, phone, name, username, _reason(ev), "\n".join(lines))
+    import appauth
+    await appauth.revoke(user_id)  # telefon ilovasidagi seanslar ham yopiladi
     if not notify:
         return
     who = esc(name or "—") + (f" (@{esc(username)})" if username else "")

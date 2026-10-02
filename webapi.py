@@ -83,9 +83,20 @@ async def _staff_name(uid: int) -> str:
 
 @web.middleware
 async def auth_middleware(request: web.Request, handler):
-    if not request.path.startswith("/api/"):
-        return await handler(request)
+    if not request.path.startswith("/api/") or request.path.startswith("/api/app/login"):
+        return await handler(request)  # telefon ilovasining kirish so'rovi — hali seans yo'q
     user = verify_init_data(request.headers.get("X-Telegram-Init-Data", ""))
+    auth = request.headers.get("Authorization", "")
+    if user is None and auth.startswith("Bearer "):
+        # telefon ilovasi / brauzer: Telegram botda tasdiqlangan seans (appauth.py)
+        import appauth
+        found = await appauth.verify(auth[7:].strip())
+        if found:
+            uid0 = found[0]
+            name = (await _staff_name(uid0) if uid0 in ADMIN_COURSE or uid0 in SUPERADMIN_IDS
+                    else ((await known_contact(uid0)) or {}).get("name") or "")
+            user = {"id": uid0, "first_name": name}
+            request["app_session"] = found[1]
     if user is None and request.headers.get("X-Desk") == "1":
         # kompyuter versiyasi: imzolangan seans cookie; X-Desk sarlavhasi begona saytlardan so'rovni to'sadi (CSRF)
         uid = deskauth.verify_cookie(request.cookies.get(deskauth.COOKIE))
@@ -242,7 +253,8 @@ async def api_me(request: web.Request) -> web.Response:
                  "courses": [{"key": k, "title": course_title(k)} for k in course_keys()] if role == "super" else []}
     return ok({"user": {"id": uid, "name": request["user"].get("first_name", "")}, "lang": request["lang"],
                "role": role, "children": cards, "unread": {"messages": unread_msgs, "notifications": unread_notes},
-               "university": loc.term(UNIVERSITY_NAME), "staff": staff})
+               "university": loc.term(UNIVERSITY_NAME), "staff": staff,
+               "bot": await _bot_username(request), "app_session": bool(request.get("app_session"))})
 
 
 def child_route(handler):
@@ -571,6 +583,43 @@ async def api_link_phone(request):
             return bad(err)
         url = await linking.confirm_url(request.app["bot"], await linking.issue_token(int(body["id"])))
     return ok({"confirm_url": url})
+
+
+# ================================================================ telefon ilovasi: Telegram orqali kirish
+async def _bot_username(request) -> str:
+    try:
+        return (await request.app["bot"].me()).username or ""
+    except Exception:  # tarmoq xatosi — ilova tugmasi oddiy t.me havolasisiz qoladi
+        return ""
+
+
+def _client_ip(request) -> str:
+    return (request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote or "?")
+
+
+async def api_app_login_start(request):
+    import appauth
+    if not appauth.allow_start(_client_ip(request)):
+        return bad("too_many", 429)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    d = await appauth.start(str(body.get("device") or "")[:80])
+    me = await request.app["bot"].me()
+    return ok({**d, "url": f"https://t.me/{me.username}?start={appauth.START_PREFIX}{d['code']}", "bot": me.username})
+
+
+async def api_app_login_poll(request):
+    import appauth
+    return ok(await appauth.poll(request.match_info["code"]))
+
+
+async def api_app_logout(request):
+    import appauth
+    if request.get("app_session"):
+        await appauth.revoke(request["user"]["id"], request["app_session"])
+    return ok({"ok": True})
 
 
 async def api_link_status(request):
@@ -1529,6 +1578,9 @@ def setup_routes(app: web.Application) -> None:
     r.add_post("/api/link", api_link)
     r.add_get("/api/link", api_link_status)
     r.add_post("/api/link/phone", api_link_phone)
+    r.add_post("/api/app/login", api_app_login_start)
+    r.add_get("/api/app/login/{code}", api_app_login_poll)
+    r.add_post("/api/app/logout", api_app_logout)
     r.add_get("/api/staff/panel", api_staff_panel)
     r.add_get("/api/staff/students", api_staff_students)
     r.add_get("/api/staff/student/{sid:\\d+}", api_staff_student)

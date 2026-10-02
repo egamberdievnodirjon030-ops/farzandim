@@ -62,7 +62,10 @@ main.no-nav { padding-bottom: 24px; }
 
 /* ================================================================ yuqori panel */
 .topbar { position: sticky; top: 0; z-index: 20; background: var(--navy-900); color: #F3F6FC;
-  padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 10px; }
+  padding: calc(10px + var(--sat)) 12px 10px 16px; display: flex; align-items: center; gap: 10px; }
+/* telefon ilovasi / «Bosh ekran» (PWA): status bar ostiga kirib ketmasin; Telegram ichida 0 */
+:root { --sat: env(safe-area-inset-top, var(--safe-area-inset-top, 0px)); }
+main.no-nav:first-child { padding-top: calc(12px + var(--sat)); }
 .brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .seal { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center;
   background: radial-gradient(circle at 30% 30%, #B03A63, var(--bordo-700)); box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
@@ -494,3 +497,8 @@ fieldset.q.missing { box-shadow: 0 0 0 2px var(--bordo-500); }
 .steps li.done span { background: var(--ok); color: #fff; }
 .hero-seal { display: block; margin: 0 auto 10px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); }
 .req-link + .req-link { margin-top: 12px; }
+
+/* ================================================================ telefon ilovasi: Telegram orqali kirish */
+.login-pin { font-size: 56px; font-weight: 800; letter-spacing: 6px; text-align: center; margin: 4px 0 16px;
+  color: var(--navy-900, #0E2240); background: var(--surface-2, #F3F5F9); border-radius: 18px; padding: 10px 0; }
+[data-theme="dark"] .login-pin { color: #fff; }
