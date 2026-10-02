@@ -46,6 +46,8 @@ async def decide_link(bot, rid: int, approve: bool, admin_id: int) -> tuple[bool
         await db.decide_link_request(rid, "approved", admin_id)
         await db.execute("UPDATE link_requests SET decided_via = ?, token = NULL WHERE id = ?",
                          ("student+coordinator" if req.get("student_ok_at") else "coordinator", rid))
+        if req.get("student_ok_at") and req.get("claimed_phone") and req.get("student_phone") == req["claimed_phone"]:
+            await db.add_self_phone(req["student_id"], req["claimed_phone"])  # endi tasdiqlangan talaba raqami
         with use_lang(lang):
             if appmode.APP_MODE:
                 text, kb = appmode.short_text("link_ok", st), appmode.app_kb("/")
@@ -238,7 +240,11 @@ async def notify_student_confirmed(bot, r: dict, st: dict) -> None:
             f"👤 Ota-ona: {esc(parent.get('tg_name') or '')}, {fmt_phone(parent.get('phone') or '')}\n"
             f"👨‍🎓 Talaba: {esc(st['full_name'])} · {esc(st.get('group_name') or '')} · ID {esc(st.get('hemis_id') or '')}\n\n"
             f"Tasdiqlagan: Telegram akkaunt «{esc(r.get('student_tg_name') or '—')}», raqami "
-            f"{fmt_phone(r.get('student_phone') or '') or '—'} — bazadagi shu talabaning raqami bilan mos.\n\n"
+            f"{fmt_phone(r.get('student_phone') or '') or '—'} — "
+            + ("bazadagi shu talabaning raqami bilan mos.\n\n" if not r.get("claimed_phone") or r.get("src") == "db" else
+               "⚠️ <b>bu raqam bazada yo'q — uni ota-ona kiritgan.</b> Raqam haqiqatan talabaniki ekanini "
+               "tekshiring (masalan, talabaning o'zidan yoki guruh sardoridan so'rang).\n\n")
+            + 
             f"<b>Yakuniy tasdiq sizda:</b> «Tasdiqlash» ni bosgandagina ota-ona ulanadi.")
     kb = appmode.app_kb("/staff/requests", "📱 Ilovada ko'rib chiqish") if appmode.APP_MODE else link_request_kb(r["id"])
     admins = course_admins(groups=[st.get("group_name")])

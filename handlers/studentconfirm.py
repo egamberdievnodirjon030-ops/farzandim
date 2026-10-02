@@ -83,11 +83,11 @@ async def on_student_contact(message: Message, state: FSMContext) -> None:
             await state.clear()
             await message.answer(tr("Bu so'rov allaqachon ko'rib chiqilgan."), reply_markup=ReplyKeyboardRemove())
             return
-        mine = {s["id"] for s in await db.students_by_self_phone(phone)} if phone else set()
-        if r["student_id"] not in mine:
+        allowed, _src = await linking.expected_phones(r)
+        if not phone or phone not in allowed or message.from_user.id == r["parent_id"]:
             await state.clear()
-            await message.answer(tr("Bu raqam universitet bazasida shu talabaning raqami sifatida yozilmagan, shuning "
-                                    "uchun tasdiqlab bo'lmaydi. So'rovni kurs koordinatori ko'rib chiqadi."),
+            await message.answer(tr("Bu raqam shu talabaning raqami sifatida ko'rsatilmagan, shuning uchun tasdiqlab "
+                                    "bo'lmaydi. So'rovni kurs koordinatori ko'rib chiqadi."),
                                  reply_markup=ReplyKeyboardRemove())
             return
         u = message.from_user

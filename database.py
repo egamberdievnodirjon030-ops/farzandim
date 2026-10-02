@@ -515,9 +515,11 @@ class Database:
         async with self.conn.execute("PRAGMA table_info(link_requests)") as cur:
             have = {r[1] for r in await cur.fetchall()}
         # talaba tasdiqlashi: bir martalik havola (token), muddati, tasdiqlagan talabaning Telegram ID si, ismi, raqami
-        # va tasdiqlagan vaqti (student_ok_at) — yakuniy tasdiqni baribir kurs koordinatori beradi
+        # va tasdiqlagan vaqti (student_ok_at) — yakuniy tasdiqni baribir kurs koordinatori beradi; claimed_phone — talaba
+        # raqami bazada bo'lmasa, ota-ona kiritgan farzand raqami (talaba aynan shu raqam bilan tasdiqlashi kerak)
         for col, ddl in (("token", "TEXT"), ("token_expires", "TEXT"), ("student_tg", "INTEGER"), ("decided_via", "TEXT"),
-                         ("student_ok_at", "TEXT"), ("student_phone", "TEXT"), ("student_tg_name", "TEXT")):
+                         ("student_ok_at", "TEXT"), ("student_phone", "TEXT"), ("student_tg_name", "TEXT"),
+                         ("claimed_phone", "TEXT")):
             if col not in have:
                 await self.conn.execute(f"ALTER TABLE link_requests ADD COLUMN {col} {ddl}")
         for t in IMPORT_TABLES:  # qaysi yuklangan fayldan kelgani (o'chirish uchun)
@@ -635,6 +637,9 @@ class Database:
             await self._replace_self_phones(sid, phones)
         await self.conn.commit()
         return len(merged)
+
+    async def add_self_phone(self, sid: int, phone: str) -> None:
+        await self.execute("INSERT OR IGNORE INTO student_self_phones (student_id, phone) VALUES (?, ?)", (sid, phone))
 
     async def students_by_self_phone(self, phone: str) -> list[dict]:
         return await self.fetchall(

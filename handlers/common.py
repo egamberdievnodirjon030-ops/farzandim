@@ -12,7 +12,7 @@ from database import db
 import appmode
 import loc
 from family import all_children, ensure_parent_here, known_contact, parent_courses
-from tenancy import (central, course_of_admin, course_title, is_coordinator, is_staff, is_super,
+from tenancy import (central, course_of_admin, course_title, current_course, is_coordinator, is_staff, is_super,
                      use_course)
 from guard import REJECT_TEXT, block_user, find_evidence
 from i18n import N_, set_lang, tr
@@ -29,6 +29,7 @@ class Reg(StatesGroup):
     contact = State()
     child_name = State()
     child_verify = State()
+    child_phone = State()   # talaba raqami bazada yo'q — ota-ona farzandining raqamini kiritadi
 
 
 LANG_PROMPT = "🌐 Tilni tanlang · Выберите язык · Choose language"
@@ -353,10 +354,10 @@ async def manual_verify(message: Message, state: FSMContext) -> None:
     st = match[0]
     await state.clear()
     with use_course(st["course_key"]):
-        await _create_link_request(message, uid, st, raw)
+        await _create_link_request(message, uid, st, raw, state)
 
 
-async def _create_link_request(message: Message, uid: int, st: dict, raw: str) -> None:
+async def _create_link_request(message: Message, uid: int, st: dict, raw: str, state: FSMContext | None = None) -> None:
     """Joriy kurs (farzandning kursi) bazasida so'rov yaratadi va faqat shu kurs koordinatorlariga yuboradi."""
     if await db.linked_student(uid, st["id"]):
         await message.answer(tr("Bu farzand sizga allaqachon bog'langan."), reply_markup=main_menu())
@@ -398,10 +399,55 @@ async def _create_link_request(message: Message, uid: int, st: dict, raw: str) -
                h=linking.TOKEN_HOURS, url=url),
             reply_markup=main_menu(), disable_web_page_preview=True)
         return
+    if state is not None:  # farzand raqami bazada yo'q — ota-ona o'zi kiritadi, farzand shu raqam bilan tasdiqlaydi
+        await state.set_state(Reg.child_phone)
+        await state.update_data(k=current_course() or "_", r=rid)
+        await message.answer(
+            tr("✅ So'rov yuborildi.\n\nFarzandingiz raqami universitet bazasida yo'q. <b>Farzandingizning Telegram'dagi "
+               "telefon raqamini</b> yozing (masalan, +998 90 123 45 67) — keyin u shu raqam bilan sizni tasdiqlaydi.\n\n"
+               "Raqamni bilmasangiz, /otkazish deb yozing — so'rovni kurs koordinatori o'zi tekshiradi."),
+            reply_markup=ReplyKeyboardRemove())
+        return
     await message.answer(
         tr("✅ So'rovingiz kurs koordinatoriga yuborildi. Tasdiqlangach, sizga shu yerda xabar keladi."),
         reply_markup=main_menu(),
     )
+
+
+PHONE_ERRORS = {
+    "bad_phone": N_("Raqam noto'g'ri. Masalan: +998 90 123 45 67. Qaytadan yozing yoki /otkazish."),
+    "own_phone": N_("Bu sizning raqamingiz. Farzandingizning o'z raqamini yozing yoki /otkazish."),
+    "phone_taken": N_("Bu raqam boshqa odamga tegishli. Farzandingizning o'z raqamini yozing yoki /otkazish."),
+}
+
+
+@router.message(Reg.child_phone)
+async def on_child_phone(message: Message, state: FSMContext) -> None:
+    import linking
+    data = await state.get_data()
+    raw = message.contact.phone_number if message.contact else (message.text or "").strip()
+    if raw.lower().lstrip("/") in ("otkazish", "o'tkazish", "skip", "cancel", "bekor"):
+        await state.clear()
+        await message.answer(tr("✅ So'rovingiz kurs koordinatoriga yuborildi. Tasdiqlangach, sizga shu yerda xabar keladi."),
+                             reply_markup=main_menu())
+        return
+    key, rid = data.get("k", "_"), data.get("r")
+    with use_course(None if key == "_" else key):
+        done, err = await linking.set_claimed_phone(rid, message.from_user.id, raw)
+        if not done and err in PHONE_ERRORS:
+            await message.answer(tr(PHONE_ERRORS[err]))
+            return
+        await state.clear()
+        if not done:
+            await message.answer(tr("Bu so'rov allaqachon ko'rib chiqilgan."), reply_markup=main_menu())
+            return
+        url = await linking.confirm_url(message.bot, await linking.issue_token(rid))
+    await message.answer(
+        tr("✅ Raqam saqlandi.\n\n<b>Keyingi qadam:</b> quyidagi havolani farzandingizga Telegram orqali yuboring — u "
+           "aynan shu raqamli Telegram akkaunti bilan sizni tasdiqlaydi (havola {h} soat amal qiladi):\n{url}\n\n"
+           "Farzandingiz tasdiqlagach, kurs koordinatori yakuniy tasdiqlaydi va sizga xabar keladi.",
+           h=linking.TOKEN_HOURS, url=url),
+        reply_markup=main_menu(), disable_web_page_preview=True)
 
 
 @router.message(Reg.contact)

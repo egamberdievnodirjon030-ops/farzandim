@@ -5,7 +5,10 @@
 3. Bo'lmasa — farzandning F.I.Sh. va tug'ilgan sanasi (yoki HEMIS ID). Noto'g'ri urinishlar cheklangan
    (MAX_FAILS kun ichida), javob talaba bor-yo'qligini oshkor qilmaydi.
 4. Tasdiqlash — ikki bosqich:
-   • talabaning o'zi (talaba raqami bazada bo'lsa): ota-ona unga bir martalik havolani yuboradi (muddati
+   • talabaning o'zi. Talaba raqami bazada bo'lsa — o'sha raqam; bo'lmasa — ota-ona farzandining raqamini o'zi
+     kiritadi (claimed_phone; ota-onaning o'z raqami, boshqa talabaning yoki boshqa ota-onaning raqami qabul
+     qilinmaydi) va talaba aynan shu raqamli Telegram akkaunt bilan tasdiqlashi kerak. Ota-ona kiritgan raqam
+     koordinatorga alohida belgilab ko'rsatiladi. Keyin ota-ona unga bir martalik havolani yuboradi (muddati
      TOKEN_HOURS soat); talaba botda O'Z telefon raqamini tasdiqlaydi — raqam bazadagi shu talabaning raqami
      bo'lishi shart — va «Ha, bu mening ota-onam» ni bosadi. «Yo'q» desa — so'rov darhol rad etiladi va kurs
      koordinatoriga ogohlantirish boradi;
@@ -60,6 +63,40 @@ async def student_can_confirm(sid: int) -> bool:
     return bool(row and row["n"])
 
 
+async def expected_phones(r: dict) -> tuple[set[str], str | None]:
+    """Talaba qaysi raqam bilan tasdiqlashi kerak: (raqamlar, manba: 'db' | 'parent' | None)."""
+    db_phones = {x["phone"] for x in await db.fetchall("SELECT phone FROM student_self_phones WHERE student_id = ?",
+                                                        (r["student_id"],))}
+    if db_phones:
+        return db_phones, "db"
+    if r.get("claimed_phone"):
+        return {r["claimed_phone"]}, "parent"
+    return set(), None
+
+
+async def set_claimed_phone(rid: int, uid: int, raw: str) -> tuple[bool, str]:
+    """Ota-ona farzandining raqamini kiritadi (talaba raqami bazada bo'lmasa). Qaytaradi: (bo'ldimi, xato kodi)."""
+    from utils import normalize_phone
+    r = await db.fetchone("SELECT * FROM link_requests WHERE id = ?", (rid,))
+    if not r or r["parent_id"] != uid or r["status"] != "pending" or r["student_ok_at"]:
+        return False, "not_found"
+    if await student_can_confirm(r["student_id"]):
+        return False, "has_phone"
+    phone = normalize_phone(raw)
+    if not phone or len("".join(ch for ch in raw if ch.isdigit())) not in (9, 12):
+        return False, "bad_phone"
+    parent = await db.get_parent(uid) or {}
+    contact = await central.get_pending(uid) or {}
+    if phone in {parent.get("phone"), contact.get("phone")}:
+        return False, "own_phone"  # ota-ona o'z raqamini «farzandim» deb kirita olmaydi
+    other = [s for s in await db.students_by_self_phone(phone) if s["id"] != r["student_id"]]
+    if (other or await db.fetchone("SELECT 1 FROM parents WHERE phone = ? AND tg_id != ?", (phone, uid))
+            or await db.fetchone("SELECT 1 FROM student_phones WHERE phone = ?", (phone,))):
+        return False, "phone_taken"  # boshqa talabaning yoki boshqa ota-onaning raqami
+    await db.execute("UPDATE link_requests SET claimed_phone = ? WHERE id = ?", (phone, rid))
+    return True, ""
+
+
 async def by_token(token: str) -> tuple[str, dict] | None:
     """Havola bo'yicha kutilayotgan so'rov (barcha kurslardan). Muddati o'tgan yoki ko'rib chiqilgan — None."""
     for key in db.keys():
@@ -81,7 +118,7 @@ async def parent_requests(bot, uid: int) -> list[dict]:
                 st = await db.get_student(r["student_id"])
                 if not st:
                     continue
-                can = await student_can_confirm(st["id"])
+                can = await student_can_confirm(st["id"]) or bool(r["claimed_phone"])
                 token = r["token"] if r["token"] and (r["token_expires"] or "") >= now_iso() else None
                 ok = bool(r["student_ok_at"])  # talaba tasdiqlagan — koordinator kutilmoqda, havola kerak emas
                 if can and not token and not ok:
@@ -89,6 +126,7 @@ async def parent_requests(bot, uid: int) -> list[dict]:
                 out.append({"id": r["id"], "course": key, "student": " ".join(loc.student_name(st).split()[:2]),
                             "group": st.get("group_name") or "", "created_at": r["created_at"],
                             "student_can_confirm": can, "student_ok": ok,
+                            "needs_phone": not can, "claimed_phone": mask_phone(r["claimed_phone"]) if r["claimed_phone"] else None,
                             "confirm_url": await confirm_url(bot, token) if token and not ok else None})
     return out
 
@@ -119,7 +157,8 @@ async def student_decide(bot, key: str, rid: int, student_tg: int, approve: bool
                     "tasdiqlangach, sizga xabar keladi.", name=appmode.short_name(st)))
             live.publish(r["parent_id"], {"type": "link_progress", "route": "/"})
             from staffops import notify_student_confirmed
-            await notify_student_confirmed(bot, {**r, "student_ok_at": now_iso()}, st)
+            _, src = await expected_phones(r)
+            await notify_student_confirmed(bot, {**r, "student_ok_at": now_iso(), "src": src}, st)
             log.info("Bog'lash so'rovi #%s talaba tomonidan tasdiqlandi (%s), koordinator kutilmoqda", rid, student_tg)
             return True, "approved"
         await db.execute("UPDATE link_requests SET status = 'rejected', decided_by = ?, decided_at = ?, "

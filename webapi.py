@@ -232,7 +232,7 @@ async def api_me(request: web.Request) -> web.Response:
         unread_notes += await d.unread_notifications(uid)
         unread_msgs += sum((await d.unread_for_parent(uid)).values())
     role = ("super" if uid in SUPERADMIN_IDS else "staff" if uid in ADMIN_COURSE else "blocked" if blocked
-            else "parent" if cards else "pending" if await central.get_pending(uid) else "new")
+            else "parent" if cards else "pending" if await known_contact(uid) else "new")
     staff = None
     if role in ("staff", "super"):
         key = await _staff_course(request)
@@ -554,7 +554,23 @@ async def api_link(request):
         await notify_link_request(request.app["bot"], rid, name, full, text)
         can = await linking.student_can_confirm(st["id"])
         url = await linking.confirm_url(request.app["bot"], await linking.issue_token(rid)) if can else None
-    return ok({"state": "requested", "student_can_confirm": can, "confirm_url": url})
+    return ok({"state": "requested", "student_can_confirm": can, "confirm_url": url, "needs_phone": not can})
+
+
+async def api_link_phone(request):
+    """Talaba raqami bazada yo'q — ota-ona farzandining raqamini kiritadi; talaba aynan shu raqam bilan tasdiqlaydi."""
+    import linking
+    uid = request["user"]["id"]
+    body = await request.json()
+    key = str(body.get("course") or "_")
+    if key not in db.keys():
+        return bad("not_found", 404)
+    with use_course(None if key == "_" else key):
+        done, err = await linking.set_claimed_phone(int(body.get("id") or 0), uid, str(body.get("phone") or ""))
+        if not done:
+            return bad(err)
+        url = await linking.confirm_url(request.app["bot"], await linking.issue_token(int(body["id"])))
+    return ok({"confirm_url": url})
 
 
 async def api_link_status(request):
@@ -1112,8 +1128,10 @@ async def api_staff_requests(request):
                     "phone": p.get("phone") or "", "lang": await central.get_lang(r["parent_id"]) or "uz",
                     "note": r["note"] or "", "at": r["created_at"], "blocked": await db.is_blocked(r["parent_id"]),
                     "student_ok": {"at": r["student_ok_at"], "tg_name": r["student_tg_name"] or "",
-                                   "phone": r["student_phone"] or ""} if r["student_ok_at"] else None,
-                    "student_can_confirm": await linking.student_can_confirm(r["student_id"]),
+                                   "phone": r["student_phone"] or "",
+                                   "source": (await linking.expected_phones(r))[1]} if r["student_ok_at"] else None,
+                    "claimed_phone": r["claimed_phone"] or "",
+                    "student_can_confirm": await linking.student_can_confirm(r["student_id"]) or bool(r["claimed_phone"]),
                     "student": {"id": st["id"], "name": st["full_name"], "group": st.get("group_name") or "",
                                 "hemis_id": st.get("hemis_id")} if st else None})
     out.sort(key=lambda x: not x["student_ok"])  # talaba tasdiqlaganlari — yuqorida
@@ -1510,6 +1528,7 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/info", api_info)
     r.add_post("/api/link", api_link)
     r.add_get("/api/link", api_link_status)
+    r.add_post("/api/link/phone", api_link_phone)
     r.add_get("/api/staff/panel", api_staff_panel)
     r.add_get("/api/staff/students", api_staff_students)
     r.add_get("/api/staff/student/{sid:\\d+}", api_staff_student)
