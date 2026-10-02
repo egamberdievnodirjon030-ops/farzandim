@@ -4,11 +4,13 @@
 2. Raqam universitet faylida talabaning ota-ona raqami sifatida bo'lsa — farzand avtomatik bog'lanadi.
 3. Bo'lmasa — farzandning F.I.Sh. va tug'ilgan sanasi (yoki HEMIS ID). Noto'g'ri urinishlar cheklangan
    (MAX_FAILS kun ichida), javob talaba bor-yo'qligini oshkor qilmaydi.
-4. Tasdiqlash — ikki yo'ldan biri, qaysi biri birinchi bo'lsa:
-   • talabaning o'zi: ota-ona unga bir martalik havolani yuboradi (muddati TOKEN_HOURS soat); talaba botda
-     O'Z telefon raqamini tasdiqlaydi — raqam bazadagi shu talabaning raqami bo'lishi shart — va «Ha, bu mening
-     ota-onam» ni bosadi. «Yo'q» desa — so'rov rad etiladi va kurs koordinatoriga ogohlantirish boradi;
-   • kurs koordinatori (avvalgidek).
+4. Tasdiqlash — ikki bosqich:
+   • talabaning o'zi (talaba raqami bazada bo'lsa): ota-ona unga bir martalik havolani yuboradi (muddati
+     TOKEN_HOURS soat); talaba botda O'Z telefon raqamini tasdiqlaydi — raqam bazadagi shu talabaning raqami
+     bo'lishi shart — va «Ha, bu mening ota-onam» ni bosadi. «Yo'q» desa — so'rov darhol rad etiladi va kurs
+     koordinatoriga ogohlantirish boradi;
+   • yakuniy tasdiq — har doim kurs koordinatori: u so'rovda talaba tasdiqlaganmi, qaysi Telegram akkaunt va
+     raqam bilan tasdiqlaganini ko'radi va «Tasdiqlash» ni bosgandagina ota-ona ulanadi.
 """
 from __future__ import annotations
 
@@ -81,11 +83,13 @@ async def parent_requests(bot, uid: int) -> list[dict]:
                     continue
                 can = await student_can_confirm(st["id"])
                 token = r["token"] if r["token"] and (r["token_expires"] or "") >= now_iso() else None
-                if can and not token:
+                ok = bool(r["student_ok_at"])  # talaba tasdiqlagan — koordinator kutilmoqda, havola kerak emas
+                if can and not token and not ok:
                     token = await issue_token(r["id"])
                 out.append({"id": r["id"], "course": key, "student": " ".join(loc.student_name(st).split()[:2]),
                             "group": st.get("group_name") or "", "created_at": r["created_at"],
-                            "student_can_confirm": can, "confirm_url": await confirm_url(bot, token) if token else None})
+                            "student_can_confirm": can, "student_ok": ok,
+                            "confirm_url": await confirm_url(bot, token) if token and not ok else None})
     return out
 
 
@@ -103,23 +107,20 @@ async def student_decide(bot, key: str, rid: int, student_tg: int, approve: bool
     from staffops import _coord_notice
     with use_course(None if key == "_" else key):
         r = await db.fetchone("SELECT * FROM link_requests WHERE id = ?", (rid,))
-        if not r or r["status"] != "pending" or r["student_tg"] != student_tg:
+        if not r or r["status"] != "pending" or r["student_tg"] != student_tg or r["student_ok_at"]:
             return False, "expired"
         st = await db.get_student(r["student_id"])
         lang = await central.get_lang(r["parent_id"]) or "uz"
-        if approve:
-            await db.link_parent(r["parent_id"], r["student_id"], "student")
-            await db.execute("UPDATE link_requests SET status = 'approved', decided_by = ?, decided_at = ?, "
-                             "decided_via = 'student', token = NULL WHERE id = ?", (student_tg, now_iso(), rid))
+        if approve:  # ulanmaydi — talaba tasdig'i bilan so'rov koordinatorga yakuniy tasdiq uchun boradi
+            await db.execute("UPDATE link_requests SET student_ok_at = ?, token = NULL WHERE id = ?", (now_iso(), rid))
             with use_lang(lang):
-                text = (appmode.short_text("link_ok", st) if appmode.APP_MODE else
-                        tr("✅ Farzandingiz so'rovingizni tasdiqladi: {name}. Endi uning ma'lumotlarini ko'rishingiz mumkin.",
-                           name=appmode.short_name(st)))
-                await safe_send(bot, r["parent_id"], text, reply_markup=appmode.app_kb("/") if appmode.APP_MODE else None)
-            live.publish(r["parent_id"], {"type": "link", "approved": True, "route": "/"})
-            await _coord_notice(bot, st, f"✅ Talaba <b>{esc(st['full_name'])}</b> o'z raqami bilan ota-onasini tasdiqladi "
-                                         f"(so'rov #{rid}). Kerak bo'lsa, ota-onani talaba kartasidan uzib qo'yish mumkin.")
-            log.info("Bog'lash so'rovi #%s talaba tomonidan tasdiqlandi (%s)", rid, student_tg)
+                await safe_send(bot, r["parent_id"], tr(
+                    "✅ Farzandingiz ({name}) sizni tasdiqladi. Endi kurs koordinatori yakuniy tasdiqlaydi — "
+                    "tasdiqlangach, sizga xabar keladi.", name=appmode.short_name(st)))
+            live.publish(r["parent_id"], {"type": "link_progress", "route": "/"})
+            from staffops import notify_student_confirmed
+            await notify_student_confirmed(bot, {**r, "student_ok_at": now_iso()}, st)
+            log.info("Bog'lash so'rovi #%s talaba tomonidan tasdiqlandi (%s), koordinator kutilmoqda", rid, student_tg)
             return True, "approved"
         await db.execute("UPDATE link_requests SET status = 'rejected', decided_by = ?, decided_at = ?, "
                          "decided_via = 'student', token = NULL WHERE id = ?", (student_tg, now_iso(), rid))

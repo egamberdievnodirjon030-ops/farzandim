@@ -392,9 +392,10 @@ async def _create_link_request(message: Message, uid: int, st: dict, raw: str) -
     if await linking.student_can_confirm(st["id"]):  # tezroq yo'l: farzandning o'zi tasdiqlaydi
         url = await linking.confirm_url(message.bot, await linking.issue_token(rid))
         await message.answer(
-            tr("✅ So'rov yuborildi.\n\n<b>Tezroq tasdiqlash:</b> quyidagi havolani farzandingizga Telegram orqali "
-               "yuboring — u o'z raqami bilan bir bosishda tasdiqlaydi (havola {h} soat amal qiladi):\n{url}\n\n"
-               "Yoki kurs koordinatori tasdiqlashini kuting.", h=linking.TOKEN_HOURS, url=url),
+            tr("✅ So'rov yuborildi.\n\n<b>Keyingi qadam:</b> quyidagi havolani farzandingizga Telegram orqali "
+               "yuboring — u o'z raqami bilan sizni tasdiqlaydi (havola {h} soat amal qiladi):\n{url}\n\n"
+               "Farzandingiz tasdiqlagach, kurs koordinatori yakuniy tasdiqlaydi va sizga xabar keladi.",
+               h=linking.TOKEN_HOURS, url=url),
             reply_markup=main_menu(), disable_web_page_preview=True)
         return
     await message.answer(

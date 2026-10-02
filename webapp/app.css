@@ -165,6 +165,8 @@ main.no-nav { padding-bottom: 24px; }
 .alert.warn { background: var(--tint-warn); }
 .alert .bar { width: 4px; border-radius: 2px; background: var(--bordo-500); flex: none; }
 .alert.warn .bar { background: var(--warn); }
+.alert.ok { background: var(--tint-ok); }
+.alert.ok .bar { background: var(--ok); }
 
 /* ================================================================ tugmalar va boshqaruv */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px;

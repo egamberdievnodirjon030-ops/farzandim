@@ -1103,6 +1103,7 @@ def _visible(st: dict | None) -> bool:
 
 @staff_route
 async def api_staff_requests(request):
+    import linking
     out = []
     for r in await _pending_requests():
         st = await db.get_student(r["student_id"])
@@ -1110,8 +1111,12 @@ async def api_staff_requests(request):
         out.append({"id": r["id"], "parent_id": r["parent_id"], "parent_name": p.get("tg_name") or "",
                     "phone": p.get("phone") or "", "lang": await central.get_lang(r["parent_id"]) or "uz",
                     "note": r["note"] or "", "at": r["created_at"], "blocked": await db.is_blocked(r["parent_id"]),
+                    "student_ok": {"at": r["student_ok_at"], "tg_name": r["student_tg_name"] or "",
+                                   "phone": r["student_phone"] or ""} if r["student_ok_at"] else None,
+                    "student_can_confirm": await linking.student_can_confirm(r["student_id"]),
                     "student": {"id": st["id"], "name": st["full_name"], "group": st.get("group_name") or "",
                                 "hemis_id": st.get("hemis_id")} if st else None})
+    out.sort(key=lambda x: not x["student_ok"])  # talaba tasdiqlaganlari — yuqorida
     return ok({"items": out})
 
 

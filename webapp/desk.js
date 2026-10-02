@@ -563,13 +563,13 @@ async function pRequests() {
   view(head('So‘rovlar', courseSub()) + skel(300));
   const d = await api('/api/staff/requests');
   view(head('Bog‘lanish so‘rovlari', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
-    <p class="hint" style="margin:-10px 0 18px">Telefon raqami bazada topilmagan ota-onalar farzandini qo‘lda bog‘lashni so‘raydi. Ota-ona yozgan ma’lumotni talaba ma’lumoti bilan solishtiring.</p>
-    <section class="sec">${d.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Ota-ona</th><th>So‘ralgan talaba</th><th>Ota-ona yozgan ma’lumot</th><th>Vaqt</th><th class="r">Qaror</th></tr></thead>
+    <p class="hint" style="margin:-10px 0 18px">Telefon raqami bazada topilmagan ota-onalar farzandini qo‘lda bog‘lashni so‘raydi. Ota-ona yozgan ma’lumotni talaba ma’lumoti bilan solishtiring. Talaba o‘zi tasdiqlagan so‘rovlar yuqorida — kim tasdiqlaganini tekshiring; yakuniy tasdiq sizda.</p>
+    <section class="sec">${d.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Ota-ona</th><th>So‘ralgan talaba</th><th>Ota-ona yozgan</th><th>Talaba tasdig‘i</th><th>Vaqt</th><th class="r">Qaror</th></tr></thead>
       <tbody>${d.items.map(r => `<tr>
         <td class="name"><b>${esc(r.parent_name || 'Ota-ona')}</b><span>${esc(fmtPhone(r.phone))}${r.lang !== 'uz' ? `, ${LANG[r.lang]} tilida` : ''}</span>
           ${r.blocked ? '<div><span class="chip bordo">talaba deb bloklangan</span></div>' : ''}</td>
         <td class="name">${r.student ? `<b>${esc(r.student.name)}</b><span>${esc(r.student.group)}${r.student.hemis_id ? ', HEMIS ' + esc(r.student.hemis_id) : ''}</span>` : '<span class="dash">topilmadi</span>'}</td>
-        <td style="max-width:320px">${esc(r.note)}</td><td style="white-space:nowrap">${when(r.at)}</td>
+        <td>${esc(r.note)}</td><td style="max-width:240px">${r.student_ok ? `<span class="chip ok" title="${esc(when(r.student_ok.at))}">✅ Talaba tasdiqladi</span><div class="small" style="margin-top:4px">${esc(r.student_ok.tg_name || '—')}</div><div class="small muted">${esc(fmtPhone(r.student_ok.phone))}</div>` : r.student_can_confirm ? '<span class="dash">⏳ hali tasdiqlamagan</span>' : '<span class="dash">talaba raqami bazada yo‘q</span>'}</td><td style="white-space:nowrap">${when(r.at)}</td>
         <td class="r" style="white-space:nowrap"><button class="btn sm primary" data-act="req" data-id="${r.id}" data-ok="1" ${r.blocked ? 'disabled title="Avval botda /bloklar orqali ruxsat bering"' : ''}>${ic('ok')} Tasdiqlash</button>
           <button class="btn sm danger" data-act="req" data-id="${r.id}" data-ok="0">Rad etish</button></td></tr>`).join('')}</tbody></table></div>`
       : emptyBox('req', 'Kutilayotgan so‘rov yo‘q', 'Yangi so‘rov kelganda bot sizga ham xabar beradi.')}</section>`);

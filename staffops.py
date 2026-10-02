@@ -17,7 +17,7 @@ from i18n import tr, use_lang
 from keyboards import coordinator_menu
 from notifier import safe_send
 from tenancy import central, course_title, is_super, reload_registry, use_course
-from utils import group_key
+from utils import fmt_phone, group_key
 
 log = logging.getLogger("staff")
 
@@ -42,8 +42,10 @@ async def decide_link(bot, rid: int, approve: bool, admin_id: int) -> tuple[bool
     st = await db.get_student(req["student_id"])
     lang = await central.get_lang(req["parent_id"]) or "uz"
     if approve:
-        await db.link_parent(req["parent_id"], req["student_id"], "manual")
+        await db.link_parent(req["parent_id"], req["student_id"], "student" if req.get("student_ok_at") else "manual")
         await db.decide_link_request(rid, "approved", admin_id)
+        await db.execute("UPDATE link_requests SET decided_via = ?, token = NULL WHERE id = ?",
+                         ("student+coordinator" if req.get("student_ok_at") else "coordinator", rid))
         with use_lang(lang):
             if appmode.APP_MODE:
                 text, kb = appmode.short_text("link_ok", st), appmode.app_kb("/")
@@ -57,6 +59,7 @@ async def decide_link(bot, rid: int, approve: bool, admin_id: int) -> tuple[bool
         log.info("Bog'lash so'rovi tasdiqlandi: #%s (ota-ona %s → talaba %s)", rid, req["parent_id"], req["student_id"])
         return True, "✅ Tasdiqlandi"
     await db.decide_link_request(rid, "rejected", admin_id)
+    await db.execute("UPDATE link_requests SET decided_via = 'coordinator', token = NULL WHERE id = ?", (rid,))
     with use_lang(lang):
         if appmode.APP_MODE:
             text, kb = appmode.short_text("link_no"), appmode.app_kb("/")
@@ -215,11 +218,34 @@ async def notify_link_request(bot, rid: int, parent_name: str, st: dict, detaile
         kb = appmode.app_kb("/staff/requests", "📱 Ilovada ko'rib chiqish")
     else:
         text, kb = detailed, link_request_kb(rid)
+    import linking
+    if await linking.student_can_confirm(st["id"]):
+        text += ("\n\n⏳ Talabaning o'z raqami bazada bor — ota-onaga talabaga yuborish uchun havola berildi. Talaba "
+                 "tasdiqlasa, sizga alohida xabar keladi (kim tasdiqlagani bilan); yakuniy tasdiq — sizda.")
     admins = course_admins(groups=[st.get("group_name")])  # talaba guruhi biriktirilgan koordinator(lar)
     for admin_id in admins:
         await safe_send(bot, admin_id, text, reply_markup=kb)
     live.publish_many(admins, {"type": "request", "course": course, "route": "/staff/requests",
                                         "text": f"{parent_name} → {st['full_name']}"})
+
+
+async def notify_student_confirmed(bot, r: dict, st: dict) -> None:
+    """Talaba ota-onasini tasdiqladi — so'rov koordinatorga yakuniy tasdiq uchun (kim tasdiqlagani bilan) boradi."""
+    from keyboards import link_request_kb
+    from tenancy import course_admins, current_course
+    parent = await db.get_parent(r["parent_id"]) or {}
+    text = (f"🔗✅ <b>Bog'lash so'rovi #{r['id']} — talaba tasdiqladi</b>\n\n"
+            f"👤 Ota-ona: {esc(parent.get('tg_name') or '')}, {fmt_phone(parent.get('phone') or '')}\n"
+            f"👨‍🎓 Talaba: {esc(st['full_name'])} · {esc(st.get('group_name') or '')} · ID {esc(st.get('hemis_id') or '')}\n\n"
+            f"Tasdiqlagan: Telegram akkaunt «{esc(r.get('student_tg_name') or '—')}», raqami "
+            f"{fmt_phone(r.get('student_phone') or '') or '—'} — bazadagi shu talabaning raqami bilan mos.\n\n"
+            f"<b>Yakuniy tasdiq sizda:</b> «Tasdiqlash» ni bosgandagina ota-ona ulanadi.")
+    kb = appmode.app_kb("/staff/requests", "📱 Ilovada ko'rib chiqish") if appmode.APP_MODE else link_request_kb(r["id"])
+    admins = course_admins(groups=[st.get("group_name")])
+    for admin_id in admins:
+        await safe_send(bot, admin_id, text, reply_markup=kb)
+    live.publish_many(admins, {"type": "request", "course": current_course() or "_", "route": "/staff/requests",
+                               "text": f"✅ Talaba tasdiqladi: {st['full_name']}"})
 
 
 # ---------------------------------------------------------------- rasmiy hujjatni ota-onalarga yetkazish

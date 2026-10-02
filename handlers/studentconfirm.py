@@ -2,7 +2,8 @@
 
 Talaba havolani ochadi → kim bog'lanmoqchi ekanini ko'radi → O'Z telefon raqamini Telegram tugmasi orqali yuboradi
 (raqam bazadagi shu talabaning raqami bo'lishi shart — boshqa odam talaba nomidan tasdiqlay olmaydi) →
-«✅ Ha, bu mening ota-onam» yoki «❌ Yo'q». Talaba ota-ona menyusiga kirmaydi, ota-ona sifatida ro'yxatga olinmaydi.
+«✅ Ha, bu mening ota-onam» yoki «❌ Yo'q». «Ha» dan keyin so'rov kurs koordinatoriga boradi —
+yakuniy tasdiqni u beradi (kim tasdiqlaganini ko'radi). Talaba ota-ona menyusiga kirmaydi, ota-ona sifatida ro'yxatga olinmaydi.
 Bu router appgate va ota-ona routerlaridan oldin ulanadi; talaba avval bloklangan bo'lsa ham shu jarayon ishlaydi.
 """
 from __future__ import annotations
@@ -89,7 +90,9 @@ async def on_student_contact(message: Message, state: FSMContext) -> None:
                                     "uchun tasdiqlab bo'lmaydi. So'rovni kurs koordinatori ko'rib chiqadi."),
                                  reply_markup=ReplyKeyboardRemove())
             return
-        await db.execute("UPDATE link_requests SET student_tg = ? WHERE id = ?", (message.from_user.id, rid))
+        u = message.from_user
+        await db.execute("UPDATE link_requests SET student_tg = ?, student_phone = ?, student_tg_name = ? WHERE id = ?",
+                         (u.id, phone, " ".join(x for x in (u.full_name, f"@{u.username}" if u.username else "") if x), rid))
         parent = await db.get_parent(r["parent_id"]) or {}
     await state.clear()
     kb = InlineKeyboardBuilder()
@@ -114,5 +117,6 @@ async def decide(cb: CallbackQuery, callback_data: ScCb) -> None:
         await cb.answer(tr("Bu so'rov allaqachon ko'rib chiqilgan."), show_alert=True)
         return
     await cb.answer()
-    await cb.message.edit_text(tr("✅ Rahmat! Ota-onangiz endi ma'lumotlaringizni ko'ra oladi.") if res == "approved" else
+    await cb.message.edit_text(tr("✅ Rahmat! Tasdig'ingiz kurs koordinatoriga yuborildi — u yakuniy tasdiqlagach, "
+                                  "ota-onangiz ulanadi.") if res == "approved" else
                                tr("Rahmat. So'rov rad etildi, kurs koordinatoriga xabar berildi."))
