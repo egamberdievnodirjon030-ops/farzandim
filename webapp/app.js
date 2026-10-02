@@ -977,8 +977,27 @@ function viewStaffFiles() {
       <label class="row" style="padding:12px 0 0;min-height:0"><div class="body">Ota-onalarga xabar yubormaslik (jim)</div><span class="switch"><input type="checkbox" name="silent"><i></i></span></label>
       <button class="btn block" style="margin-top:16px">${ic('upload')}Yuklash</button></form><div id="result"></div>
     <section class="section"><div class="section-head"><h2>Hisobot</h2></div><div class="card"><p class="muted small" style="margin-top:0">Hisobot Telegram chatingizga fayl bo‘lib keladi.</p>
-      <div class="grid2"><button class="btn ghost" data-act="export" data-fmt="x">Excel</button><button class="btn ghost" data-act="export" data-fmt="p">PDF</button></div></div></section>` });
+      <div class="grid2"><button class="btn ghost" data-act="export" data-fmt="x">Excel</button><button class="btn ghost" data-act="export" data-fmt="p">PDF</button></div></div></section>
+    <section class="section"><div class="section-head"><h2>Yuklangan fayllar</h2></div><div class="list" id="imports">${loading()}</div></section>` });
+  loadImportsApp();
 }
+async function loadImportsApp() {
+  const box = document.getElementById('imports'); if (!box) return;
+  let d; try { d = await api('/api/staff/imports'); } catch (e) { box.innerHTML = errorBox(); return; }
+  box.innerHTML = d.items.length ? d.items.slice(0, 30).map(x => `<div class="row" style="cursor:default"><div class="ic">${ic('upload')}</div>
+    <div class="body"><div class="t">${esc(x.file_name || '—')}</div><div class="d">${esc(x.kind_title)}${x.deletable ? ` · ${x.rows} ta yozuv` : ''} · ${when(x.at)}${x.parents ? ` · ${x.parents} ota-onaga xabar` : ''}</div></div>
+    ${x.deletable ? `<button class="icon-btn" style="color:var(--bordo-fg)" data-act="imp-del" data-id="${x.id}" data-name="${esc(x.file_name || '')}" aria-label="O‘chirish">${ic('x')}</button>` : ''}</div>`).join('')
+    : empty('upload', 'Hali fayl yuklanmagan');
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act="imp-del"]');
+  if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!await confirmAsync(`«${b.dataset.name}» tizimdan o‘chirilsinmi? Shu fayldan kelgan ma’lumotlar, ota-onalarga ketgan bildirishnoma va xabarlar ham o‘chadi.`)) return;
+  b.disabled = true;
+  try { const r = await api(`/api/staff/imports/${b.dataset.id}`, { method: 'DELETE' }); toast(`O‘chirildi: ${r.rows} ta yozuv, ${r.messages} ta xabar`); loadImportsApp(); }
+  catch (err) { toast(err.status === 403 ? 'Faqat o‘zingiz yuklagan faylni o‘chira olasiz' : t('error')); b.disabled = false; }
+}, true);
 async function viewSuperCourses() {
   page({ title: 'Kurslar', active: '#/staff', body: loading() });
   const d = await api('/api/super/courses');
@@ -1033,6 +1052,7 @@ function liveChunk(chunk) {
 }
 function onLive(ev) {
   LIVE.last = Date.now();
+  if (ev.type === 'refresh') { if (S.me.role === 'parent') { S.me.unread = S.me.unread || {}; api('/api/pulse').then(p => { S.me.unread.notifications = p.notifications; route(); }).catch(() => route()); } return; }  // fayl o'chirildi
   const staff = S.me.role === 'staff' || S.me.role === 'super';
   if (ev.type === 'link') { haptic('success'); boot(true); return; }  // so'rov tasdiqlandi — farzand sahifasi
   S.me.unread = S.me.unread || {};
@@ -1467,6 +1487,7 @@ document.addEventListener('submit', async e => {
       }
       delete f.dataset.force;
       res.innerHTML = out.join('');
+      loadImportsApp();
     }
   } catch (err) {
     const code = err.data && err.data.error;

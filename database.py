@@ -293,6 +293,25 @@ CREATE TABLE IF NOT EXISTS payments (
     imported_at TEXT NOT NULL,
     PRIMARY KEY (student_id, kind, as_of)
 );
+-- Yuklangan fayllar (import): har bir yozuvda import_id — qaysi fayldan kelgani; o'chirilsa shu fayldan kelgan
+-- ma'lumotlar, ota-onalarga ketgan bildirishnomalar va Telegram xabarlari ham olib tashlanadi
+CREATE TABLE IF NOT EXISTS imports (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT NOT NULL,
+    file_name   TEXT,
+    uploaded_by INTEGER,
+    uploaded_at TEXT NOT NULL,
+    rows        INTEGER NOT NULL DEFAULT 0,
+    deleted_at  TEXT,
+    deleted_by  INTEGER
+);
+CREATE TABLE IF NOT EXISTS sent_messages (
+    import_id  INTEGER NOT NULL,
+    chat_id    INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    sent_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sent_messages ON sent_messages(import_id);
 -- Har bir fayl yuklangandan keyingi holat (dinamika uchun): faqat o'zgargan qiymat yoziladi; bir kunda bir necha
 -- yuklash — o'sha kunning bitta nuqtasi. metric: att_pct, att_hours, acad, kontrakt, trimestr, gpa
 CREATE TABLE IF NOT EXISTS snapshots (
@@ -403,6 +422,16 @@ CREATE TABLE IF NOT EXISTS settings (
 PARENT_FLAGS = {"notify_instant", "notify_daily", "notify_warn", "notify_pay"}
 
 
+# Yuklangan fayldan keladigan ma'lumotlar jadvallari (import_id ustuni bilan) — fayl o'chirilsa shu yozuvlar o'chadi
+IMPORT_TABLES = ("attendance", "attendance_stats", "payments", "payment_reports", "grades", "grade_history",
+                 "academic_debts", "schedule", "elective_schedule", "student_subjects", "notifications")
+
+
+def _imp() -> int | None:
+    from tenancy import current_import
+    return current_import.get()
+
+
 class Database:
     def __init__(self) -> None:
         self.conn: aiosqlite.Connection | None = None
@@ -483,6 +512,10 @@ class Database:
         async with self.conn.execute("PRAGMA table_info(parents)") as cur:
             if "notify_pay" not in {r[1] for r in await cur.fetchall()}:
                 await self.conn.execute("ALTER TABLE parents ADD COLUMN notify_pay INTEGER NOT NULL DEFAULT 1")
+        for t in IMPORT_TABLES:  # qaysi yuklangan fayldan kelgani (o'chirish uchun)
+            async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
+                if "import_id" not in {r[1] for r in await cur.fetchall()}:
+                    await self.conn.execute(f"ALTER TABLE {t} ADD COLUMN import_id INTEGER")
 
     async def close(self) -> None:
         if self.conn:
@@ -497,6 +530,13 @@ class Database:
         async with self.conn.execute(sql, params) as cur:
             rows = await cur.fetchall()
         return [dict(r) for r in rows]
+
+    async def _tag(self, table: str, where: str, params: list[tuple]) -> None:
+        """Joriy import davomida yozilgan qatorlarga import_id qo'yadi (import bo'lmasa — hech narsa qilmaydi)."""
+        imp = _imp()
+        if imp is None or not params:
+            return
+        await self.conn.executemany(f"UPDATE {table} SET import_id = ? WHERE {where}", [(imp, *p) for p in params])
 
     async def execute(self, sql: str, params=()) -> int:
         cur = await self.conn.execute(sql, params)
@@ -760,6 +800,7 @@ class Database:
                  status      = excluded.status""",
             rows,
         )
+        await self._tag("attendance", "student_id = ? AND date = ? AND pair = ?", [(r[0], r[1], r[2]) for r in rows])
         await self.conn.commit()
         return {r[0] for r in rows}
 
@@ -806,6 +847,8 @@ class Database:
         """Yuklangan hisobot qamrovi: groups None — butun kurs, aks holda — shu guruhlar."""
         await self.conn.executemany("INSERT OR IGNORE INTO payment_reports (kind, as_of, group_key) VALUES (?, ?, ?)",
                                     [(kind, as_of, g) for g in (sorted(groups) if groups is not None else ["*"])])
+        await self._tag("payment_reports", "kind = ? AND as_of = ? AND group_key = ?",
+                        [(kind, as_of, g) for g in (sorted(groups) if groups is not None else ["*"])])
         await self.conn.commit()
 
     async def payment_coverage(self, kind: str) -> list[tuple[str, str]]:
@@ -888,6 +931,7 @@ class Database:
                        :subject, :lesson_type, :teacher, :room, :week_type, :subgroup)""",
             [{"subgroup": None, **r} for r in rows],
         )
+        await self._tag("schedule", "group_key = ?", [(k,) for k in keys])
         await self.conn.commit()
         return len(rows), len(keys)
 
@@ -916,6 +960,7 @@ class Database:
                                     "start_time", "end_time", "lesson_type", "teacher", "room", "week_type")}
              for r in rows],
         )
+        await self._tag("elective_schedule", "subject_key = ?", [(k,) for k in keys])
         await self.conn.commit()
         return len(rows), sorted({r["subject"] for r in rows})
 
@@ -941,6 +986,7 @@ class Database:
                VALUES (:student_id, :subject, :subject_key, :subgroup)""",
             [{k: r.get(k) for k in ("student_id", "subject", "subject_key", "subgroup")} for r in rows],
         )
+        await self._tag("student_subjects", "student_id = ?", [(sid,) for sid in sids])
         await self.conn.commit()
         return len(sids), len(rows)
 
@@ -983,6 +1029,9 @@ class Database:
                                           recorded_at) VALUES (?,?,?,?,?,?,?,?)""",
             [(r["student_id"], r["subject"], r["control_type"], r["semester"], r["score"], r.get("max_score"),
               r.get("credits"), ts) for r in changed])
+        await self._tag("grades", "student_id = ? AND subject = ? AND control_type = ? AND semester = ?",
+                        [(r["student_id"], r["subject"], r["control_type"], r["semester"]) for r in rows])
+        await self._tag("grade_history", "recorded_at = ?", [(ts,)])
         await self.conn.commit()
         return changed
 
@@ -1033,8 +1082,8 @@ class Database:
     async def add_notification(self, parent_id: int, text: str, student_id: int | None = None,
                                kind: str | None = None) -> None:
         """kind: att | pay | grade | digest | link — Web App'da «Ochish» qaysi bo'limga olib borishini belgilaydi."""
-        await self.execute("INSERT INTO notifications (parent_id, text, created_at, student_id, kind) VALUES (?,?,?,?,?)",
-                           (parent_id, text, now_iso(), student_id, kind))
+        await self.execute("INSERT INTO notifications (parent_id, text, created_at, student_id, kind, import_id) "
+                           "VALUES (?,?,?,?,?,?)", (parent_id, text, now_iso(), student_id, kind, _imp()))
 
     async def notifications(self, parent_id: int, limit: int = 60) -> list[dict]:
         return await self.fetchall("SELECT * FROM notifications WHERE parent_id = ? ORDER BY id DESC LIMIT ?",
@@ -1073,6 +1122,7 @@ class Database:
             "INSERT OR IGNORE INTO academic_debts (student_id, subject, semester, credits, academic_year, created_at) "
             "VALUES (?,?,?,?,?,?)",
             [(r["student_id"], r["subject"], r.get("semester") or "", r.get("credits"), r.get("year"), now) for r in rows])
+        await self._tag("academic_debts", "created_at = ?", [(now,)])
         await self.conn.commit()
         row = await self.fetchone("SELECT COUNT(*) AS n FROM academic_debts")
         return row["n"] if row else 0
@@ -1316,6 +1366,7 @@ class Database:
                 (sid, as_of, r["attended"], r["absent"], r["excused"], r.get("self_marked"),
                  r.get("teacher_marked"), ts))
             out.append((sid, prev, {**r, "as_of": as_of}))
+        await self._tag("attendance_stats", "student_id = ? AND as_of = ?", [(r["student_id"], as_of) for r in rows])
         await self.conn.commit()
         return out
 
@@ -1357,6 +1408,7 @@ class Database:
                 (sid, kind, as_of, year_label, r.get("contract"), r.get("paid"), r["debt"], r.get("overpaid") or 0,
                  r.get("percent"), r.get("note"), ts))
             out.append((sid, prev, {**r, "as_of": as_of, "kind": kind, "imported_at": ts}))
+        await self._tag("payments", "student_id = ? AND kind = ? AND as_of = ?", [(r["student_id"], kind, as_of) for r in rows])
         await self.conn.commit()
         return out
 

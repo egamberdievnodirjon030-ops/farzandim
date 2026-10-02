@@ -25,6 +25,8 @@ from config import (ADMIN_COURSE, ADMIN_IDS, COURSE_TITLES, COURSES, ENV_COURSE_
 
 _current: contextvars.ContextVar[str | None] = contextvars.ContextVar("course", default=None)
 current_user: contextvars.ContextVar[int | None] = contextvars.ContextVar("user", default=None)  # loglar uchun
+# Joriy yuklangan fayl (imports.id): shu vaqtda yozilgan ma'lumot va bildirishnomalar unga bog'lanadi
+current_import: contextvars.ContextVar[int | None] = contextvars.ContextVar("import", default=None)
 
 
 def course_keys() -> list[str]:

@@ -24,11 +24,21 @@ from utils import (fmt_pairs, STATUS_ICON, STATUS_TEXT, esc, fmt_date, fmt_day_m
 log = logging.getLogger(__name__)
 
 
+async def _remember(chat_id: int, msg) -> None:
+    """Fayl yuklash natijasida ketgan xabar — fayl o'chirilsa Telegram chatidan ham o'chirish uchun."""
+    from tenancy import current_import
+    imp = current_import.get()
+    if imp is not None and getattr(msg, "message_id", None):
+        await db.execute("INSERT INTO sent_messages (import_id, chat_id, message_id, sent_at) VALUES (?, ?, ?, ?)",
+                         (imp, chat_id, msg.message_id, now_iso()))
+
+
 async def safe_send(bot: Bot, chat_id: int, text: str, **kwargs) -> bool:
     """Xabar yuboradi; bot bloklangan bo'lsa ota-onani nofaol qiladi. Telegram limitiga rioya qiladi."""
     for attempt in range(2):
         try:
-            await bot.send_message(chat_id, text, **kwargs)
+            msg = await bot.send_message(chat_id, text, **kwargs)
+            await _remember(chat_id, msg)
             await asyncio.sleep(0.04)  # ~25 xabar/soniya — Telegram chegarasidan past
             return True
         except TelegramRetryAfter as e:

@@ -35,6 +35,7 @@ ADMIN_COMMANDS = PUBLIC_COMMANDS + [
     BotCommand(command="chegaralar", description="Dars qoldirish chegaralariga yetganlar"),
     BotCommand(command="hujjat", description="PDF hujjatni ota-onaga yuborish"),
     BotCommand(command="hujjatlar", description="Talabaga yuborilgan hujjatlar"),
+    BotCommand(command="yuklamalar", description="📂 Yuklangan fayllar (o'chirish)"),
     BotCommand(command="shablon", description="Excel namunalari"),
     BotCommand(command="guruhlar", description="Talabalar Telegram guruhlari"),
     BotCommand(command="tekshir", description="Ro'yxatdan o'tganlarni qayta tekshirish"),

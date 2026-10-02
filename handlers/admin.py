@@ -53,6 +53,8 @@ from utils import (CONTRACT, GRANT, normalize_phone, fmt_pairs, fmt_dt, now_iso,
 
 log = logging.getLogger(__name__)
 
+from aiogram.filters.callback_data import CallbackData
+
 router = Router(name="admin")
 router.message.filter(F.chat.type == "private")  # guruhlarda faqat handlers/groups.py ishlaydi
 router.message.filter(F.from_user.id.in_(ADMIN_IDS))
@@ -384,6 +386,23 @@ async def _scope_rows(rows: list[dict], scope: set[str]) -> tuple[list[dict], in
 
 async def _process_import(bot, progress: Message, kind: str, rows: list, caption: str, file_name: str,
                           n: int | None = None, user_id: int | None = None) -> bool:
+    """Yuklangan fayl — «yuklangan fayllar» ro'yxatiga yoziladi; undan kelgan ma'lumot, bildirishnoma va xabarlar
+    shu yozuvga bog'lanadi (keyin faylni o'chirish mumkin)."""
+    import imports
+    from tenancy import current_import
+    imp_id = await imports.start(kind, file_name, user_id)
+    token = current_import.set(imp_id)
+    ok = False
+    try:
+        ok = await _process_import_body(bot, progress, kind, rows, caption, file_name, n, user_id)
+    finally:
+        current_import.reset(token)
+        await imports.finish(imp_id, ok)
+    return ok
+
+
+async def _process_import_body(bot, progress: Message, kind: str, rows: list, caption: str, file_name: str,
+                               n: int | None = None, user_id: int | None = None) -> bool:
     silent = "jim" in caption.lower()
     # Kurs koordinatoriga guruhlar biriktirilgan bo'lsa — faylda faqat uning guruhlari talabalari tanilinadi
     scope = group_scope(user_id) if kind not in UNSCOPED_KINDS else None
@@ -2056,6 +2075,61 @@ async def cmd_terms(message: Message) -> None:
 
 
 # ---------------------------------------------------------------- kurs koordinatorining ota-onalarga ko'rinadigan ismi
+# ---------------------------------------------------------------- yuklangan fayllar: ro'yxat va o'chirish
+class ImpDelCb(CallbackData, prefix="idl"):
+    i: int
+    ok: int = 0   # 0 — tasdiq so'raladi, 1 — o'chiriladi
+
+
+@router.message(Command("yuklamalar"))
+async def cmd_imports(message: Message) -> None:
+    import imports
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from config import SUPERADMIN_IDS
+    uid = message.from_user.id
+    items = await imports.listing(uid, uid in SUPERADMIN_IDS, limit=15)
+    if not items:
+        await message.answer("Hali fayl yuklanmagan (yoki o'zingiz yuklagan fayl yo'q).")
+        return
+    kb = InlineKeyboardBuilder()
+    lines = ["📂 <b>Yuklangan fayllar</b> — o'chirilsa, shu fayldan kelgan ma'lumotlar, ota-onalarga ketgan "
+             "bildirishnoma va xabarlar ham o'chadi:", ""]
+    for i, r in enumerate(items, 1):
+        lines.append(f"{i}. {esc(r['file_name'] or '—')} · {esc(KIND_TITLES.get(r['kind'], r['kind']))} · "
+                     f"{r['rows']} ta yozuv · {fmt_dt(r['uploaded_at'])}")
+        if imports.can_delete(r, uid, uid in SUPERADMIN_IDS):
+            kb.button(text=f"🗑 {i}. {(r['file_name'] or '')[:28]}", callback_data=ImpDelCb(i=r["id"]))
+    kb.adjust(1)
+    await message.answer("\n".join(lines), reply_markup=kb.as_markup())
+
+
+@router.callback_query(ImpDelCb.filter())
+async def cb_import_delete(cb: CallbackQuery, callback_data: ImpDelCb) -> None:
+    import imports
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from config import SUPERADMIN_IDS
+    uid = cb.from_user.id
+    r = await imports.get(callback_data.i)
+    if not r or not imports.can_delete(r, uid, uid in SUPERADMIN_IDS):
+        await cb.answer("Bu faylni o'chirib bo'lmaydi (allaqachon o'chirilgan yoki boshqa koordinator yuklagan).",
+                        show_alert=True)
+        return
+    if not callback_data.ok:
+        kb = InlineKeyboardBuilder()
+        kb.button(text="✅ Ha, o'chirish", callback_data=ImpDelCb(i=r["id"], ok=1))
+        await cb.answer()
+        await cb.message.answer(f"«{esc(r['file_name'] or '—')}» tizimdan o'chirilsinmi? {r['rows']} ta yozuv, ota-onalarga "
+                                "ketgan bildirishnoma va xabarlar ham o'chadi. Buni qaytarib bo'lmaydi.",
+                                reply_markup=kb.as_markup())
+        return
+    await cb.answer("O'chirilmoqda…")
+    st = await imports.delete(cb.bot, r["id"], uid)
+    await cb.message.edit_text(
+        f"🗑 «{esc(r['file_name'] or '—')}» o'chirildi: {st['rows']} ta yozuv, {st['notifications']} ta bildirishnoma, "
+        f"Telegram'dan {st['messages']} ta xabar" + (f" ({st['messages_failed']} tasini Telegram o'chirishga ruxsat bermadi — "
+                                                     "48 soatdan o'tgan)" if st["messages_failed"] else "") + ".")
+
+
 @router.message(Command("koordinator"))
 async def cmd_coordinator(message: Message, command: CommandObject) -> None:
     arg = (command.args or "").strip()

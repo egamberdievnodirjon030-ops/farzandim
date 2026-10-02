@@ -1438,6 +1438,33 @@ async def api_super_regulation_delete(request):
     return ok({"ok": True})
 
 
+
+# ================================================================ yuklangan fayllar (kurs koordinatori, super-admin)
+@staff_route
+async def api_staff_imports(request):
+    import imports
+    from importer import KIND_TITLES
+    uid = request["user"]["id"]
+    items = await imports.listing(uid, uid in SUPERADMIN_IDS)
+    names = {c["user_id"]: c.get("name") for c in (await central.registry())[1]}
+    return ok({"items": [{"id": r["id"], "kind": r["kind"], "kind_title": KIND_TITLES.get(r["kind"], r["kind"]),
+                          "file_name": r["file_name"], "at": r["uploaded_at"], "rows": r["rows"],
+                          "by": names.get(r["uploaded_by"]) or ("Super-admin" if r["uploaded_by"] in SUPERADMIN_IDS else ""),
+                          "parents": r["parents_notified"], "deletable": imports.can_delete(r, uid, uid in SUPERADMIN_IDS)}
+                         for r in items]})
+
+
+@staff_route
+async def api_staff_import_delete(request):
+    import imports
+    uid = request["user"]["id"]
+    r = await imports.get(int(request.match_info["iid"]))
+    if not r:
+        return bad("not_found", 404)
+    if not imports.can_delete(r, uid, uid in SUPERADMIN_IDS):
+        return bad("forbidden", 403)
+    return ok(await imports.delete(request.app["bot"], r["id"], uid))
+
 def setup_routes(app: web.Application) -> None:
     r = app.router
     r.add_get("/api/me", api_me)
@@ -1498,6 +1525,8 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/surveys/{course}/{sid:\\d+}", api_survey)
     r.add_post("/api/surveys/{course}/{sid:\\d+}", api_survey)
     r.add_get("/api/pulse", api_pulse)
+    r.add_get("/api/staff/imports", api_staff_imports)
+    r.add_delete("/api/staff/imports/{iid:\\d+}", api_staff_import_delete)
     r.add_get("/api/regulations", api_regulations)
     r.add_get("/api/regulations/{rid:\\d+}/pages", api_regulation_pages)
     r.add_get("/api/regulations/{rid:\\d+}/page/{n:\\d+}", api_regulation_page)

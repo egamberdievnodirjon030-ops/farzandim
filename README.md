@@ -41,6 +41,15 @@ Serverga kirish va botni qayta ishga tushirish shart emas — o'zgarish darhol i
 
 `.env` dagi `ADMIN_IDS` va `KURSLAR` — faqat boshlang'ich sozlama: bot birinchi ishga tushganda umumiy ro'yxatga (`central.db`) yoziladi, keyin hamma narsa bot ichidan boshqariladi. Bot ichidan olib tashlangan koordinator `.env` da qolib ketsa ham qayta qo'shilmaydi. Koordinatori yo'q kursning xabarlari (savollar, bog'lash so'rovlari) super-adminga boradi — boshqa kurslarning koordinatorlariga emas.
 
+### Yuklangan fayllarni o'chirish
+
+Har bir yuklangan Excel fayl «Yuklangan fayllar» ro'yxatiga yoziladi (kompyuter versiyasi → «Ma'lumot va hisobot», ilova → «Fayllar», botda `/yuklamalar`): fayl nomi, turi, yozuvlar soni, nechta ota-onaga xabar ketgani, kim va qachon yuklagani.
+
+Fayl o'chirilganda **hamma joydan** olib tashlanadi: shu fayldan kelgan davomat, HEMIS statistikasi, baholar, akademik qarzdorlar, kontrakt/trimestr, jadval yozuvlari; ota-onalarning ilovasidagi bildirishnomalar; ota-onalarning Telegram chatidagi xabarlar (Telegram 48 soat ichida ruxsat beradi — kechroq bo'lsa, natijada aytiladi). Ochiq turgan ota-ona ilovasi darhol yangilanadi, dinamika qayta hisoblanadi.
+- Kurs koordinatori — faqat o'zi yuklagan fayllarni, super-admin — istalganini o'chiradi.
+- Talabalar ro'yxati va tarjimalar o'chirilmaydi — ular boshqa barcha ma'lumotlarning asosi.
+- Keyingi fayl avvalgisidagi yozuvni yangilagan bo'lsa (masalan, o'sha kunning davomati qayta yuklangan), u yozuv keyingi faylga tegishli bo'ladi.
+
 ### So'rovnomalar (ota-onalar fikri)
 
 Kurs koordinatori (yoki super-admin) ota-onalar o'rtasida so'rovnoma o'tkazadi — kompyuter versiyasida «So'rovnomalar» yoki ilovadagi kurs holati → «So'rovnomalar».

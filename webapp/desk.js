@@ -671,7 +671,9 @@ async function pFiles() {
         <label><input type="radio" name="fmt" value="p"><span><b>PDF</b><span>dekanat yig‘ilishi va rahbariyat uchun</span></span></label></div>
       <label class="field"><span>Bo‘lim</span><select class="select" id="sec">${SECTIONS_EXP.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></label>
       <div class="actions"><button class="btn primary" id="dl">${ic('download')} Yuklab olish</button>
-        <button class="btn" id="tgsend">${ic('telegram')} Telegram chatimga yuborish</button></div></div></section></div>`);
+        <button class="btn" id="tgsend">${ic('telegram')} Telegram chatimga yuborish</button></div></div></section></div>
+    <section class="sec" style="margin-top:22px"><header><h2>Yuklangan fayllar</h2><span class="hint">${S.me.role === 'super' ? 'barcha koordinatorlar' : 'siz yuklaganlar'}</span></header><div id="imports">${skel(80)}</div></section>`);
+  loadImports();
   const dz = $('#dz');
   ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
@@ -722,8 +724,30 @@ async function upload(files, force = null) {
       <div class="rep">${safeHtml(r.report)}</div>`;
     S.stu = null;
   }
-  refreshBadges();
+  refreshBadges(); loadImports();
 }
+/* Yuklangan fayllar: o'chirilsa — shu fayldan kelgan ma'lumot, ota-onalarga ketgan bildirishnoma va xabarlar ham */
+async function loadImports() {
+  const box = document.getElementById('imports'); if (!box) return;
+  let d; try { d = await api('/api/staff/imports'); } catch (e) { box.innerHTML = `<div class="pad hint">Ro‘yxat yuklanmadi</div>`; return; }
+  box.innerHTML = d.items.length ? `<div class="tbl-wrap" style="max-height:420px"><table class="tbl"><thead><tr><th>Fayl</th><th>Turi</th><th class="r">Yozuvlar</th><th class="r">Ota-onalarga xabar</th><th>Kim, qachon</th><th></th></tr></thead><tbody>
+    ${d.items.map(x => `<tr><td class="name"><b>${esc(x.file_name || '—')}</b></td><td>${esc(x.kind_title)}</td><td class="r">${x.deletable ? x.rows : '<span class="dash">—</span>'}</td><td class="r">${x.parents || '<span class="dash">—</span>'}</td>
+      <td>${esc(x.by || '')}${x.by ? ', ' : ''}${when(x.at)}</td>
+      <td class="r">${x.deletable ? `<button class="btn sm ghost" data-act="imp-del" data-id="${x.id}" data-name="${esc(x.file_name || '')}" data-rows="${x.rows}" data-parents="${x.parents}" title="O‘chirish" aria-label="O‘chirish">${ic('x')}</button>` : '<span class="hint" title="Talabalar ro‘yxati va tarjimalar boshqa ma’lumotlarning asosi">o‘chirilmaydi</span>'}</td></tr>`).join('')}</tbody></table></div>`
+    : `<div class="pad">${emptyBox('upload', 'Hali fayl yuklanmagan', '')}</div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act="imp-del"]');
+  if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!await confirmDlg('Faylni tizimdan o‘chirasizmi?', `<b>${esc(b.dataset.name)}</b> dan kelgan ${b.dataset.rows} ta yozuv o‘chiriladi.${Number(b.dataset.parents) ? ` ${b.dataset.parents} ta ota-onaga ketgan bildirishnomalar ilovadan, xabarlar Telegram chatidan (48 soat ichida) ham o‘chiriladi.` : ''} Buni qaytarib bo‘lmaydi.`, 'O‘chirish', true)) return;
+  b.disabled = true;
+  try {
+    const r = await api(`/api/staff/imports/${b.dataset.id}`, { method: 'DELETE' });
+    toast(`O‘chirildi: ${r.rows} ta yozuv, ${r.notifications} ta bildirishnoma, ${r.messages} ta Telegram xabar` + (r.messages_failed ? ` (${r.messages_failed} tasini Telegram o‘chirishga ruxsat bermadi)` : ''));
+    S.stu = null; loadImports(); refreshBadges();
+  } catch (err) { toast(err.status === 403 ? 'Faqat o‘zingiz yuklagan faylni o‘chira olasiz' : 'O‘chirilmadi', true); b.disabled = false; }
+}, true);
 
 
 /* ================================================================ rasmiy hujjat yuborish */
