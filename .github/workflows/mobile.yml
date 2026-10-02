@@ -31,8 +31,10 @@ jobs:
   android:
     name: Android (APK)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
+        shell: bash
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
@@ -90,16 +92,16 @@ jobs:
   ios:
     name: iOS
     runs-on: macos-latest
+    timeout-minutes: 45
     defaults:
       run:
+        shell: bash   # -eo pipefail: «xcodebuild | tail» xatoni yashirmasin
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4   # macOS da npm keshini saqlash qotib qolardi — keshsiz
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
       - name: Server manzili
         run: |
           if [ -z "$APP_SERVER_URL" ]; then
