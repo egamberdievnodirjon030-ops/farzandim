@@ -22,6 +22,7 @@ const T = {
     hemis_missed: 'HEMIS ma’lumoti bo‘yicha', hemis_missed_note: 'HEMIS umumiy statistikasida har bir darsning sanasi va fani bo‘lmaydi. Kurs koordinatori kunlik davomatni yuklasa, darslar sana va fan bo‘yicha shu yerda ko‘rinadi.', until: '{d} gacha', unexcused_n: 'Sababsiz: {a}', excused_n: 'sababli: {b}',
     gpa_low: '{min} dan past — kursdan kursga o‘tmaydi',
     back: 'Ortga',
+    surveys: 'So‘rovnomalar', survey: 'So‘rovnoma', regs: 'Ichki nizomlar', regs_sub: 'Universitet ichki tartib qoidalari va nizomlari', answer_now: 'Javob berish', q_n: '{n} ta savol', closes: '{d} gacha', submit_survey: 'Yuborish', survey_thanks: 'Rahmat! Javobingiz qabul qilindi.', survey_closed: 'So‘rovnoma yopilgan', required_q: 'Iltimos, belgilangan savollarga javob bering', your_answer: 'Javobingiz…', answered: 'Javob berilgan', no_surveys: 'Hozircha so‘rovnoma yo‘q', no_regs: 'Nizomlar hali joylanmagan', edit_answer: 'Javobni o‘zgartirish', anon: 'Anonim: ismingiz va farzandingiz ko‘rsatilmaydi', scale_lo: 'yomon', scale_hi: 'a’lo', choose_many: 'bir nechtasini tanlash mumkin', waiting_you: 'Fikringizni kutyapmiz', open_link: 'Ochish', new_note: 'Yangi bildirishnoma', poll_done: 'Javob berganlar',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -59,6 +60,7 @@ const T = {
     hemis_missed: 'По данным HEMIS', hemis_missed_note: 'В общей статистике HEMIS нет даты и предмета каждого занятия. Когда координатор загрузит ежедневную посещаемость, занятия появятся здесь по датам и предметам.', until: 'до {d}', unexcused_n: 'Без причины: {a}', excused_n: 'по уваж. причине: {b}',
     gpa_low: 'ниже {min} — не переводится на следующий курс',
     back: 'Назад',
+    surveys: 'Опросы', survey: 'Опрос', regs: 'Внутренние положения', regs_sub: 'Правила внутреннего распорядка и положения университета', answer_now: 'Ответить', q_n: 'вопросов: {n}', closes: 'до {d}', submit_survey: 'Отправить', survey_thanks: 'Спасибо! Ваш ответ принят.', survey_closed: 'Опрос закрыт', required_q: 'Пожалуйста, ответьте на отмеченные вопросы', your_answer: 'Ваш ответ…', answered: 'Ответ отправлен', no_surveys: 'Пока опросов нет', no_regs: 'Положения ещё не размещены', edit_answer: 'Изменить ответ', anon: 'Анонимно: ваше имя и имя ребёнка не показываются', scale_lo: 'плохо', scale_hi: 'отлично', choose_many: 'можно выбрать несколько', waiting_you: 'Ждём вашего мнения', open_link: 'Открыть', new_note: 'Новое уведомление', poll_done: 'Ответили',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -96,6 +98,7 @@ const T = {
     hemis_missed: 'According to HEMIS', hemis_missed_note: 'HEMIS summary statistics do not include the date and subject of each class. Once the coordinator uploads daily attendance, classes will appear here by date and subject.', until: 'until {d}', unexcused_n: 'Unexcused: {a}', excused_n: 'excused: {b}',
     gpa_low: 'below {min} — will not advance to the next year',
     back: 'Back',
+    surveys: 'Surveys', survey: 'Survey', regs: 'University regulations', regs_sub: 'Internal rules and regulations of the university', answer_now: 'Answer', q_n: '{n} question(s)', closes: 'until {d}', submit_survey: 'Submit', survey_thanks: 'Thank you! Your answer has been received.', survey_closed: 'The survey is closed', required_q: 'Please answer the marked questions', your_answer: 'Your answer…', answered: 'Answered', no_surveys: 'No surveys yet', no_regs: 'No regulations published yet', edit_answer: 'Change answer', anon: 'Anonymous: your and your child’s names are not shown', scale_lo: 'poor', scale_hi: 'excellent', choose_many: 'you can choose several', waiting_you: 'We’d like your opinion', open_link: 'Open', new_note: 'New notification', poll_done: 'Answered',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -213,6 +216,8 @@ const P = {
   bell: 'M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0',
   menu: 'M4 7h16M4 12h16M4 17h16',
   chev: 'M9 6l6 6-6 6', left: 'M15 6l-6 6 6 6',
+  poll: 'M9 3h6v3H9zM9 4.5H6a1 1 0 0 0-1 1V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5.5a1 1 0 0 0-1-1h-3M8.5 12l2 2 4-4M8.5 17h7',
+  book: 'M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5zM4 19.5A1.5 1.5 0 0 0 5.5 21H20v-3M8 7h8M8 10.5h6',
   ok: 'M20 6 9 17l-5-5', alert: 'M12 8v5M12 16.5v.5M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
   wallet: 'M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14h.01',
   file: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h6',
@@ -333,8 +338,10 @@ function lessonRow(l) {
 async function viewHome() {
   const c = S.child;
   page({ title: t('home'), sub: c ? c.short : '', active: '#/', body: switcher() + loading() });
-  let o;
-  try { o = await api(childPath(c, 'overview')); } catch (e) { return page({ title: t('home'), active: '#/', body: errorBox() }); }
+  let o, sv = { pending: [] };
+  try { [o, sv] = await Promise.all([api(childPath(c, 'overview')), api('/api/surveys').catch(() => ({ pending: [] }))]); }
+  catch (e) { return page({ title: t('home'), active: '#/', body: errorBox() }); }
+  S.pendingSurveys = sv.pending.length;
   const a = o.attendance;
   const attTile = a ? `<a class="tile ${a.percent >= 90 ? 'ok' : a.percent >= 75 ? 'warn' : 'bad'}" href="#/attendance"><span class="k">${t('attendance')}</span>
       <div class="ring-wrap">${ring(a.percent, 54, 7)}<span class="v num">${a.percent != null ? a.percent + '%' : '—'}</span></div>
@@ -345,7 +352,8 @@ async function viewHome() {
       <span class="v" style="font-size:${o.academic.count ? 26 : 22}px">${o.academic.count ? `${o.academic.count}<small class="of"> ${esc(subjUnit(o.academic.count))}</small>` : t('none')}</span>
       <span class="s clamp3">${o.academic.count ? esc(o.academic.debts.map(d => d.subject).join(', ')) : ''}</span></a>`;
   const tutor = c.tutor || {};
-  const body = switcher() + idCard(c) + verdict(o) + `
+  // birinchi ekranda: talaba kartasi → javob kutayotgan so'rovnoma → so'rovnomalar va ichki nizomlar → holat
+  const body = switcher() + idCard(c) + sv.pending.slice(0, 2).map(surveyCta).join('') + quickLinks(sv.pending.length) + verdict(o) + `
     <div class="grid2" style="margin-top:14px">${attTile}${gpaTile}${acadTile}${payTile('kontrakt', o.pays.kontrakt)}</div>
     ${o.pays.trimestr && o.pays.trimestr.state === 'debt' ? `<div style="margin-top:12px">${payTile('trimestr', o.pays.trimestr)}</div>` : ''}
     <section class="section"><div class="section-head"><h2>${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
@@ -518,6 +526,7 @@ const NOTE_KIND = {
   doc: { icon: 'file', route: '/documents', tone: 'bordo' },
   news: { icon: 'mega', route: '/news', tone: 'navy' }, chat: { icon: 'chat', route: '/chat', tone: 'navy' },
   digest: { icon: 'cal', route: '/', tone: 'navy' }, link: { icon: 'users', route: '/', tone: 'ok' },
+  survey: { icon: 'poll', route: '/surveys', tone: 'bordo' }, reg: { icon: 'book', route: '/regulations', tone: 'navy' },
 };
 const GO_ROUTE = Object.fromEntries(Object.entries(NOTE_KIND).map(([k, v]) => [k, v.route]));
 const PICTO = /^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u;
@@ -647,7 +656,8 @@ async function viewTrends() {
 
 /* ================================================================ menyu, sozlamalar, ma'lumot */
 function viewMenu() {
-  const items = [['#/finance', 'wallet', t('finance')], ['#/documents', 'file', t('documents')], ['#/trends', 'trend', t('trends')],
+  const items = [['#/surveys', 'poll', t('surveys')], ['#/regulations', 'book', t('regs')],
+    ['#/finance', 'wallet', t('finance')], ['#/documents', 'file', t('documents')], ['#/trends', 'trend', t('trends')],
     ['#/news', 'mega', t('news')], ['#/info', 'info', t('info')], ['#/settings', 'gear', t('settings')]];
   page({ title: t('menu'), active: '', body: `<h2 class="screen-title">${t('menu')}</h2><div class="list">${items.map(([h, i, l]) =>
     `<a class="row" href="${h}"><div class="ic">${ic(i)}</div><div class="body"><div class="t">${esc(l)}</div></div>${ic('chev', 'chev')}</a>`).join('')}</div>` });
@@ -757,6 +767,7 @@ async function viewStaff() {
     <section class="section"><div class="section-head"><h2>Muammoli talabalar</h2><a href="#/staff/students?filter=prob">Barchasi</a></div>
       <div class="list">${d.top.length ? d.top.slice(0, 12).map(staffRow).join('') : empty('ok', 'Muammoli talaba yo‘q')}</div></section>
     <section class="section"><div class="list">
+      <a class="row" href="#/staff/surveys"><div class="ic">${ic('poll')}</div><div class="body"><div class="t">So‘rovnomalar</div><div class="d">Ota-onalar fikri — tuzish va natijalar</div></div>${ic('chev', 'chev')}</a>
       <a class="row" href="#/staff/docs"><div class="ic bordo">${ic('file')}</div><div class="body"><div class="t">Rasmiy hujjat yuborish</div><div class="d">Buyruq yoki xat — har bir ota-onaga o‘z farzandining nusxasi</div></div>${ic('chev', 'chev')}</a>
       <a class="row" href="#/staff/requests"><div class="ic">${ic('users')}</div><div class="body"><div class="t">Bog‘lash so‘rovlari</div><div class="d">${d.link_requests ? d.link_requests + ' ta kutilmoqda' : 'Kutilayotgan so‘rov yo‘q'}</div></div>${d.link_requests ? `<span class="pill bordo">${d.link_requests}</span>` : ''}${ic('chev', 'chev')}</a>
     </div></section>
@@ -856,6 +867,72 @@ function confirmSafe(msg) {
   return Promise.resolve(window.confirm(msg));
 }
 function confirmAsync(msg) { return confirmSafe(msg); }
+/* ================================================================ kurs koordinatori: so'rovnomalar (telefonda) */
+async function viewStaffSurveys() {
+  page({ title: 'So‘rovnomalar', active: '', body: loading() });
+  let d;
+  try { d = await api('/api/staff/surveys'); } catch (e) { return page({ title: 'So‘rovnomalar', active: '', body: errorBox() }); }
+  page({ title: 'So‘rovnomalar', active: '', body: `<h2 class="screen-title">So‘rovnomalar</h2>
+    <a class="btn block" href="#/staff/surveys/new" style="margin-bottom:12px">${ic('poll')} Yangi so‘rovnoma</a>
+    <div class="list">${d.items.length ? d.items.map(x => `<a class="row" href="#/staff/surveys/${x.id}"><div class="ic ${x.open ? '' : 'muted'}">${ic('poll')}</div>
+      <div class="body"><div class="t">${esc(x.title)}</div><div class="d">${x.answered} / ${x.eligible} javob · ${x.open ? 'ochiq' : 'yopilgan'}${x.groups.length ? ' · ' + esc(x.groups.join(', ')) : ''}</div></div>${ic('chev', 'chev')}</a>`).join('')
+      : empty('poll', 'Hali so‘rovnoma yo‘q')}</div>` });
+}
+async function viewStaffSurvey(id) {
+  page({ title: 'So‘rovnoma', active: '', body: loading() });
+  let d;
+  try { d = await api(`/api/staff/surveys/${id}`); } catch (e) { return page({ title: 'So‘rovnoma', active: '', body: errorBox() }); }
+  const pct = d.eligible ? Math.round(100 * d.answered / d.eligible) : 0;
+  page({ title: 'So‘rovnoma', sub: `${d.answered} / ${d.eligible} javob`, active: '', body: `<h2 class="screen-title">${esc(d.title)}</h2>
+    <div class="card"><div class="kv"><span>Javob berganlar</span><b class="num">${d.answered} / ${d.eligible} (${pct}%)</b></div><div class="progress"><i style="width:${pct}%"></i></div>
+      <div class="kv" style="margin-top:8px"><span>Holat</span><b>${d.open ? 'ochiq' : 'yopilgan'}${d.anonymous ? ', anonim' : ''}</b></div></div>
+    ${d.questions.map((q, i) => `<section class="section"><div class="section-head"><h2 style="font-size:16px">${i + 1}. ${esc(q.text)}</h2></div><div class="card">
+      ${q.options ? (() => { const tot = q.options.reduce((a, o) => a + o.count, 0) || 1; return q.options.map(o => `<div class="kv"><span>${esc(o.label)}</span><b class="num">${o.count} · ${Math.round(100 * o.count / tot)}%</b></div><div class="progress" style="margin-bottom:8px"><i style="width:${Math.round(100 * o.count / tot)}%"></i></div>`).join('') + (q.average != null ? `<p class="small muted">O‘rtacha: <b>${num(q.average)}</b> / 5</p>` : ''); })()
+        : q.texts.length ? q.texts.map(x => `<p style="margin:0 0 8px;white-space:pre-line">${esc(x.text)}${x.student ? `<br><span class="muted small">${esc(x.student)}, ${esc(x.group || '')}</span>` : ''}</p>`).join('') : '<p class="muted small">Hali javob yo‘q</p>'}</div></section>`).join('')}
+    ${d.open ? `<button class="btn ghost block" data-act="st-sv-close" data-id="${d.id}" style="margin-top:14px">So‘rovnomani yopish</button>` : ''}` });
+}
+function viewStaffSurveyNew() {
+  const kinds = [['single', 'Bitta javob'], ['multi', 'Bir nechta javob'], ['scale', 'Baho 1–5'], ['text', 'Erkin javob']];
+  const qBlock = i => `<fieldset class="card q" data-i="${i}"><div class="q-t"><b>${i + 1}-savol</b></div>
+    <select class="input" name="kind" style="margin-bottom:8px">${kinds.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+    <input class="input" name="text" placeholder="Savol matni" maxlength="500" style="margin-bottom:8px">
+    <textarea class="input" name="options" rows="3" placeholder="Javob variantlari — har biri yangi qatorda (bitta / bir nechta javob uchun)"></textarea></fieldset>`;
+  page({ title: 'Yangi so‘rovnoma', active: '', body: `<form id="stSurvey">
+    <label class="field" style="margin-top:0"><span>Sarlavha</span><input class="input" name="title" required minlength="3" maxlength="200"></label>
+    <label class="field"><span>Izoh (ixtiyoriy)</span><textarea class="input" name="description" rows="2" maxlength="2000"></textarea></label>
+    <div id="stQs">${qBlock(0)}</div>
+    <button class="btn ghost block" type="button" data-act="st-sv-addq">+ Savol qo‘shish</button>
+    <label class="field"><span>Guruhlar (ixtiyoriy, vergul bilan; bo‘sh — ${(S.me.staff && S.me.staff.groups || []).length ? 'barcha guruhlaringiz' : 'butun kurs'})</span><input class="input" name="groups" placeholder="XM-21, XM-22"></label>
+    <label class="field"><span>Yopilish sanasi (ixtiyoriy)</span><input class="input" type="date" name="closes_at"></label>
+    <label class="row" style="margin-top:8px;cursor:pointer"><span class="switch"><input type="checkbox" name="anonymous"><i></i></span><div class="body"><div class="t">Anonim</div><div class="d">Natijada ismlar ko‘rinmaydi</div></div></label>
+    <button class="btn block" style="margin-top:14px">${ic('send')} E’lon qilish</button></form>` });
+  S.stQ = 1;
+  document.querySelector('[data-act="st-sv-addq"]').onclick = () => { document.getElementById('stQs').insertAdjacentHTML('beforeend', qBlock(S.stQ++)); };
+}
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'stSurvey') return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const f = e.target, fd = new FormData(f);
+  const questions = [...f.querySelectorAll('fieldset.q')].map(fs => ({ kind: fs.querySelector('[name=kind]').value, text: fs.querySelector('[name=text]').value.trim(),
+    options: fs.querySelector('[name=options]').value.split('\n').map(x => x.trim()).filter(Boolean), required: true })).filter(q => q.text);
+  if (!questions.length) return toast('Kamida bitta savol yozing');
+  const bad = questions.findIndex(q => (q.kind === 'single' || q.kind === 'multi') && q.options.length < 2);
+  if (bad >= 0) return toast(`${bad + 1}-savolga kamida ikkita variant yozing`);
+  if (!await confirmAsync('So‘rovnoma e’lon qilinadi va ota-onalarga yuboriladi. Davom etasizmi?')) return;
+  const btn = f.querySelector('button:not([type=button])'); btn.disabled = true;
+  try {
+    const r = await api('/api/staff/surveys', { json: { title: fd.get('title'), description: fd.get('description'), questions,
+      groups: String(fd.get('groups') || '').split(',').map(x => x.trim()).filter(Boolean), closes_at: fd.get('closes_at') || null, anonymous: !!fd.get('anonymous') } });
+    toast(`E’lon qilindi: ${r.sent} / ${r.recipients}`); location.hash = `#/staff/surveys/${r.id}`;
+  } catch (err) { toast('E’lon qilinmadi: ' + ((err.data && err.data.error) || '')); btn.disabled = false; }
+}, true);
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act="st-sv-close"]');
+  if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!await confirmAsync('So‘rovnomani yopasizmi? Ota-onalar endi javob bera olmaydi.')) return;
+  try { await api(`/api/staff/surveys/${b.dataset.id}/close`, { method: 'POST' }); route(); } catch (err) { toast(t('error')); }
+}, true);
 function viewStaffAnnounce() {
   page({ title: 'E’lon yuborish', active: '#/staff/announce', body: `<form class="card" data-act="announce">
     <label class="field" style="margin-top:0"><span>E’lon matni</span><textarea class="input" name="text" rows="7" required placeholder="Ota-onalar yig‘ilishi shanba kuni soat 10:00 da.&#10;---ru&#10;Родительское собрание в субботу в 10:00."></textarea></label>
@@ -934,6 +1011,7 @@ function liveChunk(chunk) {
   try { onLive(JSON.parse(data)); } catch (_) { /* */ }
 }
 function onLive(ev) {
+  LIVE.last = Date.now();
   const staff = S.me.role === 'staff' || S.me.role === 'super';
   if (ev.type === 'link') { haptic('success'); boot(true); return; }  // so'rov tasdiqlandi — farzand sahifasi
   S.me.unread = S.me.unread || {};
@@ -946,12 +1024,13 @@ function onLive(ev) {
     || (staff && ev.type === 'message' && (h.startsWith('#/staff/inbox') || h.startsWith('#/staff/chat')))
     || (staff && ev.type === 'request' && h.startsWith('#/staff/requests'));
   if (here) { route(); return; }
-  updateChrome();
+  const top = (h.split('?')[0]);
+  if (!staff && ['#/', '#', '#/surveys', '#/regulations'].includes(top)) route(); else updateChrome();  // yangilashsiz
   banner(ev);
 }
 function banner(ev) {
   document.querySelectorAll('.live-banner').forEach(x => x.remove());
-  const icon = { att: 'att', grade: 'grade', acad: 'grade', pay: 'wallet', doc: 'file', news: 'mega', digest: 'cal', link: 'users' }[ev.kind] || (ev.type === 'message' ? 'chat' : ev.type === 'request' ? 'users' : 'bell');
+  const icon = { att: 'att', grade: 'grade', acad: 'grade', pay: 'wallet', doc: 'file', news: 'mega', digest: 'cal', link: 'users', survey: 'poll', reg: 'book' }[ev.kind] || (ev.type === 'message' ? 'chat' : ev.type === 'request' ? 'users' : 'bell');
   const el = document.createElement('a');
   el.className = 'live-banner'; el.href = '#' + (ev.route || '/notifications');
   el.innerHTML = `<span class="ic-badge">${ic(icon)}</span><span class="lb-t">${esc(String(ev.text || '').replace(/<[^>]+>/g, '').slice(0, 160))}</span><b>${t('open')}</b>`;
@@ -961,6 +1040,135 @@ function banner(ev) {
   setTimeout(() => { el.classList.remove('on'); setTimeout(() => el.remove(), 350); }, 7000);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me && !LIVE.ctrl) connectLive(); });
+
+/* ================================================================ so'rovnomalar va ichki nizomlar (ota-ona) */
+function surveyCta(x) {
+  return `<a class="survey-cta" href="#/survey/${encodeURIComponent(x.course)}/${x.id}"><span class="ic-badge">${ic('poll')}</span>
+    <div class="body"><small>${t('waiting_you')}</small><b>${esc(x.title)}</b><span class="muted small">${t('q_n', { n: x.questions })}${x.closes_at ? ' · ' + t('closes', { d: dateLabel(x.closes_at) }) : ''}</span></div>
+    <span class="go">${t('answer_now')}</span></a>`;
+}
+function quickLinks(pending) {
+  return `<div class="quick"><a href="#/surveys">${ic('poll')}<span>${t('surveys')}</span>${pending ? `<span class="dot">${pending}</span>` : ''}</a>
+    <a href="#/regulations">${ic('book')}<span>${t('regs')}</span></a></div>`;
+}
+async function viewSurveys() {
+  page({ title: t('surveys'), active: '', body: loading() });
+  let d;
+  try { d = await api('/api/surveys'); } catch (e) { return page({ title: t('surveys'), active: '', body: errorBox() }); }
+  const row = x => `<a class="row" href="#/survey/${encodeURIComponent(x.course)}/${x.id}"><div class="ic ${x.answered ? '' : 'bordo'}">${ic(x.answered ? 'ok' : 'poll')}</div>
+    <div class="body"><div class="t">${esc(x.title)}</div><div class="d">${x.answered ? t('answered') : t('q_n', { n: x.questions })}${!x.open ? ' · ' + t('survey_closed') : x.closes_at ? ' · ' + t('closes', { d: dateLabel(x.closes_at) }) : ''}</div></div>${ic('chev', 'chev')}</a>`;
+  page({ title: t('surveys'), active: '', body: `<h2 class="screen-title">${t('surveys')}</h2>
+    ${d.pending.length ? d.pending.map(surveyCta).join('') : ''}
+    ${d.done.length ? `<section class="section"><div class="section-head"><h2>${t('answered')}</h2></div><div class="list">${d.done.map(row).join('')}</div></section>` : ''}
+    ${!d.pending.length && !d.done.length ? `<div class="list">${empty('poll', t('no_surveys'))}</div>` : ''}` });
+}
+async function viewSurvey(course, sid) {
+  page({ title: t('survey'), active: '', body: loading() });
+  let d;
+  try { d = await api(`/api/surveys/${encodeURIComponent(decodeURIComponent(course))}/${sid}`); } catch (e) { return page({ title: t('survey'), active: '', body: errorBox() }); }
+  const dis = d.open ? '' : 'disabled';
+  const q = (x, i) => {
+    const head = `<div class="q-t"><b>${i + 1}.</b> ${esc(x.text)}${x.required ? ' <span class="req">*</span>' : ''}${x.kind === 'multi' ? `<small class="muted"> — ${t('choose_many')}</small>` : ''}</div>`;
+    let inp;
+    if (x.kind === 'single' || x.kind === 'multi') {
+      const ty = x.kind === 'single' ? 'radio' : 'checkbox', cur = [].concat(x.answer || []);
+      inp = `<div class="opts">${x.options.map(o => `<label class="opt"><input type="${ty}" name="q${x.id}" value="${esc(o)}" ${cur.includes(o) ? 'checked' : ''} ${dis}><span>${esc(o)}</span></label>`).join('')}</div>`;
+    } else if (x.kind === 'scale') {
+      inp = `<div class="scale">${[1, 2, 3, 4, 5].map(n => `<label><input type="radio" name="q${x.id}" value="${n}" ${String(x.answer) === String(n) ? 'checked' : ''} ${dis}><span>${n}</span></label>`).join('')}</div>
+        <div class="scale-ends muted small"><span>1 — ${t('scale_lo')}</span><span>5 — ${t('scale_hi')}</span></div>`;
+    } else {
+      inp = `<textarea class="input" name="q${x.id}" rows="3" maxlength="2000" placeholder="${t('your_answer')}" ${dis}>${esc(x.answer || '')}</textarea>`;
+    }
+    return `<fieldset class="card q" data-q="${x.id}" data-kind="${x.kind}" data-req="${x.required ? 1 : 0}">${head}${inp}</fieldset>`;
+  };
+  page({ title: t('survey'), active: '', body: `<h2 class="screen-title">${esc(d.title)}</h2>
+    ${d.description ? `<p class="muted" style="margin:-4px 2px 12px;white-space:pre-line">${esc(d.description)}</p>` : ''}
+    ${d.anonymous ? `<p class="small muted" style="margin:-4px 2px 12px">🔒 ${t('anon')}</p>` : ''}
+    ${d.answered ? `<div class="verdict ok" style="margin-bottom:12px">${ic('ok')}<div><b>${t('survey_thanks')}</b>${d.open ? `<p>${t('edit_answer')} ↓</p>` : ''}</div></div>` : ''}
+    ${!d.open ? `<div class="verdict warn" style="margin-bottom:12px">${ic('alert')}<div><b>${t('survey_closed')}</b></div></div>` : ''}
+    <form id="surveyForm" data-course="${esc(d.course)}" data-sid="${d.id}">${d.questions.map(q).join('')}
+      ${d.open ? `<button class="btn block" type="submit" style="margin-top:14px">${ic('send')} ${d.answered ? t('edit_answer') : t('submit_survey')}</button>` : ''}</form>` });
+}
+document.addEventListener('submit', async e => {
+  const f = e.target;
+  if (f.id !== 'surveyForm') return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const answers = {}, missing = [];
+  f.querySelectorAll('fieldset.q').forEach(fs => {
+    const id = fs.dataset.q, kind = fs.dataset.kind;
+    let v;
+    if (kind === 'multi') v = [...fs.querySelectorAll('input:checked')].map(x => x.value);
+    else if (kind === 'text') v = fs.querySelector('textarea').value.trim();
+    else v = (fs.querySelector('input:checked') || {}).value;
+    const emptyV = v == null || v === '' || (Array.isArray(v) && !v.length);
+    fs.classList.toggle('missing', emptyV && fs.dataset.req === '1');
+    if (emptyV) { if (fs.dataset.req === '1') missing.push(fs); } else answers[id] = v;
+  });
+  if (missing.length) { toast(t('required_q')); missing[0].scrollIntoView({ behavior: 'smooth', block: 'center' }); haptic('rigid'); return; }
+  const btn = f.querySelector('button[type="submit"]'); if (btn) btn.disabled = true;
+  try {
+    await api(`/api/surveys/${encodeURIComponent(f.dataset.course)}/${f.dataset.sid}`, { json: { answers } });
+    haptic('success'); toast(t('survey_thanks'));
+    S.pendingSurveys = Math.max(0, (S.pendingSurveys || 1) - 1);
+    location.hash = '#/surveys';
+  } catch (err) { toast(err.data && err.data.error === 'closed' ? t('survey_closed') : t('error')); if (btn) btn.disabled = false; }
+}, true);
+
+async function viewRegulations() {
+  page({ title: t('regs'), active: '', body: loading() });
+  let d;
+  try { d = await api('/api/regulations'); } catch (e) { return page({ title: t('regs'), active: '', body: errorBox() }); }
+  page({ title: t('regs'), active: '', body: `<h2 class="screen-title">${t('regs')}</h2><p class="muted small" style="margin:-4px 2px 12px">${t('regs_sub')}</p>
+    <div class="list">${d.items.length ? d.items.map(r => `<a class="row" ${r.kind === 'pdf' ? `href="#/regulation/${r.id}"` : `href="${esc(r.url)}" data-act="reg-link" data-url="${esc(r.url)}"`}>
+      <div class="ic">${ic('book')}</div><div class="body"><div class="t">${esc(r.title)}</div>${r.description ? `<div class="d">${esc(r.description)}</div>` : ''}</div>${ic('chev', 'chev')}</a>`).join('')
+      : empty('book', t('no_regs'))}</div>` });
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act="reg-link"]');
+  if (!a) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (tg && tg.openLink) tg.openLink(a.dataset.url); else window.open(a.dataset.url, '_blank', 'noopener');
+}, true);
+async function viewRegulation(rid) {
+  page({ title: t('regs'), noNav: true, body: `<div class="empty">${ic('book')}<b>${t('doc_loading')}</b></div>` });
+  let d;
+  try { d = await api(`/api/regulations/${rid}/pages`); } catch (e) { return page({ title: t('regs'), noNav: true, body: errorBox() }); }
+  page({ title: d.title, sub: t('regs'), noNav: true, body: `<div class="doc-tools"><span class="muted small">${d.pages} ${t('pages')} · ${t('tap_zoom')}</span></div>
+    <div class="doc-pages" id="docPages">${Array.from({ length: d.pages }, (_, i) => `<figure class="doc-page" data-n="${i}"><div class="skeleton"></div></figure>`).join('')}</div>` });
+  const w = Math.min(1600, Math.round(window.innerWidth * Math.max(2, window.devicePixelRatio || 2)));
+  for (let i = 0; i < d.pages; i++) {
+    let url;
+    try { url = URL.createObjectURL(await (await api(`/api/regulations/${rid}/page/${i}?w=${w}`, { raw: true })).blob()); } catch (e) { continue; }
+    const fig = document.querySelector(`.doc-page[data-n="${i}"]`);
+    if (!fig) return;
+    fig.innerHTML = `<img src="${url}" alt="${i + 1}">`;
+  }
+  const box = document.getElementById('docPages');
+  if (box) box.addEventListener('click', e => { if (e.target.tagName === 'IMG') { box.classList.toggle('zoom'); haptic('light'); } });
+}
+
+/* ================================================================ yangilashsiz: zaxira tekshiruv va ilova versiyasi */
+// Jonli ulanish (SSE) Telegram ichida ba'zan uziladi — har 20 soniyada yengil /api/pulse: yangi bildirishnoma,
+// xabar yoki so'rovnoma bo'lsa darhol ko'rsatiladi; server yangilangan bo'lsa ilova keyingi o'tishda o'zini yangilaydi.
+const PULSE = { v: null, reload: false };
+async function pulse() {
+  if (document.hidden || !S.me || S.me.role !== 'parent') return;
+  let p;
+  try { p = await api('/api/pulse'); } catch (e) { return; }
+  if (PULSE.v && p.v !== PULSE.v) PULSE.reload = true;
+  PULSE.v = PULSE.v || p.v;
+  const u = S.me.unread = S.me.unread || {};
+  const moreNotes = p.notifications > (u.notifications || 0), moreMsgs = p.messages > (u.messages || 0);
+  const surveysChanged = S.pendingSurveys != null && p.surveys !== S.pendingSurveys;
+  u.notifications = p.notifications; u.messages = p.messages;
+  if (!moreNotes && !moreMsgs && !surveysChanged) return;
+  const h = (location.hash || '#/').split('?')[0];
+  if (['#/', '#', '#/surveys', '#/notifications'].includes(h) || (moreMsgs && h.startsWith('#/chat'))) route(); else updateChrome();
+  // jonli voqea kelmagan (ulanish uzilgan yoki «osilib» qolgan) — bildirishnomani shu yerda ko'rsatamiz
+  if ((moreNotes || moreMsgs) && Date.now() - (LIVE.last || 0) > 25000) { haptic('light'); banner({ type: moreMsgs ? 'message' : 'notification', text: t('new_note'), route: moreMsgs ? '/chat' : '/notifications' }); }
+}
+setInterval(pulse, 20000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (PULSE.reload) location.reload(); else pulse(); } });
 
 /* ================================================================ hujjatni ilovada ko'rish */
 async function viewDoc(did) {
@@ -1075,6 +1283,7 @@ async function viewDebts() {
       : `<div class="verdict ok">${ic('ok')}<div><b>${t('no_debts')}</b></div></div>`}` });
 }
 async function route() {
+  if (PULSE.reload) { location.reload(); return; }  // server yangilangan — yangi versiya (qo'lda yangilash shart emas)
   clearInterval(S.timer);
   const [path, qs] = (location.hash.slice(1) || '/').split('?');
   const params = new URLSearchParams(qs || '');
@@ -1092,6 +1301,7 @@ async function route() {
     if (parts[1] === 'courses') return viewSuperCourses();
     if (parts[1] === 'requests') return viewStaffRequests();
     if (parts[1] === 'docs') return viewStaffDocs();
+    if (parts[1] === 'surveys') return parts[2] === 'new' ? viewStaffSurveyNew() : parts[2] ? viewStaffSurvey(parts[2]) : viewStaffSurveys();
     return viewStaff();
   }
   if (role === 'new') return viewWelcome();
@@ -1116,6 +1326,10 @@ async function route() {
     case 'documents': return viewDocs();
     case 'trends': return viewTrends();
     case 'menu': return viewMenu();
+    case 'surveys': return viewSurveys();
+    case 'survey': return viewSurvey(parts[1], parts[2]);
+    case 'regulations': return viewRegulations();
+    case 'regulation': return viewRegulation(parts[1]);
     case 'settings': return viewSettings();
     case 'info': return viewInfo();
     default: return viewHome();

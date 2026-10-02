@@ -293,6 +293,43 @@ CREATE TABLE IF NOT EXISTS payments (
     imported_at TEXT NOT NULL,
     PRIMARY KEY (student_id, kind, as_of)
 );
+-- Ota-onalar so'rovnomalari: kurs koordinatori (yoki super-admin) tuzadi, ota-onalar ilovada javob beradi.
+-- target_groups — guruh kalitlari, vergul bilan (bo'sh — butun kurs). Bitta ota-ona — bitta javob.
+CREATE TABLE IF NOT EXISTS surveys (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    title         TEXT NOT NULL,
+    description   TEXT,
+    target_groups TEXT NOT NULL DEFAULT '',
+    anonymous     INTEGER NOT NULL DEFAULT 0,
+    created_by    INTEGER,
+    created_at    TEXT NOT NULL,
+    closes_at     TEXT,
+    closed        INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS survey_questions (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    survey_id INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    pos       INTEGER NOT NULL,
+    kind      TEXT NOT NULL CHECK (kind IN ('single', 'multi', 'scale', 'text')),
+    text      TEXT NOT NULL,
+    options   TEXT NOT NULL DEFAULT '[]',
+    required  INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS survey_responses (
+    survey_id    INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    parent_id    INTEGER NOT NULL,
+    student_id   INTEGER,
+    group_key    TEXT,
+    submitted_at TEXT NOT NULL,
+    PRIMARY KEY (survey_id, parent_id)
+);
+CREATE TABLE IF NOT EXISTS survey_answers (
+    survey_id   INTEGER NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    parent_id   INTEGER NOT NULL,
+    question_id INTEGER NOT NULL REFERENCES survey_questions(id) ON DELETE CASCADE,
+    value       TEXT NOT NULL,
+    PRIMARY KEY (survey_id, parent_id, question_id)
+);
 -- Buxgalteriya hisoboti qaysi talabalarni qamrab olgani: group_key '*' — butun kurs, aks holda — shu guruh
 -- (guruhlari biriktirilgan koordinator yuklagan). Qamrovdagi talaba hisobotda bo'lmasa — qarzi mavjud emas.
 CREATE TABLE IF NOT EXISTS payment_reports (

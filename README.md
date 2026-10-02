@@ -41,6 +41,25 @@ Serverga kirish va botni qayta ishga tushirish shart emas — o'zgarish darhol i
 
 `.env` dagi `ADMIN_IDS` va `KURSLAR` — faqat boshlang'ich sozlama: bot birinchi ishga tushganda umumiy ro'yxatga (`central.db`) yoziladi, keyin hamma narsa bot ichidan boshqariladi. Bot ichidan olib tashlangan koordinator `.env` da qolib ketsa ham qayta qo'shilmaydi. Koordinatori yo'q kursning xabarlari (savollar, bog'lash so'rovlari) super-adminga boradi — boshqa kurslarning koordinatorlariga emas.
 
+### So'rovnomalar (ota-onalar fikri)
+
+Kurs koordinatori (yoki super-admin) ota-onalar o'rtasida so'rovnoma o'tkazadi — kompyuter versiyasida «So'rovnomalar» yoki ilovadagi kurs holati → «So'rovnomalar».
+- Savol turlari: bitta javob, bir nechta javob, 1–5 baho, erkin javob; majburiy/ixtiyoriy, yopilish sanasi, anonim rejim; super-admin — barcha kurslarga.
+- Kimga: butun kurs yoki tanlangan guruhlar (guruhlari biriktirilgan koordinator — faqat o'z guruhlari).
+- E'lon qilinganda ota-onaga bot orqali qisqa xabar («📱 Ilovada ochish» — to'g'ridan-to'g'ri so'rovnomaga). Ilovada so'rovnoma **bosh sahifaning eng yuqorisida** ko'zga tashlanadigan kartochka bo'lib turadi — ota-ona qidirmaydi. Javobni so'rovnoma yopilguncha o'zgartirish mumkin.
+- Natijalar: javob berganlar soni va ulushi, har bir variant bo'yicha son va foiz, o'rtacha baho, erkin javoblar; Excel (natijalar + har bir ota-onaning javoblari).
+- Ilova manzili (`WEBAPP_URL`) sozlangan bo'lishi kerak — javob ilovada beriladi.
+
+### Universitet ichki nizomlari
+
+Super-admin kompyuter versiyasida «Ichki nizomlar» bo'limida PDF yuklaydi yoki havola qo'shadi (nomi ---ru / ---en bilan uch tilda bo'lishi mumkin; xohlasa — barcha ota-onalarga bildirishnoma). Ota-ona ilovada bosh sahifadagi «Ichki nizomlar» tugmasi yoki menyudan ochadi — PDF ilovaning o'zida sahifalab ko'rsatiladi; botda — `/nizomlar`. Fayllar `data/regulations/` da saqlanadi va tungi zaxira nusxaga kiradi.
+
+### Bildirishnomalar — darhol, ilovani yangilashsiz
+
+- Ilova ochiq bo'lsa yangi bildirishnoma, xabar yoki so'rovnoma darhol keladi (jonli ulanish): yuqorida banner, qo'ng'iroqcha belgisi, bosh sahifa o'zi yangilanadi.
+- Telegram ichida jonli ulanish uzilsa ham — har 20 soniyada yengil tekshiruv (`/api/pulse`), shuning uchun hech narsa kechikmaydi.
+- Yangi versiya o'rnatilganda ilova fayllari versiya bilan beriladi (eski nusxa keshdan olinmaydi), ochiq turgan ilova esa keyingi o'tishda o'zini yangilaydi — ota-ona hech narsani qo'lda yangilamaydi.
+
 ### GPA chegarasi (kursdan kursga o'tish)
 
 Talabaning **umumiy GPA** si (barcha semestrlar bo'yicha) `GPA_MIN` dan (standart **2,6**) past bo'lsa — u kursdan kursga o'tkazilmaydi. GPA **yaxlitlanmaydi**: 2,599 — o'tmaydi va «2,59» deb ko'rsatiladi (hamma joyda GPA 2 xonagacha kesiladi, yaxlitlanmaydi); aynan 2,6 — o'tadi.

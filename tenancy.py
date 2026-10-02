@@ -232,6 +232,17 @@ CREATE TABLE IF NOT EXISTS coordinator_groups (
     added_at   TEXT,
     PRIMARY KEY (user_id, course_key, group_key)
 );
+-- Universitet ichki nizomlari (barcha kurslar uchun umumiy; super-admin boshqaradi): PDF fayl yoki havola
+CREATE TABLE IF NOT EXISTS regulations (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,            -- ---ru / ---en bilan ko'p tilli bo'lishi mumkin
+    description TEXT,
+    file        TEXT,                     -- data/regulations/ dagi fayl nomi (PDF)
+    url         TEXT,                     -- yoki tashqi havola
+    sort        INTEGER NOT NULL DEFAULT 0,
+    created_by  INTEGER,
+    created_at  TEXT NOT NULL
+);
 -- Telegram guruh qaysi kursga biriktirilgan (/guruh buyrug'ini bergan koordinatorning kursi)
 CREATE TABLE IF NOT EXISTS group_courses (
     chat_id    INTEGER PRIMARY KEY,

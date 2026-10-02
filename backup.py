@@ -60,6 +60,9 @@ async def make_backup() -> dict:
         tpl_dir = Path(DATA_DIR) / "templates"  # super-admin yuklagan shablonlar (barcha versiyalar)
         if tpl_dir.exists():
             shutil.copytree(tpl_dir, tmp / "templates")
+        reg_dir = Path(DATA_DIR) / "regulations"  # universitet ichki nizomlari (PDF)
+        if reg_dir.exists():
+            shutil.copytree(reg_dir, tmp / "regulations")
         manifest = [f"Zaxira nusxa: {stamp}", f"Kurslar: {len(items)}", ""]
         manifest += [f"{i['key']}: {i['title']} — talabalar {i['students']}, ota-onalar {i['parents']}, "
                      f"yaxlitlik: {i['ok']}" for i in items]

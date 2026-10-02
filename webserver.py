@@ -34,8 +34,28 @@ async def security_headers(request: web.Request, handler):
     return resp
 
 
-async def index(request: web.Request) -> web.FileResponse:
-    return web.FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+def _version() -> str:
+    """Ilova fayllari versiyasi (o'zgartirilgan vaqtlari bo'yicha): yangi kod o'rnatilganda o'zgaradi."""
+    import hashlib
+    stamp = "|".join(f"{f}:{(STATIC / f).stat().st_mtime_ns}" for f in ("app.js", "app.css", "desk.js", "desk.css")
+                     if (STATIC / f).exists())
+    return hashlib.sha1(stamp.encode()).hexdigest()[:10]
+
+
+APP_VERSION = _version()
+
+
+def _html(name: str) -> web.Response:
+    """HTML sahifa — skript va uslublar versiya bilan (?v=…): Telegram eski nusxani keshdan olmaydi, ilovani
+    qo'lda yangilash shart emas."""
+    html = (STATIC / name).read_text(encoding="utf-8")
+    for f in ("app.css", "app.js", "desk.css", "desk.js", "fonts.css"):
+        html = html.replace(f"static/{f}\"", f"static/{f}?v={APP_VERSION}\"")
+    return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
+async def index(request: web.Request) -> web.Response:
+    return _html("index.html")
 
 
 # ---------------------------------------------------------------- kompyuter versiyasi (boshqaruv paneli)
@@ -91,8 +111,8 @@ async def desk_login(request: web.Request) -> web.Response:
     return resp
 
 
-async def desk(request: web.Request) -> web.FileResponse:
-    return web.FileResponse(STATIC / "desk.html", headers={"Cache-Control": "no-cache"})
+async def desk(request: web.Request) -> web.Response:
+    return _html("desk.html")
 
 
 def create_app(bot: Bot) -> web.Application:

@@ -14,6 +14,8 @@ const S = { me: null, course: null, stu: null, stuCourse: null, timers: [], badg
 
 /* ---------------------------------------------------------------- belgilar */
 const P = {
+  poll: '<path d="M9 3h6v3H9zM9 4.5H6a1 1 0 0 0-1 1V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5.5a1 1 0 0 0-1-1h-3M8.5 12l2 2 4-4M8.5 17h7"/>',
+  book: '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5zM4 19.5A1.5 1.5 0 0 0 5.5 21H20v-3M8 7h8M8 10.5h6"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M12 7h4.5M12 11h6M12 15h5.5"/>',
@@ -195,8 +197,8 @@ function renderLogin(msg = '') {
 
 /* ---------------------------------------------------------------- karkas: yon menyu */
 const NAV_COURSE = [['#/panel', 'panel', 'Kurs holati'], ['#/students', 'users', 'Talabalar'], ['#/inbox', 'chat', 'Xabarlar', 'unread'],
-  ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/files', 'upload', 'Ma’lumot va hisobot']];
-const NAV_SUPER = [['#/super', 'chart', 'Barcha kurslar'], ['#/super/courses', 'building', 'Kurslar va koordinatorlar'], ['#/super/system', 'shield', 'Tizim']];
+  ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar'], ['#/files', 'upload', 'Ma’lumot va hisobot']];
+const NAV_SUPER = [['#/super', 'chart', 'Barcha kurslar'], ['#/super/courses', 'building', 'Kurslar va koordinatorlar'], ['#/super/regs', 'book', 'Ichki nizomlar'], ['#/super/system', 'shield', 'Tizim']];
 
 function renderShell() {
   const me = S.me, sup = me.role === 'super';
@@ -259,11 +261,11 @@ async function route() {
   const sup = S.me.role === 'super';
   if (!parts.length) { location.replace(sup ? '#/super' : '#/panel'); return; }
   markNav();
-  const pages = { panel: pPanel, students: pStudents, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles };
+  const pages = { panel: pPanel, students: pStudents, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles, surveys: pSurveys };
   try {
     if (parts[0] === 'super') {
       if (!sup) { location.replace('#/panel'); return; }
-      await ({ courses: pSuperCourses, system: pSuperSystem }[parts[1]] || pSuperOverview)(parts, q);
+      await ({ courses: pSuperCourses, system: pSuperSystem, regs: pSuperRegs }[parts[1]] || pSuperOverview)(parts, q);
     } else if (parts[0] === 'student' && parts[1]) {
       await pStudents(parts, q); openStudent(Number(parts[1]));
     } else {
@@ -932,6 +934,192 @@ async function pSuperSystem() {
       <div class="toolbar" style="margin:16px 0 0"><button class="btn primary" data-act="pt-save">${ic('clock')} Saqlash</button>
         <button class="btn" data-act="pt-sample">Namuna bilan to‘ldirish</button><span class="hint">Namuna — 80 daqiqalik juftlik va 10 daqiqa tanaffus; JIDU jadvaliga moslab, keyin saqlang.</span></div></div></section>`);
 }
+
+/* ================================================================ so'rovnomalar (kurs koordinatori) */
+const SV_KINDS = [['single', 'Bitta javob'], ['multi', 'Bir nechta javob'], ['scale', 'Baho 1–5'], ['text', 'Erkin javob']];
+function svNew() {
+  return { title: '', description: '', groups: new Set(), closes: '', anonymous: false, all: false,
+    questions: [{ kind: 'single', text: '', options: ['', ''], required: true }] };
+}
+async function pSurveys(parts) {
+  if (parts[1] === 'new') return pSurveyBuilder();
+  if (parts[1]) return pSurveyResults(Number(parts[1]));
+  document.title = 'So‘rovnomalar — Boshqaruv paneli';
+  view(head('So‘rovnomalar', courseSub()) + skel(240));
+  const d = await api('/api/staff/surveys');
+  view(head('So‘rovnomalar', courseSub(), `<a class="btn primary" href="#/surveys/new">${ic('plus')} Yangi so‘rovnoma</a>`) + `
+    <p class="hint" style="margin:-10px 0 18px">Ota-onalar so‘rovnomani ilovada — bosh sahifadagi ko‘zga tashlanadigan kartochkadan to‘ldiradi; e’lon qilinganda bot orqali xabar boradi.${myGroups().length ? ' Faqat guruhlaringiz: ' + esc(myGroups().join(', ')) + '.' : ''}</p>
+    <section class="sec">${d.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>So‘rovnoma</th><th>Kimga</th><th class="r">Javoblar</th><th>Holat</th></tr></thead><tbody>
+      ${d.items.map(x => { const p = x.eligible ? Math.round(100 * x.answered / x.eligible) : 0; return `<tr class="click" onclick="location.hash='#/surveys/${x.id}'"><td class="name"><b>${esc(x.title)}</b><span>${when(x.created_at)}</span></td>
+        <td>${x.groups.length ? esc(x.groups.join(', ')) : 'butun kurs'}</td>
+        <td class="r"><b>${x.answered}</b> / ${x.eligible}<div class="meter" style="margin-top:4px"><i style="width:${p}%"></i></div></td>
+        <td>${x.open ? '<span class="chip ok">ochiq</span>' : '<span class="chip muted">yopilgan</span>'}</td></tr>`; }).join('')}</tbody></table></div>`
+      : emptyBox('poll', 'Hali so‘rovnoma yo‘q', 'Ota-onalar fikrini bilish uchun birinchi so‘rovnomani tuzing.', `<a class="btn primary" href="#/surveys/new">${ic('plus')} Yangi so‘rovnoma</a>`)}</section>`);
+}
+async function pSurveyBuilder() {
+  document.title = 'Yangi so‘rovnoma — Boshqaruv paneli';
+  S.sv = S.sv || svNew();
+  let groups = [];
+  try { groups = [...new Set((await loadStudents()).rows.map(r => r.group).filter(Boolean))].sort(); } catch (_) { /* */ }
+  S.svGroups = groups;
+  drawSurveyBuilder();
+}
+function drawSurveyBuilder() {
+  const v = S.sv, sup = S.me.role === 'super';
+  const qHtml = (q, i) => `<div class="svq" data-i="${i}">
+    <div class="svq-head"><b>${i + 1}.</b><select class="input" data-f="kind" aria-label="Savol turi">${SV_KINDS.map(([k, l]) => `<option value="${k}" ${q.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="svq-req"><input type="checkbox" data-f="required" ${q.required ? 'checked' : ''}> majburiy</label>
+      <button class="btn sm ghost" data-act="sv-up" data-i="${i}" title="Yuqoriga" ${i ? '' : 'disabled'}>↑</button>
+      <button class="btn sm ghost" data-act="sv-del" data-i="${i}" title="Savolni o‘chirish" aria-label="Savolni o‘chirish">${ic('x')}</button></div>
+    <input class="input" data-f="text" value="${esc(q.text)}" placeholder="Savol matni" maxlength="500" style="width:100%">
+    ${q.kind === 'single' || q.kind === 'multi' ? `<div class="svq-opts">${q.options.map((o, j) => `<div class="svq-opt"><span>${q.kind === 'single' ? '○' : '☐'}</span>
+        <input class="input" data-f="opt" data-j="${j}" value="${esc(o)}" placeholder="${j + 1}-variant" maxlength="200">
+        <button class="btn sm ghost" data-act="sv-opt-del" data-i="${i}" data-j="${j}" aria-label="Variantni o‘chirish" ${q.options.length > 2 ? '' : 'disabled'}>${ic('x')}</button></div>`).join('')}
+      <button class="btn sm" data-act="sv-opt-add" data-i="${i}">${ic('plus')} Variant</button></div>`
+    : q.kind === 'scale' ? '<p class="hint">Ota-ona 1 dan 5 gacha baho beradi (1 — yomon, 5 — a’lo); natijada o‘rtacha baho ko‘rsatiladi.</p>'
+    : '<p class="hint">Ota-ona o‘z so‘zlari bilan yozadi.</p>'}</div>`;
+  view(head('Yangi so‘rovnoma', courseSub(), `<a class="btn" href="#/surveys">Bekor qilish</a>`) + `<div class="grid-2" id="svb">
+    <section class="sec"><header><h2>Savollar</h2></header><div class="pad">
+      <label class="field"><span>Sarlavha</span><input class="input" data-g="title" value="${esc(v.title)}" placeholder="Masalan: Ota-onalar yig‘ilishi vaqti" maxlength="200"></label>
+      <label class="field"><span>Izoh (ixtiyoriy)</span><textarea class="input" data-g="description" rows="2" maxlength="2000" placeholder="Nima uchun so‘rayapmiz, qachongacha">${esc(v.description)}</textarea></label>
+      ${v.questions.map(qHtml).join('')}
+      <div class="toolbar" style="margin-top:12px">${SV_KINDS.map(([k, l]) => `<button class="btn sm" data-act="sv-add" data-kind="${k}">${ic('plus')} ${l}</button>`).join('')}</div>
+    </div></section>
+    <div class="stack"><section class="sec"><header><h2>Kimga va qachongacha</h2></header><div class="pad">
+      <div class="field"><span>Guruhlar ${myGroups().length ? '(faqat sizning guruhlaringiz)' : ''}</span>
+        <div class="groups">${S.svGroups.length ? S.svGroups.map(g => `<button data-act="sv-grp" data-g="${esc(g)}" class="${v.groups.has(g) ? 'on' : ''}">${esc(g)}</button>`).join('') : '<span class="hint">Talabalar hali yuklanmagan</span>'}</div>
+        <small class="hint">Hech biri tanlanmasa — ${myGroups().length ? 'barcha guruhlaringiz' : 'butun kurs'}.</small></div>
+      <label class="field"><span>Yopilish sanasi (ixtiyoriy)</span><input class="input" type="date" data-g="closes" value="${esc(v.closes)}"></label>
+      <label class="switch" style="margin-top:8px"><span><b style="font-weight:600">Anonim</b><br><span class="hint">Natijalarda ota-ona va talaba ismi ko‘rsatilmaydi</span></span><input type="checkbox" data-g="anonymous" ${v.anonymous ? 'checked' : ''}></label>
+      ${sup ? `<label class="switch" style="margin-top:8px"><span><b style="font-weight:600">Barcha kurslarga</b><br><span class="hint">Universitet miqyosidagi so‘rovnoma</span></span><input type="checkbox" data-g="all" ${v.all ? 'checked' : ''}></label>` : ''}
+      <button class="btn primary" style="margin-top:16px;width:100%" data-act="sv-publish">${ic('send')} E’lon qilish va ota-onalarga yuborish</button>
+      <p class="hint">E’lon qilingach savollarni o‘zgartirib bo‘lmaydi. Ota-onalar javobini so‘rovnoma yopilguncha o‘zgartirishi mumkin.</p>
+    </div></section></div></div>`);
+}
+document.addEventListener('input', e => {
+  if (!S.sv || !e.target.closest('#svb')) return;
+  const el = e.target, v = S.sv;
+  if (el.dataset.g) { v[el.dataset.g] = el.type === 'checkbox' ? el.checked : el.value; return; }
+  const box = el.closest('.svq'); if (!box) return;
+  const q = v.questions[Number(box.dataset.i)], f = el.dataset.f;
+  if (f === 'text') q.text = el.value;
+  else if (f === 'opt') q.options[Number(el.dataset.j)] = el.value;
+  else if (f === 'required') q.required = el.checked;
+});
+document.addEventListener('change', e => {
+  if (!S.sv || !e.target.closest('#svb')) return;
+  const el = e.target;
+  if (el.dataset.f === 'kind') {
+    const q = S.sv.questions[Number(el.closest('.svq').dataset.i)];
+    q.kind = el.value; if ((q.kind === 'single' || q.kind === 'multi') && q.options.length < 2) q.options = ['', ''];
+    drawSurveyBuilder();
+  } else if (el.dataset.g && el.type === 'checkbox') S.sv[el.dataset.g] = el.checked;
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act^="sv-"]');
+  if (!b || !S.sv) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const v = S.sv, i = Number(b.dataset.i), act = b.dataset.act;
+  if (act === 'sv-add') v.questions.push({ kind: b.dataset.kind, text: '', options: ['', ''], required: true });
+  else if (act === 'sv-del') { v.questions.splice(i, 1); if (!v.questions.length) v.questions.push({ kind: 'single', text: '', options: ['', ''], required: true }); }
+  else if (act === 'sv-up' && i > 0) [v.questions[i - 1], v.questions[i]] = [v.questions[i], v.questions[i - 1]];
+  else if (act === 'sv-opt-add') v.questions[i].options.push('');
+  else if (act === 'sv-opt-del') v.questions[i].options.splice(Number(b.dataset.j), 1);
+  else if (act === 'sv-grp') { v.groups.has(b.dataset.g) ? v.groups.delete(b.dataset.g) : v.groups.add(b.dataset.g); }
+  else if (act === 'sv-publish') {
+    const qs = v.questions.map(q => ({ ...q, text: q.text.trim(), options: q.options.map(o => o.trim()).filter(Boolean) }));
+    if (v.title.trim().length < 3) return toast('Sarlavhani yozing', true);
+    const bad = qs.findIndex(q => !q.text || ((q.kind === 'single' || q.kind === 'multi') && q.options.length < 2));
+    if (bad >= 0) return toast(`${bad + 1}-savol to‘liq emas: matn va kamida ikkita variant kerak`, true);
+    const who = v.groups.size ? [...v.groups].join(', ') + ' guruhlari' : (myGroups().length ? 'barcha guruhlaringiz' : 'butun kurs');
+    if (!await confirmDlg('So‘rovnomani e’lon qilasizmi?', `«${esc(v.title)}» — ${qs.length} ta savol, ${esc(v.all ? 'barcha kurslar' : who)} ota-onalariga yuboriladi.`, 'E’lon qilish')) return;
+    b.disabled = true;
+    try {
+      const r = await api('/api/staff/surveys', { method: 'POST', json: { title: v.title, description: v.description, questions: qs, groups: [...v.groups],
+        closes_at: v.closes || null, anonymous: v.anonymous, all_courses: v.all } });
+      S.sv = null; toast(`E’lon qilindi — ${r.sent} / ${r.recipients} ota-onaga yuborildi`);
+      location.hash = `#/surveys/${r.id}`;
+    } catch (err) { toast('E’lon qilinmadi: ' + (err.data?.error || err.message), true); b.disabled = false; }
+    return;
+  }
+  drawSurveyBuilder();
+}, true);
+async function pSurveyResults(id) {
+  document.title = 'So‘rovnoma natijalari — Boshqaruv paneli';
+  view(head('So‘rovnoma', courseSub()) + skel(300));
+  const d = await api(`/api/staff/surveys/${id}`);
+  const pct = d.eligible ? Math.round(100 * d.answered / d.eligible) : 0;
+  const qBox = (q, i) => {
+    let body;
+    if (q.options) {
+      const tot = q.options.reduce((a, o) => a + o.count, 0) || 1;
+      body = q.options.map(o => `<div class="bar-row"><span class="lbl">${esc(o.label)}</span><div class="bar"><i style="width:${Math.round(100 * o.count / tot)}%"></i></div><b class="num">${o.count}</b><span class="hint num">${Math.round(100 * o.count / tot)}%</span></div>`).join('')
+        + (q.average != null ? `<p class="hint" style="margin:8px 0 0">O‘rtacha baho: <b>${String(q.average).replace('.', ',')}</b> / 5</p>` : '');
+    } else {
+      body = q.texts.length ? `<ul class="answers">${q.texts.map(x => `<li>${esc(x.text)}${x.student ? `<span class="hint"> — ${esc(x.student)}, ${esc(x.group || '')}</span>` : ''}</li>`).join('')}</ul>` : '<p class="hint">Hali javob yo‘q</p>';
+    }
+    return `<section class="sec"><header><h2>${i + 1}. ${esc(q.text)}</h2><span class="hint">${q.answered} ta javob</span></header><div class="pad">${body}</div></section>`;
+  };
+  view(head(d.title, `${d.groups.length ? esc(d.groups.join(', ')) : 'butun kurs'} · ${when(d.created_at)}${d.closes_at ? ' · ' + esc(d.closes_at) + ' gacha' : ''}`,
+    `<button class="btn" data-act="svr-export" data-id="${id}">${ic('download')} Excel</button>
+     ${d.open ? `<button class="btn" data-act="svr-close" data-id="${id}">Yopish</button>` : '<span class="chip muted">yopilgan</span>'}
+     <button class="btn ghost" data-act="svr-del" data-id="${id}" title="O‘chirish" aria-label="O‘chirish">${ic('x')}</button>`) + `
+    <section class="band" style="--cols:3"><div><div class="k">Javob berganlar</div><div class="v navy">${d.answered}</div><div class="s">${d.eligible} ta ota-onadan</div></div>
+      <div><div class="k">Qatnashish</div><div class="v ${pct >= 50 ? 'ok' : 'warn'}">${pct}%</div><div class="meter"><i style="width:${pct}%"></i></div></div>
+      <div><div class="k">Holat</div><div class="v" style="font-size:20px">${d.open ? 'ochiq' : 'yopilgan'}</div><div class="s">${d.anonymous ? 'anonim' : 'ismlar ko‘rinadi'}</div></div></section>
+    ${d.description ? `<p class="hint" style="white-space:pre-line">${esc(d.description)}</p>` : ''}
+    <div class="stack">${d.questions.map(qBox).join('')}</div>`);
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act^="svr-"]');
+  if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const id = b.dataset.id, act = b.dataset.act;
+  try {
+    if (act === 'svr-export') toast('Yuklab olindi: ' + await download(`/api/staff/surveys/${id}/export`));
+    else if (act === 'svr-close') { if (!await confirmDlg('So‘rovnomani yopasizmi?', 'Ota-onalar endi javob bera olmaydi; natijalar saqlanadi.', 'Yopish')) return; await api(`/api/staff/surveys/${id}/close`, { method: 'POST' }); toast('Yopildi'); route(); }
+    else if (act === 'svr-del') { if (!await confirmDlg('So‘rovnomani o‘chirasizmi?', 'Barcha javoblar ham o‘chadi. Buni qaytarib bo‘lmaydi.', 'O‘chirish', true)) return; await api(`/api/staff/surveys/${id}`, { method: 'DELETE' }); toast('O‘chirildi'); location.hash = '#/surveys'; }
+  } catch (err) { toast('Bajarilmadi', true); }
+}, true);
+
+/* ================================================================ ichki nizomlar (super-admin) */
+async function pSuperRegs() {
+  document.title = 'Ichki nizomlar — Boshqaruv paneli';
+  view(head('Ichki nizomlar', todayLabel()) + skel(260));
+  const d = await api('/api/regulations');
+  view(head('Ichki nizomlar', todayLabel()) + `<p class="hint" style="margin:-10px 0 18px">Barcha kurslar ota-onalari ilovada — bosh sahifadagi «Ichki nizomlar» tugmasidan ko‘radi. PDF ilovaning o‘zida sahifalab ochiladi; havola — brauzerda. Nomni uch tilda yozish mumkin: alohida qatordan <code>---ru</code> va <code>---en</code>.</p>
+    <div class="grid-2"><section class="sec"><header><h2>Nizomlar</h2><span class="hint">${d.items.length} ta</span></header>
+      ${d.items.length ? `<ul class="list">${d.items.map(r => `<li style="display:flex;align-items:flex-start;gap:12px"><div class="t" style="flex:1"><b>${ic(r.kind === 'pdf' ? 'file' : 'book')} ${esc(r.title)}</b>${r.description ? `<p>${esc(r.description)}</p>` : ''}<p>${r.kind === 'pdf' ? `<button class="btn sm" data-act="reg-pdf" data-id="${r.id}">${ic('download')} PDF</button>` : `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a>`}</p></div>
+        <button class="btn sm ghost" data-act="reg-del" data-id="${r.id}" data-title="${esc(r.title)}" aria-label="O‘chirish">${ic('x')}</button></li>`).join('')}</ul>`
+        : `<div class="pad">${emptyBox('book', 'Hali nizom yo‘q', 'O‘ng tomondagi shakl orqali PDF yoki havola qo‘shing.')}</div>`}</section>
+    <section class="sec"><header><h2>Yangi nizom</h2></header><form class="pad" id="regForm">
+      <label class="field"><span>Nomi</span><textarea class="input" name="title" rows="2" required minlength="3" placeholder="Masalan: Talabalar odob-axloq qoidalari"></textarea></label>
+      <label class="field"><span>Qisqa izoh (ixtiyoriy)</span><input class="input" name="description" maxlength="1000"></label>
+      <label class="field"><span>PDF fayl</span><input class="input" type="file" name="file" accept="application/pdf"></label>
+      <label class="field"><span>yoki havola</span><input class="input" type="url" name="url" placeholder="https://uwed.uz/..."></label>
+      <label class="switch" style="margin-top:6px"><span><b style="font-weight:600">Ota-onalarga xabar berish</b><br><span class="hint">Barcha kurslar ota-onalariga qisqa bildirishnoma</span></span><input type="checkbox" name="notify"></label>
+      <button class="btn primary" style="margin-top:14px">${ic('plus')} Qo‘shish</button></form></section></div>`);
+}
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'regForm') return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const f = e.target, fd = new FormData(f), file = fd.get('file');
+  if (file && file.size === 0) fd.delete('file');
+  if (!fd.get('file') && !String(fd.get('url') || '').trim()) return toast('PDF fayl tanlang yoki havola yozing', true);
+  fd.set('notify', f.notify.checked ? '1' : '0');
+  const b = f.querySelector('button'); b.disabled = true;
+  try { const r = await api('/api/super/regulations', { method: 'POST', body: fd }); toast(r.recipients ? `Qo‘shildi — ${r.sent} / ${r.recipients} ota-onaga xabar` : 'Qo‘shildi'); route(); }
+  catch (err) { toast({ title: 'Nomini yozing', not_pdf: 'Fayl PDF emas', too_big: 'Fayl 20 MB dan katta', url: 'Havola https:// bilan boshlansin' }[err.data?.error] || 'Qo‘shilmadi', true); b.disabled = false; }
+}, true);
+document.addEventListener('click', async e => {
+  const pdf = e.target.closest('[data-act="reg-pdf"]');
+  if (pdf) { e.preventDefault(); e.stopImmediatePropagation(); try { await download(`/api/regulations/${pdf.dataset.id}/file`); } catch (_) { toast('Yuklab bo‘lmadi', true); } return; }
+  const b = e.target.closest('[data-act="reg-del"]');
+  if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (!await confirmDlg('Nizomni o‘chirasizmi?', `«${esc(b.dataset.title)}» ota-onalar ro‘yxatidan olib tashlanadi.`, 'O‘chirish', true)) return;
+  try { await api(`/api/super/regulations/${b.dataset.id}`, { method: 'DELETE' }); toast('O‘chirildi'); route(); } catch (err) { toast('Bajarilmadi', true); }
+}, true);
 
 /* ================================================================ amallar (hodisalar) */
 document.addEventListener('click', async e => {

@@ -1227,6 +1227,217 @@ async def api_super_backup(request):
 
 
 # ================================================================ marshrutlar
+
+# ================================================================ so'rovnomalar va ichki nizomlar (ota-ona)
+async def _parent_surveys(uid: int) -> list[dict]:
+    import surveys
+    out = []
+    for key in await parent_courses(uid):
+        with use_course(None if key == "_" else key):
+            out += [{**x, "course": key} for x in await surveys.for_parent(uid)]
+    return sorted(out, key=lambda x: (x["answered"], not x["open"], x["created_at"]), reverse=False)
+
+
+async def api_surveys(request):
+    items = await _parent_surveys(request["user"]["id"])
+    return ok({"pending": [x for x in items if x["open"] and not x["answered"]],
+               "done": [x for x in items if x["answered"] or not x["open"]]})
+
+
+async def api_survey(request):
+    import surveys
+    uid, key = request["user"]["id"], _course_arg(request.match_info["course"])
+    if key is None or key not in await parent_courses(uid):
+        return bad("not_found", 404)
+    with use_course(None if key == "_" else key):
+        sid = int(request.match_info["sid"])
+        s = await surveys.get(sid)
+        if not s or not await surveys._child_for(uid, s):
+            return bad("not_found", 404)
+        if request.method == "POST":
+            body = await request.json()
+            err = await surveys.submit(sid, uid, body.get("answers") or {})
+            if err:
+                return bad(err, 409 if err == "closed" else 400)
+            log.info("So'rovnoma #%s: javob (ota-ona %s, kurs %s)", sid, uid, key)
+            return ok({"ok": True})
+        mine = await surveys.my_answers(sid, uid)
+        return ok({"id": s["id"], "course": key, "title": s["title"], "description": s["description"],
+                   "open": surveys.is_open(s), "closes_at": s["closes_at"], "anonymous": bool(s["anonymous"]),
+                   "answered": bool(mine),
+                   "questions": [{"id": q["id"], "kind": q["kind"], "text": q["text"], "options": q["options"],
+                                  "required": bool(q["required"]),
+                                  "answer": (json.loads(mine[q["id"]]) if q["kind"] == "multi" and q["id"] in mine
+                                             else mine.get(q["id"]))} for q in s["questions"]]})
+
+
+async def api_pulse(request):
+    """Yengil holat: o'qilmaganlar, javob kutayotgan so'rovnomalar va ilova versiyasi — ilova ochiq turganda
+    vaqti-vaqti bilan so'raydi (jonli ulanish uzilsa ham bildirishnoma kechikmaydi, yangilash shart emas)."""
+    import webserver
+    uid = request["user"]["id"]
+    notes = msgs = 0
+    for k in await parent_courses(uid):
+        d = db.for_course(k)
+        notes += await d.unread_notifications(uid)
+        msgs += sum((await d.unread_for_parent(uid)).values())
+    pending = sum(1 for x in await _parent_surveys(uid) if x["open"] and not x["answered"])
+    return ok({"notifications": notes, "messages": msgs, "surveys": pending, "v": webserver.APP_VERSION})
+
+
+async def api_regulations(request):
+    import regulations
+    return ok({"items": [{"id": r["id"], "title": loc.pick(r["title"], request["lang"]),
+                          "description": loc.pick(r["description"], request["lang"]) if r["description"] else None,
+                          "kind": "pdf" if r["file"] else "url", "url": r["url"], "created_at": r["created_at"]}
+                         for r in await regulations.all_items()]})
+
+
+async def api_regulation_pages(request):
+    import docstore
+    import regulations
+    r = await regulations.get(int(request.match_info["rid"]))
+    data = regulations.read_pdf(r)
+    if not data:
+        return bad("not_found", 404)
+    return ok({"pages": await asyncio.to_thread(docstore.page_count, data), "title": loc.pick(r["title"], request["lang"])})
+
+
+async def api_regulation_page(request):
+    import docstore
+    import regulations
+    r = await regulations.get(int(request.match_info["rid"]))
+    data = regulations.read_pdf(r)
+    if not data:
+        return bad("not_found", 404)
+    n = int(request.match_info["n"])
+    if n < 0 or n >= await asyncio.to_thread(docstore.page_count, data):
+        return bad("not_found", 404)
+    png = await docstore.page_png(f"reg:{r['id']}", data, n, int(request.query.get("w", 1240) or 1240))
+    return web.Response(body=png, content_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
+
+
+async def api_regulation_file(request):
+    import regulations
+    r = await regulations.get(int(request.match_info["rid"]))
+    data = regulations.read_pdf(r)
+    if not data:
+        return bad("not_found", 404)
+    return web.Response(body=data, content_type="application/pdf",
+                        headers={"Content-Disposition": f'inline; filename="nizom-{r["id"]}.pdf"'})
+
+
+# ================================================================ so'rovnomalar (kurs koordinatori)
+@staff_route
+async def api_staff_surveys(request):
+    import surveys
+    from staffops import notify_survey
+    uid, scope = request["user"]["id"], viewer_scope()
+    if request.method == "GET":
+        return ok({"items": await surveys.listing(uid, scope)})
+    body = await request.json()
+    title = str(body.get("title") or "").strip()
+    if len(title) < 3:
+        return bad("title")
+    try:
+        questions = surveys.clean_questions(body.get("questions"))
+    except ValueError as e:
+        return bad(str(e))
+    groups = surveys.target_keys(body.get("groups"), scope)
+    if groups is None:
+        return bad("groups")
+    closes = str(body.get("closes_at") or "").strip() or None
+    if closes and not re.match(r"^\d{4}-\d{2}-\d{2}$", closes):
+        return bad("closes_at")
+    sent = total = 0
+    courses = ([k for k in db.keys()] if body.get("all_courses") and uid in SUPERADMIN_IDS else [request["course"]])
+    for key in courses:
+        with use_course(None if key == "_" else key):
+            sid = await surveys.create(title, body.get("description") or "", questions,
+                                       groups if key == request["course"] else [], uid, closes, bool(body.get("anonymous")))
+            s_, t_ = await notify_survey(request.app["bot"], key, await surveys.get(sid))
+            sent, total = sent + s_, total + t_
+    return ok({"id": sid, "sent": sent, "recipients": total})
+
+
+async def _staff_survey(request) -> dict | None:
+    import surveys
+    s = await surveys.get(int(request.match_info["sid"]))
+    return s if s and surveys.visible_to(s, request["user"]["id"], viewer_scope()) else None
+
+
+@staff_route
+async def api_staff_survey(request):
+    import surveys
+    s = await _staff_survey(request)
+    if not s:
+        return bad("not_found", 404)
+    if request.method == "DELETE":
+        await surveys.delete(s["id"])
+        return ok({"ok": True})
+    return ok(await surveys.results(s["id"], viewer_scope()))
+
+
+@staff_route
+async def api_staff_survey_close(request):
+    import surveys
+    s = await _staff_survey(request)
+    if not s:
+        return bad("not_found", 404)
+    await surveys.close(s["id"])
+    return ok({"ok": True})
+
+
+@staff_route
+async def api_staff_survey_export(request):
+    import surveys
+    s = await _staff_survey(request)
+    if not s:
+        return bad("not_found", 404)
+    res = await surveys.results(s["id"], viewer_scope())
+    content = await asyncio.to_thread(surveys.build_xlsx, res, await surveys.raw_rows(s["id"], viewer_scope()))
+    return web.Response(body=content, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": f'attachment; filename="sorovnoma-{s["id"]}.xlsx"'})
+
+
+# ================================================================ ichki nizomlar (super-admin)
+@super_route
+async def api_super_regulations(request):
+    import regulations
+    from staffops import notify_regulation
+    pdf, fields = None, {}
+    if request.content_type.startswith("multipart/"):
+        async for part in await request.multipart():
+            if part.name == "file":
+                pdf = bytes(await part.read(decode=False))
+            else:
+                fields[part.name] = (await part.read(decode=True)).decode()
+    else:
+        fields = await request.json()
+    title, url = str(fields.get("title") or "").strip(), str(fields.get("url") or "").strip()
+    if len(title) < 3:
+        return bad("title")
+    if pdf is not None and not pdf.startswith(b"%PDF"):
+        return bad("not_pdf")
+    if pdf is not None and len(pdf) > 20 * 1024 * 1024:
+        return bad("too_big")
+    if pdf is None and not re.match(r"^https?://", url):
+        return bad("url")
+    rid = await regulations.add(title, fields.get("description"), request["user"]["id"], pdf, None if pdf else url)
+    sent = total = 0
+    if str(fields.get("notify")) in ("1", "true", "on", "True"):
+        sent, total = await notify_regulation(request.app["bot"], title)
+    log.info("Ichki nizom qo'shildi: #%s «%s» (xabar: %s/%s)", rid, title, sent, total)
+    return ok({"id": rid, "sent": sent, "recipients": total})
+
+
+@super_route
+async def api_super_regulation_delete(request):
+    import regulations
+    await regulations.delete(int(request.match_info["rid"]))
+    return ok({"ok": True})
+
+
 def setup_routes(app: web.Application) -> None:
     r = app.router
     r.add_get("/api/me", api_me)
@@ -1283,5 +1494,21 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/super/courses/{key}/groups", api_super_course_groups)
     r.add_post("/api/super/coordinators/{uid:\\d+}/groups", api_super_coordinator_groups)
     r.add_get("/api/super/errors", api_super_errors)
+    r.add_get("/api/surveys", api_surveys)
+    r.add_get("/api/surveys/{course}/{sid:\\d+}", api_survey)
+    r.add_post("/api/surveys/{course}/{sid:\\d+}", api_survey)
+    r.add_get("/api/pulse", api_pulse)
+    r.add_get("/api/regulations", api_regulations)
+    r.add_get("/api/regulations/{rid:\\d+}/pages", api_regulation_pages)
+    r.add_get("/api/regulations/{rid:\\d+}/page/{n:\\d+}", api_regulation_page)
+    r.add_get("/api/regulations/{rid:\\d+}/file", api_regulation_file)
+    r.add_get("/api/staff/surveys", api_staff_surveys)
+    r.add_post("/api/staff/surveys", api_staff_surveys)
+    r.add_get("/api/staff/surveys/{sid:\\d+}", api_staff_survey)
+    r.add_delete("/api/staff/surveys/{sid:\\d+}", api_staff_survey)
+    r.add_post("/api/staff/surveys/{sid:\\d+}/close", api_staff_survey_close)
+    r.add_get("/api/staff/surveys/{sid:\\d+}/export", api_staff_survey_export)
+    r.add_post("/api/super/regulations", api_super_regulations)
+    r.add_delete("/api/super/regulations/{rid:\\d+}", api_super_regulation_delete)
     r.add_post("/api/super/backup", api_super_backup)
 

@@ -36,10 +36,13 @@ SHORT = {
     "link": "✅ Farzandingiz ma'lumotlari ilovada.",
     "link_ok": "✅ Kurs koordinatori so'rovingizni tasdiqladi: {name}.",
     "link_no": "❌ Farzandni bog'lash so'rovingiz tasdiqlanmadi. Kurs koordinatori bilan bevosita bog'laning.",
+    "survey": "📋 Yangi so'rovnoma: «{title}». Fikringiz biz uchun muhim — bir necha daqiqa.",
+    "reg": "📜 Universitet ichki nizomlariga qo'shildi: «{title}».",
 }
 KIND_OF = {"att_new": "att", "att_change": "att", "att_warn": "att", "att_good": "att", "grade": "grade", "acad": "grade",
            "pay": "pay", "pay_remind": "pay", "doc": "doc", "news": "news", "chat": "chat", "digest": "digest",
-           "link": "link", "link_ok": "link", "link_no": "link"}
+           "link": "link", "link_ok": "link", "link_no": "link",
+           "survey": "survey", "reg": "reg"}
 
 
 def short_name(st: dict | None) -> str:

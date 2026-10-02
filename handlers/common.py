@@ -164,6 +164,32 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
     await message.answer(tr("Bekor qilindi."), reply_markup=main_menu() if parent else contact_kb())
 
 
+@router.message(Command("nizomlar", "nizom", "regulations"), StateFilter("*"))
+async def cmd_regulations(message: Message, state: FSMContext) -> None:
+    """Universitet ichki nizomlari: PDF — fayl sifatida, havola — tugma; ilova sozlangan bo'lsa — ilovada ochish."""
+    import regulations
+    from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup
+    from keyboards import webapp_kb
+    await state.clear()
+    items = await regulations.all_items()
+    if not items:
+        await message.answer(tr("📜 Universitet ichki nizomlari hali joylanmagan."))
+        return
+    links = [r for r in items if r["url"] and not r["file"]]
+    kb = webapp_kb("/regulations", tr("📱 Ilovada ochish"))
+    rows = [[InlineKeyboardButton(text=loc.pick(r["title"])[:60], url=r["url"])] for r in links[:20]]
+    if kb:
+        rows = kb.inline_keyboard + rows
+    await message.answer(tr("📜 <b>Universitet ichki nizomlari</b>") + "\n\n"
+                         + "\n".join(f"• {esc(loc.pick(r['title']))}" for r in items),
+                         reply_markup=InlineKeyboardMarkup(inline_keyboard=rows) if rows else None)
+    for r in items:
+        data = regulations.read_pdf(r)
+        if data:
+            await message.answer_document(BufferedInputFile(data, f"nizom-{r['id']}.pdf"),
+                                          caption=esc(loc.pick(r["title"]))[:1000])
+
+
 @router.message(Command("yordam", "help"), StateFilter("*"))
 async def cmd_help(message: Message) -> None:
     await message.answer(tr(HELP))

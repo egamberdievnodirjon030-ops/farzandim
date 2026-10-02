@@ -16,7 +16,7 @@ from database import db
 from i18n import tr, use_lang
 from keyboards import coordinator_menu
 from notifier import safe_send
-from tenancy import central, course_title, is_super, reload_registry
+from tenancy import central, course_title, is_super, reload_registry, use_course
 from utils import group_key
 
 log = logging.getLogger("staff")
@@ -152,6 +152,48 @@ async def save_coord_groups(uid: int, key: str, names: list[str], by: int | None
     await reload_registry()
     log.info("Koordinator guruhlari: %s (%s) → %s", uid, key, ", ".join(chosen.values()) or "-")
     return {"saved": sorted(chosen.values(), key=str.lower), "taken": taken}
+
+
+# ---------------------------------------------------------------- so'rovnoma va ichki nizom — ota-onalarga xabar
+async def _broadcast(bot, pids, kind: str, title: str, route: str) -> int:
+    """Qisqa xabar (ota-ona tilida) + «Ilovada ochish» tugmasi, bildirishnomalar markazi va jonli voqea (ilova ochiq
+    bo'lsa — darhol, yangilashsiz)."""
+    import loc
+    from keyboards import webapp_kb
+    from notifier import safe_send
+    sent = 0
+    for pid in pids:
+        lang = await central.get_lang(pid) or "uz"
+        with use_lang(lang):
+            text = tr(appmode.SHORT[kind], title=esc(loc.pick(title, lang)))
+            ok = await safe_send(bot, pid, text, reply_markup=webapp_kb(route, tr("📱 Ilovada ochish")))
+        sent += ok
+        await db.add_notification(pid, text, None, kind)
+        live.publish(pid, {"type": "notification", "kind": kind, "text": text, "route": route})
+    return sent
+
+
+async def notify_survey(bot, course: str, s: dict) -> tuple[int, int]:
+    """Yangi so'rovnoma — uning guruhlaridagi (yoki butun kursdagi) ota-onalarga."""
+    import surveys
+    pids = await surveys.recipients(s)
+    sent = await _broadcast(bot, pids, "survey", s["title"], f"/survey/{course}/{s['id']}")
+    log.info("So'rovnoma #%s yuborildi: %s/%s ota-onaga", s["id"], sent, len(pids))
+    return sent, len(pids)
+
+
+async def notify_regulation(bot, title: str) -> tuple[int, int]:
+    """Yangi ichki nizom — barcha kurslarning ota-onalariga (har biriga bir marta)."""
+    seen: set[int] = set()
+    sent = total = 0
+    for key in db.keys():
+        d = db.for_course(key)
+        pids = [r["tg_id"] for r in await d.fetchall("SELECT tg_id FROM parents WHERE active = 1") if r["tg_id"] not in seen]
+        seen.update(pids)
+        with use_course(None if key == "_" else key):
+            sent += await _broadcast(bot, pids, "reg", title, "/regulations")
+        total += len(pids)
+    return sent, total
 
 
 # ---------------------------------------------------------------- yangi bog'lash so'rovi — kurs koordinatorlariga

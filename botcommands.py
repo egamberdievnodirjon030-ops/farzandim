@@ -14,6 +14,7 @@ PUBLIC_COMMANDS = [
     BotCommand(command="start", description="Bosh menyu"),
     BotCommand(command="yordam", description="Botdan foydalanish"),
     BotCommand(command="bekor", description="Joriy amalni bekor qilish"),
+    BotCommand(command="nizomlar", description="📜 Universitet ichki nizomlari"),
 ]
 ADMIN_COMMANDS = PUBLIC_COMMANDS + [
     BotCommand(command="admin", description="Kurs koordinatori buyruqlari"),
@@ -52,7 +53,8 @@ SUPER_COMMANDS = [
 ] + [c for c in ADMIN_COMMANDS if c.command not in ("start",)]
 
 
-APP_PUBLIC_COMMANDS = [BotCommand(command="start", description="📱 Ilovani ochish")]
+APP_PUBLIC_COMMANDS = [BotCommand(command="start", description="📱 Ilovani ochish"),
+                       BotCommand(command="nizomlar", description="📜 Universitet ichki nizomlari")]
 APP_STAFF_COMMANDS = APP_PUBLIC_COMMANDS + [BotCommand(command="kompyuter", description="💻 Kompyuter versiyasi")]
 
 

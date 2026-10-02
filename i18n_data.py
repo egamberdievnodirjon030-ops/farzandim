@@ -1080,4 +1080,14 @@ TR: dict[str, dict[str, str]] = {
         'en': '✅ No outstanding debt: your child is not on the debtor list in the report as of {d}.'},
     "Oldingi hisobot ({d}): qarzdorlik {v}.": {
         'ru': 'Предыдущий отчёт ({d}): задолженность {v}.', 'en': 'Previous report ({d}): debt {v}.'},
+    # So'rovnoma va ichki nizomlar
+    "📋 Yangi so'rovnoma: «{title}». Fikringiz biz uchun muhim — bir necha daqiqa.": {
+        'ru': '📋 Новый опрос: «{title}». Ваше мнение важно для нас — это займёт несколько минут.',
+        'en': '📋 New survey: “{title}”. Your opinion matters to us — it takes a few minutes.'},
+    "📜 Universitet ichki nizomlariga qo'shildi: «{title}».": {
+        'ru': '📜 Во внутренние положения университета добавлено: «{title}».',
+        'en': '📜 Added to the university regulations: “{title}”.'},
+    "📜 Universitet ichki nizomlari hali joylanmagan.": {
+        'ru': '📜 Внутренние положения университета ещё не размещены.', 'en': '📜 University regulations have not been published yet.'},
+    "📜 <b>Universitet ichki nizomlari</b>": {'ru': '📜 <b>Внутренние положения университета</b>', 'en': '📜 <b>University regulations</b>'},
 }
