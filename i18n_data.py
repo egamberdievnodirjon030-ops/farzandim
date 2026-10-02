@@ -1102,4 +1102,6 @@ TR: dict[str, dict[str, str]] = {
     'Akademik qarzdorlik': {'ru': 'Академическая задолженность', 'en': 'Academic debt'},
     'Trimestr qarzi': {'ru': 'Долг за триместр', 'en': 'Trimester debt'},
     '{a} → {b}': {'ru': '{a} → {b}', 'en': '{a} → {b}'},
+    'Davomat (kunlik)': {'ru': 'Посещаемость (ежедневная)', 'en': 'Attendance (daily)'},
+    'Sababsiz qoldirilgan (kunlik)': {'ru': 'Пропуски без причины (ежедневные)', 'en': 'Unexcused absences (daily)'},
 }

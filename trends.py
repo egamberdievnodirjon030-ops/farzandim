@@ -181,6 +181,12 @@ async def short_line(st: dict) -> str | None:
     return "📈 " + tr("Dinamika: {v}", v=", ".join(parts)) if parts else None
 
 
+def _snap_label(at: str, prev: str | None) -> str:
+    """Nuqta yorlig'i: «12.09»; o'sha kunning ikkinchi yuklashi bo'lsa — vaqti bilan («12.09 15:40»)."""
+    d = date.fromisoformat(at[:10]).strftime("%d.%m")
+    return f"{d} {at[11:16]}" if prev and prev[:10] == at[:10] and len(at) > 10 else d
+
+
 async def mini(st: dict) -> list[dict]:
     """Ota-ona bosh sahifasi uchun ixcham dinamika — fayl yuklashlari bo'yicha (snapshots): faqat kamida bir marta
     o'zgargan ko'rsatkichlar; har birida oxirgi qiymat, oldingi yuklashga nisbatan o'zgarish va grafik nuqtalari."""
@@ -191,7 +197,8 @@ async def mini(st: dict) -> list[dict]:
         rows = hist.get(key, [])
         if len(rows) < 2:  # o'zgarish bo'lmagan — dinamikada ko'rsatilmaydi
             continue
-        pts = [{"label": date.fromisoformat(r["day"]).strftime("%d.%m"), "value": r["value"]} for r in rows[-WEEKS:]]
+        pts = [{"label": _snap_label(r["day"], rows[i - 1]["day"] if i else None), "value": r["value"]}
+               for i, r in enumerate(rows)][-WEEKS:]
         items.append({"key": key, "title": tr(title), "unit": unit, "points": pts, "value": pts[-1]["value"],
                       "delta": round(pts[-1]["value"] - pts[-2]["value"], 4), "better": better,
                       "caption": tr("{a} → {b}", a=pts[-2]["label"], b=pts[-1]["label"])})
