@@ -512,6 +512,12 @@ class Database:
         async with self.conn.execute("PRAGMA table_info(parents)") as cur:
             if "notify_pay" not in {r[1] for r in await cur.fetchall()}:
                 await self.conn.execute("ALTER TABLE parents ADD COLUMN notify_pay INTEGER NOT NULL DEFAULT 1")
+        async with self.conn.execute("PRAGMA table_info(link_requests)") as cur:
+            have = {r[1] for r in await cur.fetchall()}
+        # talaba tasdiqlashi: bir martalik havola (token), muddati, tasdiqlagan talabaning Telegram ID si
+        for col, ddl in (("token", "TEXT"), ("token_expires", "TEXT"), ("student_tg", "INTEGER"), ("decided_via", "TEXT")):
+            if col not in have:
+                await self.conn.execute(f"ALTER TABLE link_requests ADD COLUMN {col} {ddl}")
         for t in IMPORT_TABLES:  # qaysi yuklangan fayldan kelgani (o'chirish uchun)
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 if "import_id" not in {r[1] for r in await cur.fetchall()}:

@@ -522,6 +522,9 @@ async def api_link(request):
         return bad("no_phone")
     if len(query) < 3 or not verify:
         return bad("fields")
+    import linking
+    if not await linking.can_try(uid):  # F.I.Sh. va tug'ilgan sanani taxmin qilib bo'lmasin
+        return bad("too_many_attempts", 429)
     cands = []
     for k in db.keys():
         with use_course(None if k == "_" else k):
@@ -530,7 +533,9 @@ async def api_link(request):
     match = [c for c in cands if (c.get("hemis_id") and normalize_text(c["hemis_id"]) == normalize_text(verify))
              or (dates and c.get("birth_date") and c["birth_date"] == dates[0].isoformat())]
     if len(match) != 1:
-        return bad("not_matched")
+        await linking.record_try(uid, False)
+        return bad("not_matched")  # talaba bor-yo'qligi oshkor qilinmaydi
+    await linking.record_try(uid, True)
     st = match[0]
     with use_course(None if st["course_key"] == "_" else st["course_key"]):
         if await db.linked_student(uid, st["id"]):
@@ -547,7 +552,15 @@ async def api_link(request):
                 f"Tasdiqlash uchun kiritilgan: {verify}")
         from staffops import notify_link_request
         await notify_link_request(request.app["bot"], rid, name, full, text)
-    return ok({"state": "requested"})
+        can = await linking.student_can_confirm(st["id"])
+        url = await linking.confirm_url(request.app["bot"], await linking.issue_token(rid)) if can else None
+    return ok({"state": "requested", "student_can_confirm": can, "confirm_url": url})
+
+
+async def api_link_status(request):
+    """Ota-onaning kutilayotgan so'rovlari: farzandi tasdiqlashi uchun havola (yoki kurs koordinatori kutilmoqda)."""
+    import linking
+    return ok({"requests": await linking.parent_requests(request.app["bot"], request["user"]["id"])})
 
 
 # ================================================================ kurs koordinatori
@@ -1491,6 +1504,7 @@ def setup_routes(app: web.Application) -> None:
     r.add_post("/api/settings", api_settings_save)
     r.add_get("/api/info", api_info)
     r.add_post("/api/link", api_link)
+    r.add_get("/api/link", api_link_status)
     r.add_get("/api/staff/panel", api_staff_panel)
     r.add_get("/api/staff/students", api_staff_students)
     r.add_get("/api/staff/student/{sid:\\d+}", api_staff_student)

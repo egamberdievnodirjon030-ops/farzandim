@@ -16,7 +16,7 @@ from aiogram.types import ErrorEvent
 
 from config import ADMIN_IDS, BOT_TOKEN, COURSES, DATA_DIR, DB_PATH, SUPERADMIN_IDS
 from database import db
-from handlers import admin, appgate, common, groups, parent, search, staff, superadmin
+from handlers import admin, appgate, common, groups, parent, search, staff, studentconfirm, superadmin
 from keyboards import AttCb, ChildCb, DocGetCb, SchCb
 from middlewares import BlockedUserMiddleware, CourseMiddleware, LangMiddleware, register_parent_callbacks
 from botcommands import setup_commands
@@ -41,7 +41,7 @@ def build_dispatcher() -> Dispatcher:
     dp.callback_query.outer_middleware(BlockedUserMiddleware())
     # Tartib muhim: guruhlar -> super-admin -> kurs koordinatori menyusi -> ota-ona menyusi -> ro'yxatdan o'tish ->
     # admin buyruqlari -> ism bo'yicha qidiruv (oxirida)
-    dp.include_routers(groups.router, superadmin.router, staff.router, appgate.router, parent.router, common.router, admin.router,
+    dp.include_routers(groups.router, studentconfirm.router, superadmin.router, staff.router, appgate.router, parent.router, common.router, admin.router,
                        search.router)
     dp.errors.register(on_error)
     return dp

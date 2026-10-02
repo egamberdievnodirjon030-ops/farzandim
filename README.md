@@ -181,6 +181,19 @@ Ruscha matnlar rasmiy uslubda: murojaat «Вы / Ваш» bosh harf bilan. Kurs 
 
 Istalgan odam istalgan talabaning ismini yozib davomatini ko'ra olmasligi uchun ota-ona avval Telegram orqali **o'z telefon raqamini** tasdiqlaydi (bot faqat foydalanuvchining o'z kontaktini qabul qiladi). Raqam talabalar faylidagi ota-ona telefonlari bilan solishtiriladi va mos kelsa farzand avtomatik bog'lanadi. Raqam bazada bo'lmasa, ota-ona farzandning familiya-ismi va tug'ilgan sanasini (yoki HEMIS ID) kiritadi, so'rov kurs koordinatoriga boradi va kurs koordinatori tasdiqlagandan keyingina bog'lanadi. Ism bo'yicha qidiruv faqat shu ota-onaga bog'langan farzandlar ichida ishlaydi.
 
+### Farzandni bog'lash: sodda ko'rinishda, ichida — bir necha himoya qatlami
+
+Ota-ona ilovada uch qadamni ko'radi: **1. Telefon → 2. Farzand → 3. Tasdiqlash.**
+
+1. **Telefon** — bitta tugma: raqamni Telegram o'zi beradi (qo'lda yozilgan raqam qabul qilinmaydi). Raqam talabalar faylida bo'lsa — farzand shu zahoti ulanadi, qolgan qadamlar kerak emas.
+2. **Farzand** — familiya-ism va tug'ilgan sana (yoki HEMIS ID). Mos kelmasa, javob doim bir xil: «Ma'lumot mos kelmadi» — bunday talaba bor-yo'qligi oshkor qilinmaydi. Taxmin qilib topishning oldini olish uchun bir kunda **5 ta xato urinish**dan keyin so'rov yuborish ertagacha to'xtatiladi (bot va ilova uchun umumiy hisob).
+3. **Tasdiqlash** — so'rov kurs koordinatoriga boradi. Agar talabaning **o'z telefon raqami** bazada bo'lsa («Talaba telefonlari» fayli yoki HEMIS fayli), ota-onaga bir martalik havola beriladi — «Farzandimga yuborish» tugmasi uni Telegram orqali farzandga jo'natadi. Talaba havolani ochadi, kim ulanmoqchi ekanini (ismi va yashirilgan raqami) ko'radi, **o'z raqamini** Telegram tugmasi bilan yuboradi (raqam shu talabaniki bo'lishi shart — boshqa odam talaba nomidan tasdiqlay olmaydi) va «✅ Ha, bu mening ota-onam» yoki «❌ Yo'q, tanimayman» ni bosadi.
+   - «Ha» — farzand darhol ulanadi, ota-onaga va koordinatorga xabar boradi;
+   - «Yo'q» — so'rov rad etiladi, koordinator ogohlantiriladi (bu begona odamning urinishi bo'lishi mumkin);
+   - havola **72 soat** amal qiladi va faqat bir marta ishlaydi; talabaning raqami bazada bo'lmasa, so'rovni faqat koordinator tasdiqlaydi.
+
+Talabalar botga ota-ona sifatida kira olmasligi saqlanadi: tasdiqlash havolasi bloklangan talabaga ham ochiladi, lekin u faqat «ha/yo'q» deydi — ota-ona menyusiga va ilovaga kirmaydi.
+
 ## Talabalar botga kira olmaydi
 
 Bot faqat ota-onalar uchun. Talaba o'z raqami bilan ro'yxatdan o'tib, «ota-ona» bo'lib olmasligi uchun ikki usul birga ishlaydi.
@@ -227,6 +240,8 @@ Bot bilan birga ilova ham ishlaydi: ota-ona uni bot chatidagi «📱 Ilova» tug
 **Ishga tushirish.** `.env` fayliga `WEBAPP_URL` (ochiq HTTPS manzil) yozing va botni qayta ishga tushiring — qolganini bot o'zi qiladi (menyu tugmasi, xabarlar ostidagi tugmalar). HTTPS manzil qanday olinishi — «Serverga joylashtirish» bo'limida. `WEBAPP_URL` bo'sh bo'lsa, ilova o'chiq va bot avvalgidek ishlaydi.
 
 Ixtiyoriy: @BotFather → `/newapp` bilan ilovani ro'yxatdan o'tkazsangiz, `https://t.me/<bot_nomi>/<ilova_nomi>` ko'rinishidagi to'g'ridan-to'g'ri havola paydo bo'ladi — uni ota-onalar chatlariga yuborish mumkin.
+
+**To'liq Mini App sifatida.** @BotFather → botingiz → *Bot Settings → Configure Mini App → Enable Mini App* ga `WEBAPP_URL` ni kiriting: shunda bot profilida «Ilovani ochish» tugmasi chiqadi va `https://t.me/<bot_nomi>?startapp` havolasi ilovani to'g'ridan-to'g'ri ochadi (chatga kirmasdan). Ilova Telegram mavzusi, «Orqaga» tugmasi, tebranish (haptic) bilan ishlaydi, pastga surilganda tasodifan yopilmaydi (Telegram 7.7+).
 
 ## Kompyuter versiyasi (boshqaruv paneli)
 

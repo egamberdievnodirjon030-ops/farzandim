@@ -196,6 +196,13 @@ async def notify_regulation(bot, title: str) -> tuple[int, int]:
     return sent, total
 
 
+async def _coord_notice(bot, st: dict, text: str) -> None:
+    """Talaba guruhi koordinator(lar)iga qisqa xabar (bog'lash bo'yicha talabaning qarori)."""
+    from tenancy import course_admins
+    for admin_id in course_admins(groups=[st.get("group_name")]):
+        await safe_send(bot, admin_id, text)
+
+
 # ---------------------------------------------------------------- yangi bog'lash so'rovi — kurs koordinatorlariga
 async def notify_link_request(bot, rid: int, parent_name: str, st: dict, detailed: str) -> None:
     """Ilova rejimida — qisqa xabar va «Ilovada ko'rib chiqish»; aks holda — batafsil matn va botdagi tugmalar."""

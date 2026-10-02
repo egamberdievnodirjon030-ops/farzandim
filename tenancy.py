@@ -245,6 +245,13 @@ CREATE TABLE IF NOT EXISTS regulations (
     created_by  INTEGER,
     created_at  TEXT NOT NULL
 );
+-- Farzandni bog'lash urinishlari (F.I.Sh. + tug'ilgan sana taxmin qilinmasligi uchun cheklov)
+CREATE TABLE IF NOT EXISTS link_attempts (
+    tg_id INTEGER NOT NULL,
+    ok    INTEGER NOT NULL,
+    at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_link_attempts ON link_attempts(tg_id, at);
 -- Telegram guruh qaysi kursga biriktirilgan (/guruh buyrug'ini bergan koordinatorning kursi)
 CREATE TABLE IF NOT EXISTS group_courses (
     chat_id    INTEGER PRIMARY KEY,

@@ -481,3 +481,14 @@ fieldset.q.missing { box-shadow: 0 0 0 2px var(--bordo-500); }
 .sem-bar i { display: block; width: 100%; max-width: 38px; border-radius: 8px 8px 0 0; background: var(--navy-500); }
 .sem-bar i.low { background: var(--bordo-500); }
 .sem-bar span { color: var(--muted); white-space: nowrap; }
+
+/* bog'lash: uch qadam */
+.steps { list-style: none; display: flex; gap: 6px; padding: 0; margin: 0 0 14px; counter-reset: s; }
+.steps li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); text-align: center; position: relative; }
+.steps li span { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--line); color: var(--muted); }
+.steps li span svg { width: 16px; height: 16px; }
+.steps li.on { color: var(--ink); font-weight: 600; }
+.steps li.on span { background: var(--accent); color: #fff; }
+.steps li.done span { background: var(--ok); color: #fff; }
+.hero-seal { display: block; margin: 0 auto 10px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); }
+.req-link + .req-link { margin-top: 12px; }

@@ -306,6 +306,12 @@ async def manual_verify(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     uid = message.from_user.id
     raw = message.text.strip()
+    import linking
+    if not await linking.can_try(uid):  # F.I.Sh. va tug'ilgan sanani taxmin qilib bo'lmasin (sutkalik cheklov)
+        await state.clear()
+        await message.answer(tr("Urinishlar soni tugadi. Ertaga qayta urinib ko'ring yoki kurs koordinatori bilan "
+                                "bog'laning."), reply_markup=main_menu())
+        return
     dates = parse_user_dates(raw)
     candidates = []  # barcha kurslardan; so'rov topilgan farzandning kursiga boradi
     for key in db.keys():
@@ -326,6 +332,7 @@ async def manual_verify(message: Message, state: FSMContext) -> None:
         key = normalize_text(raw).replace(" ", "")
         match = [s for s in candidates if normalize_text(s["hemis_id"]).replace(" ", "") == key]
 
+    await linking.record_try(uid, len(match) == 1)
     if len(match) != 1:
         attempts = data.get("attempts", 0) + 1
         if attempts >= 3:
@@ -381,6 +388,15 @@ async def _create_link_request(message: Message, uid: int, st: dict, raw: str) -
     )
     from staffops import notify_link_request
     await notify_link_request(message.bot, rid, message.from_user.full_name, full, admin_text)
+    import linking
+    if await linking.student_can_confirm(st["id"]):  # tezroq yo'l: farzandning o'zi tasdiqlaydi
+        url = await linking.confirm_url(message.bot, await linking.issue_token(rid))
+        await message.answer(
+            tr("✅ So'rov yuborildi.\n\n<b>Tezroq tasdiqlash:</b> quyidagi havolani farzandingizga Telegram orqali "
+               "yuboring — u o'z raqami bilan bir bosishda tasdiqlaydi (havola {h} soat amal qiladi):\n{url}\n\n"
+               "Yoki kurs koordinatori tasdiqlashini kuting.", h=linking.TOKEN_HOURS, url=url),
+            reply_markup=main_menu(), disable_web_page_preview=True)
+        return
     await message.answer(
         tr("✅ So'rovingiz kurs koordinatoriga yuborildi. Tasdiqlangach, sizga shu yerda xabar keladi."),
         reply_markup=main_menu(),

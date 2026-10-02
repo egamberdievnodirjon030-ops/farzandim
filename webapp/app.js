@@ -26,6 +26,7 @@ const T = {
     dyn_first: 'birinchi ma’lumot', dyn_same: 'o‘zgarmadi', more: 'Batafsil',
     dyn_none: 'Oxirgi yuklashlarda o‘zgarish bo‘lmadi — o‘zgarish bo‘lsa, shu yerda ko‘rinadi.',
     by_upload: 'Yuklangan ma’lumotlar bo‘yicha', by_semester: 'Semestrlar bo‘yicha', avg_score: 'o‘rtacha ball',
+    step_phone: 'Telefon', step_child: 'Farzand', step_confirm: 'Tasdiqlash', phone_safe: 'Raqamingizni Telegram o‘zi tasdiqlaydi — uni qo‘lda yozish shart emas. Raqam universitet ro‘yxatida bo‘lsa, farzandingiz darhol ulanadi.', child_title: 'Farzandingizni toping', child_sub: 'Raqamingiz universitet ro‘yxatida topilmadi. Farzandingiz ma’lumotlarini hujjatdagidek kiriting.', birth_date: 'Tug‘ilgan sanasi', or_hemis: 'yoki talaba ID (HEMIS) bilan', hemis_id: 'Talaba ID (HEMIS)', find_child: 'Davom etish', confirm_title: 'Oxirgi qadam — tasdiqlash', confirm_student_sub: 'Havolani farzandingizga yuboring: u o‘z telefon raqami bilan bir bosishda tasdiqlaydi. Shunda begona odam sizning farzandingizga ulana olmaydi.', send_to_child: 'Farzandimga yuborish', copy_link: 'Havolani nusxalash', link_copied: 'Havola nusxalandi', wait_coord: 'yoki kurs koordinatori tasdiqlashini kuting', coord_only: 'So‘rovingizni kurs koordinatori tekshirib tasdiqlaydi — tasdiqlangach, shu yerda ochiladi.', add_child: 'Boshqa farzandni qo‘shish', too_many_tries: 'Urinishlar soni tugadi. Ertaga qayta urinib ko‘ring yoki kurs koordinatori bilan bog‘laning.', share_text: 'Assalomu alaykum! Ota-onalar botida sizni tasdiqlashim kerak — havolani oching va «Ha» ni bosing:', waiting: 'kutilmoqda', done_step: 'bajarildi',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -67,6 +68,7 @@ const T = {
     dyn_first: 'первые данные', dyn_same: 'без изменений', more: 'Подробнее',
     dyn_none: 'В последних загрузках изменений не было — при изменениях они появятся здесь.',
     by_upload: 'По загруженным данным', by_semester: 'По семестрам', avg_score: 'средний балл',
+    step_phone: 'Телефон', step_child: 'Ребёнок', step_confirm: 'Подтверждение', phone_safe: 'Номер подтверждает сам Telegram — вводить вручную не нужно. Если номер есть в списке университета, ребёнок подключится сразу.', child_title: 'Найдите ребёнка', child_sub: 'Ваш номер не найден в списке университета. Введите данные ребёнка как в документе.', birth_date: 'Дата рождения', or_hemis: 'или по ID студента (HEMIS)', hemis_id: 'ID студента (HEMIS)', find_child: 'Продолжить', confirm_title: 'Последний шаг — подтверждение', confirm_student_sub: 'Отправьте ссылку ребёнку: он подтвердит своим номером телефона в одно нажатие. Так посторонний не сможет подключиться к вашему ребёнку.', send_to_child: 'Отправить ребёнку', copy_link: 'Скопировать ссылку', link_copied: 'Ссылка скопирована', wait_coord: 'или дождитесь подтверждения координатора', coord_only: 'Запрос проверит и подтвердит координатор курса — после этого всё откроется здесь.', add_child: 'Добавить другого ребёнка', too_many_tries: 'Попытки закончились. Попробуйте завтра или свяжитесь с координатором.', share_text: 'Здравствуйте! Подтвердите меня в боте для родителей — откройте ссылку и нажмите «Да»:', waiting: 'ожидается', done_step: 'выполнено',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -108,6 +110,7 @@ const T = {
     dyn_first: 'first data', dyn_same: 'no change', more: 'Details',
     dyn_none: 'No changes in the latest uploads — changes will appear here.',
     by_upload: 'By uploaded data', by_semester: 'By semester', avg_score: 'average score',
+    step_phone: 'Phone', step_child: 'Child', step_confirm: 'Confirm', phone_safe: 'Telegram itself confirms your number — no need to type it. If it is in the university list, your child is connected at once.', child_title: 'Find your child', child_sub: 'Your number was not found in the university list. Enter your child’s details as in official documents.', birth_date: 'Date of birth', or_hemis: 'or by student ID (HEMIS)', hemis_id: 'Student ID (HEMIS)', find_child: 'Continue', confirm_title: 'Last step — confirmation', confirm_student_sub: 'Send the link to your child: they confirm with their own phone number in one tap. This way a stranger cannot connect to your child.', send_to_child: 'Send to my child', copy_link: 'Copy link', link_copied: 'Link copied', wait_coord: 'or wait for the coordinator to approve', coord_only: 'The course coordinator will check and approve your request — then everything opens here.', add_child: 'Add another child', too_many_tries: 'No attempts left. Try again tomorrow or contact the coordinator.', share_text: 'Hello! Please confirm me in the parents’ bot — open the link and tap “Yes”:', waiting: 'waiting', done_step: 'done',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -712,21 +715,54 @@ async function viewInfo() {
 }
 
 /* ================================================================ ro'yxatdan o'tish */
+// Bog'lash — uch qadam: 1 telefon (Telegram tasdiqlaydi) → 2 farzand (topilmasa — F.I.Sh. + sana) → 3 tasdiqlash
+function steps(n) {
+  const L = [t('step_phone'), t('step_child'), t('step_confirm')];
+  return `<ol class="steps">${L.map((l, i) => `<li class="${i + 1 < n ? 'done' : i + 1 === n ? 'on' : ''}"><span>${i + 1 < n ? ic('ok') : i + 1}</span>${esc(l)}</li>`).join('')}</ol>`;
+}
 function viewWelcome() {
   const langs = [['uz', 'O‘zbekcha'], ['ru', 'Русский'], ['en', 'English']];
-  $app.innerHTML = `<main class="no-nav"><div class="hero-center"><div class="seal">J</div><h2>${t('welcome')}</h2><p class="muted">${esc(S.me.university)}</p>
-    <p>${t('welcome_sub')}</p></div>
-    <div class="section-head"><h2>${t('choose_lang')}</h2></div><div class="seg">${langs.map(([k, l]) => `<button data-act="lang" data-lang="${k}" aria-pressed="${S.lang === k}">${l}</button>`).join('')}</div>
-    <div class="card" style="margin-top:20px"><p style="margin-top:0">${t('phone_why')}</p>
+  $app.innerHTML = `<main class="no-nav"><div class="hero-center"><img class="hero-seal" src="static/jidu-seal.webp" alt="" width="72" height="72"><h2>${t('welcome')}</h2><p class="muted">${esc(S.me.university)}</p></div>
+    <div class="seg" style="margin-bottom:16px">${langs.map(([k, l]) => `<button data-act="lang" data-lang="${k}" aria-pressed="${S.lang === k}">${l}</button>`).join('')}</div>
+    ${steps(1)}
+    <div class="card"><p style="margin-top:0">${t('phone_safe')}</p>
       <button class="btn block" data-act="contact">${ic('phone')}${t('confirm_phone')}</button>
       ${tg && tg.initData ? '' : `<p class="small muted" style="margin-bottom:0">${t('open_in_tg')}</p>`}</div></main>`;
 }
-function viewPending() {
-  $app.innerHTML = topbar(t('home')) + `<main class="no-nav"><div class="hero-center"><h2>${t('pending_title')}</h2><p class="muted">${t('pending_sub')}</p></div>
-    <form class="card" data-act="link"><label class="field"><span>${t('full_name')}</span><input class="input" name="name" required autocomplete="off"></label>
-    <label class="field"><span>${t('verify')}</span><input class="input" name="verify" required inputmode="text" placeholder="05.05.2008"></label>
-    <button class="btn block" style="margin-top:16px">${t('send_request')}</button></form></main>`;
+async function viewPending(addMore = false) {
+  let reqs = [];
+  try { reqs = (await api('/api/link')).requests; } catch (_) { /* */ }
+  const form = `<form class="card" data-act="link"><h3 style="margin:0 0 4px">${t('child_title')}</h3><p class="muted small" style="margin:0 0 10px">${t('child_sub')}</p>
+    <label class="field"><span>${t('full_name')}</span><input class="input" name="name" required minlength="3" autocomplete="off" placeholder="Aliyev Vali"></label>
+    <label class="field"><span>${t('birth_date')}</span><input class="input" name="verify" type="date" required max="${new Date().toISOString().slice(0, 10)}"></label>
+    <details class="small muted"><summary>${t('or_hemis')}</summary><label class="field"><span>${t('hemis_id')}</span><input class="input" name="hemis" inputmode="numeric" autocomplete="off"></label></details>
+    <button class="btn block" style="margin-top:16px">${t('find_child')}</button></form>`;
+  const reqCard = r => `<div class="card req-link"><div class="t"><b>${esc(r.student)}</b> <span class="muted small">${esc(r.group)}</span></div>
+    ${r.student_can_confirm && r.confirm_url ? `<p class="small" style="margin:6px 0 12px">${t('confirm_student_sub')}</p>
+      <button class="btn block" data-act="share-link" data-url="${esc(r.confirm_url)}">${ic('send')}${t('send_to_child')}</button>
+      <button class="btn ghost block" style="margin-top:8px" data-act="copy-link" data-url="${esc(r.confirm_url)}">${t('copy_link')}</button>
+      <p class="muted small" style="text-align:center;margin:10px 0 0">${t('wait_coord')}</p>`
+      : `<p class="small muted" style="margin:6px 0 0">${t('coord_only')}</p>`}</div>`;
+  const body = reqs.length && !addMore
+    ? `${steps(3)}<h2 class="screen-title" style="margin-top:4px">${t('confirm_title')}</h2>${reqs.map(reqCard).join('')}
+       <p style="text-align:center;margin-top:16px"><a href="#" data-act="add-child" class="small">${t('add_child')}</a></p>`
+    : `${steps(2)}${form}`;
+  $app.innerHTML = topbar(t('home')) + `<main class="no-nav">${body}</main>`;
 }
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act="share-link"],[data-act="copy-link"],[data-act="add-child"]');
+  if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (b.dataset.act === 'add-child') return viewPending(true);
+  const url = b.dataset.url;
+  if (b.dataset.act === 'share-link') {
+    const share = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(t('share_text'))}`;
+    haptic('light');
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(share); else window.open(share, '_blank', 'noopener');
+  } else {
+    try { await navigator.clipboard.writeText(url); toast(t('link_copied')); } catch (_) { prompt('', url); }
+  }
+}, true);
 
 /* ================================================================ kurs koordinatori */
 function staffRow(r, withCourse = false) {
@@ -1449,9 +1485,11 @@ document.addEventListener('submit', async e => {
       const text = String(fd.get('text') || '').trim();
       if (text) { await api(`/api/staff/thread/${f.dataset.sid}/${f.dataset.pid}`, { json: { text } }); haptic('medium'); await viewStaffChat(f.dataset.sid, f.dataset.pid, false); }
     } else if (act === 'link') {
-      const r = await api('/api/link', { json: { name: fd.get('name'), verify: fd.get('verify') } });
-      f.outerHTML = `<div class="verdict ok">${ic('ok')}<div><b>${t('requested')}</b></div></div>`;
-      if (r.state === 'linked') await boot(true);
+      const hemis = String(fd.get('hemis') || '').trim(), d = String(fd.get('verify') || '');
+      const verify = hemis || (d ? d.split('-').reverse().join('.') : '');  // 2008-05-05 → 05.05.2008
+      const r = await api('/api/link', { json: { name: fd.get('name'), verify } });
+      haptic('success');
+      if (r.state === 'linked') await boot(true); else await viewPending();
     } else if (act === 'search') {
       location.hash = `#/staff/students?${fd.get('all') ? 'all=1&' : ''}q=${encodeURIComponent(fd.get('q') || '')}`;
     } else if (act === 'announce') {
@@ -1508,7 +1546,7 @@ document.addEventListener('submit', async e => {
     }
   } catch (err) {
     const code = err.data && err.data.error;
-    toast(code === 'too_many' ? t('too_many') : code === 'not_matched' ? t('not_matched') : t('error'));
+    toast(code === 'too_many' ? t('too_many') : code === 'not_matched' ? t('not_matched') : code === 'too_many_attempts' ? t('too_many_tries') : t('error'));
   } finally { if (btn) btn.disabled = false; }
 });
 document.addEventListener('change', e => {  // fayl tanlanganda nomini ko'rsatish
@@ -1663,6 +1701,7 @@ async function boot(again) {
 }
 if (tg) {
   tg.ready(); tg.expand();
+  try { if (tg.isVersionAtLeast && tg.isVersionAtLeast('7.7')) tg.disableVerticalSwipes(); } catch (_) { /* eski Telegram */ }
   tg.onEvent && tg.onEvent('themeChanged', applyTheme);
   tg.BackButton && tg.BackButton.onClick(goBack);
 }

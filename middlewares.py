@@ -131,6 +131,16 @@ async def _blocked_anywhere(user_id: int) -> bool:
     return False
 
 
+def _student_confirm(event, data: dict) -> bool:
+    """Talaba ota-onasini tasdiqlash jarayoni (havola, o'z raqami, «Ha/Yo'q») — talaba deb bloklangan bo'lsa ham ochiq."""
+    if isinstance(event, Message):
+        return bool(event.text and event.text.startswith("/start t_")) or \
+            (bool(event.contact) and (data.get("raw_state") or "").startswith("SC:"))
+    if isinstance(event, CallbackQuery):
+        return (event.data or "").startswith("sc:")
+    return False
+
+
 class BlockedUserMiddleware(BaseMiddleware):
     async def __call__(
         self,
@@ -141,7 +151,8 @@ class BlockedUserMiddleware(BaseMiddleware):
         user = data.get("event_from_user")
         chat = data.get("event_chat")
         private = chat is None or chat.type == "private"
-        if user and private and user.id not in ADMIN_IDS and await _blocked_anywhere(user.id):
+        if user and private and user.id not in ADMIN_IDS and not _student_confirm(event, data) \
+                and await _blocked_anywhere(user.id):
             if isinstance(event, Message):
                 await event.answer(tr(BLOCKED_TEXT), reply_markup=ReplyKeyboardRemove())
             elif isinstance(event, CallbackQuery):
