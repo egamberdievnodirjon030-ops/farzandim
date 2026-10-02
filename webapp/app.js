@@ -677,6 +677,32 @@ function staffRow(r, withCourse = false) {
     <div class="body"><div class="t">${esc(r.name)}</div><div class="d">${withCourse ? `<b>${esc(r.course_title)}</b>, ` : ''}${esc(r.group)}${r.percent != null ? ' — davomat ' + r.percent + '%' : ''}</div>
     <div class="chips" style="gap:4px;margin-top:4px">${tags.join('')}</div></div>${ic('chev', 'chev')}</a>`;
 }
+/* Dinamika: kichik grafik (sparkline) — oxirgi nuqta ajratib ko'rsatiladi */
+function spark(points, cls) {
+  const v = points.map(p => p.value), W = 120, H = 34, P = 3;
+  if (v.length < 2) return '';
+  const lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+  const xy = v.map((y, i) => [P + i * (W - 2 * P) / (v.length - 1), H - P - (y - lo) * (H - 2 * P) / span]);
+  const d = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
+  const [lx, ly] = xy[xy.length - 1];
+  return `<svg class="spark ${cls}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${points.map(p => p.label + ': ' + p.value).join(', ')}">
+    <path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lx}" cy="${ly}" r="3" fill="currentColor"/></svg>`;
+}
+function dynVal(it, v) { return v == null ? '—' : it.unit === '%' ? `${v}%` : it.unit === 'so\'m' ? money(v) : `${v} ta`; }
+function dynDelta(it) {
+  const d = it.delta;
+  if (d == null) return { cls: 'flat', txt: 'taqqoslash uchun ma’lumot kam' };
+  if (!d) return { cls: 'flat', txt: 'o‘zgarmadi' };
+  const good = (d > 0) === (it.better === 'up');
+  const mag = it.unit === '%' ? `${Math.abs(Math.round(d * 10) / 10)} p.p.` : dynVal(it, Math.abs(d));
+  return { cls: good ? 'good' : 'bad', txt: `${d > 0 ? '▲' : '▼'} ${mag}` };
+}
+function dynCard(items) {
+  if (!items || !items.length) return '';
+  return `<section class="section"><div class="section-head"><h2>Dinamika</h2></div><div class="card dyn">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">
+    <div class="body"><div class="t">${esc(it.title)}</div><div class="d">${esc(it.note || it.caption)}</div></div>
+    ${spark(it.points, dl.cls)}<div class="val"><b class="num">${esc(dynVal(it, it.value))}</b><span class="${dl.cls}">${esc(dl.txt)}</span></div></div>`; }).join('')}</div></section>`;
+}
 async function viewStaff() {
   const title = S.me.staff && S.me.staff.title || 'Kurs koordinatori';
   const mine = (S.me.staff && S.me.staff.groups) || [];
@@ -694,6 +720,7 @@ async function viewStaff() {
       ${tile('3+ muammoli', d.multi, 'birinchi navbatda', d.multi ? 'bad' : 'ok', '#/staff/students?filter=prob')}
       ${tile('Kontrakt qarzi', d.kontrakt.count, money(d.kontrakt.sum), d.kontrakt.count ? 'warn' : 'ok', '#/staff/students?filter=kontrakt')}
       ${tile('Trimestr qarzi', d.trimestr.count, money(d.trimestr.sum), d.trimestr.count ? 'warn' : 'ok', '#/staff/students?filter=trimestr')}</div>
+    ${dynCard(d.dynamics)}
     <section class="section"><div class="section-head"><h2>Muammoli talabalar</h2><a href="#/staff/students?filter=prob">Barchasi</a></div>
       <div class="list">${d.top.length ? d.top.slice(0, 12).map(staffRow).join('') : empty('ok', 'Muammoli talaba yo‘q')}</div></section>
     <section class="section"><div class="list">

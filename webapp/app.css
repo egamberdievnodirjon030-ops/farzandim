@@ -429,3 +429,15 @@ svg[viewBox="0 0 24 24"]:not([width]) { width: 24px; height: 24px; flex: none; }
 
 /* ---- asosiy ekran: uzun ro'yxat — 3 qator (to'liq ro'yxat alohida sahifada) ---- */
 .tile .s.clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* kurs dinamikasi (kurs koordinatori) */
+.dyn { padding: 4px 14px; }
+.dyn-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.dyn-row + .dyn-row { border-top: 1px solid var(--line); }
+.dyn-row .body { flex: 1; min-width: 0; }
+.dyn-row .t { font-weight: 600; font-size: 14px; }
+.dyn-row .d { color: var(--muted); font-size: 12px; }
+.dyn-row .val { text-align: right; min-width: 84px; display: flex; flex-direction: column; font-size: 14px; }
+.dyn-row .val span { font-size: 12px; font-weight: 600; }
+.spark { width: 72px; height: 28px; flex: none; }
+.dyn .good { color: var(--ok); } .dyn .bad { color: var(--bordo-fg); } .dyn .flat { color: var(--muted); }

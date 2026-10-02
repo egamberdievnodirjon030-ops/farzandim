@@ -33,6 +33,7 @@ import individual
 import loc
 import status
 import trends
+import course_trends
 from config import (ADMIN_COURSE, BOT_TOKEN, DATA_DIR, LOG_DIR, PAIR_TIMES, SUPERADMIN_IDS, UNIVERSITY_NAME,
                     WEBAPP_AUTH_TTL, WEBAPP_DEV_USER, WEBAPP_URL)
 from database import db
@@ -597,7 +598,8 @@ async def api_staff_panel(request):
                "multi": sum(1 for r in rows if r["problems"] >= 3),
                "unread": sum(i["unread"] for i in inbox), "link_requests": pending,
                "top": sorted([r for r in rows if r["problems"]], key=lambda r: (-r["problems"], r["name"]))[:30],
-               "updated": await _last_update(), "scope": scope_label(request["user"]["id"])})
+               "updated": await _last_update(), "scope": scope_label(request["user"]["id"]),
+               "dynamics": await course_trends.course_dynamics(viewer_scope())})
 
 
 async def _student_rows(q: str = "", limit: int = 3000) -> list[dict]:

@@ -147,6 +147,17 @@ svg.i { width: 18px; height: 18px; flex: none; }
 .meter i { display: block; height: 100%; background: var(--ok); border-radius: 3px; }
 
 /* ---------------------------------------------------------------- bo'limlar va jadvallar */
+/* dinamika — kurs holati ostida ixcham ko'rsatkichlar */
+.dyn { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: -8px 0 22px; }
+.dyn-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; box-shadow: var(--shadow); }
+.dyn-card .k { font-size: 13px; color: var(--muted); font-weight: 500; }
+.dyn-card .k span { color: var(--faint); font-weight: 400; }
+.dyn-card .row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.dyn-card .v { font: 700 22px/1.2 var(--sans); }
+.dyn-card .d { font-size: 13px; font-weight: 600; margin-top: 2px; }
+.dyn-card .s { font-size: 12px; color: var(--faint); margin-top: 6px; }
+.dyn .good { color: var(--ok); } .dyn .bad { color: var(--bordo-600); } .dyn .flat { color: var(--muted); }
+.spark { width: 120px; height: 34px; flex: none; }
 .grid-2 { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 22px; align-items: start; }
 .grid-2 > *, .cols > *, .stack > * { min-width: 0; }
 .stack { display: grid; gap: 22px; }

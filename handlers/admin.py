@@ -1924,7 +1924,16 @@ async def _panel_text(f: str) -> str:
         f"💳 Trimestr qarzdorlar: <b>{cnt['trimestr']}</b>" + (f" (jami {fmt_money(total['trimestr'])})" if cnt["trimestr"] else ""),
         f"🚫 Davomat muammosi borlar: <b>{cnt['att']}</b> ({fmt_pairs(absence.LEVELS[0])} va undan ko'p, {absence.COUNTED_LABEL})",
         f"🔴 3+ muammoli talabalar: <b>{many}</b>",
-    ] + ([f"\n🕐 Oxirgi yangilanish: {fmt_dt(ts)}"] if ts else []) + ["\nRo'yxatni ochish uchun tugmani bosing 👇"])
+    ] + await _dynamics_lines(f) + ([f"\n🕐 Oxirgi yangilanish: {fmt_dt(ts)}"] if ts else []) + ["\nRo'yxatni ochish uchun tugmani bosing 👇"])
+
+
+async def _dynamics_lines(f: str) -> list[str]:
+    """Kurs holati ostida — dinamika (guruh/kurs filtri bo'lmaganda; koordinator — o'z guruhlari bo'yicha)."""
+    if f:
+        return []
+    import course_trends
+    items = await course_trends.course_dynamics(viewer_scope())
+    return ["", "📈 <b>Dinamika</b>"] + course_trends.text_lines(items) if items else []
 
 
 @router.message(Command("panel"))

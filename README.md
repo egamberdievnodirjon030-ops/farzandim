@@ -41,6 +41,15 @@ Serverga kirish va botni qayta ishga tushirish shart emas — o'zgarish darhol i
 
 `.env` dagi `ADMIN_IDS` va `KURSLAR` — faqat boshlang'ich sozlama: bot birinchi ishga tushganda umumiy ro'yxatga (`central.db`) yoziladi, keyin hamma narsa bot ichidan boshqariladi. Bot ichidan olib tashlangan koordinator `.env` da qolib ketsa ham qayta qo'shilmaydi. Koordinatori yo'q kursning xabarlari (savollar, bog'lash so'rovlari) super-adminga boradi — boshqa kurslarning koordinatorlariga emas.
 
+### Kurs dinamikasi (Kurs holati)
+
+«Kurs holati» (bot, ilova va kompyuter versiyasi) ostida ixcham **Dinamika**: har bir ko'rsatkichning hozirgi qiymati, oldingi davrga nisbatan o'zgarishi (▲/▼; yaxshilansa — yashil, yomonlashsa — bordo) va kichik grafik:
+- **Davomat, %** — kunlik davomat bo'lsa oxirgi 6 hafta bo'yicha; bo'lmasa HEMIS statistikasi yuklashlari orasidagi davrlar bo'yicha;
+- **Chegaraga yetganlar** — birinchi chegaradan oshgan talabalar soni (hafta yoki yuklash bo'yicha);
+- **Kontrakt / trimestr qarzi** — buxgalteriya hisobotlari sanalari bo'yicha jami qarz va qarzdorlar soni.
+
+Hisobot faqat bir guruh uchun yuklangan sanada boshqalarning oldingi holati olinadi. Koordinator dinamikani faqat o'z guruhlari bo'yicha ko'radi.
+
 ### Koordinatorlarga guruh biriktirish
 
 Bitta kursda bir nechta kurs koordinatori bo'lsa, ma'lumotlar chalkashmasligi uchun har biriga o'z guruhlari biriktiriladi:

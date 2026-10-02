@@ -299,7 +299,7 @@ async function pPanel() {
   const msgs = unread.length ? `<ul class="list">${unread.map(i => `<li><a href="#/inbox/${i.sid}/${i.pid}">
       <div class="t"><b>${esc(i.parent)} <span class="chip bordo" style="height:20px;margin-left:4px">${i.unread}</span></b><p>${esc(i.student)}: ${esc(i.last)}</p></div><time>${when(i.at)}</time></a></li>`).join('')}</ul>`
     : `<div class="pad"><div class="note ok">${ic('ok')}<span>Javob kutayotgan xabar yo‘q.</span></div></div>`;
-  view(head('Kurs holati', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + band + `
+  view(head('Kurs holati', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + band + dynSection(d.dynamics) + `
     <div class="grid-2">
       <section class="sec"><header><h2>E’tibor talab qiladigan talabalar</h2><a href="#/students?f=prob">Barchasi</a></header>${top}</section>
       <div class="stack">
@@ -314,6 +314,34 @@ async function pPanel() {
       </div>
     </div>
     <p class="foot">Ma’lumotlar oxirgi marta yangilangan: ${d.updated ? when(d.updated) : 'hali yuklanmagan'}.</p>`);
+}
+/* Dinamika: kichik grafik (sparkline) — oxirgi nuqta ajratib ko'rsatiladi */
+function spark(points, cls) {
+  const v = points.map(p => p.value), W = 120, H = 34, P = 3;
+  if (v.length < 2) return '';
+  const lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+  const xy = v.map((y, i) => [P + i * (W - 2 * P) / (v.length - 1), H - P - (y - lo) * (H - 2 * P) / span]);
+  const d = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
+  const [lx, ly] = xy[xy.length - 1];
+  return `<svg class="spark ${cls}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${points.map(p => p.label + ': ' + p.value).join(', ')}">
+    <path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lx}" cy="${ly}" r="3" fill="currentColor"/></svg>`;
+}
+function dynVal(it, v) { return v == null ? '—' : it.unit === '%' ? `${v}%` : it.unit === 'so\'m' ? money(v) : `${v} ta`; }
+function dynDelta(it) {
+  const d = it.delta;
+  if (d == null) return { cls: 'flat', txt: 'taqqoslash uchun ma’lumot kam' };
+  if (!d) return { cls: 'flat', txt: 'o‘zgarmadi' };
+  const good = (d > 0) === (it.better === 'up');
+  const mag = it.unit === '%' ? `${Math.abs(Math.round(d * 10) / 10)} p.p.` : dynVal(it, Math.abs(d));
+  return { cls: good ? 'good' : 'bad', txt: `${d > 0 ? '▲' : '▼'} ${mag}` };
+}
+function dynSection(items) {
+  if (!items || !items.length) return '';
+  return `<section class="dyn" aria-label="Dinamika">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-card">
+    <div class="k">${esc(it.title)}</div>
+    <div class="row"><div><div class="v num">${esc(dynVal(it, it.value))}</div>
+      <div class="d ${dl.cls}" title="${esc(it.caption)}">${esc(dl.txt)}</div></div>${spark(it.points, dl.cls)}</div>
+    <div class="s">${it.note ? esc(it.note) + ' · ' : ''}${esc(it.caption)}</div></div>`; }).join('')}</section>`;
 }
 function issueChips(r) {
   const out = [];
