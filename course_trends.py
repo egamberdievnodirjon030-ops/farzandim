@@ -118,13 +118,30 @@ async def _payments(scope) -> list[dict]:
     for kind, title in (("kontrakt", "Kontrakt qarzi"), ("trimestr", "Trimestr qarzi")):
         rows = await db.fetchall(f"SELECT student_id, as_of, debt FROM payments WHERE kind = ? AND student_id IN ({S})",
                                  (kind,) + p)
-        if not rows:
-            continue
+        # Hisobot talaba guruhini qamragan, lekin talaba unda yo'q — shu sanadan boshlab qarzi 0 (to'lagan)
+        cov: dict[str, set[str]] = {}
+        for d, g in await db.payment_coverage(kind):
+            cov.setdefault(d, set()).add(g)
+        groups = {r["id"]: r["group_key"] or "" for r in await db.fetchall(
+            f"SELECT id, group_key FROM students WHERE id IN ({S})", p)}
+        by_date: dict[str, dict[int, float]] = {}
+        for r in rows:
+            by_date.setdefault(r["as_of"], {})[r["student_id"]] = r["debt"] or 0
+        state: dict[int, float] = {}
         pts = []
-        for d, state in _carry(rows, "as_of")[-POINTS:]:
-            debts = [r["debt"] or 0 for r in state.values()]
-            pts.append({"label": _label(date.fromisoformat(d)), "value": round(sum(debts)),
-                        "count": sum(1 for x in debts if x > 0)})
+        for d in sorted(set(by_date) | set(cov)):
+            here, gs = by_date.get(d, {}), cov.get(d, set())
+            for sid, g in groups.items():
+                if sid in here:
+                    state[sid] = here[sid]
+                elif "*" in gs or g in gs:
+                    state[sid] = 0
+            if here or gs & ({"*"} | set(groups.values())):
+                pts.append({"label": _label(date.fromisoformat(d)), "value": round(sum(state.values())),
+                            "count": sum(1 for x in state.values() if x > 0)})
+        pts = pts[-POINTS:]
+        if not pts:
+            continue
         out.append(_item(kind, title, "so'm", pts, "down", "oldingi hisobotga nisbatan",
                          f"qarzdorlar: {pts[-1]['count']} ta"))
     return out

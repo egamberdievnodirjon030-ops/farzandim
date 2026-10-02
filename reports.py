@@ -103,9 +103,7 @@ async def student_card(st: dict) -> str:
             state = f"<b>{fmt_money(p['debt'])}</b>" if p["debt"] > 0 else tr("mavjud emas ✅")
         elif kind == "kontrakt" and st.get("payment_form") == GRANT:
             state = tr("talab qilinmaydi (davlat granti)")
-        elif await last_update(UPDATE_KEYS[kind][0]):
-            state = tr("mavjud emas ✅")  # hisobot yuklangan, talaba qarzdorlar ro'yxatida yo'q
-        else:
+        else:  # bu turdagi hisobot talaba guruhini hali qamramagan (qamragan bo'lsa — p «mavjud emas» bo'ladi)
             state = tr("ma'lumot yo'q")
         lines.append(f"{icon} {tr(title)}: {state}")
     lines.append(tr("🎓 O'zlashtirish ko'rsatkichi (GPA): <b>{v}</b> / 5", v=fmt_gpa(s['gpa'])) if s["gpa"] is not None
@@ -446,9 +444,7 @@ async def finance_menu(st: dict) -> str:
             state = (f"<b>{fmt_money(p['debt'])}</b>" + (", " + tr("muddat: {d}", d=fmt_date(dl[kind], False))
                                                          if dl[kind] else "")
                      if p["debt"] > 0 else tr("mavjud emas ✅"))
-        elif await last_update(UPDATE_KEYS[kind][0]):
-            state = tr("mavjud emas ✅")
-        else:
+        else:  # bu turdagi hisobot talaba guruhini hali qamramagan
             state = tr("ma'lumot yo'q")
         parts.append(f"{icon} {tr(title)}: {state}")
     parts.append("\n" + tr("Batafsil ma'lumot uchun turini tanlang 👇"))
@@ -461,13 +457,16 @@ async def payment_report(st: dict, kind: str = "kontrakt") -> str:
     form = st.get("payment_form")
     parts.append(_form_line(form))
     hist = await db.payment_history(st["id"], kind)
-    report_ts = await last_update(UPDATE_KEYS[kind][0])
-    if not hist:
+    cur = await db.latest_payment(st["id"], kind)  # hisobot qamrovini hisobga olgan joriy holat
+    if not hist or (cur and cur.get("absent")):
         if form == GRANT and kind == "kontrakt":
             parts.append("\n" + tr("Davlat granti asosida o'qiydi — kontrakt to'lovi talab qilinmaydi."))
-        elif report_ts:
-            parts.append("\n" + tr("✅ Qarzdorlik mavjud emas: farzandingiz oxirgi hisobotdagi qarzdorlar ro'yxatida yo'q.")
-                         + "\n" + tr("🕐 Ma'lumot {dt} da yangilangan.", dt=fmt_dt(report_ts)))
+        elif cur:
+            parts.append("\n" + tr("✅ Qarzdorlik mavjud emas: farzandingiz {d} holatidagi hisobotda qarzdorlar "
+                                   "ro'yxatida yo'q.", d=fmt_date(cur["as_of"], False)))
+            if hist:
+                parts.append(tr("Oldingi hisobot ({d}): qarzdorlik {v}.", d=fmt_date(hist[-1]["as_of"], False),
+                                v=fmt_money(hist[-1]["debt"])))
         else:
             parts.append("\n" + tr("Bu bo'yicha ma'lumot hali yuklanmagan."))
         return "\n".join(parts)
@@ -477,7 +476,7 @@ async def payment_report(st: dict, kind: str = "kontrakt") -> str:
     if p.get("contract"):
         parts.append(tr("Shartnoma summasi: {v}", v=fmt_money(p['contract'])))
     parts.append(tr("To'langan: {v}", v=fmt_money(p['paid'])) + (f" ({p['percent']:g}%)" if p.get("percent") is not None else ""))
-    parts.append(tr("💰 <b>Qarzdorlik: {v}</b>", v=fmt_money(p['debt'])) if p["debt"] > 0 else tr("✅ Qarzdorlik yo'q"))
+    parts.append(tr("💰 <b>Qarzdorlik: {v}</b>", v=fmt_money(p['debt'])) if p["debt"] > 0 else tr("✅ Qarzdorlik mavjud emas"))
     dl = (await status.deadlines())[kind]
     if dl and p["debt"] > 0:
         left = (dl - today()).days

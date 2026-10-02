@@ -1073,4 +1073,11 @@ TR: dict[str, dict[str, str]] = {
     "ℹ️ HEMIS umumiy statistikasida har bir darsning sanasi va fani bo'lmaydi. Kurs koordinatori kunlik davomatni yuklasa, darslar sana va fan bo'yicha ko'rinadi.": {
         'ru': 'ℹ️ В общей статистике HEMIS нет даты и предмета каждого занятия. Когда координатор загрузит ежедневную посещаемость, занятия будут видны по датам и предметам.',
         'en': 'ℹ️ HEMIS summary statistics do not include the date and subject of each class. Once the coordinator uploads daily attendance, classes will be shown by date and subject.'},
+    # Kontrakt / trimestr — rasmiy yozuv
+    "✅ Qarzdorlik mavjud emas": {'ru': '✅ Задолженность отсутствует', 'en': '✅ No outstanding debt'},
+    "✅ Qarzdorlik mavjud emas: farzandingiz {d} holatidagi hisobotda qarzdorlar ro'yxatida yo'q.": {
+        'ru': '✅ Задолженность отсутствует: вашего ребёнка нет в списке должников по отчёту на {d}.',
+        'en': '✅ No outstanding debt: your child is not on the debtor list in the report as of {d}.'},
+    "Oldingi hisobot ({d}): qarzdorlik {v}.": {
+        'ru': 'Предыдущий отчёт ({d}): задолженность {v}.', 'en': 'Previous report ({d}): debt {v}.'},
 }

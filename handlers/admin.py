@@ -606,6 +606,8 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
                  or _stats_date(None, file_name))
         year = result.meta.get("year")
         changes = await db.upsert_payments(rows, as_of, year, pay_kind)
+        # hisobot qamrovi: unda yo'q (qamrovdagi) talabalarning qarzdorligi — «mavjud emas»
+        await db.add_payment_report(pay_kind, as_of, scope)
         # To'lov shakli faqat yillik kontrakt hisobotidan: trimestr (qayta o'qish) to'lovini grant talaba ham to'laydi
         to_contract = ({r["student_id"]: CONTRACT for r in rows if (r.get("contract") or 0) > 0}
                        if pay_kind == "kontrakt" else {})
@@ -618,8 +620,10 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
         debtors = sorted((r for r in rows if r["debt"] > 0), key=lambda r: -r["debt"])
         lines.append(f"Talabalar: {len(rows)}, holat sanasi: {fmt_date(as_of, False)}"
                      + (f", {esc(year)} o'quv yili" if year else ""))
-        lines.append(f"Qarzdorlar: {len(debtors)}, jami qarz: <b>{fmt_money(sum(r['debt'] for r in debtors))}</b>; "
-                     f"qarzi yo'q: {len(rows) - len(debtors)}")
+        lines.append(f"Qarzdorlar: {len(debtors)}, jami qarz: <b>{fmt_money(sum(r['debt'] for r in debtors))}</b>"
+                     + (f"; qarzdorligi mavjud emas: {len(rows) - len(debtors)}" if len(rows) > len(debtors) else ""))
+        lines.append("ℹ️ Ro'yxatda bo'lmagan talabalar" + (" (guruhlaringizda)" if scope is not None else "")
+                     + " — qarzdorlik mavjud emas deb ko'rsatiladi (avval qarzi bo'lganlar ham).")
         if debtors:
             lines.append("\n💰 <b>Eng katta qarzlar:</b>")
             for r in debtors[:10]:
@@ -869,7 +873,7 @@ async def cmd_find_student(message: Message, command: CommandObject) -> None:
             pay_txt = "\n   💳 " + esc(full.get("payment_form") or "to'lov shakli ko'rsatilmagan")
             for k, p in pays.items():
                 if p:
-                    pay_txt += (f" · {k}: " + (fmt_money(p["debt"]) if p["debt"] > 0 else "qarz yo'q")
+                    pay_txt += (f" · {k}: " + (fmt_money(p["debt"]) if p["debt"] > 0 else "mavjud emas")
                                 + f" ({fmt_date(p['as_of'], False)})")
         ac = await academic.summary(s["id"])
         if ac["results"]:

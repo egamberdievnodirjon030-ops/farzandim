@@ -293,6 +293,14 @@ CREATE TABLE IF NOT EXISTS payments (
     imported_at TEXT NOT NULL,
     PRIMARY KEY (student_id, kind, as_of)
 );
+-- Buxgalteriya hisoboti qaysi talabalarni qamrab olgani: group_key '*' — butun kurs, aks holda — shu guruh
+-- (guruhlari biriktirilgan koordinator yuklagan). Qamrovdagi talaba hisobotda bo'lmasa — qarzi mavjud emas.
+CREATE TABLE IF NOT EXISTS payment_reports (
+    kind      TEXT NOT NULL,
+    as_of     TEXT NOT NULL,
+    group_key TEXT NOT NULL,
+    PRIMARY KEY (kind, as_of, group_key)
+);
 
 -- Foydalanuvchi tanlagan til (uz | ru | en) — ota-ona ro'yxatdan o'tmasidan oldin ham saqlanadi
 CREATE TABLE IF NOT EXISTS user_prefs (
@@ -746,11 +754,52 @@ class Database:
                WHERE b.student_id = a.student_id AND b.as_of >= ?)""", (since,))
         return {r["student_id"]: r for r in rows}
 
+    # ------------------------------------------------------------ to'lov hisobotlari qamrovi
+    async def add_payment_report(self, kind: str, as_of: str, groups: set[str] | None) -> None:
+        """Yuklangan hisobot qamrovi: groups None — butun kurs, aks holda — shu guruhlar."""
+        await self.conn.executemany("INSERT OR IGNORE INTO payment_reports (kind, as_of, group_key) VALUES (?, ?, ?)",
+                                    [(kind, as_of, g) for g in (sorted(groups) if groups is not None else ["*"])])
+        await self.conn.commit()
+
+    async def payment_coverage(self, kind: str) -> list[tuple[str, str]]:
+        """[(sana, guruh_kaliti | '*'), ...]. Qamrov yozilmagan eski hisobotlar — butun kurs uchun deb olinadi."""
+        rows = [(r["as_of"], r["group_key"]) for r in
+                await self.fetchall("SELECT as_of, group_key FROM payment_reports WHERE kind = ?", (kind,))]
+        known = {d for d, _ in rows}
+        rows += [(r["as_of"], "*") for r in await self.fetchall(
+            "SELECT DISTINCT as_of FROM payments WHERE kind = ?", (kind,)) if r["as_of"] not in known]
+        return rows
+
+    @staticmethod
+    def covered_at(coverage: list[tuple[str, str]], gkey: str | None) -> str | None:
+        """Talaba guruhini qamragan eng oxirgi hisobot sanasi (yo'q bo'lsa — None: bu turda ma'lumot yo'q)."""
+        return max((d for d, g in coverage if g == "*" or g == (gkey or "")), default=None)
+
+    @staticmethod
+    def _clear(sid: int, kind: str, as_of: str) -> dict:
+        """Hisobot talaba guruhini qamragan, lekin talaba unda yo'q — qarzdorlik mavjud emas."""
+        return {"student_id": sid, "kind": kind, "as_of": as_of, "year_label": None, "contract": None, "paid": None,
+                "debt": 0.0, "overpaid": 0.0, "percent": None, "note": None, "imported_at": None, "absent": True}
+
     async def bulk_latest_payments(self, kind: str) -> dict[int, dict]:
+        """Har bir talabaning shu turdagi joriy holati: oxirgi yozuvi yoki — keyingi hisobot uning guruhini qamragan,
+        lekin talaba unda yo'q bo'lsa (masalan, qarzini to'lagan) — «qarzdorlik mavjud emas»."""
         rows = await self.fetchall(
             """SELECT p.* FROM payments p WHERE p.kind = ? AND p.as_of = (SELECT MAX(p2.as_of) FROM payments p2
                WHERE p2.student_id = p.student_id AND p2.kind = p.kind)""", (kind,))
-        return {r["student_id"]: r for r in rows}
+        latest = {r["student_id"]: r for r in rows}
+        cov = await self.payment_coverage(kind)
+        if not cov:
+            return latest
+        out = {}
+        for st in await self.fetchall("SELECT id, group_key FROM students"):
+            d = self.covered_at(cov, st["group_key"])
+            p = latest.get(st["id"])
+            if d and (p is None or p["as_of"] < d):
+                out[st["id"]] = self._clear(st["id"], kind, d)
+            elif p is not None:
+                out[st["id"]] = p
+        return out
 
     async def bulk_grades(self) -> dict[int, list[dict]]:
         out: dict[int, list[dict]] = {}
@@ -1265,8 +1314,14 @@ class Database:
         return out
 
     async def latest_payment(self, sid: int, kind: str = "kontrakt") -> dict | None:
-        return await self.fetchone(
+        """Joriy holat (bulk_latest_payments bilan bir xil qoida); None — bu turda hisobot yuklanmagan."""
+        p = await self.fetchone(
             "SELECT * FROM payments WHERE student_id = ? AND kind = ? ORDER BY as_of DESC LIMIT 1", (sid, kind))
+        st = await self.fetchone("SELECT group_key FROM students WHERE id = ?", (sid,))
+        d = self.covered_at(await self.payment_coverage(kind), st["group_key"] if st else None)
+        if d and (p is None or p["as_of"] < d):
+            return self._clear(sid, kind, d)
+        return p
 
     async def payment_history(self, sid: int, kind: str = "kontrakt", limit: int = 8) -> list[dict]:
         rows = await self.fetchall(
@@ -1275,13 +1330,16 @@ class Database:
 
     async def debtors(self, kind: str = "kontrakt") -> list[dict]:
         """Shu turdagi oxirgi hisobot bo'yicha qarzi bor talabalar, qarz kamayish tartibida."""
-        return await self.fetchall(
+        rows = await self.fetchall(
             """SELECT s.id, s.full_name, s.group_name, s.course, p.debt, p.percent, p.as_of, p.contract
                FROM payments p JOIN students s ON s.id = p.student_id
                WHERE p.kind = ? AND p.as_of = (SELECT MAX(as_of) FROM payments p2
                                                WHERE p2.student_id = p.student_id AND p2.kind = p.kind)
                  AND p.debt > 0
                ORDER BY p.debt DESC""", (kind,))
+        # keyingi hisobot talaba guruhini qamragan, lekin talaba unda yo'q — qarzdorlar ro'yxatidan chiqadi
+        cur = await self.bulk_latest_payments(kind)
+        return [r for r in rows if (cur.get(r["id"]) or {}).get("debt", 0) > 0]
 
     async def get_lang(self, tg_id: int) -> str | None:
         row = await self.fetchone("SELECT lang FROM user_prefs WHERE tg_id = ?", (tg_id,))
