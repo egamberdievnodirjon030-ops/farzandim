@@ -834,9 +834,9 @@ TR: dict[str, dict[str, str]] = {
     '📚 Akademik qarzdorlik: <b>{n} ta fan</b> — {names}': {
         'ru': '📚 Академическая задолженность: <b>{n}</b> — {names}',
         'en': '📚 Academic debt: <b>{n} subject(s)</b> — {names}'},
-    "📚 Akademik qarzdorlik: yo'q ✅": {
-        'ru': '📚 Академическая задолженность: нет ✅',
-        'en': '📚 Academic debt: none ✅'},
+    "📚 Akademik qarzdorlik: mavjud emas ✅": {
+        'ru': '📚 Академическая задолженность: отсутствует ✅',
+        'en': '📚 Academic debt: none outstanding ✅'},
     "📚 Akademik qarzdorlik: ma'lumot yo'q": {
         'ru': '📚 Академическая задолженность: нет данных',
         'en': '📚 Academic debt: no data'},
@@ -1098,4 +1098,8 @@ TR: dict[str, dict[str, str]] = {
     'bir oy oldingiga nisbatan': {'ru': 'по сравнению с прошлым месяцем', 'en': 'vs a month ago'},
     'oldingi baholarga nisbatan': {'ru': 'по сравнению с прошлыми оценками', 'en': 'vs earlier grades'},
     'oldingi hisobotga nisbatan': {'ru': 'по сравнению с прошлым отчётом', 'en': 'vs previous report'},
+    'Sababsiz qoldirilgan': {'ru': 'Пропуски без причины', 'en': 'Unexcused absences'},
+    'Akademik qarzdorlik': {'ru': 'Академическая задолженность', 'en': 'Academic debt'},
+    'Trimestr qarzi': {'ru': 'Долг за триместр', 'en': 'Trimester debt'},
+    '{a} → {b}': {'ru': '{a} → {b}', 'en': '{a} → {b}'},
 }

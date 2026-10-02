@@ -24,6 +24,7 @@ const T = {
     back: 'Ortga',
     surveys: 'So‘rovnomalar', survey: 'So‘rovnoma', regs: 'Ichki nizomlar', regs_sub: 'Universitet ichki tartib qoidalari va nizomlari', answer_now: 'Javob berish', q_n: '{n} ta savol', closes: '{d} gacha', submit_survey: 'Yuborish', survey_thanks: 'Rahmat! Javobingiz qabul qilindi.', survey_closed: 'So‘rovnoma yopilgan', required_q: 'Iltimos, belgilangan savollarga javob bering', your_answer: 'Javobingiz…', answered: 'Javob berilgan', no_surveys: 'Hozircha so‘rovnoma yo‘q', no_regs: 'Nizomlar hali joylanmagan', edit_answer: 'Javobni o‘zgartirish', anon: 'Anonim: ismingiz va farzandingiz ko‘rsatilmaydi', scale_lo: 'yomon', scale_hi: 'a’lo', choose_many: 'bir nechtasini tanlash mumkin', waiting_you: 'Fikringizni kutyapmiz', open_link: 'Ochish', new_note: 'Yangi bildirishnoma', poll_done: 'Javob berganlar',
     dyn_first: 'birinchi ma’lumot', dyn_same: 'o‘zgarmadi', more: 'Batafsil',
+    dyn_none: 'Oxirgi yuklashlarda o‘zgarish bo‘lmadi — o‘zgarish bo‘lsa, shu yerda ko‘rinadi.',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
     this_week: 'Shu hafta', prev: 'Oldingi', next: 'Keyingi', next_limit: 'Keyingi', toq: 'toq hafta', juft: 'juft hafta', no_lessons: 'Bu kuni dars yo‘q',
@@ -34,7 +35,7 @@ const T = {
     no_docs_sub: 'Rasmiy hujjat chiqqanda shu yerda paydo bo‘ladi va Telegram’ga ham keladi.', month_ago: 'bir oy oldin', now: 'hozir',
     no_trends: 'Taqqoslash uchun ma’lumot hali yetarli emas', type_msg: 'Xabar yozing…', msg_sent: 'Xabar yuborildi',
     no_msgs: 'Hali xabar yo‘q', no_msgs_sub: 'Savolingizni yozing — javob shu yerda va Telegram’da keladi.', mark_read: 'Hammasini o‘qildi',
-    nav_att: 'Davomat', nav_msg: 'Xabarlar', debts_title: 'Akademik qarzdorlik', from_hemis: 'HEMIS qarzdorlar ro‘yxati', debt_score: '{s} ball → «2»', sem_n: '{n}-semestr', credits_n: '{n} kredit', debts_help: 'Qayta topshirish tartibi bo‘yicha kurs koordinatoriga murojaat qiling.', ask_coord: 'Kurs koordinatoriga yozish', no_debts: 'Akademik qarz yo‘q', open: 'Ochish', theme: 'Mavzu', th_auto: 'Avtomatik', th_light: 'Kunduzgi', th_dark: 'Tungi', pages: 'sahifa', open_doc: 'Ochish', doc_loading: 'Hujjat ochilmoqda…', tap_zoom: 'Kattalashtirish uchun sahifani bosing', no_notes: 'Bildirishnomalar yo‘q', no_notes_sub: 'Dars qoldirilganda, baho qo‘yilganda yoki to‘lov yaqinlashganda shu yerda paydo bo‘ladi.',
+    nav_att: 'Davomat', nav_msg: 'Xabarlar', debts_title: 'Akademik qarzdorlik', from_hemis: 'HEMIS qarzdorlar ro‘yxati', debt_score: '{s} ball → «2»', sem_n: '{n}-semestr', credits_n: '{n} kredit', debts_help: 'Qayta topshirish tartibi bo‘yicha kurs koordinatoriga murojaat qiling.', ask_coord: 'Kurs koordinatoriga yozish', no_debts: 'Akademik qarzdorlik mavjud emas', open: 'Ochish', theme: 'Mavzu', th_auto: 'Avtomatik', th_light: 'Kunduzgi', th_dark: 'Tungi', pages: 'sahifa', open_doc: 'Ochish', doc_loading: 'Hujjat ochilmoqda…', tap_zoom: 'Kattalashtirish uchun sahifani bosing', no_notes: 'Bildirishnomalar yo‘q', no_notes_sub: 'Dars qoldirilganda, baho qo‘yilganda yoki to‘lov yaqinlashganda shu yerda paydo bo‘ladi.',
     no_news: 'E’lonlar yo‘q', lang: 'Til', flags: 'Qaysi xabarlar kelsin', notify_instant: 'Dars qoldirilganda — darhol',
     notify_daily: 'Kunlik xulosa — kechqurun', notify_warn: 'Muhim ogohlantirishlar', notify_pay: 'To‘lov eslatmalari',
     grade_scale: 'Baholash shkalasi', welcome: 'Assalomu alaykum!', welcome_sub: 'Farzandingizning davomati, baholari va to‘lovlari — bir joyda, o‘z vaqtida.',
@@ -63,6 +64,7 @@ const T = {
     back: 'Назад',
     surveys: 'Опросы', survey: 'Опрос', regs: 'Внутренние положения', regs_sub: 'Правила внутреннего распорядка и положения университета', answer_now: 'Ответить', q_n: 'вопросов: {n}', closes: 'до {d}', submit_survey: 'Отправить', survey_thanks: 'Спасибо! Ваш ответ принят.', survey_closed: 'Опрос закрыт', required_q: 'Пожалуйста, ответьте на отмеченные вопросы', your_answer: 'Ваш ответ…', answered: 'Ответ отправлен', no_surveys: 'Пока опросов нет', no_regs: 'Положения ещё не размещены', edit_answer: 'Изменить ответ', anon: 'Анонимно: ваше имя и имя ребёнка не показываются', scale_lo: 'плохо', scale_hi: 'отлично', choose_many: 'можно выбрать несколько', waiting_you: 'Ждём вашего мнения', open_link: 'Открыть', new_note: 'Новое уведомление', poll_done: 'Ответили',
     dyn_first: 'первые данные', dyn_same: 'без изменений', more: 'Подробнее',
+    dyn_none: 'В последних загрузках изменений не было — при изменениях они появятся здесь.',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
     this_week: 'Эта неделя', prev: 'Назад', next: 'Вперёд', next_limit: 'Следующий', toq: 'нечётная неделя', juft: 'чётная неделя', no_lessons: 'В этот день занятий нет',
@@ -73,7 +75,7 @@ const T = {
     no_docs_sub: 'Официальные документы появятся здесь и придут в Telegram.', month_ago: 'месяц назад', now: 'сейчас',
     no_trends: 'Пока недостаточно данных для сравнения', type_msg: 'Напишите сообщение…', msg_sent: 'Сообщение отправлено',
     no_msgs: 'Сообщений пока нет', no_msgs_sub: 'Напишите Ваш вопрос — ответ придёт сюда и в Telegram.', mark_read: 'Прочитать все',
-    nav_att: 'Пропуски', nav_msg: 'Чат', debts_title: 'Академическая задолженность', from_hemis: 'список должников HEMIS', debt_score: '{s} баллов → «2»', sem_n: '{n}-й семестр', credits_n: '{n} кредит(а)', debts_help: 'По порядку пересдачи обращайтесь к куратору курса.', ask_coord: 'Написать куратору курса', no_debts: 'Академической задолженности нет', open: 'Открыть', theme: 'Тема', th_auto: 'Авто', th_light: 'Светлая', th_dark: 'Тёмная', pages: 'стр.', open_doc: 'Открыть', doc_loading: 'Документ открывается…', tap_zoom: 'Нажмите на страницу, чтобы увеличить', no_notes: 'Уведомлений нет', no_notes_sub: 'Здесь появятся сообщения о пропусках, оценках и сроках оплаты.',
+    nav_att: 'Пропуски', nav_msg: 'Чат', debts_title: 'Академическая задолженность', from_hemis: 'список должников HEMIS', debt_score: '{s} баллов → «2»', sem_n: '{n}-й семестр', credits_n: '{n} кредит(а)', debts_help: 'По порядку пересдачи обращайтесь к куратору курса.', ask_coord: 'Написать куратору курса', no_debts: 'Академическая задолженность отсутствует', open: 'Открыть', theme: 'Тема', th_auto: 'Авто', th_light: 'Светлая', th_dark: 'Тёмная', pages: 'стр.', open_doc: 'Открыть', doc_loading: 'Документ открывается…', tap_zoom: 'Нажмите на страницу, чтобы увеличить', no_notes: 'Уведомлений нет', no_notes_sub: 'Здесь появятся сообщения о пропусках, оценках и сроках оплаты.',
     no_news: 'Объявлений нет', lang: 'Язык', flags: 'Какие уведомления получать', notify_instant: 'При пропуске — сразу',
     notify_daily: 'Ежедневная сводка — вечером', notify_warn: 'Важные предупреждения', notify_pay: 'Напоминания об оплате',
     grade_scale: 'Шкала оценок', welcome: 'Здравствуйте!', welcome_sub: 'Посещаемость, оценки и оплата Вашего ребёнка — в одном месте и вовремя.',
@@ -102,6 +104,7 @@ const T = {
     back: 'Back',
     surveys: 'Surveys', survey: 'Survey', regs: 'University regulations', regs_sub: 'Internal rules and regulations of the university', answer_now: 'Answer', q_n: '{n} question(s)', closes: 'until {d}', submit_survey: 'Submit', survey_thanks: 'Thank you! Your answer has been received.', survey_closed: 'The survey is closed', required_q: 'Please answer the marked questions', your_answer: 'Your answer…', answered: 'Answered', no_surveys: 'No surveys yet', no_regs: 'No regulations published yet', edit_answer: 'Change answer', anon: 'Anonymous: your and your child’s names are not shown', scale_lo: 'poor', scale_hi: 'excellent', choose_many: 'you can choose several', waiting_you: 'We’d like your opinion', open_link: 'Open', new_note: 'New notification', poll_done: 'Answered',
     dyn_first: 'first data', dyn_same: 'no change', more: 'Details',
+    dyn_none: 'No changes in the latest uploads — changes will appear here.',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
     this_week: 'This week', prev: 'Previous', next: 'Next', next_limit: 'Next', toq: 'odd week', juft: 'even week', no_lessons: 'No classes on this day',
@@ -112,7 +115,7 @@ const T = {
     no_docs_sub: 'Official documents will appear here and in Telegram.', month_ago: 'a month ago', now: 'now',
     no_trends: 'Not enough data to compare yet', type_msg: 'Write a message…', msg_sent: 'Message sent',
     no_msgs: 'No messages yet', no_msgs_sub: 'Write your question — the reply comes here and in Telegram.', mark_read: 'Mark all read',
-    nav_att: 'Attendance', nav_msg: 'Chat', debts_title: 'Academic debt', from_hemis: 'HEMIS debtor list', debt_score: '{s} points → “2”', sem_n: 'semester {n}', credits_n: '{n} credits', debts_help: 'Please contact the course coordinator about retakes.', ask_coord: 'Write to the course coordinator', no_debts: 'No academic debt', open: 'Open', theme: 'Theme', th_auto: 'Auto', th_light: 'Light', th_dark: 'Dark', pages: 'pages', open_doc: 'Open', doc_loading: 'Opening the document…', tap_zoom: 'Tap a page to zoom', no_notes: 'No notifications', no_notes_sub: 'Absences, new grades and payment deadlines will appear here.',
+    nav_att: 'Attendance', nav_msg: 'Chat', debts_title: 'Academic debt', from_hemis: 'HEMIS debtor list', debt_score: '{s} points → “2”', sem_n: 'semester {n}', credits_n: '{n} credits', debts_help: 'Please contact the course coordinator about retakes.', ask_coord: 'Write to the course coordinator', no_debts: 'No outstanding academic debt', open: 'Open', theme: 'Theme', th_auto: 'Auto', th_light: 'Light', th_dark: 'Dark', pages: 'pages', open_doc: 'Open', doc_loading: 'Opening the document…', tap_zoom: 'Tap a page to zoom', no_notes: 'No notifications', no_notes_sub: 'Absences, new grades and payment deadlines will appear here.',
     no_news: 'No announcements', lang: 'Language', flags: 'Which notifications to receive', notify_instant: 'Absence — immediately',
     notify_daily: 'Daily summary — evening', notify_warn: 'Important warnings', notify_pay: 'Payment reminders',
     grade_scale: 'Grading scale', welcome: 'Welcome!', welcome_sub: 'Your child’s attendance, grades and payments — in one place, on time.',
@@ -352,7 +355,7 @@ async function viewHome() {
     : `<a class="tile" href="#/attendance"><span class="k">${t('attendance')}</span><span class="v muted" style="font-size:18px">${t('no_data')}</span></a>`;
   const gpaTile = `<a class="tile ${o.gpa_low ? 'bad' : ''}" href="#/grades"><span class="k">${t('gpa')}</span><span class="v num">${o.gpa != null ? gpaNum(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${o.gpa_low ? t('gpa_low', { min: limNum(o.gpa_min) }) : t('gpa_hint')}</span></a>`;
   const acadTile = `<a class="tile ${o.academic.count ? 'bad' : 'ok'}" href="${o.academic.count ? '#/debts' : '#/grades'}"><span class="k">${t('acad')}</span>
-      <span class="v" style="font-size:${o.academic.count ? 26 : 22}px">${o.academic.count ? `${o.academic.count}<small class="of"> ${esc(subjUnit(o.academic.count))}</small>` : t('none')}</span>
+      <span class="v" style="font-size:${o.academic.count ? 26 : 22}px">${o.academic.count ? `${o.academic.count}<small class="of"> ${esc(subjUnit(o.academic.count))}</small>` : t('no_debt')}</span>
       <span class="s clamp3">${o.academic.count ? esc(o.academic.debts.map(d => d.subject).join(', ')) : ''}</span></a>`;
   const tutor = c.tutor || {};
   // birinchi ekranda: talaba kartasi → javob kutayotgan so'rovnoma → so'rovnomalar va ichki nizomlar → holat
@@ -476,7 +479,7 @@ async function viewGrades() {
     + empty('grade', t('no_data')) });
   const body = switcher() + `<div class="card" style="display:flex;justify-content:space-between;align-items:center">
       <div><div class="muted small">${t('gpa_long')}</div><div class="bigstat"><b class="num">${d.gpa != null ? gpaNum(d.gpa) : '—'}</b><span class="muted">/ 5</span></div>${d.gpa_low ? `<div class="small" style="color:var(--bordo-fg);font-weight:600;margin-top:2px">${t('gpa_low', { min: limNum(d.gpa_min) })}</div>` : ''}</div>
-      ${d.debts ? `<a class="pill bordo" href="#/debts" style="font-size:14px;padding:8px 12px">${t('acad')}: ${d.debts} ${ic('chev')}</a>` : `<span class="pill ok" style="font-size:14px;padding:8px 12px">${t('acad')}: ${t('none')}</span>`}</div>
+      ${d.debts ? `<a class="pill bordo" href="#/debts" style="font-size:14px;padding:8px 12px">${t('acad')}: ${d.debts} ${ic('chev')}</a>` : `<span class="pill ok" style="font-size:14px;padding:8px 12px">${t('acad')}: ${t('no_debt').toLowerCase()}</span>`}</div>
     ${d.semesters.map(s => `<section class="section"><div class="section-head"><h2>${t('semN', { n: s.semester })}</h2>${s.gpa != null ? `<span class="muted num">GPA ${gpaNum(s.gpa)}</span>` : ''}</div>
       <div class="list">${s.subjects.map(g => `<div class="subject ${g.debt ? 'debt' : ''}"><div><div style="font-weight:600">${esc(g.subject)}</div>
         <div class="small muted num">${num(g.score)} / 100${g.credits ? ' · ' + num(g.credits) + ' ' + t('credits') : ''}${g.debt ? ' · <span style="color:var(--bordo-fg)">' + t('debt_subject') + '</span>' : ''}</div></div>
@@ -736,6 +739,8 @@ function dynVal(it, v) {
   if (v == null) return '—';
   if (it.unit === '%') return `${num(v)}%`;
   if (it.unit === 'gpa') return gpaNum(v);
+  if (it.unit === 'pairs') return pairs(v);
+  if (it.unit === 'subjects') return v ? t('subjectsN', { n: v }) : t('no_debt');
   if (it.unit === 'so\'m' || it.unit === 'money') return v ? money(v) : t('no_debt');
   return `${v} ta`;
 }
@@ -744,7 +749,7 @@ function dynDelta(it) {
   if (d == null) return { cls: 'flat', txt: t('dyn_first') };
   if (!d) return { cls: 'flat', txt: t('dyn_same') };
   const good = (d > 0) === (it.better === 'up');
-  const mag = it.unit === '%' ? `${num(Math.abs(d))} p.p.` : it.unit === 'gpa' ? gpaNum(Math.abs(d)) : it.unit === 'money' || it.unit === 'so\'m' ? money(Math.abs(d)) : dynVal(it, Math.abs(d));
+  const mag = it.unit === '%' ? `${num(Math.abs(d))} p.p.` : it.unit === 'gpa' ? gpaNum(Math.abs(d)) : it.unit === 'pairs' ? pairs(Math.abs(d)) : it.unit === 'subjects' ? t('subjectsN', { n: Math.abs(d) }) : it.unit === 'money' || it.unit === 'so\'m' ? money(Math.abs(d)) : dynVal(it, Math.abs(d));
   return { cls: good ? 'good' : 'bad', txt: `${d > 0 ? '▲' : '▼'} ${mag}` };
 }
 function parentDyn(items) {
@@ -753,7 +758,7 @@ function parentDyn(items) {
     ${items && items.length ? `<a class="card dyn" href="#/trends" style="display:block;color:inherit;text-decoration:none">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">
       <div class="body"><div class="t">${esc(it.title)}</div><div class="d">${esc(it.caption)}</div></div>
       ${spark(it.points, dl.cls)}<div class="val"><b class="num">${esc(dynVal(it, it.value))}</b><span class="${dl.cls}">${esc(dl.txt)}</span></div></div>`; }).join('')}</a>`
-      : `<div class="card muted small">${t('no_trends')}</div>`}</section>`;
+      : `<div class="card muted small">${t('dyn_none')}</div>`}</section>`;
 }
 function dynCard(items) {
   if (!items || !items.length) return '';
@@ -823,7 +828,7 @@ async function viewStaffStudent(sid) {
   const c = o.child, a = o.attendance;
   const body = idCard(c) + verdict(o) + `<div class="grid2" style="margin-top:14px">
       <div class="tile"><span class="k">Davomat</span><span class="v num">${a && a.percent != null ? a.percent + '%' : '—'}</span><span class="s">${a ? `sababsiz<br><b class="nowrap">${pairs(a.counted_hours)}</b>` : ''}</span></div>
-      <div class="tile"><span class="k">GPA</span><span class="v num">${o.gpa != null ? gpaNum(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${o.gpa_low ? `<b>${limNum(o.gpa_min)} dan past — kursdan kursga o‘tmaydi</b><br>` : ''}akademik qarz: ${o.academic.count ? o.academic.count + ' ta fan' : 'yo‘q'}</span></div>
+      <div class="tile"><span class="k">GPA</span><span class="v num">${o.gpa != null ? gpaNum(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${o.gpa_low ? `<b>${limNum(o.gpa_min)} dan past — kursdan kursga o‘tmaydi</b><br>` : ''}akademik qarz: ${o.academic.count ? o.academic.count + ' ta fan' : 'mavjud emas'}</span></div>
       ${payTile('kontrakt', o.pays.kontrakt)}${payTile('trimestr', o.pays.trimestr)}</div>
     ${o.academic.count ? `<section class="section"><div class="section-head"><h2>Akademik qarzdorlik</h2><span class="muted small">${o.academic.count} ta fan</span></div>
       <div class="list">${o.academic.debts.map(debtRow).join('')}</div></section>` : ''}

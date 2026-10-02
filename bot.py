@@ -26,7 +26,7 @@ import webserver
 import templates
 from logsetup import alert_handler, setup_logging
 from i18n import tr, use_lang
-from tenancy import central, course_keys, course_title, is_staff, reload_registry
+from tenancy import central, course_keys, course_title, is_staff, reload_registry, use_course
 
 def build_dispatcher() -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage())
@@ -132,6 +132,12 @@ async def open_storage() -> None:
                 await central.set_group_course(g["chat_id"], key)
         logging.info("Kurs «%s»: %s — koordinatorlar %s", course_title(key), Path(DATA_DIR) / key,
                      ", ".join(map(str, COURSES[key])) or "yo'q")
+        try:  # dinamika uchun boshlang'ich nuqta (keyingi yuklash bilan solishtiriladi; o'zgarmagan — yozilmaydi)
+            import snapshots
+            with use_course(key):
+                await snapshots.capture()
+        except Exception:
+            logging.exception("Dinamika boshlang'ich nuqtasi yozilmadi: %s", key)
     if not SUPERADMIN_IDS:
         logging.warning("SUPERADMIN_IDS bo'sh — kurslarni bot ichidan boshqarish, zaxira nusxa va xatolar haqida "
                         "xabarlar ishlamaydi")

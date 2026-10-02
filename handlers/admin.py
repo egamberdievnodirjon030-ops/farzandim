@@ -687,6 +687,13 @@ async def _process_import(bot, progress: Message, kind: str, rows: list, caption
         lines.extend(esc(e) for e in errors[:15])
         if len(errors) > 15:
             lines.append(f"… va yana {len(errors) - 15} ta")
+    if result.rows and kind not in ("translations", "schedule", "elsched"):
+        # har bir yuklash — dinamika uchun yangi nuqta (faqat o'zgargan ko'rsatkichlar yoziladi)
+        import snapshots
+        try:
+            await snapshots.capture()
+        except Exception:
+            log.exception("Dinamika nuqtalari yozilmadi")
     parts = split_message("\n".join(lines))
     await progress.edit_text(parts[0])
     for extra in parts[1:]:
@@ -878,7 +885,7 @@ async def cmd_find_student(message: Message, command: CommandObject) -> None:
         ac = await academic.summary(s["id"])
         if ac["results"]:
             pay_txt += ("\n   📚 akademik qarz: " + (f"{len(ac['debts'])} ta fan — " + ", ".join(
-                esc(d["subject"]) for d in ac["debts"]) if ac["debts"] else "yo'q"))
+                esc(d["subject"]) for d in ac["debts"]) if ac["debts"] else "mavjud emas"))
         lines.append(f"• <b>{esc(s['full_name'])}</b> · {esc(s['group_name'] or '')} · ID {esc(s['hemis_id'])} · "
                      f"ulangan ota-onalar: {n}" + (f" · hujjatlar: {docs}" if docs else "")
                      + ("\n   🎯 " + ", ".join(esc(x["subject"]) + (f" ({x['subgroup']}-oqim)" if x["subgroup"] else "")
@@ -1819,7 +1826,7 @@ async def cmd_debtors(message: Message, command: CommandObject) -> None:
         rows = _filter_students(scope_students(await db.debtors(kind)), arg)
         title = "Kontrakt" if kind == "kontrakt" else "Trimestr"
         if not rows:
-            lines.append(f"💰 <b>{title} qarzdorlari</b>{' — ' + esc(arg) if arg else ''}: yo'q\n")
+            lines.append(f"💰 <b>{title} qarzdorlari</b>{' — ' + esc(arg) if arg else ''}: mavjud emas\n")
             continue
         lines.append(f"💰 <b>{title} qarzdorlari</b>{' — ' + esc(arg) if arg else ''}: {len(rows)} ta, "
                      f"jami qarz: <b>{fmt_money(sum(r['debt'] for r in rows))}</b>")

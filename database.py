@@ -293,6 +293,16 @@ CREATE TABLE IF NOT EXISTS payments (
     imported_at TEXT NOT NULL,
     PRIMARY KEY (student_id, kind, as_of)
 );
+-- Har bir fayl yuklangandan keyingi holat (dinamika uchun): faqat o'zgargan qiymat yoziladi; bir kunda bir necha
+-- yuklash — o'sha kunning bitta nuqtasi. metric: att_pct, att_hours, acad, kontrakt, trimestr, gpa
+CREATE TABLE IF NOT EXISTS snapshots (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    metric     TEXT NOT NULL,
+    value      REAL NOT NULL,
+    day        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_snapshots ON snapshots(student_id, metric, id);
 -- Ota-onalar so'rovnomalari: kurs koordinatori (yoki super-admin) tuzadi, ota-onalar ilovada javob beradi.
 -- target_groups — guruh kalitlari, vergul bilan (bo'sh — butun kurs). Bitta ota-ona — bitta javob.
 CREATE TABLE IF NOT EXISTS surveys (

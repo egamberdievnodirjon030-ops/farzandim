@@ -94,7 +94,7 @@ async def student_card(st: dict) -> str:
     if s["results"]:
         lines.append(tr("📚 Akademik qarzdorlik: <b>{n} ta fan</b> — {names}", n=len(s['debts']),
                         names=esc(", ".join(loc.term(d["subject"]) for d in s["debts"]))) if s["debts"]
-                     else tr("📚 Akademik qarzdorlik: yo'q ✅"))
+                     else tr("📚 Akademik qarzdorlik: mavjud emas ✅"))
     else:
         lines.append(tr("📚 Akademik qarzdorlik: ma'lumot yo'q"))
     for kind, icon, title in (("kontrakt", "💰", N_("Kontrakt qarzdorligi")), ("trimestr", "💳", N_("Trimestr qarzdorligi"))):
