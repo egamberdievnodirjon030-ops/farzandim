@@ -49,10 +49,12 @@ jobs:
           java-version: 21
       - name: Server manzili
         run: |
+          [ -n "$APP_SERVER_URL" ] || APP_SERVER_URL=$(node -p "require('./app.json').serverUrl || ''")
           if [ -z "$APP_SERVER_URL" ]; then
-            echo "::warning::APP_SERVER_URL o'zgaruvchisi sozlanmagan — sinov uchun https://example.org bilan yig'iladi (bu APK ishlamaydi)."
-            echo "APP_SERVER_URL=https://example.org" >> "$GITHUB_ENV"
+            echo "::warning::Server manzili (mobile/app.json → serverUrl yoki APP_SERVER_URL) yo'q — sinov uchun https://example.org bilan yig'iladi (bu APK ishlamaydi)."
+            APP_SERVER_URL=https://example.org
           fi
+          echo "APP_SERVER_URL=$APP_SERVER_URL" >> "$GITHUB_ENV"
       - run: npm ci
       - name: Android loyihasi
         run: npm run android
@@ -104,10 +106,12 @@ jobs:
           node-version: 22
       - name: Server manzili
         run: |
+          [ -n "$APP_SERVER_URL" ] || APP_SERVER_URL=$(node -p "require('./app.json').serverUrl || ''")
           if [ -z "$APP_SERVER_URL" ]; then
-            echo "::warning::APP_SERVER_URL sozlanmagan — sinov uchun https://example.org bilan yig'iladi."
-            echo "APP_SERVER_URL=https://example.org" >> "$GITHUB_ENV"
+            echo "::warning::Server manzili yo'q — sinov uchun https://example.org bilan yig'iladi."
+            APP_SERVER_URL=https://example.org
           fi
+          echo "APP_SERVER_URL=$APP_SERVER_URL" >> "$GITHUB_ENV"
       - run: npm ci
       - name: iOS loyihasi
         run: npm run ios

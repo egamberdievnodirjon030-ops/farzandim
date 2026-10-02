@@ -1,9 +1,10 @@
 // capacitor.config.json ni yaratadi: server manzili (APP_SERVER_URL — botdagi WEBAPP_URL bilan bir xil),
 // ilova identifikatori va nomi. Ilova shu manzildagi Web App ni ochadi — yangi funksiyalar serverga qo'yilishi
 // bilan telefonda ham paydo bo'ladi, ilovani qayta o'rnatish shart emas.
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
-const url = (process.env.APP_SERVER_URL || '').trim().replace(/\/+$/, '');
+const fromFile = (() => { try { return JSON.parse(readFileSync('app.json', 'utf8')).serverUrl || ''; } catch { return ''; } })();
+const url = (process.env.APP_SERVER_URL || fromFile).trim().replace(/\/+$/, '');
 if (!/^https:\/\/[^/]+/.test(url)) {
   console.error("APP_SERVER_URL berilmagan yoki https:// bilan boshlanmaydi (masalan: https://ilova.example.uz)");
   process.exit(1);
