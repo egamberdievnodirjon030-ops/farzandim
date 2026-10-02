@@ -1,0 +1,19 @@
+aiogram>=3.13,<4
+# Telegram Web App uchun veb-server (aiogram bilan birga keladi, bu yerda aniq ko'rsatilgan)
+aiohttp>=3.9
+aiosqlite>=0.20
+openpyxl>=3.1
+python-dotenv>=1.0
+# rasmiy hujjatlarda boshqa talabalar ma'lumotlarini yopish
+pdfplumber>=0.11
+pypdfium2>=4.0
+Pillow>=10.0
+numpy>=1.24
+# skanerlangan hujjatlar uchun (serverda tesseract-ocr ham o'rnatilgan bo'lishi kerak)
+pytesseract>=0.3.10
+# ota-onaga dinamika grafigi va kurs koordinatoriga PDF hisobot
+matplotlib>=3.7
+reportlab>=4.0
+# zaxira nusxa arxivini AES-256 bilan shifrlash (BACKUP_PASSWORD)
+pyzipper>=0.3.6
+tzdata>=2024.1; sys_platform == "win32"

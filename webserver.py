@@ -1,0 +1,129 @@
+"""Web App veb-serveri: ilova fayllari (webapp/) va API (webapi.py). Bot bilan bitta jarayonda ishlaydi."""
+from __future__ import annotations
+
+import html
+import logging
+from pathlib import Path
+
+from aiogram import Bot
+from aiogram.types import MenuButtonDefault, MenuButtonWebApp, WebAppInfo
+from aiohttp import web
+
+import deskauth
+import live
+import webapi
+from config import ADMIN_COURSE, SUPERADMIN_IDS, WEBAPP_HOST, WEBAPP_PORT, WEBAPP_URL
+from tenancy import course_title
+
+log = logging.getLogger("webapp")
+STATIC = Path(__file__).parent / "webapp"
+
+
+@web.middleware
+async def security_headers(request: web.Request, handler):
+    resp = await handler(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    # Ilova faqat Telegram ichida ochiladi — begona saytlarga joylashtirilmaydi
+    resp.headers.setdefault("Content-Security-Policy",
+                            "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; "
+                            "img-src 'self' data: blob:; connect-src 'self'; frame-ancestors https://web.telegram.org "
+                            "https://*.telegram.org; object-src 'none'; base-uri 'self'")
+    if request.path.startswith("/api/"):
+        resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+async def index(request: web.Request) -> web.FileResponse:
+    return web.FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+# ---------------------------------------------------------------- kompyuter versiyasi (boshqaruv paneli)
+_LOGIN_PAGE = """<!doctype html><html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kirish — Boshqaruv paneli</title><link rel="stylesheet" href="/static/fonts.css"><style>
+*{{box-sizing:border-box}}body{{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.5 'Golos Text',system-ui,sans-serif;
+background:radial-gradient(1200px 600px at 80% -10%,#1B3A6B 0%,#0E2240 55%,#0A1830 100%);color:#16213A}}
+.card{{width:min(440px,92vw);background:#fff;border-radius:22px;padding:36px 34px 30px;box-shadow:0 30px 80px rgba(0,0,0,.35);position:relative;overflow:hidden}}
+.card:before{{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,#7D1D3F,#9E2A52)}}
+.seal{{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:#7D1D3F;color:#fff;font:700 24px 'PT Serif',Georgia,serif;margin-bottom:18px}}
+h1{{font:700 24px/1.25 'PT Serif',Georgia,serif;margin:0 0 6px;color:#0E2240}}p{{margin:0 0 18px;color:#5B6781}}
+.who{{background:#F3F5F9;border-radius:14px;padding:12px 14px;margin:0 0 20px;font-weight:600}}
+button{{width:100%;border:0;border-radius:14px;padding:14px 18px;font:600 16px 'Golos Text',system-ui,sans-serif;color:#fff;background:#0E2240;cursor:pointer}}
+button:hover{{background:#1B3A6B}}small{{display:block;margin-top:16px;color:#8A93A8;font-size:13px}}</style></head>
+<body><main class="card"><div class="seal">J</div>{body}</main></body></html>"""
+
+
+def _login_html(body: str, status: int = 200) -> web.Response:
+    return web.Response(text=_LOGIN_PAGE.format(body=body), content_type="text/html", status=status,
+                        headers={"Cache-Control": "no-store"})
+
+
+_EXPIRED = ("<h1>Havola eskirgan</h1><p>Kirish havolasi 10 daqiqa amal qiladi va faqat bir marta ishlatiladi.</p>"
+            "<p>Yangi havola olish uchun botda <b>«💻 Kompyuter versiyasi»</b> tugmasini bosing yoki "
+            "<b>/kompyuter</b> buyrug'ini yuboring.</p>")
+
+
+async def desk_login_page(request: web.Request) -> web.Response:
+    token = request.query.get("t", "")
+    uid = deskauth.peek(token)
+    if uid is None:
+        return _login_html(_EXPIRED, 410)
+    role = "Super-admin" if uid in SUPERADMIN_IDS else "Kurs koordinatori"
+    title = course_title(ADMIN_COURSE[uid]) if uid in ADMIN_COURSE and ADMIN_COURSE[uid] != "_" else ""
+    who = html.escape(role + (f" · {title}" if title else ""))
+    return _login_html(
+        "<h1>Boshqaruv paneli</h1><p>Ota-onalar davomat boti — kompyuter versiyasi</p>"
+        f'<div class="who">{who}<br><span style="font-weight:400;color:#5B6781">Telegram ID {uid}</span></div>'
+        f'<form method="post" action="/desk/login"><input type="hidden" name="t" value="{html.escape(token)}">'
+        '<button type="submit">Kirish</button></form>'
+        "<small>Seans 12 soat amal qiladi. Umumiy kompyuterda ishlagandan so'ng «Chiqish» tugmasini bosing.</small>")
+
+
+async def desk_login(request: web.Request) -> web.Response:
+    form = await request.post()
+    uid = deskauth.consume(str(form.get("t", "")))
+    if uid is None or (uid not in ADMIN_COURSE and uid not in SUPERADMIN_IDS):
+        return _login_html(_EXPIRED, 410)
+    resp = web.HTTPSeeOther("/desk")
+    resp.set_cookie(deskauth.COOKIE, deskauth.make_cookie(uid), max_age=deskauth.SESSION_TTL, path="/",
+                    httponly=True, secure=deskauth.cookie_secure(), samesite="Lax")
+    log.info("Kompyuter versiyasiga kirish: %s", uid)
+    return resp
+
+
+async def desk(request: web.Request) -> web.FileResponse:
+    return web.FileResponse(STATIC / "desk.html", headers={"Cache-Control": "no-cache"})
+
+
+def create_app(bot: Bot) -> web.Application:
+    app = web.Application(middlewares=[security_headers, webapi.auth_middleware], client_max_size=25 * 1024 * 1024)
+    app["bot"] = bot
+    webapi.setup_routes(app)
+    app.router.add_get("/", index)
+    app.router.add_get("/healthz", lambda r: web.Response(text="ok"))
+    app.on_shutdown.append(live.close_all)  # real vaqt ulanishlari server to'xtaganda darhol yopilsin
+    app.router.add_get("/desk", desk)
+    app.router.add_get("/desk/login", desk_login_page)
+    app.router.add_post("/desk/login", desk_login)
+    app.router.add_static("/static/", STATIC, show_index=False)
+    return app
+
+
+async def start(bot: Bot) -> web.AppRunner | None:
+    """Veb-serverni ishga tushiradi va Telegram'dagi chat pastiga «📱 Ilova» tugmasini o'rnatadi.
+    WEBAPP_URL bo'sh bo'lsa, tugma standart holatga qaytariladi — eski (masalan vaqtinchalik tunnel)
+    manzili menyuda qolib ketmasin."""
+    runner = None
+    if WEBAPP_PORT:
+        runner = web.AppRunner(create_app(bot), access_log=None)
+        await runner.setup()
+        await web.TCPSite(runner, WEBAPP_HOST, WEBAPP_PORT).start()
+        log.info("Web App serveri: http://%s:%s (ochiq manzil: %s)", WEBAPP_HOST, WEBAPP_PORT, WEBAPP_URL or "sozlanmagan")
+    try:
+        if WEBAPP_PORT and WEBAPP_URL:
+            await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="📱 Ilova", web_app=WebAppInfo(url=WEBAPP_URL + "/")))
+        else:
+            await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
+    except Exception as e:  # tarmoq xatosi botning ishiga to'sqinlik qilmasin
+        log.warning("Menyu tugmasini o'rnatib bo'lmadi: %s", e)
+    return runner
