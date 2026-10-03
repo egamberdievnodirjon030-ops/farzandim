@@ -130,6 +130,8 @@ MAX_OPEN_QUESTIONS = 5     # bitta ota-onaning javobsiz savollari
 # Telegram Web App (bot ichida ochiladigan ilova). WEBAPP_URL — ilovaning ochiq HTTPS manzili
 # (masalan https://bot.uwed.uz); bo'sh bo'lsa, ilova tugmalari ko'rsatilmaydi, server esa baribir ishlaydi.
 WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip().rstrip("/")
+# Telefon ilovasi (Android APK) — GitHub Releases dan avtomatik olinadi (mobile/README.md). Bo'sh — o'chiq.
+APP_RELEASES_REPO = os.getenv("APP_RELEASES_REPO", "egamberdievnodirjon030-ops/farzandim").strip()
 WEBAPP_HOST = os.getenv("WEBAPP_HOST", "127.0.0.1")
 WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", "8080") or 0)  # 0 — veb-server ishga tushmaydi
 WEBAPP_AUTH_TTL = int(os.getenv("WEBAPP_AUTH_TTL", "86400"))  # Telegram imzosi amal qilish muddati, soniya

@@ -67,6 +67,7 @@ jobs:
         run: |
           mkdir -p dist
           if [ -n "$KS_B64" ]; then
+            echo "SIGNED=1" >> "$GITHUB_ENV"
             echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
             npx cap build android --androidreleasetype APK --signing-type apksigner \
               --keystorepath "$RUNNER_TEMP/release.jks" --keystorepass "$KS_PASS" \
@@ -82,14 +83,15 @@ jobs:
         with:
           name: jidu-ota-ona-android-${{ github.run_number }}
           path: mobile/dist/jidu-ota-ona.apk
+      # Imzolangan APK — GitHub Releases ga: bot uni 6 soatda bir tekshirib, o'zi oladi (APP_RELEASES_REPO)
       - name: GitHub Releases
-        if: github.event_name == 'workflow_dispatch' && inputs.release
+        if: env.SIGNED == '1' && env.APP_SERVER_URL != 'https://example.org' && (github.event_name == 'push' || inputs.release)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "android-1.0.${APP_BUILD}" dist/jidu-ota-ona.apk \
+          gh release create "android-1.0.${APP_BUILD}" dist/jidu-ota-ona.apk --latest \
             --title "Android ilova 1.0.${APP_BUILD}" --target "${GITHUB_SHA}" \
-            --notes "APK ni yuklab olib, Telegram botga (super-admin) yuboring — ota-onalar /ilova orqali oladi."
+            --notes "Bot bu faylni avtomatik oladi (6 soat ichida yoki qayta ishga tushganda). Qo'lda: APK ni super-admin sifatida botga yuboring."
 
   ios:
     name: iOS

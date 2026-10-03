@@ -12,6 +12,22 @@ ekranlar. Yangi funksiya serverga qo'yilishi bilan telefonda ham paydo bo'ladi: 
 Botda: `/ilova` — yuklab olish, `/qurilmalar` — ilovaga kirgan qurilmalar va ulardan chiqarish. Foydalanuvchi talaba deb
 bloklansa, uning barcha qurilmalari avtomatik chiqariladi.
 
+## Server manzili o'zgarsa
+
+Ilova o'z ichidagi kichik sahifadan ishga tushadi va oxirgi ma'lum manzilni ochadi (birinchisi — `app.json` → `serverUrl`).
+Server ochilmasa, «Server bilan aloqa yo'q» oynasi chiqadi: **«Telegram'dan yangi manzilni olish»** botni ochadi, bot joriy
+manzilni yuboradi (`/manzil`), uni nusxalab ilovaga joylanadi. APK ni qayta yig'ish shart emas.
+
+Muhim: vaqtinchalik `trycloudflare.com` manzili har ishga tushganda o'zgaradi — har safar barcha ota-onalar manzilni
+qayta kiritishi kerak bo'ladi. Haqiqiy foydalanish uchun **doimiy domen** oling va uni `app.json` dagi `serverUrl` va
+`allowHosts` ga yozing (README, «Web App uchun HTTPS manzil»).
+
+## Yangi versiya botga o'zi keladi
+
+Imzolangan APK GitHub Releases ga joylanadi. Bot (`APP_RELEASES_REPO`, standart — shu repo) har 6 soatda va qayta ishga
+tushganda so'nggi relizni tekshiradi va yangi APK ni o'zi oladi — ota-onalar `/ilova` orqali darhol yangisini oladi.
+Qo'lda ham mumkin: APK ni super-admin sifatida botga yuboring.
+
 ## 1. Bir martalik sozlash (GitHub)
 
 Repo → **Settings → Secrets and variables → Actions**:

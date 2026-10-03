@@ -156,11 +156,14 @@ async def main() -> None:
     dp = build_dispatcher()
     await setup_commands(bot)
     scheduler = asyncio.create_task(scheduler_loop(bot))
+    from handlers.mobileapp import apk_loop
+    apk_task = asyncio.create_task(apk_loop())  # telefon ilovasining yangi versiyasi (GitHub Releases)
     web_runner = await webserver.start(bot)  # Telegram Web App (bot ichidagi ilova)
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         scheduler.cancel()
+        apk_task.cancel()
         if web_runner:
             await web_runner.cleanup()
         await db.close()

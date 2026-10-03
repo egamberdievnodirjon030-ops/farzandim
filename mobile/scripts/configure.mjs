@@ -1,33 +1,36 @@
-// capacitor.config.json ni yaratadi: server manzili (APP_SERVER_URL — botdagi WEBAPP_URL bilan bir xil),
-// ilova identifikatori va nomi. Ilova shu manzildagi Web App ni ochadi — yangi funksiyalar serverga qo'yilishi
-// bilan telefonda ham paydo bo'ladi, ilovani qayta o'rnatish shart emas.
+// capacitor.config.json va www/config.js ni yaratadi.
+// Ilova o'z ichidagi kichik sahifadan (www/index.html) ishga tushadi va oxirgi ma'lum server manzilini ochadi.
+// Manzil o'zgarsa (masalan, vaqtinchalik tunnel), ilova uni botdan oladi — APK ni qayta yig'ish shart emas.
+// Server manzili: APP_SERVER_URL (muhit) yoki app.json → serverUrl.
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const fromFile = (() => { try { return JSON.parse(readFileSync('app.json', 'utf8')).serverUrl || ''; } catch { return ''; } })();
-const url = (process.env.APP_SERVER_URL || fromFile).trim().replace(/\/+$/, '');
+let file = {};
+try { file = JSON.parse(readFileSync('app.json', 'utf8')); } catch { /* yo'q */ }
+const url = (process.env.APP_SERVER_URL || file.serverUrl || '').trim().replace(/\/+$/, '');
 if (!/^https:\/\/[^/]+/.test(url)) {
-  console.error("APP_SERVER_URL berilmagan yoki https:// bilan boshlanmaydi (masalan: https://ilova.example.uz)");
+  console.error("Server manzili berilmagan yoki https:// bilan boshlanmaydi (app.json → serverUrl yoki APP_SERVER_URL)");
   process.exit(1);
 }
-const host = new URL(url).host;
+const hosts = [...new Set([new URL(url).host, ...(file.allowHosts || [])])];
 const config = {
   appId: process.env.APP_ID || 'uz.jidu.otaona',
   appName: process.env.APP_NAME || 'JIDU Ota-ona',
   webDir: 'www',
-  // Telegram'siz rejimni ilova o'zi aniqlaydi (webapp/app.js: NATIVE)
+  // Telegram'siz rejimni server sahifasi o'zi aniqlaydi (webapp/app.js: NATIVE)
   appendUserAgent: 'JiduApp/1.0',
   backgroundColor: '#0E2240',
   server: {
-    url: url + '/',
-    hostname: host,
     androidScheme: 'https',
+    // shu domenlar ilova ichida ochiladi; boshqa havolalar (t.me va h.k.) — Telegram yoki brauzerda
+    allowNavigation: hosts,
     errorPath: 'offline.html',
     cleartext: false
   },
   android: { allowMixedContent: false },
-  ios: { contentInset: 'never', scrollEnabled: true },
+  ios: { contentInset: 'never', scrollEnabled: true, limitsNavigationsToAppBoundDomains: false },
   plugins: { SystemBars: { insetsHandling: 'css' } }
 };
 writeFileSync('capacitor.config.json', JSON.stringify(config, null, 2) + '\n');
-writeFileSync('www/config.js', `window.APP_SERVER_URL = ${JSON.stringify(url + '/')};\n`);
-console.log(`capacitor.config.json: ${config.appId} → ${url}/`);
+writeFileSync('www/config.js', `window.APP_DEFAULT_SERVER = ${JSON.stringify(url + '/')};\n` +
+  `window.APP_ALLOW_HOSTS = ${JSON.stringify(hosts)};\n`);
+console.log(`capacitor.config.json: ${config.appId} → ${url}/ (ruxsat: ${hosts.join(', ')})`);

@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>JIDU Ota-ona</title><script src="config.js"></script></head>
-<body style="margin:0;background:#0E2240">
-<script>if (window.APP_SERVER_URL) location.replace(window.APP_SERVER_URL);</script>
-</body></html>
+<title>JIDU Ota-ona</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0E2240}
+.seal{width:72px;height:72px;border-radius:50%;background:#7D1D3F;display:grid;place-items:center;color:#fff;
+font:700 34px Georgia,serif;box-shadow:0 0 0 4px rgba(255,255,255,.85) inset;animation:p 1.4s ease-in-out infinite}
+@keyframes p{50%{opacity:.6}}</style>
+<script src="config.js"></script><script src="app.js"></script></head>
+<body><div class="seal">J</div><script>JIDU.launch();</script></body></html>

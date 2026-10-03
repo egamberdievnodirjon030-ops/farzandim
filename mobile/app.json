@@ -1,4 +1,5 @@
 {
-  "_izoh": "serverUrl — botdagi WEBAPP_URL (doimiy https manzil). Bo'sh bo'lsa GitHub Variables dagi APP_SERVER_URL olinadi.",
-  "serverUrl": ""
+  "_izoh": "serverUrl — ilova birinchi ochilganda ulanadigan manzil (botdagi WEBAPP_URL). Manzil keyin o'zgarsa, ilova uni botdan oladi (/manzil). allowHosts — ilova ichida ochiladigan qo'shimcha domenlar (doimiy domen olsangiz, shu yerga qo'shing).",
+  "serverUrl": "https://scan-circles-gui-jungle.trycloudflare.com",
+  "allowHosts": ["*.trycloudflare.com"]
 }

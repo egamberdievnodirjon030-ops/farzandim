@@ -83,7 +83,7 @@ async def _staff_name(uid: int) -> str:
 
 @web.middleware
 async def auth_middleware(request: web.Request, handler):
-    if not request.path.startswith("/api/") or request.path.startswith("/api/app/login"):
+    if not request.path.startswith("/api/") or request.path.startswith(("/api/app/login", "/api/app/info")):
         return await handler(request)  # telefon ilovasining kirish so'rovi — hali seans yo'q
     user = verify_init_data(request.headers.get("X-Telegram-Init-Data", ""))
     auth = request.headers.get("Authorization", "")
@@ -613,6 +613,14 @@ async def api_app_login_start(request):
 async def api_app_login_poll(request):
     import appauth
     return ok(await appauth.poll(request.match_info["code"]))
+
+
+async def api_app_info(request):
+    """Telefon ilovasining ishga tushiruvchi sahifasi uchun (ochiq): bot nomi va joriy manzil. Ilova manzil
+    o'zgarganda (masalan, vaqtinchalik tunnel) yangisini botdan olish uchun bot nomini eslab qoladi."""
+    resp = ok({"bot": await _bot_username(request), "url": WEBAPP_URL + "/" if WEBAPP_URL else ""})
+    resp.headers["Access-Control-Allow-Origin"] = "*"  # ilovaning mahalliy sahifasi boshqa manbadan so'raydi
+    return resp
 
 
 async def api_app_logout(request):
@@ -1581,6 +1589,7 @@ def setup_routes(app: web.Application) -> None:
     r.add_post("/api/app/login", api_app_login_start)
     r.add_get("/api/app/login/{code}", api_app_login_poll)
     r.add_post("/api/app/logout", api_app_logout)
+    r.add_get("/api/app/info", api_app_info)
     r.add_get("/api/staff/panel", api_staff_panel)
     r.add_get("/api/staff/students", api_staff_students)
     r.add_get("/api/staff/student/{sid:\\d+}", api_staff_student)

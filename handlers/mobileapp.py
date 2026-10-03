@@ -24,7 +24,7 @@ from aiogram.types import (CallbackQuery, InlineKeyboardButton, InlineKeyboardMa
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import appauth
-from config import DATA_DIR, WEBAPP_URL
+from config import APP_RELEASES_REPO, DATA_DIR, WEBAPP_URL
 from family import known_contact
 from i18n import tr
 from tenancy import central, is_staff, is_super
@@ -62,16 +62,65 @@ def download_kb() -> InlineKeyboardMarkup:
                                                                        callback_data=DL_CB)]])
 
 
+# ---------------------------------------------------------------- GitHub Releases dan yangi APK
+async def refresh_apk() -> bool:
+    """GitHub'dagi eng so'nggi relizdan APK ni yuklab oladi (yangi bo'lsa). Qaytaradi: yangilandimi."""
+    if not APP_RELEASES_REPO:
+        return False
+    import aiohttp
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as s:
+            async with s.get(f"https://api.github.com/repos/{APP_RELEASES_REPO}/releases/latest",
+                             headers={"Accept": "application/vnd.github+json"}) as r:
+                if r.status != 200:
+                    return False
+                rel = await r.json()
+            asset = next((a for a in rel.get("assets", []) if a.get("name", "").endswith(".apk")), None)
+            tag = rel.get("tag_name") or ""
+            if not asset or tag == await central.get_meta("android_apk_tag"):
+                return False
+            async with s.get(asset["browser_download_url"]) as r:
+                if r.status != 200:
+                    return False
+                data = await r.read()
+        if not data.startswith(b"PK"):  # APK — zip arxiv
+            return False
+        tmp = apk_path().with_suffix(".tmp")
+        tmp.write_bytes(data)
+        tmp.replace(apk_path())
+        await central.set_meta("android_apk_tag", tag)
+        await central.set_meta("android_apk_version", tag.split("-", 1)[-1])
+        await central.set_meta("android_apk_file_id", "")  # keyingi yuborishda yangi fayl Telegram'ga yuklanadi
+        log.info("Android ilova GitHub'dan yangilandi: %s (%s bayt)", tag, len(data))
+        return True
+    except Exception as e:  # tarmoq xatosi — keyingi safar
+        log.warning("APK ni GitHub'dan olib bo'lmadi: %s", e)
+        return False
+
+
+async def apk_loop() -> None:
+    import asyncio
+    while True:
+        await refresh_apk()
+        await asyncio.sleep(6 * 3600)
+
+
 # ---------------------------------------------------------------- yuklab olish
 async def send_download(bot: Bot, chat_id: int) -> None:
+    from aiogram.types import FSInputFile
     file_id = await central.get_meta("android_apk_file_id")
     version = await central.get_meta("android_apk_version") or ""
     ios_url = await central.get_meta("ios_url")
-    if file_id:
-        await bot.send_document(chat_id, file_id, caption=tr(
-            "🤖 <b>Android</b>{v}: faylni oching → «O'rnatish». Telefon «noma'lum manba» haqida so'rasa — "
-            "Telegram uchun ruxsat bering (bir marta).\n\nIlovani ochib «Telegram orqali kirish» ni bosing — "
-            "kirish shu botda tasdiqlanadi.", v=f" (versiya {html.escape(version)})" if version else ""))
+    caption = tr(
+        "🤖 <b>Android</b>{v}: faylni oching → «O'rnatish». Telefon «noma'lum manba» haqida so'rasa — "
+        "Telegram uchun ruxsat bering (bir marta).\n\nIlovani ochib «Telegram orqali kirish» ni bosing — "
+        "kirish shu botda tasdiqlanadi.", v=f" (versiya {html.escape(version)})" if version else "")
+    if not file_id and apk_path().exists():  # GitHub'dan olingan fayl — bir marta yuklanadi, keyin file_id bilan
+        msg = await bot.send_document(chat_id, FSInputFile(apk_path(), filename=APK_NAME), caption=caption)
+        if msg.document:
+            await central.set_meta("android_apk_file_id", msg.document.file_id)
+    elif file_id:
+        await bot.send_document(chat_id, file_id, caption=caption)
     else:
         await bot.send_message(chat_id, tr("🤖 Android ilovasi tez orada shu yerda paydo bo'ladi."))
     if ios_url:
@@ -95,6 +144,26 @@ async def cmd_download(message: Message) -> None:
 async def cb_download(cb: CallbackQuery) -> None:
     await cb.answer()
     await send_download(cb.bot, cb.message.chat.id)
+
+
+# ---------------------------------------------------------------- ilova manzili (server manzili o'zgarganda)
+async def send_address(message: Message) -> None:
+    if not WEBAPP_URL:
+        await message.answer(tr("Ilova hozircha sozlanmagan."))
+        return
+    await message.answer(tr(
+        "🔗 <b>Ilova manzili:</b>\n<code>{url}</code>\n\nManzilni bosib nusxalang, so'ng telefon ilovasida "
+        "«Yangi manzil» maydoniga joylab «Saqlash» ni bosing.", url=html.escape(WEBAPP_URL + "/")))
+
+
+@router.message(CommandStart(deep_link=True, magic=F.args == "url"), StateFilter("*"))
+async def start_address(message: Message) -> None:
+    await send_address(message)
+
+
+@router.message(Command("manzil", "url"), StateFilter("*"))
+async def cmd_address(message: Message) -> None:
+    await send_address(message)
 
 
 # ---------------------------------------------------------------- super-admin: yangi versiya
