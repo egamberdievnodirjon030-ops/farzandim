@@ -66,6 +66,8 @@ jobs:
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           mkdir -p dist
+          # apksigner — Android SDK build-tools ichida (PATH da yo'q)
+          export PATH="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1):$PATH"
           if [ -n "$KS_B64" ]; then
             echo "SIGNED=1" >> "$GITHUB_ENV"
             echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
@@ -95,6 +97,8 @@ jobs:
 
   ios:
     name: iOS
+    # macOS mashinalari navbati uzun — faqat qo'lda (Actions → Run workflow) yoki iOS fayllari o'zgarganda
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     timeout-minutes: 45
     defaults:
