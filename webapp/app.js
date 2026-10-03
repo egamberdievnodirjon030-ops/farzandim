@@ -1,6 +1,6 @@
 /* JIDU — Ota-onalar uchun davomat boti: Telegram Web App.
    Hech qanday tashqi kutubxonasiz: hash-router, uch tilli matnlar, ekranlar funksiyalar ko'rinishida. */
-(() => {
+const JIDU_MAIN = () => {
 'use strict';
 // Telegram ichida (Mini App) — initData bor; aks holda telefon ilovasi (Android/iOS) yoki oddiy brauzer:
 // kirish Telegram botda tasdiqlanadi va seans kaliti qurilmada saqlanadi (Authorization: Bearer)
@@ -742,7 +742,10 @@ function deviceName() {
   const os = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Brauzer';
   return `${os} — ${NATIVE ? t('app_word') : t('browser_word')}`;
 }
-const LOGIN = { code: null, timer: null };
+const LOGIN = { code: null, timer: null, until: 0 };
+// Kirish jarayoni sahifa qayta yuklansa ham (masalan, telefon brauzeri Telegram'ga o'tib qaytganda) davom etadi
+const loginSaved = { get() { try { const v = JSON.parse(sessionStorage.getItem('jiduLogin') || 'null'); return v && v.until > Date.now() ? v : null; } catch (_) { return null; } },
+  set(v) { try { v ? sessionStorage.setItem('jiduLogin', JSON.stringify(v)) : sessionStorage.removeItem('jiduLogin'); } catch (_) { /* */ } } };
 function viewLogin(msg) {
   clearTimeout(LOGIN.timer); LOGIN.code = null;
   S.lang = store.get('lang') || ((navigator.language || '').startsWith('ru') ? 'ru' : 'uz');
@@ -753,33 +756,44 @@ function viewLogin(msg) {
     <div class="card" id="login-box">${msg ? `<p class="small" style="margin-top:0;color:var(--bordo-fg)">${esc(msg)}</p>` : ''}<p style="margin-top:0">${t('login_sub')}</p>
       <button class="btn block" data-act="login">${ic('send')}${t('login_tg')}</button>
       <p class="small muted" style="margin-bottom:0">${t('login_note')}</p></div></main>`;
+  const saved = !msg && loginSaved.get();
+  if (saved) showPin(saved); else loginSaved.set(null);
+}
+function showPin(d) {
+  LOGIN.code = d.code; LOGIN.until = d.until;
+  // Brauzerda — oddiy havola (foydalanuvchi bosadi: telefon brauzerlari server javobidan keyin avtomatik ochilgan
+  // oynani bloklaydi); ilovada (Android/iOS) — tugma, havola Telegram'da ochiladi
+  const open = NATIVE ? `<button class="btn block" data-act="login-open" data-url="${esc(d.url)}">${ic('send')}${t('login_open_tg')}</button>`
+    : `<a class="btn block" href="${esc(d.url)}" target="_blank" rel="noopener">${ic('send')}${t('login_open_tg')}</a>`;
+  document.getElementById('login-box').innerHTML = `<p style="margin-top:0">${t('login_pin')}</p><div class="login-pin num">${d.pin}</div>
+    ${open}
+    <p class="small muted" style="text-align:center;margin-bottom:0">${t('login_wait')}</p>
+    <p style="text-align:center;margin:12px 0 0"><a href="#" data-act="login-cancel" class="small">${t('cancel')}</a></p>`;
+  pollLogin(d.code);
 }
 async function startLogin() {
-  const box = document.getElementById('login-box');
   let d;
   try { d = await api('/api/app/login', { json: { device: deviceName() } }); }
   catch (e) { toast(e.status === 429 ? t('too_many_tries') : t('error')); return; }
-  LOGIN.code = d.code;
-  box.innerHTML = `<p style="margin-top:0">${t('login_pin')}</p><div class="login-pin num">${d.pin}</div>
-    <button class="btn block" data-act="login-open" data-url="${esc(d.url)}">${ic('send')}${t('login_open_tg')}</button>
-    <p class="small muted" style="text-align:center;margin-bottom:0">${t('login_wait')}</p>
-    <p style="text-align:center;margin:12px 0 0"><a href="#" data-act="login-cancel" class="small">${t('cancel')}</a></p>`;
-  openExternal(d.url);
-  pollLogin(d.code, Date.now() + d.expires_in * 1000);
+  const saved = { code: d.code, pin: d.pin, url: d.url, until: Date.now() + d.expires_in * 1000 };
+  loginSaved.set(saved);
+  showPin(saved);
+  if (NATIVE) openExternal(d.url);
 }
-async function pollLogin(code, until) {
+async function pollLogin(code) {
   clearTimeout(LOGIN.timer);
   if (LOGIN.code !== code) return;
-  if (Date.now() > until) return viewLogin(t('login_expired'));
+  const end = msg => { LOGIN.code = null; loginSaved.set(null); return viewLogin(msg); };
+  if (Date.now() > LOGIN.until) return end(t('login_expired'));
   let r = { state: 'pending' };
   try { r = await api('/api/app/login/' + encodeURIComponent(code)); } catch (_) { /* tarmoq — qayta urinamiz */ }
   if (LOGIN.code !== code) return;
-  if (r.state === 'approved') { LOGIN.code = null; store.set('appToken', r.token); haptic('success'); return boot(); }
-  if (r.state === 'cancelled') return viewLogin(t('login_cancelled'));
-  if (r.state === 'expired' || r.state === 'used') return viewLogin(t('login_expired'));
-  LOGIN.timer = setTimeout(() => pollLogin(code, until), document.hidden ? 4000 : 1500);
+  if (r.state === 'approved') { LOGIN.code = null; loginSaved.set(null); store.set('appToken', r.token); haptic('success'); return boot(); }
+  if (r.state === 'cancelled') return end(t('login_cancelled'));
+  if (r.state === 'expired' || r.state === 'used') return end(t('login_expired'));
+  LOGIN.timer = setTimeout(() => pollLogin(code), document.hidden ? 4000 : 1500);
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden && LOGIN.code) pollLogin(LOGIN.code, Date.now() + 600000); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && LOGIN.code) pollLogin(LOGIN.code); });
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act="login"],[data-act="login-open"],[data-act="login-cancel"],[data-act="login-lang"],[data-act="logout"]');
   if (!b) return;
@@ -787,12 +801,14 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act;
   if (act === 'login') { b.disabled = true; await startLogin(); b.disabled = false; }
   else if (act === 'login-open') openExternal(b.dataset.url);
-  else if (act === 'login-cancel') viewLogin();
+  else if (act === 'login-cancel') { loginSaved.set(null); viewLogin(); }
   else if (act === 'login-lang') { store.set('lang', b.dataset.lang); viewLogin(); }
   else if (act === 'logout') {
     if (!(await confirmSafe(t('logout_q')))) return;
     try { await api('/api/app/logout', { method: 'POST', json: {} }); } catch (_) { /* */ }
-    store.set('appToken', null); if (LIVE.ctrl) LIVE.ctrl.abort(); S.me = null; location.hash = ''; viewLogin();
+    store.set('appToken', null); S.me = null;
+    if (LIVE.ctrl) { LIVE.ctrl.abort(); LIVE.ctrl = null; }  // qayta kirganda real vaqt ulanishi yangidan ochilsin
+    history.replaceState(null, '', location.pathname + location.search); viewLogin();
   }
 }, true);
 
@@ -1474,6 +1490,7 @@ async function viewDebts() {
 async function route() {
   if (PULSE.reload) { location.reload(); return; }  // server yangilangan — yangi versiya (qo'lda yangilash shart emas)
   clearInterval(S.timer);
+  if (!S.me) return;  // hali kirilmagan yoki chiqilgan (kirish ekrani)
   const [path, qs] = (location.hash.slice(1) || '/').split('?');
   const params = new URLSearchParams(qs || '');
   const parts = path.split('/').filter(Boolean);
@@ -1803,4 +1820,6 @@ if (tg) {
 }
 applyTheme();
 boot();
-})();
+};
+// Telegram ichida — avval telegram-web-app.js yuklanadi (static/tg.js); oddiy brauzerda — darhol
+(window.TG_LOADING || Promise.resolve()).then(JIDU_MAIN);

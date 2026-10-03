@@ -502,3 +502,9 @@ fieldset.q.missing { box-shadow: 0 0 0 2px var(--bordo-500); }
 .login-pin { font-size: 56px; font-weight: 800; letter-spacing: 6px; text-align: center; margin: 4px 0 16px;
   color: var(--navy-900, #0E2240); background: var(--surface-2, #F3F5F9); border-radius: 18px; padding: 10px 0; }
 [data-theme="dark"] .login-pin { color: #fff; }
+
+/* ================================================================ kompyuter brauzeri: keng ekranda kontent kengligida */
+@media (min-width: 720px) {
+  .nav { padding-left: calc((100% - 640px) / 2); padding-right: calc((100% - 640px) / 2); }
+  .topbar { padding-left: max(16px, calc((100% - 640px) / 2 + 4px)); padding-right: max(12px, calc((100% - 640px) / 2)); }
+}

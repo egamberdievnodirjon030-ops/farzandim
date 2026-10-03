@@ -244,6 +244,14 @@ Ixtiyoriy: @BotFather → `/newapp` bilan ilovani ro'yxatdan o'tkazsangiz, `http
 
 **To'liq Mini App sifatida.** @BotFather → botingiz → *Bot Settings → Configure Mini App → Enable Mini App* ga `WEBAPP_URL` ni kiriting: shunda bot profilida «Ilovani ochish» tugmasi chiqadi va `https://t.me/<bot_nomi>?startapp` havolasi ilovani to'g'ridan-to'g'ri ochadi (chatga kirmasdan). Ilova Telegram mavzusi, «Orqaga» tugmasi, tebranish (haptic) bilan ishlaydi, pastga surilganda tasodifan yopilmaydi (Telegram 7.7+).
 
+## Brauzerda (Chrome, Safari, Firefox, Edge)
+
+Ilovaning o'zi oddiy brauzerda ham ishlaydi: `WEBAPP_URL` manzilini telefon yoki kompyuter brauzerida oching →
+«Telegram orqali kirish» → ekrandagi 2 xonali raqamni botda tanlang. Parol yo'q; seans shu brauzerda saqlanadi
+(«Sozlamalar» → «Shu qurilmadan chiqish», barcha qurilmalar — botda `/qurilmalar`). Ota-onalar ham, kurs koordinatorlari
+ham kira oladi. Oddiy brauzerda `telegram.org` ga murojaat qilinmaydi — Telegram yopilgan tarmoqda ham sahifa ochiladi
+(kirish tasdig'i uchun telefondagi Telegram yetarli). Telefonda «Bosh ekranga qo'shish» bilan ilova kabi o'rnatiladi.
+
 ## Telefon ilovasi (Android va iOS)
 
 Telegram ichidagi ilovaning o'zi — alohida telefon ilovasi sifatida. Ota-ona uni **botdan yuklab oladi** (`/ilova` yoki
