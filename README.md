@@ -246,6 +246,15 @@ Ixtiyoriy: @BotFather → `/newapp` bilan ilovani ro'yxatdan o'tkazsangiz, `http
 
 ## Brauzerda (Chrome, Safari, Firefox, Edge)
 
+**Kompyuter versiyasi.** Kompyuterda (ekran kengligi 1100px dan katta) manzil ochilsa, alohida kompyuter interfeysi chiqadi:
+- **ota-ona** — chapda yon menyu (farzandlar va bo'limlar), bosh sahifada talaba kartasi, holat, ko'rsatkichlar, dinamika va
+  bugungi darslar yonma-yon; jadval — butun hafta bitta ekranda; baholar va qoldirilgan darslar — jadval ko'rinishida;
+  yozishma — alohida oynada. Uch tilda, kunduzgi va tungi mavzuda;
+- **kurs koordinatori va super-admin** — avtomatik ravishda boshqaruv paneliga (`/desk`) o'tadi.
+
+Ikkalasiga ham kirish bir xil: «Telegram orqali kirish» → raqamni botda tanlash. Telefon va Telegram ichida — telefon
+ko'rinishi (avvalgidek).
+
 Ilovaning o'zi oddiy brauzerda ham ishlaydi: `WEBAPP_URL` manzilini telefon yoki kompyuter brauzerida oching →
 «Telegram orqali kirish» → ekrandagi 2 xonali raqamni botda tanlang. Parol yo'q; seans shu brauzerda saqlanadi
 («Sozlamalar» → «Shu qurilmadan chiqish», barcha qurilmalar — botda `/qurilmalar`). Ota-onalar ham, kurs koordinatorlari

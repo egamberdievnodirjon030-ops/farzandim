@@ -1156,6 +1156,9 @@ async def api_desk_link(request):
 
 
 async def api_desk_logout(request):
+    if request.get("app_session"):  # Telegram orqali kirilgan seans — serverda ham yopiladi
+        import appauth
+        await appauth.revoke(request["user"]["id"], request["app_session"])
     resp = ok({"ok": True})
     resp.del_cookie(deskauth.COOKIE, path="/")
     return resp

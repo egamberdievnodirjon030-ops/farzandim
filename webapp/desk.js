@@ -10,6 +10,10 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 /* bot hisobotlaridagi xavfsiz teglar (<b>, <i>, <code>, <u>) — qolgani matn sifatida */
 const safeHtml = s => esc(s).replace(/&lt;(\/?)(b|i|u|code)&gt;/g, '<$1$2>');
 const DEV = new URLSearchParams(location.search).has('dev');
+/* Telegram orqali kirish seansi — telefon/brauzer ilovasi bilan umumiy (bir xil manba: localStorage) */
+const appToken = { get() { try { return localStorage.getItem('appToken'); } catch (_) { return null; } },
+  set(v) { try { v ? localStorage.setItem('appToken', v) : localStorage.removeItem('appToken'); } catch (_) { /* */ } } };
+function authHeaders(h) { const tk = appToken.get(); if (tk) h.Authorization = 'Bearer ' + tk; return h; }
 const S = { me: null, course: null, stu: null, stuCourse: null, timers: [], badges: { unread: 0, requests: 0 } };
 
 /* ---------------------------------------------------------------- belgilar */
@@ -99,7 +103,7 @@ applyTheme();
 
 /* ---------------------------------------------------------------- API */
 async function api(path, { method = 'GET', json, body, raw, course } = {}) {
-  const h = { 'X-Desk': '1' };
+  const h = authHeaders({ 'X-Desk': '1' });
   if (DEV) h['X-Dev-User'] = '1';
   if (course) h['X-Course-Temp'] = course;  // bir martalik (masalan, boshqa kurs talabasi kartasi) — faol kurs o'zgarmaydi
   else if (S.course && S.me && S.me.role === 'super') h['X-Course'] = S.course;
@@ -184,16 +188,64 @@ async function download(path) {
 
 /* ---------------------------------------------------------------- kirish sahifasi */
 function renderLogin(msg = '') {
-  clearTimers();
+  clearTimers(); clearTimeout(LOGIN.timer); LOGIN.code = null;
   document.title = 'Kirish — Boshqaruv paneli';
   $('#app').className = '';
-  $('#app').innerHTML = `<div class="login"><main class="card"><div class="seal">J</div>
-    <h1>Boshqaruv paneli</h1><p>${msg ? esc(msg) : 'Ota-onalar davomat boti — kurs koordinatori va super-admin uchun kompyuter versiyasi.'}</p>
-    <ol><li>Telegram’da botni oching.</li>
+  $('#app').innerHTML = `<div class="login"><main class="card"><img class="seal-img" src="/static/jidu-seal.webp" alt="" width="60" height="60">
+    <h1>Boshqaruv paneli</h1><p>${msg ? esc(msg) : 'Kurs koordinatori va super-admin uchun kompyuter versiyasi.'}</p>
+    <div id="login-box"><button class="btn primary lg" data-act="tg-login">${ic('telegram')} Telegram orqali kirish</button>
+      <p class="hint" style="margin:12px 0 0">Ekranda 2 xonali raqam chiqadi — botda shu raqamni tanlaysiz. Parol kerak emas.</p></div>
+    <details class="alt"><summary>Boshqa usul: botdagi havola</summary><ol><li>Telegram’da botni oching.</li>
       <li><b>«💻 Kompyuter versiyasi»</b> tugmasini bosing yoki <b>/kompyuter</b> buyrug‘ini yuboring.</li>
-      <li>Bot yuborgan tugmani shu kompyuterda bosing — panel ochiladi.</li></ol>
-    <p style="margin:18px 0 0;font-size:13px">Havola 10 daqiqa amal qiladi va bir marta ishlatiladi. Seans 12 soat davom etadi.</p></main></div>`;
+      <li>Bot yuborgan tugmani shu kompyuterda bosing — panel ochiladi.</li></ol></details></main></div>`;
+  const saved = !msg && loginSaved();
+  if (saved) showPin(saved);
 }
+/* Telegram orqali kirish: kod + 2 xonali raqam → botda tasdiqlash → seans (appauth.py) */
+const LOGIN = { code: null, timer: null, until: 0 };
+function loginSaved(v) {
+  try {
+    if (v === undefined) { const x = JSON.parse(sessionStorage.getItem('jiduLogin') || 'null'); return x && x.until > Date.now() ? x : null; }
+    v ? sessionStorage.setItem('jiduLogin', JSON.stringify(v)) : sessionStorage.removeItem('jiduLogin');
+  } catch (_) { return null; }
+}
+async function startTgLogin() {
+  const os = /Windows/.test(navigator.userAgent) ? 'Windows' : /Mac OS/.test(navigator.userAgent) ? 'Mac' : /Linux/.test(navigator.userAgent) ? 'Linux' : 'Kompyuter';
+  const r = await fetch('/api/app/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ device: `${os} — kompyuter` }) });
+  if (!r.ok) { toast(r.status === 429 ? 'Urinishlar ko‘p. Birozdan so‘ng qayta urinib ko‘ring.' : 'Server bilan bog‘lanib bo‘lmadi', true); return; }
+  const d = await r.json();
+  const v = { code: d.code, pin: d.pin, url: d.url, until: Date.now() + d.expires_in * 1000 };
+  loginSaved(v); showPin(v);
+}
+function showPin(v) {
+  LOGIN.code = v.code; LOGIN.until = v.until;
+  $('#login-box').innerHTML = `<p style="margin:0 0 6px">Telegram’da botni oching va shu raqamni tanlang:</p>
+    <div class="login-pin">${esc(v.pin)}</div>
+    <a class="btn primary lg" href="${esc(v.url)}" target="_blank" rel="noopener">${ic('telegram')} Telegram’ni ochish</a>
+    <p class="hint" style="margin:12px 0 0;text-align:center">Tasdiqlashingiz kutilmoqda… · <a href="#" data-act="tg-cancel">Bekor qilish</a></p>`;
+  pollTg(v.code);
+}
+async function pollTg(code) {
+  clearTimeout(LOGIN.timer);
+  if (LOGIN.code !== code) return;
+  const end = m => { LOGIN.code = null; loginSaved(null); renderLogin(m); };
+  if (Date.now() > LOGIN.until) return end('Kirish vaqti tugadi. Qaytadan urinib ko‘ring.');
+  let st = { state: 'pending' };
+  try { const r = await fetch('/api/app/login/' + encodeURIComponent(code), { cache: 'no-store' }); if (r.ok) st = await r.json(); } catch (_) { /* tarmoq */ }
+  if (LOGIN.code !== code) return;
+  if (st.state === 'approved') { LOGIN.code = null; loginSaved(null); appToken.set(st.token); location.reload(); return; }
+  if (st.state === 'cancelled') return end('Kirish bekor qilindi.');
+  if (st.state === 'expired' || st.state === 'used') return end('Kirish vaqti tugadi. Qaytadan urinib ko‘ring.');
+  LOGIN.timer = setTimeout(() => pollTg(code), document.hidden ? 4000 : 1500);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && LOGIN.code) pollTg(LOGIN.code); });
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act="tg-login"],[data-act="tg-cancel"]');
+  if (!b) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (b.dataset.act === 'tg-cancel') { loginSaved(null); renderLogin(); return; }
+  b.disabled = true; await startTgLogin(); b.disabled = false;
+}, true);
 
 /* ---------------------------------------------------------------- karkas: yon menyu */
 const NAV_COURSE = [['#/panel', 'panel', 'Kurs holati'], ['#/students', 'users', 'Talabalar'], ['#/inbox', 'chat', 'Xabarlar', 'unread'],
@@ -208,7 +260,7 @@ function renderShell() {
   $('#app').className = 'app';
   $('#app').innerHTML = `
     <aside class="side">
-      <div class="brand"><div class="seal">J</div><div><b>JIDU</b><span>Ota-onalar davomat boti</span></div></div>
+      <div class="brand"><img class="seal-img" src="/static/jidu-seal.webp" alt="" width="42" height="42"><div><b>JIDU</b><span>Boshqaruv paneli</span></div></div>
       <div class="course-box">${sup && courses.length
         ? `<small>Joriy kurs</small><select id="course" aria-label="Joriy kurs">${courses.map(c => `<option value="${esc(c.key)}" ${c.key === S.course ? 'selected' : ''}>${esc(c.title)}</option>`).join('')}</select>`
         : `<small>Kurs</small><strong>${esc(me.staff.title || 'Kurs')}</strong>`}</div>
@@ -854,7 +906,7 @@ async function connectLive() {
   if (LIVE.ctrl) return;
   const ctrl = new AbortController(); LIVE.ctrl = ctrl;
   try {
-    const h = { 'X-Desk': '1' }; if (DEV) h['X-Dev-User'] = '1';
+    const h = authHeaders({ 'X-Desk': '1' }); if (DEV) h['X-Dev-User'] = '1';
     const r = await fetch('/api/events', { headers: h, signal: ctrl.signal, credentials: 'same-origin', cache: 'no-store' });
     if (!r.ok || !r.body) throw new Error('http ' + r.status);
     LIVE.retry = 2000;
@@ -1191,8 +1243,10 @@ document.addEventListener('click', async e => {
   else if (act === 'reload') route();
   else if (act === 'reload-students') { S.stu = null; S.stuAll = null; route(); }
   else if (act === 'logout') {
-    if (!await confirmDlg('Chiqasizmi?', 'Qayta kirish uchun botdan yangi havola olasiz.', 'Chiqish')) return;
+    if (!await confirmDlg('Chiqasizmi?', 'Qayta kirish Telegram orqali tasdiqlanadi.', 'Chiqish')) return;
     try { await api('/api/desk/logout', { method: 'POST' }); } catch (err) { /* jim */ }
+    appToken.set(null);
+    if (LIVE.ctrl) { LIVE.ctrl.abort(); LIVE.ctrl = null; }
     renderLogin('Siz paneldan chiqdingiz.');
   } else if (act === 'export') {
     b.disabled = true;
@@ -1280,7 +1334,8 @@ async function reloadMe() {
     if (e.status !== 401) $('#app').innerHTML = `<div class="boot">Server bilan bog‘lanib bo‘lmadi. Sahifani yangilang.</div>`;
     return;
   }
-  if (!['staff', 'super'].includes(S.me.role)) { renderLogin('Bu panel faqat kurs koordinatorlari va super-admin uchun.'); return; }
+  // ota-ona — o'zining kompyuter versiyasiga (asosiy sahifa keng ekranda shunday ochiladi)
+  if (!['staff', 'super'].includes(S.me.role)) { location.replace('/' + (DEV ? '?dev' : '')); return; }
   S.course = S.me.staff.course;
   renderShell();
   window.addEventListener('hashchange', route);

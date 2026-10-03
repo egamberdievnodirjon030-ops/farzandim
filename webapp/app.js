@@ -31,6 +31,7 @@ const T = {
     dyn_first: 'birinchi ma’lumot', dyn_same: 'o‘zgarmadi', more: 'Batafsil',
     dyn_none: 'Oxirgi yuklashlarda o‘zgarish bo‘lmadi — o‘zgarish bo‘lsa, shu yerda ko‘rinadi.',
     by_upload: 'Yuklangan ma’lumotlar bo‘yicha', by_semester: 'Semestrlar bo‘yicha', avg_score: 'o‘rtacha ball',
+    portal: 'Ota-onalar portali', my_children: 'Farzandlarim', sec_study: 'O‘qish', sec_contact: 'Aloqa', sec_uni: 'Universitet', subj_h: 'Fan', score_h: 'Ball', grade_h: 'Baho', credits_h: 'Kredit', week_view: 'Haftalik jadval', today_word: 'Bugun', no_lessons_short: 'Dars yo‘q', hero_title: 'Farzandingizning o‘qishi — bir oynada', hero_1: 'Davomat, baholar va to‘lovlar — har kuni yangilanadi', hero_2: 'Kurs koordinatori bilan to‘g‘ridan-to‘g‘ri yozishma', hero_3: 'Bildirishnomalar Telegram’ga darhol keladi', hero_secure: 'Parolsiz va xavfsiz: kirish har safar Telegram’da tasdiqlanadi', missed_list: 'Qoldirilgan darslar', date_h: 'Sana', status_h: 'Holat', pair_h: 'Juftlik',
     login_sub: 'Ilovaga kirish Telegram orqali tasdiqlanadi — parol kerak emas.', login_tg: 'Telegram orqali kirish', login_note: 'Bildirishnomalar Telegram’dagi botga keladi.', login_pin: 'Telegram’da botni oching va shu raqamni tanlang:', login_open_tg: 'Telegram’ni ochish', login_wait: 'Tasdiqlashingiz kutilmoqda…', login_expired: 'Kirish vaqti tugadi. Qaytadan urinib ko‘ring.', login_cancelled: 'Kirish bekor qilindi.', cancel: 'Bekor qilish', app_word: 'ilova', browser_word: 'brauzer', logout: 'Shu qurilmadan chiqish', logout_q: 'Ilovadan chiqasizmi? Qayta kirish Telegram orqali tasdiqlanadi.', devices_hint: 'Barcha qurilmalar ro‘yxati — botda /qurilmalar', step_phone: 'Telefon', step_child: 'Farzand', step_confirm: 'Tasdiqlash', phone_safe: 'Raqamingizni Telegram o‘zi tasdiqlaydi — uni qo‘lda yozish shart emas. Raqam universitet ro‘yxatida bo‘lsa, farzandingiz darhol ulanadi.', child_title: 'Farzandingizni toping', child_sub: 'Raqamingiz universitet ro‘yxatida topilmadi. Farzandingiz ma’lumotlarini hujjatdagidek kiriting.', birth_date: 'Tug‘ilgan sanasi', or_hemis: 'yoki talaba ID (HEMIS) bilan', hemis_id: 'Talaba ID (HEMIS)', find_child: 'Davom etish', confirm_title: 'Oxirgi qadam — tasdiqlash', confirm_student_sub: 'Havolani farzandingizga yuboring: u o‘z telefon raqami bilan sizni tasdiqlaydi, so‘ng kurs koordinatori yakuniy tasdiqlaydi. Shunda begona odam sizning farzandingizga ulana olmaydi.', send_to_child: 'Farzandimga yuborish', copy_link: 'Havolani nusxalash', link_copied: 'Havola nusxalandi', wait_coord: 'Farzandingiz tasdiqlagach, so‘rov kurs koordinatoriga boradi', no_phone_hint: 'Raqamni bilmasangiz — so‘rovni kurs koordinatori o‘zi tekshirib tasdiqlaydi.', child_phone: 'Farzandingizning telefon raqami', child_phone_sub: 'Farzandingiz raqami universitet bazasida yo‘q. Uning Telegram’dagi raqamini kiriting — keyin farzandingiz shu raqam bilan sizni tasdiqlaydi.', phone_err_bad_phone: 'Raqam noto‘g‘ri. Masalan: +998 90 123 45 67', phone_err_own_phone: 'Bu sizning raqamingiz. Farzandingizning o‘z raqamini kiriting.', phone_err_phone_taken: 'Bu raqam boshqa odamga tegishli. Farzandingizning o‘z raqamini kiriting.', phone_err_not_found: 'So‘rov topilmadi yoki allaqachon ko‘rib chiqilgan.', phone_err_has_phone: 'Farzandingiz raqami bazada bor — havolani yuboring.', student_ok_wait: 'Farzandingiz sizni tasdiqladi. Endi kurs koordinatorining yakuniy tasdig‘i kutilmoqda — tasdiqlangach, shu yerda ochiladi.', coord_only: 'So‘rovingizni kurs koordinatori tekshirib tasdiqlaydi — tasdiqlangach, shu yerda ochiladi.', add_child: 'Boshqa farzandni qo‘shish', too_many_tries: 'Urinishlar soni tugadi. Ertaga qayta urinib ko‘ring yoki kurs koordinatori bilan bog‘laning.', share_text: 'Assalomu alaykum! Ota-onalar botida sizni tasdiqlashim kerak — havolani oching va «Ha» ni bosing:', waiting: 'kutilmoqda', done_step: 'bajarildi',
     levels: 'Dars qoldirish chegaralari', missed: 'Qoldirilgan darslar', by_subject: 'Fanlar bo‘yicha', by_week: 'Haftalar bo‘yicha',
     keldi: 'Keldi', kelmadi: 'Kelmadi', sababli: 'Sababli', kechikdi: 'Kechikdi', nothing_missed: 'Qoldirilgan dars yo‘q',
@@ -73,6 +74,7 @@ const T = {
     dyn_first: 'первые данные', dyn_same: 'без изменений', more: 'Подробнее',
     dyn_none: 'В последних загрузках изменений не было — при изменениях они появятся здесь.',
     by_upload: 'По загруженным данным', by_semester: 'По семестрам', avg_score: 'средний балл',
+    portal: 'Портал для родителей', my_children: 'Мои дети', sec_study: 'Учёба', sec_contact: 'Связь', sec_uni: 'Университет', subj_h: 'Предмет', score_h: 'Балл', grade_h: 'Оценка', credits_h: 'Кредиты', week_view: 'Расписание на неделю', today_word: 'Сегодня', no_lessons_short: 'Занятий нет', hero_title: 'Учёба вашего ребёнка — в одном окне', hero_1: 'Посещаемость, оценки и оплата — обновляются каждый день', hero_2: 'Прямая переписка с куратором курса', hero_3: 'Уведомления сразу приходят в Telegram', hero_secure: 'Без пароля и безопасно: вход каждый раз подтверждается в Telegram', missed_list: 'Пропущенные занятия', date_h: 'Дата', status_h: 'Статус', pair_h: 'Пара',
     login_sub: 'Вход в приложение подтверждается через Telegram — пароль не нужен.', login_tg: 'Войти через Telegram', login_note: 'Уведомления приходят в бот в Telegram.', login_pin: 'Откройте бота в Telegram и выберите это число:', login_open_tg: 'Открыть Telegram', login_wait: 'Ожидаем подтверждения…', login_expired: 'Время входа истекло. Попробуйте ещё раз.', login_cancelled: 'Вход отменён.', cancel: 'Отмена', app_word: 'приложение', browser_word: 'браузер', logout: 'Выйти на этом устройстве', logout_q: 'Выйти из приложения? Повторный вход подтверждается через Telegram.', devices_hint: 'Все устройства — в боте: /qurilmalar', step_phone: 'Телефон', step_child: 'Ребёнок', step_confirm: 'Подтверждение', phone_safe: 'Номер подтверждает сам Telegram — вводить вручную не нужно. Если номер есть в списке университета, ребёнок подключится сразу.', child_title: 'Найдите ребёнка', child_sub: 'Ваш номер не найден в списке университета. Введите данные ребёнка как в документе.', birth_date: 'Дата рождения', or_hemis: 'или по ID студента (HEMIS)', hemis_id: 'ID студента (HEMIS)', find_child: 'Продолжить', confirm_title: 'Последний шаг — подтверждение', confirm_student_sub: 'Отправьте ссылку ребёнку: он подтвердит вас своим номером телефона, затем координатор курса даст окончательное подтверждение. Так посторонний не сможет подключиться к вашему ребёнку.', send_to_child: 'Отправить ребёнку', copy_link: 'Скопировать ссылку', link_copied: 'Ссылка скопирована', wait_coord: 'После подтверждения ребёнка запрос уйдёт координатору курса', no_phone_hint: 'Если не знаете номер — координатор курса проверит запрос сам.', child_phone: 'Телефон ребёнка', child_phone_sub: 'Номера ребёнка нет в базе университета. Введите его номер в Telegram — затем ребёнок подтвердит вас с этого номера.', phone_err_bad_phone: 'Неверный номер. Например: +998 90 123 45 67', phone_err_own_phone: 'Это ваш номер. Введите собственный номер ребёнка.', phone_err_phone_taken: 'Этот номер принадлежит другому человеку. Введите номер ребёнка.', phone_err_not_found: 'Запрос не найден или уже рассмотрен.', phone_err_has_phone: 'Номер ребёнка уже есть в базе — отправьте ссылку.', student_ok_wait: 'Ребёнок подтвердил вас. Теперь ожидается окончательное подтверждение координатора курса — после этого всё откроется здесь.', coord_only: 'Запрос проверит и подтвердит координатор курса — после этого всё откроется здесь.', add_child: 'Добавить другого ребёнка', too_many_tries: 'Попытки закончились. Попробуйте завтра или свяжитесь с координатором.', share_text: 'Здравствуйте! Подтвердите меня в боте для родителей — откройте ссылку и нажмите «Да»:', waiting: 'ожидается', done_step: 'выполнено',
     levels: 'Пороги пропусков', missed: 'Пропущенные занятия', by_subject: 'По предметам', by_week: 'По неделям',
     keldi: 'Присутствовал(а)', kelmadi: 'Отсутствовал(а)', sababli: 'Уважительная причина', kechikdi: 'Опоздал(а)', nothing_missed: 'Пропусков нет',
@@ -115,6 +117,7 @@ const T = {
     dyn_first: 'first data', dyn_same: 'no change', more: 'Details',
     dyn_none: 'No changes in the latest uploads — changes will appear here.',
     by_upload: 'By uploaded data', by_semester: 'By semester', avg_score: 'average score',
+    portal: 'Parents’ portal', my_children: 'My children', sec_study: 'Study', sec_contact: 'Contact', sec_uni: 'University', subj_h: 'Subject', score_h: 'Score', grade_h: 'Grade', credits_h: 'Credits', week_view: 'Weekly timetable', today_word: 'Today', no_lessons_short: 'No classes', hero_title: 'Your child’s studies — in one window', hero_1: 'Attendance, grades and payments — updated daily', hero_2: 'Direct messaging with the course coordinator', hero_3: 'Notifications arrive in Telegram instantly', hero_secure: 'No password, secure: every sign-in is confirmed in Telegram', missed_list: 'Missed classes', date_h: 'Date', status_h: 'Status', pair_h: 'Pair',
     login_sub: 'Sign-in is confirmed via Telegram — no password needed.', login_tg: 'Sign in with Telegram', login_note: 'Notifications arrive in the Telegram bot.', login_pin: 'Open the bot in Telegram and choose this number:', login_open_tg: 'Open Telegram', login_wait: 'Waiting for your confirmation…', login_expired: 'Sign-in timed out. Please try again.', login_cancelled: 'Sign-in was cancelled.', cancel: 'Cancel', app_word: 'app', browser_word: 'browser', logout: 'Sign out on this device', logout_q: 'Sign out of the app? Signing in again is confirmed via Telegram.', devices_hint: 'All devices — in the bot: /qurilmalar', step_phone: 'Phone', step_child: 'Child', step_confirm: 'Confirm', phone_safe: 'Telegram itself confirms your number — no need to type it. If it is in the university list, your child is connected at once.', child_title: 'Find your child', child_sub: 'Your number was not found in the university list. Enter your child’s details as in official documents.', birth_date: 'Date of birth', or_hemis: 'or by student ID (HEMIS)', hemis_id: 'Student ID (HEMIS)', find_child: 'Continue', confirm_title: 'Last step — confirmation', confirm_student_sub: 'Send the link to your child: they confirm you with their own phone number, then the course coordinator gives final approval. This way a stranger cannot connect to your child.', send_to_child: 'Send to my child', copy_link: 'Copy link', link_copied: 'Link copied', wait_coord: 'After your child confirms, the request goes to the course coordinator', no_phone_hint: 'If you don’t know the number, the course coordinator will check the request.', child_phone: 'Your child’s phone number', child_phone_sub: 'Your child’s number is not in the university database. Enter their Telegram number — then your child confirms you from that number.', phone_err_bad_phone: 'Invalid number. Example: +998 90 123 45 67', phone_err_own_phone: 'This is your own number. Enter your child’s number.', phone_err_phone_taken: 'This number belongs to someone else. Enter your child’s number.', phone_err_not_found: 'Request not found or already reviewed.', phone_err_has_phone: 'Your child’s number is already on file — send the link.', student_ok_wait: 'Your child has confirmed you. Now waiting for the course coordinator’s final approval — then everything opens here.', coord_only: 'The course coordinator will check and approve your request — then everything opens here.', add_child: 'Add another child', too_many_tries: 'No attempts left. Try again tomorrow or contact the coordinator.', share_text: 'Hello! Please confirm me in the parents’ bot — open the link and tap “Yes”:', waiting: 'waiting', done_step: 'done',
     levels: 'Absence thresholds', missed: 'Missed classes', by_subject: 'By subject', by_week: 'By week',
     keldi: 'Present', kelmadi: 'Absent', sababli: 'Excused', kechikdi: 'Late', nothing_missed: 'No missed classes',
@@ -243,6 +246,7 @@ const P = {
   phone: 'M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z',
   send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z', users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
   upload: 'M12 16V4M7 9l5-5 5 5M4 20h16', search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3', panel: 'M4 13h6V4H4zM14 20h6v-9h-6zM14 4v4h6V4zM4 20h6v-4H4z',
+  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
 };
 const ic = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[name]}"/></svg>`;
@@ -296,17 +300,66 @@ function nav(active) {
     return `<a href="${href}" ${href === active ? 'aria-current="page"' : ''}>${ic(icon)}<span>${esc(label)}</span>${badge ? `<span class="dot">${badge}</span>` : ''}</a>`;
   }).join('')}</nav>`;
 }
-function page({ title, sub, body, active, noNav }) {
-  S.chrome = { title, sub, active, noNav };
+function page({ title, sub, body, active, noNav, wide }) {
+  S.chrome = { title, sub, active, noNav, wide };
+  if (deskMode()) {  // kompyuter: yon menyu + sarlavha + keng ish maydoni
+    $app.innerHTML = `<div class="dk">${deskSide()}<div class="dk-main">${deskHead(title, sub, noNav)}
+      <main class="dk-body${wide ? ' wide' : ''}">${body}</main></div></div>`;
+    window.scrollTo(0, 0);
+    return;
+  }
   $app.innerHTML = topbar(title, sub) + `<main class="${noNav ? 'no-nav' : ''}">${body}</main>` + (noNav ? '' : nav(active));
   window.scrollTo(0, 0);
+}
+
+/* ================================================================ kompyuter versiyasi (keng ekran, oddiy brauzer)
+   Ota-ona uchun: chapda yon menyu (farzandlar va bo'limlar), yuqorida sarlavha, sahifalar ko'p ustunli.
+   Kurs koordinatori kompyuterda — alohida boshqaruv paneliga (/desk) o'tadi. */
+const DESK_MQ = matchMedia('(min-width: 1100px)');
+const deskWide = () => !tg && !NATIVE && DESK_MQ.matches;
+const deskMode = () => deskWide() && !!S.me && S.me.role === 'parent';
+if (DESK_MQ.addEventListener) DESK_MQ.addEventListener('change', () => { if (S.me && !tg && !NATIVE) route(); });
+function deskSide() {
+  const u = S.me.unread || {}, cur = (location.hash.split('?')[0] || '#/').replace(/^#$/, '#/');
+  const on = href => cur === href || (href !== '#/' && cur.startsWith(href + '/')) || (href === '#/debts' && cur === '#/debts');
+  const item = (href, icon, label, badge) => `<a href="${href}" class="${on(href) ? 'on' : ''}"${on(href) ? ' aria-current="page"' : ''}>${ic(icon)}<span>${esc(label)}</span>${badge ? `<b class="cnt">${badge > 99 ? '99+' : badge}</b>` : ''}</a>`;
+  const kids = S.me.children;
+  return `<aside class="dk-side" aria-label="${t('menu')}">
+    <a class="dk-brand" href="#/"><img src="static/jidu-seal.webp" alt="" width="40" height="40"><span><b>JIDU</b><small>${t('portal')}</small></span></a>
+    ${kids.length ? `<div class="dk-kids"><h6>${t('my_children')}</h6>${kids.map(k => `<button class="dk-kid${S.child === k ? ' on' : ''}" data-act="child" data-key="${k.course}/${k.id}" aria-pressed="${S.child === k}">
+      <span class="av">${esc(k.initials)}</span><span class="nm"><b>${esc(k.short)}</b><small>${esc([k.group, k.year ? t('yearN', { n: k.year }) : ''].filter(Boolean).join(' · '))}</small></span></button>`).join('')}</div>` : ''}
+    <nav class="dk-nav">
+      <h6>${t('sec_study')}</h6>
+      ${item('#/', 'home', t('home'))}${item('#/schedule', 'cal', t('schedule'))}${item('#/attendance', 'att', t('attendance'))}${item('#/grades', 'grade', t('grades'))}
+      ${item('#/finance', 'wallet', t('finance'))}${item('#/trends', 'trend', t('trends'))}${item('#/documents', 'file', t('documents'))}
+      <h6>${t('sec_contact')}</h6>
+      ${item('#/chat', 'chat', t('messages'), u.messages)}${item('#/notifications', 'bell', t('notifications'), u.notifications)}${item('#/news', 'mega', t('news'))}
+      <h6>${t('sec_uni')}</h6>
+      ${item('#/surveys', 'poll', t('surveys'), S.pendingSurveys)}${item('#/regulations', 'book', t('regs'))}${item('#/info', 'info', t('info'))}
+    </nav>
+    <div class="dk-me"><span class="av">${esc((S.me.user.name || '?').trim().charAt(0).toUpperCase())}</span>
+      <span class="nm"><b>${esc(S.me.user.name || '')}</b><small>${t('portal')}</small></span>
+      <a class="icon-btn" href="#/settings" title="${t('settings')}" aria-label="${t('settings')}">${ic('gear')}</a>
+      ${S.me.app_session ? `<button class="icon-btn" data-act="logout" title="${t('logout')}" aria-label="${t('logout')}">${ic('logout')}</button>` : ''}</div>
+  </aside>`;
+}
+function deskHead(title, sub, back) {
+  const u = S.me.unread || {}, d = new Date();
+  const today = `${d.getDate()} ${(MONTHS[S.lang] || MONTHS.uz)[d.getMonth()]}`;
+  return `<header class="dk-head">
+    ${back ? `<button class="icon-btn" data-act="back" aria-label="${t('back')}" title="${t('back')}">${ic('left')}</button>` : ''}
+    <div class="dk-title"><h1>${esc(title)}</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div>
+    <span class="dk-date">${ic('cal')}${esc(today)}</span>
+    <a class="icon-btn" href="#/notifications" aria-label="${t('notifications')}" title="${t('notifications')}">${ic('bell')}${u.notifications ? `<span class="dot">${u.notifications > 9 ? '9+' : u.notifications}</span>` : ''}</a>
+    <button class="icon-btn" data-act="theme" aria-label="${t('theme')}: ${t('th_' + themePref())}" title="${t('theme')}: ${t('th_' + themePref())}">${ic({ auto: 'auto', light: 'sun', dark: 'moon' }[themePref()])}</button>
+  </header>`;
 }
 const loading = () => `<div class="skeleton" style="height:190px;margin-top:4px"></div><div class="grid2" style="margin-top:16px"><div class="skeleton" style="height:118px"></div><div class="skeleton" style="height:118px"></div></div><div class="skeleton" style="height:160px;margin-top:16px"></div>`;
 const empty = (icon, title, sub = '') => `<div class="empty">${ic(icon)}<b>${esc(title)}</b>${esc(sub)}</div>`;
 const errorBox = () => `<div class="empty">${ic('alert')}<b>${t('error')}</b><button class="btn ghost" data-act="reload" style="margin-top:12px">${t('retry')}</button></div>`;
 function switcher() {
   const kids = S.me.children;
-  if (kids.length < 2) return '';
+  if (kids.length < 2 || deskMode()) return '';  // kompyuterda farzand yon menyuda tanlanadi
   return `<div class="switcher${kids.length === 2 ? ' two' : ''}" role="group" aria-label="${t('choose_child')}">${kids.map(k =>
     `<button class="kid" data-act="child" data-key="${k.course}/${k.id}" aria-pressed="${S.child === k ? 'true' : 'false'}"><span class="av">${esc(k.initials)}</span><span class="nm">${esc(k.short)}</span></button>`).join('')}</div>`;
 }
@@ -370,6 +423,28 @@ async function viewHome() {
       <span class="v" style="font-size:${o.academic.count ? 26 : 22}px">${o.academic.count ? `${o.academic.count}<small class="of"> ${esc(subjUnit(o.academic.count))}</small>` : t('no_debt')}</span>
       <span class="s clamp3">${o.academic.count ? esc(o.academic.debts.map(d => d.subject).join(', ')) : ''}</span></a>`;
   const tutor = c.tutor || {};
+  if (deskMode()) {  // kompyuter: chapda — talaba va holat, o'ngda — bugungi darslar, so'rovnomalar, koordinator
+    const kpis = `<div class="dk-kpis">${attTile}${gpaTile}${acadTile}${payTile('kontrakt', o.pays.kontrakt)}${o.pays.trimestr && o.pays.trimestr.state !== 'none' ? payTile('trimestr', o.pays.trimestr) : ''}</div>`;
+    const tutorCard = tutor.name || tutor.phone ? `<section class="card dk-tutor"><h3>${t('coordinator')}</h3>
+      <div class="chat-head" style="padding:0;box-shadow:none;background:none"><div class="av">${esc((tutor.name || '?').trim().charAt(0))}</div>
+      <div><b>${esc(tutor.name || '')}</b><div class="muted small">${esc(fmtPhone(tutor.phone))}</div></div></div>
+      <a class="btn block" href="#/chat" style="margin-top:14px">${ic('chat')}${t('write')}</a></section>` : '';
+    const lessons = `<section class="section"><div class="section-head"><h2>${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
+      <div class="list">${o.today.length ? o.today.map(l => lessonRow(l)).join('') : `<div class="empty" style="padding:22px">${t('no_lessons_today')}</div>`}</div></section>`;
+    // 1-qator: talaba kartasi | holat va koordinator; 2-qator: ko'rsatkichlar; 3-qator: dinamika | bugungi darslar
+    page({ title: t('home'), sub: `${c.name}${c.group ? ' · ' + c.group : ''}`, active: '#/', wide: true, body: `
+      <div class="dk-grid home">
+        <div class="dk-col">${idCard(c)}</div>
+        <div class="dk-col">${verdict(o)}${sv.pending.slice(0, 2).map(surveyCta).join('')}${tutorCard}</div>
+      </div>
+      ${kpis}
+      <div class="dk-grid home">
+        <div class="dk-col">${parentDyn(o.dynamics)}</div>
+        <div class="dk-col">${lessons}${o.updated ? `<p class="muted small" style="text-align:center">${t('updated', { t: when(o.updated) })}</p>` : ''}</div>
+      </div>` });
+    animateRings();
+    return;
+  }
   // birinchi ekranda: talaba kartasi → javob kutayotgan so'rovnoma → so'rovnomalar va ichki nizomlar → holat
   const body = switcher() + idCard(c) + sv.pending.slice(0, 2).map(surveyCta).join('') + quickLinks(sv.pending.length) + verdict(o) + `
     <div class="grid2" style="margin-top:14px">${attTile}${gpaTile}${acadTile}${payTile('kontrakt', o.pays.kontrakt)}</div>
@@ -424,6 +499,27 @@ async function viewAttendance() {
   const byDate = {};
   d.absences.forEach(x => { (byDate[x.date] = byDate[x.date] || []).push(x); });
   const hp = d.absences.length ? [] : (d.hemis_periods || []);  // kunlik ro'yxat yo'q — HEMIS davrlari bo'yicha
+  if (deskMode()) {
+    const summary = `<div class="card dk-att-sum">${ring(a.percent, 120, 12)}<div><div class="bigstat"><b class="num">${a.percent != null ? a.percent + '%' : '—'}</b></div>
+        <div class="muted">${t('since_start')}</div>
+        <div class="kv" style="margin-top:12px"><span>${t('unexcused')}</span><b class="num">${pairs(a.counted_hours)}</b></div>
+        <div class="kv"><span>${t('excused')}</span><b class="num">${pairs(a.excused_hours)}</b></div>
+        <p class="small muted" style="margin:6px 0 0">${esc(a.note)}</p></div></div>`;
+    const levels = `<div class="card"><h3 class="dk-h3">${t('levels')}</h3>${ladder(a)}<p style="margin:12px 0 0" class="${a.level >= 0 ? '' : 'muted'}">${esc(next)}</p></div>`;
+    const weeks = d.weeks && d.weeks.length > 1 ? `<div class="card"><h3 class="dk-h3">${t('by_week')}</h3>${weekChart(d.weeks)}</div>` : '';
+    const subj = d.subjects.length ? `<div class="card"><h3 class="dk-h3">${t('by_subject')}</h3><div class="list flat">${d.subjects.map(s => {
+      const pct = s.total ? Math.round(100 * (s.keldi + s.kechikdi) / s.total) : 0;
+      return `<div class="subject"><div><div class="t" style="font-weight:600">${esc(s.subject)}</div><div class="small muted">${t('kelmadi')}: ${s.kelmadi} · ${t('sababli')}: ${s.sababli}</div></div>
+        <b class="num">${pct}%</b><div class="meter"><i style="width:${pct}%"></i></div></div>`; }).join('')}</div></div>` : '';
+    const missed = d.absences.length ? `<div class="card"><h3 class="dk-h3">${t('missed_list')}</h3><table class="dk-tbl"><thead><tr><th>${t('date_h')}</th><th>${t('pair_h')}</th><th>${t('subj_h')}</th><th class="r">${t('status_h')}</th></tr></thead>
+        <tbody>${d.absences.slice(0, 60).map(x => `<tr><td>${esc(x.weekday)}, ${dateLabel(x.date)}</td><td class="num">${esc(t('pairN', { n: x.pair }))}</td><td>${esc(x.subject)}</td>
+          <td class="r"><span class="pill ${x.status === 'kelmadi' ? 'bordo' : 'warn'}">${t(x.status)}</span></td></tr>`).join('')}</tbody></table></div>`
+      : `<div class="card">${empty('ok', t('nothing_missed'))}</div>`;
+    page({ title: t('attendance'), sub: c.name, active: '#/attendance', wide: true, body: `<div class="dk-grid att">
+      <div class="dk-col">${summary}${levels}</div><div class="dk-col">${weeks}${subj}</div></div>${missed}` });
+    animateRings();
+    return;
+  }
   const body = switcher() + `
     <div class="card"><div style="display:flex;gap:16px;align-items:center">${ring(a.percent, 96, 10)}
       <div><div class="bigstat"><b class="num">${a.percent != null ? a.percent + '%' : '—'}</b></div><div class="muted">${t('since_start')}</div></div></div>
@@ -468,6 +564,22 @@ async function viewSchedule(week) {
 }
 function renderSchedule() {
   const d = S.cache.schedule, i = S.cache.day, day = d.days[i], c = S.child;
+  if (deskMode()) {  // kompyuter: butun hafta bir qarashda — kunlar ustunlar
+    const nav = `<div class="dk-weeknav"><button class="btn ghost" data-act="week" data-week="${d.prev}">${ic('left')}${t('prev')}</button>
+      <div><b>${dateLabel(d.days[0].date)} – ${dateLabel(d.days[d.days.length - 1].date)}</b><span class="muted small">${t(d.week_type)}</span></div>
+      <button class="btn ghost" data-act="week" data-week="${d.next}">${t('next')}${ic('chev')}</button></div>`;
+    const st = l => l.status ? `<span class="pill ${l.status === 'keldi' ? 'ok' : l.status === 'kelmadi' ? 'bordo' : 'warn'}">${t(l.status)}</span>` : '';
+    const grid = `<div class="dk-week">${d.days.map(x => `<section class="dk-day${x.today ? ' today' : ''}">
+      <header><b>${esc(x.weekday)}</b><span>${new Date(x.date + 'T00:00:00').getDate()}${x.today ? ` · ${t('today_word')}` : ''}</span></header>
+      ${x.lessons.length ? x.lessons.map(l => `<article class="dk-lesson">
+        <div class="tm num">${l.start ? `${esc(l.start)}–${esc(l.end || '')}` : esc(t('pairN', { n: l.pair }))}</div>
+        <b>${esc(l.subject)}</b>
+        <div class="meta">${l.type ? `<span class="pill">${esc(l.type)}${l.subgroup ? ' ' + esc(l.subgroup) : ''}</span>` : ''}${st(l)}</div>
+        ${l.room || l.teacher ? `<small>${[l.room, l.teacher].filter(Boolean).map(esc).join(' · ')}</small>` : ''}</article>`).join('')
+        : `<div class="dk-free">${t('no_lessons_short')}</div>`}</section>`).join('')}</div>`;
+    page({ title: t('schedule'), sub: c.name, active: '#/schedule', wide: true, body: nav + grid });
+    return;
+  }
   const body = switcher() + `
     <div class="weeknav"><button data-act="week" data-week="${d.prev}">${ic('left', 'chev')} ${t('prev')}</button>
       <div style="text-align:center"><b>${dateLabel(d.days[0].date)} – ${dateLabel(d.days[5].date)}</b><div class="small muted">${t(d.week_type)}</div></div>
@@ -489,6 +601,22 @@ async function viewGrades() {
     + (d.debts ? `<a class="card desk-card" href="#/debts" style="margin-bottom:14px"><span class="ic-badge" style="color:var(--bordo-fg)">${ic('alert')}</span>
       <div style="flex:1;text-align:left"><b style="display:block">${t('acad')}: ${d.debts}</b><span class="muted small">${t('open')}</span></div>${ic('chev')}</a>` : '')
     + empty('grade', t('no_data')) });
+  if (deskMode()) {
+    const head = `<div class="dk-kpis">
+      <div class="tile ${d.gpa_low ? 'bad' : ''}"><span class="k">${t('gpa_long')}</span><span class="v num">${d.gpa != null ? gpaNum(d.gpa) : '—'}<small class="of"> / 5</small></span>
+        <span class="s">${d.gpa_low ? t('gpa_low', { min: limNum(d.gpa_min) }) : t('gpa_hint')}</span></div>
+      <a class="tile ${d.debts ? 'bad' : 'ok'}" href="${d.debts ? '#/debts' : '#/grades'}"><span class="k">${t('acad')}</span>
+        <span class="v">${d.debts ? `${d.debts}<small class="of"> ${esc(subjUnit(d.debts))}</small>` : t('no_debt')}</span><span class="s">${d.debts ? t('open') : ''}</span></a>
+      <div class="tile"><span class="k">${t('grade_scale')}</span><div class="dk-scale">${[['90–100', 5], ['70–89', 4], ['60–69', 3], ['0–59', 2]].map(([r, g]) =>
+        `<span><i class="grade g${g}">${g}</i><small class="num">${r}</small></span>`).join('')}</div></div></div>`;
+    const sems = d.semesters.map(sm => `<section class="card"><div class="section-head" style="margin:0 0 4px"><h2>${t('semN', { n: sm.semester })}</h2>${sm.gpa != null ? `<span class="muted num">GPA ${gpaNum(sm.gpa)}</span>` : ''}</div>
+      <table class="dk-tbl"><thead><tr><th>${t('subj_h')}</th><th class="r">${t('credits_h')}</th><th style="width:38%">${t('score_h')}</th><th class="r">${t('grade_h')}</th></tr></thead><tbody>
+      ${sm.subjects.map(g => `<tr class="${g.debt ? 'debt' : ''}"><td><b>${esc(g.subject)}</b>${g.debt ? `<div class="small" style="color:var(--bordo-fg)">${t('debt_subject')}</div>` : ''}</td>
+        <td class="r num">${g.credits ? num(g.credits) : '—'}</td>
+        <td><div class="dk-bar"><i style="width:${Math.min(100, g.score)}%"></i></div><span class="num small">${num(g.score)} / 100</span></td>
+        <td class="r"><span class="grade g${g.grade}">${g.grade}</span></td></tr>`).join('')}</tbody></table></section>`).join('');
+    return page({ title: t('grades'), sub: c.name, active: '#/grades', wide: true, body: head + sems });
+  }
   const body = switcher() + `<div class="card" style="display:flex;justify-content:space-between;align-items:center">
       <div><div class="muted small">${t('gpa_long')}</div><div class="bigstat"><b class="num">${d.gpa != null ? gpaNum(d.gpa) : '—'}</b><span class="muted">/ 5</span></div>${d.gpa_low ? `<div class="small" style="color:var(--bordo-fg);font-weight:600;margin-top:2px">${t('gpa_low', { min: limNum(d.gpa_min) })}</div>` : ''}</div>
       ${d.debts ? `<a class="pill bordo" href="#/debts" style="font-size:14px;padding:8px 12px">${t('acad')}: ${d.debts} ${ic('chev')}</a>` : `<span class="pill ok" style="font-size:14px;padding:8px 12px">${t('acad')}: ${t('no_debt').toLowerCase()}</span>`}</div>
@@ -529,8 +657,13 @@ async function refreshChat(first) {
     <div class="msgs">${msgs || empty('chat', t('no_msgs'), t('no_msgs_sub'))}</div>
     <form class="composer" data-act="send"><textarea class="input" name="text" rows="1" placeholder="${t('type_msg')}" aria-label="${t('type_msg')}" maxlength="3000">${esc(keep)}</textarea>
       <button class="send" type="submit" aria-label="${t('write')}">${ic('send')}</button></form>`;
-  page({ title: t('messages'), sub: c.short, active: '#/chat', body, noNav: true });
-  window.scrollTo(0, document.body.scrollHeight);
+  if (deskMode()) {
+    page({ title: t('messages'), sub: c.name, active: '#/chat', body: `<div class="dk-chat">${body}</div>` });
+    const box = document.querySelector('.dk-chat .msgs'); if (box) box.scrollTop = box.scrollHeight;
+  } else {
+    page({ title: t('messages'), sub: c.short, active: '#/chat', body, noNav: true });
+    window.scrollTo(0, document.body.scrollHeight);
+  }
   clearInterval(S.timer);
   S.timer = setInterval(() => { if (location.hash.startsWith('#/chat') && !document.hidden) refreshChat(false); }, 15000);
 }
@@ -633,8 +766,9 @@ async function viewFinance() {
   page({ title: t('finance'), sub: c.short, body: switcher() + loading(), active: '' });
   let d;
   try { d = await api(childPath(c, 'finance')); } catch (e) { return page({ title: t('finance'), body: errorBox() }); }
-  page({ title: t('finance'), sub: c.short, active: '', body: switcher() + `<h2 class="screen-title">${t('finance')}</h2>${d.payment_form ? `<p class="screen-sub">${esc(d.payment_form)}</p>` : ''}
-    ${moneyCard(t('contract_pay'), d.kontrakt)}${moneyCard(t('trimester_pay'), d.trimestr)}` });
+  page({ title: t('finance'), sub: deskMode() ? `${c.name}${d.payment_form ? ' · ' + d.payment_form : ''}` : c.short, active: '', wide: deskMode(),
+    body: switcher() + `<h2 class="screen-title">${t('finance')}</h2>${d.payment_form && !deskMode() ? `<p class="screen-sub">${esc(d.payment_form)}</p>` : ''}
+    <div class="dk-pair">${moneyCard(t('contract_pay'), d.kontrakt)}${moneyCard(t('trimester_pay'), d.trimestr)}</div>` });
 }
 async function viewDocs() {
   const c = S.child;
@@ -729,7 +863,7 @@ async function viewInfo() {
 // Bog'lash — uch qadam: 1 telefon (Telegram tasdiqlaydi) → 2 farzand (topilmasa — F.I.Sh. + sana) → 3 tasdiqlash
 function steps(n) {
   const L = [t('step_phone'), t('step_child'), t('step_confirm')];
-  return `<ol class="steps">${L.map((l, i) => `<li class="${i + 1 < n ? 'done' : i + 1 === n ? 'on' : ''}"><span>${i + 1 < n ? ic('ok') : i + 1}</span>${esc(l)}</li>`).join('')}</ol>`;
+  return `<ol class="wizard">${L.map((l, i) => `<li class="${i + 1 < n ? 'done' : i + 1 === n ? 'on' : ''}"><span>${i + 1 < n ? ic('ok') : i + 1}</span>${esc(l)}</li>`).join('')}</ol>`;
 }
 /* ================================================================ telefon ilovasi / brauzer: Telegram orqali kirish */
 function openExternal(url) {
@@ -751,11 +885,18 @@ function viewLogin(msg) {
   S.lang = store.get('lang') || ((navigator.language || '').startsWith('ru') ? 'ru' : 'uz');
   document.documentElement.lang = S.lang;
   const langs = [['uz', 'O‘zbekcha'], ['ru', 'Русский'], ['en', 'English']];
-  $app.innerHTML = `<main class="no-nav"><div class="hero-center"><img class="hero-seal" src="static/jidu-seal.webp" alt="" width="72" height="72"><h2>${t('welcome')}</h2><p class="muted">${t('welcome_sub')}</p></div>
+  const form = `<div class="hero-center"><img class="hero-seal" src="static/jidu-seal.webp" alt="" width="72" height="72"><h2>${t('welcome')}</h2><p class="muted">${t('welcome_sub')}</p></div>
     <div class="seg" style="margin-bottom:16px">${langs.map(([k, l]) => `<button data-act="login-lang" data-lang="${k}" aria-pressed="${S.lang === k}">${l}</button>`).join('')}</div>
     <div class="card" id="login-box">${msg ? `<p class="small" style="margin-top:0;color:var(--bordo-fg)">${esc(msg)}</p>` : ''}<p style="margin-top:0">${t('login_sub')}</p>
       <button class="btn block" data-act="login">${ic('send')}${t('login_tg')}</button>
-      <p class="small muted" style="margin-bottom:0">${t('login_note')}</p></div></main>`;
+      <p class="small muted" style="margin-bottom:0">${t('login_note')}</p></div>`;
+  $app.innerHTML = deskWide()  // kompyuter: chapda — tanishtiruv, o'ngda — kirish
+    ? `<div class="dk-login"><section class="dk-hero"><div class="dk-hero-in"><img src="static/jidu-seal.webp" alt="" width="84" height="84">
+        <p class="eyebrow">${t('portal')}</p><h1>${t('hero_title')}</h1>
+        <ul>${['hero_1', 'hero_2', 'hero_3'].map((k, i) => `<li>${ic(['att', 'chat', 'bell'][i])}<span>${t(k)}</span></li>`).join('')}</ul>
+        <p class="secure">${ic('ok')}${t('hero_secure')}</p></div></section>
+      <main class="dk-form">${form}</main></div>`
+    : `<main class="no-nav">${form}</main>`;
   const saved = !msg && loginSaved.get();
   if (saved) showPin(saved); else loginSaved.set(null);
 }
@@ -1172,6 +1313,11 @@ function pickChild(key) {
 /* ================================================================ sahifa ramkasini yangilash (nishonlar, mavzu) */
 function updateChrome() {
   const c = S.chrome; if (!c || !S.me) return;
+  if (deskMode()) {
+    const side = document.querySelector('.dk-side'); if (side) side.outerHTML = deskSide();
+    const head = document.querySelector('.dk-head'); if (head) head.outerHTML = deskHead(c.title, c.sub, c.noNav);
+    return;
+  }
   const h = document.querySelector('header.topbar'); if (h) h.outerHTML = topbar(c.title, c.sub);
   const n = document.querySelector('nav.nav'); if (n && !c.noNav) n.outerHTML = nav(c.active);
 }
@@ -1805,6 +1951,7 @@ async function boot(again) {
   }
   S.lang = S.me.lang || 'uz';
   document.documentElement.lang = S.lang;
+  if (deskWide() && (S.me.role === 'staff' || S.me.role === 'super')) { location.replace('/desk' + (DEV ? '?dev' : '')); return; }
   if (S.me.staff && S.me.staff.course) S.staffCourse = S.me.staff.course;
   if (S.me.children.length) pickChild(localStorage.getItem('child') || '');
   const start = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param;
