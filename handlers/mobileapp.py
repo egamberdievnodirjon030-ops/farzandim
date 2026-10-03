@@ -113,8 +113,10 @@ async def send_download(bot: Bot, chat_id: int) -> None:
     ios_url = await central.get_meta("ios_url")
     caption = tr(
         "🤖 <b>Android</b>{v}: faylni oching → «O'rnatish». Telefon «noma'lum manba» haqida so'rasa — "
-        "Telegram uchun ruxsat bering (bir marta).\n\nIlovani ochib «Telegram orqali kirish» ni bosing — "
-        "kirish shu botda tasdiqlanadi.", v=f" (versiya {html.escape(version)})" if version else "")
+        "Telegram uchun ruxsat bering (bir marta).\n\n🛡 «Google Play Защита» oynasi chiqsa — bu ilova Google Play'dan "
+        "emas, universitetdan kelgani uchun. <b>«Все равно установить»</b> (Baribir o'rnatish) ni bosing, «OK» ni emas.\n\n"
+        "Ilovani ochib «Telegram orqali kirish» ni bosing — kirish shu botda tasdiqlanadi.",
+        v=f" (versiya {html.escape(version)})" if version else "")
     if not file_id and apk_path().exists():  # GitHub'dan olingan fayl — bir marta yuklanadi, keyin file_id bilan
         msg = await bot.send_document(chat_id, FSInputFile(apk_path(), filename=APK_NAME), caption=caption)
         if msg.document:

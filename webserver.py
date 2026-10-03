@@ -82,7 +82,8 @@ async def download_page(request: web.Request) -> web.Response:
     has_apk = apk_path().exists()
     android = (f'<a class="btn" href="/ilova/{APK_NAME}">🤖 Android uchun yuklab olish{f" ({html.escape(version)})" if version else ""}</a>'
                '<p class="hint">Faylni oching → «O\'rnatish». Telefon ruxsat so\'rasa — brauzer uchun «noma\'lum manbalar»ga '
-               'bir marta ruxsat bering.</p>' if has_apk else
+               'bir marta ruxsat bering. «Google Play Защита» oynasi chiqsa — '
+               '«Все равно установить» (Baribir o\'rnatish) ni bosing: ilova Google Play\'dan emas, universitetdan.</p>' if has_apk else
                f'<p class="hint">Android fayli botda: <b>/ilova</b> buyrug\'ini yuboring.</p>')
     ios = (f'<a class="btn" href="{html.escape(ios_url)}">🍏 iPhone uchun o\'rnatish</a>' if ios_url else
            '<p class="hint">🍏 <b>iPhone</b>: shu sahifani <b>Safari</b>da oching → «Ulashish» belgisi → '
