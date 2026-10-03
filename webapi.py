@@ -1550,7 +1550,8 @@ async def api_staff_imports(request):
     return ok({"items": [{"id": r["id"], "kind": r["kind"], "kind_title": KIND_TITLES.get(r["kind"], r["kind"]),
                           "file_name": r["file_name"], "at": r["uploaded_at"], "rows": r["rows"],
                           "by": names.get(r["uploaded_by"]) or ("Super-admin" if r["uploaded_by"] in SUPERADMIN_IDS else ""),
-                          "parents": r["parents_notified"], "deletable": imports.can_delete(r, uid, uid in SUPERADMIN_IDS)}
+                          "parents": r["parents_notified"], "deletable": imports.can_delete(r, uid, uid in SUPERADMIN_IDS),
+                          "students": r.get("students"), "linked_parents": r.get("linked_parents")}
                          for r in items]})
 
 

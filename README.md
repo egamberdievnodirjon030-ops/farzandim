@@ -47,7 +47,11 @@ Har bir yuklangan Excel fayl «Yuklangan fayllar» ro'yxatiga yoziladi (kompyute
 
 Fayl o'chirilganda **hamma joydan** olib tashlanadi: shu fayldan kelgan davomat, HEMIS statistikasi, baholar, akademik qarzdorlar, kontrakt/trimestr, jadval yozuvlari; ota-onalarning ilovasidagi bildirishnomalar; ota-onalarning Telegram chatidagi xabarlar (Telegram 48 soat ichida ruxsat beradi — kechroq bo'lsa, natijada aytiladi). Ochiq turgan ota-ona ilovasi darhol yangilanadi, dinamika qayta hisoblanadi.
 - Kurs koordinatori — faqat o'zi yuklagan fayllarni, super-admin — istalganini o'chiradi.
-- Talabalar ro'yxati va tarjimalar o'chirilmaydi — ular boshqa barcha ma'lumotlarning asosi.
+- **Talabalar ro'yxati (kontingent)** ham o'chiriladi: shu fayl orqali kelgan va keyingi fayllarda qayta kelmagan
+  talabalar o'chadi — ular bilan birga davomati, baholari, to'lovlari, hujjatlari, yozishmalari va ota-ona bog'lanishlari
+  (ota-onaning o'zi qoladi, farzandni qayta bog'lashi mumkin). Keyingi fayllarda qayta kelgan talabalar qoladi. O'chirishdan
+  oldin aniq son ko'rsatiladi: nechta talaba va nechta ota-ona ulardan uziladi.
+- Talabalar telefonlari va tarjimalar fayllari o'chirilmaydi.
 - Keyingi fayl avvalgisidagi yozuvni yangilagan bo'lsa (masalan, o'sha kunning davomati qayta yuklangan), u yozuv keyingi faylga tegishli bo'ladi.
 
 ### So'rovnomalar (ota-onalar fikri)

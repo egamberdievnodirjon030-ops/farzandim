@@ -1283,17 +1283,21 @@ async function loadImportsApp() {
   const box = document.getElementById('imports'); if (!box) return;
   let d; try { d = await api('/api/staff/imports'); } catch (e) { box.innerHTML = errorBox(); return; }
   box.innerHTML = d.items.length ? d.items.slice(0, 30).map(x => `<div class="row" style="cursor:default"><div class="ic">${ic('upload')}</div>
-    <div class="body"><div class="t">${esc(x.file_name || '—')}</div><div class="d">${esc(x.kind_title)}${x.deletable ? ` · ${x.rows} ta yozuv` : ''} · ${when(x.at)}${x.parents ? ` · ${x.parents} ota-onaga xabar` : ''}</div></div>
-    ${x.deletable ? `<button class="icon-btn" style="color:var(--bordo-fg)" data-act="imp-del" data-id="${x.id}" data-name="${esc(x.file_name || '')}" aria-label="O‘chirish">${ic('x')}</button>` : ''}</div>`).join('')
+    <div class="body"><div class="t">${esc(x.file_name || '—')}</div><div class="d">${esc(x.kind_title)}${x.deletable ? ` · ${x.rows} ta ${x.kind === 'students' ? 'talaba' : 'yozuv'}` : ''} · ${when(x.at)}${x.parents ? ` · ${x.parents} ota-onaga xabar` : ''}</div></div>
+    ${x.deletable ? `<button class="icon-btn" style="color:var(--bordo-fg)" data-act="imp-del" data-id="${x.id}" data-name="${esc(x.file_name || '')}" data-kind="${esc(x.kind)}" data-rows="${x.rows}" data-linked="${x.linked_parents || 0}" aria-label="O‘chirish">${ic('x')}</button>` : ''}</div>`).join('')
     : empty('upload', 'Hali fayl yuklanmagan');
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act="imp-del"]');
   if (!b) return;
   e.preventDefault(); e.stopImmediatePropagation();
-  if (!await confirmAsync(`«${b.dataset.name}» tizimdan o‘chirilsinmi? Shu fayldan kelgan ma’lumotlar, ota-onalarga ketgan bildirishnoma va xabarlar ham o‘chadi.`)) return;
+  const q = b.dataset.kind === 'students'
+    ? (Number(b.dataset.rows) ? `«${b.dataset.name}» — talabalar ro‘yxati. Shu fayl orqali kelgan ${b.dataset.rows} ta talaba va ularning barcha ma’lumotlari (davomat, baholar, to‘lovlar, yozishmalar) o‘chadi; ${b.dataset.linked} ta ota-ona ulardan uziladi. Keyingi fayllarda qayta kelgan talabalar qoladi. O‘chirilsinmi?`
+      : `«${b.dataset.name}» dagi talabalar keyingi fayllarda qayta kelgan — o‘chiriladigan talaba yo‘q. Fayl ro‘yxatdan olib tashlansinmi?`)
+    : `«${b.dataset.name}» tizimdan o‘chirilsinmi? Shu fayldan kelgan ma’lumotlar, ota-onalarga ketgan bildirishnoma va xabarlar ham o‘chadi.`;
+  if (!await confirmAsync(q)) return;
   b.disabled = true;
-  try { const r = await api(`/api/staff/imports/${b.dataset.id}`, { method: 'DELETE' }); toast(`O‘chirildi: ${r.rows} ta yozuv, ${r.messages} ta xabar`); loadImportsApp(); }
+  try { const r = await api(`/api/staff/imports/${b.dataset.id}`, { method: 'DELETE' }); toast(`O‘chirildi: ${r.students ? r.students + ' ta talaba, ' : ''}${r.rows} ta yozuv`); loadImportsApp(); }
   catch (err) { toast(err.status === 403 ? 'Faqat o‘zingiz yuklagan faylni o‘chira olasiz' : t('error')); b.disabled = false; }
 }, true);
 async function viewSuperCourses() {

@@ -785,18 +785,23 @@ async function loadImports() {
   box.innerHTML = d.items.length ? `<div class="tbl-wrap" style="max-height:420px"><table class="tbl"><thead><tr><th>Fayl</th><th>Turi</th><th class="r">Yozuvlar</th><th class="r">Ota-onalarga xabar</th><th>Kim, qachon</th><th></th></tr></thead><tbody>
     ${d.items.map(x => `<tr><td class="name"><b>${esc(x.file_name || '—')}</b></td><td>${esc(x.kind_title)}</td><td class="r">${x.deletable ? x.rows : '<span class="dash">—</span>'}</td><td class="r">${x.parents || '<span class="dash">—</span>'}</td>
       <td>${esc(x.by || '')}${x.by ? ', ' : ''}${when(x.at)}</td>
-      <td class="r">${x.deletable ? `<button class="btn sm ghost" data-act="imp-del" data-id="${x.id}" data-name="${esc(x.file_name || '')}" data-rows="${x.rows}" data-parents="${x.parents}" title="O‘chirish" aria-label="O‘chirish">${ic('x')}</button>` : '<span class="hint" title="Talabalar ro‘yxati va tarjimalar boshqa ma’lumotlarning asosi">o‘chirilmaydi</span>'}</td></tr>`).join('')}</tbody></table></div>`
+      <td class="r">${x.deletable ? `<button class="btn sm ghost" data-act="imp-del" data-id="${x.id}" data-name="${esc(x.file_name || '')}" data-rows="${x.rows}" data-parents="${x.parents}" data-kind="${esc(x.kind)}" data-linked="${x.linked_parents || 0}" title="O‘chirish" aria-label="O‘chirish">${ic('x')}</button>` : '<span class="hint" title="Talabalar telefonlari va tarjimalar fayllari o‘chirilmaydi">o‘chirilmaydi</span>'}</td></tr>`).join('')}</tbody></table></div>`
     : `<div class="pad">${emptyBox('upload', 'Hali fayl yuklanmagan', '')}</div>`;
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act="imp-del"]');
   if (!b) return;
   e.preventDefault(); e.stopImmediatePropagation();
-  if (!await confirmDlg('Faylni tizimdan o‘chirasizmi?', `<b>${esc(b.dataset.name)}</b> dan kelgan ${b.dataset.rows} ta yozuv o‘chiriladi.${Number(b.dataset.parents) ? ` ${b.dataset.parents} ta ota-onaga ketgan bildirishnomalar ilovadan, xabarlar Telegram chatidan (48 soat ichida) ham o‘chiriladi.` : ''} Buni qaytarib bo‘lmaydi.`, 'O‘chirish', true)) return;
+  const stu = b.dataset.kind === 'students';
+  const text = stu
+    ? (Number(b.dataset.rows) ? `<b>${esc(b.dataset.name)}</b> — talabalar ro‘yxati. Shu fayl orqali kelgan <b>${b.dataset.rows} ta talaba</b> va ularning barcha ma’lumotlari (davomat, baholar, to‘lovlar, hujjatlar, yozishmalar) o‘chadi; <b>${b.dataset.linked} ta ota-ona</b> ulardan uziladi. Keyingi fayllarda qayta kelgan talabalar qoladi. Buni qaytarib bo‘lmaydi.`
+      : `<b>${esc(b.dataset.name)}</b> dagi talabalarning hammasi keyingi fayllarda qayta kelgan — o‘chiriladigan talaba yo‘q. Fayl faqat ro‘yxatdan olib tashlanadi.`)
+    : `<b>${esc(b.dataset.name)}</b> dan kelgan ${b.dataset.rows} ta yozuv o‘chiriladi.${Number(b.dataset.parents) ? ` ${b.dataset.parents} ta ota-onaga ketgan bildirishnomalar ilovadan, xabarlar Telegram chatidan (48 soat ichida) ham o‘chiriladi.` : ''} Buni qaytarib bo‘lmaydi.`;
+  if (!await confirmDlg(stu ? 'Talabalar ro‘yxatini o‘chirasizmi?' : 'Faylni tizimdan o‘chirasizmi?', text, 'O‘chirish', true)) return;
   b.disabled = true;
   try {
     const r = await api(`/api/staff/imports/${b.dataset.id}`, { method: 'DELETE' });
-    toast(`O‘chirildi: ${r.rows} ta yozuv, ${r.notifications} ta bildirishnoma, ${r.messages} ta Telegram xabar` + (r.messages_failed ? ` (${r.messages_failed} tasini Telegram o‘chirishga ruxsat bermadi)` : ''));
+    toast(`O‘chirildi: ${r.students ? r.students + ' ta talaba, ' : ''}${r.rows} ta yozuv, ${r.notifications} ta bildirishnoma, ${r.messages} ta Telegram xabar` + (r.messages_failed ? ` (${r.messages_failed} tasini Telegram o‘chirishga ruxsat bermadi)` : ''));
     S.stu = null; loadImports(); refreshBadges();
   } catch (err) { toast(err.status === 403 ? 'Faqat o‘zingiz yuklagan faylni o‘chira olasiz' : 'O‘chirilmadi', true); b.disabled = false; }
 }, true);

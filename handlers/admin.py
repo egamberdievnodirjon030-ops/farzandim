@@ -2118,6 +2118,19 @@ async def cb_import_delete(cb: CallbackQuery, callback_data: ImpDelCb) -> None:
         kb = InlineKeyboardBuilder()
         kb.button(text="✅ Ha, o'chirish", callback_data=ImpDelCb(i=r["id"], ok=1))
         await cb.answer()
+        if r["kind"] == "students":
+            im = await imports.students_impact(r)
+            if not im["students"]:
+                await cb.message.answer(f"«{esc(r['file_name'] or '—')}» dagi talabalarning hammasi keyingi fayllarda qayta "
+                                        "kelgan — o'chiriladigan talaba yo'q. Faqat yuklamalar ro'yxatidan olib tashlanadi.",
+                                        reply_markup=kb.as_markup())
+                return
+            await cb.message.answer(
+                f"⚠️ «{esc(r['file_name'] or '—')}» — talabalar ro'yxati. O'chirilsa, shu fayl orqali kelgan "
+                f"<b>{im['students']} ta talaba</b> va ularning barcha ma'lumotlari (davomat, baholar, to'lovlar, hujjatlar, "
+                f"yozishmalar) o'chadi; <b>{im['parents']} ta ota-ona</b> ulardan uziladi. Keyingi fayllarda qayta kelgan "
+                "talabalar qoladi. Buni qaytarib bo'lmaydi.", reply_markup=kb.as_markup())
+            return
         await cb.message.answer(f"«{esc(r['file_name'] or '—')}» tizimdan o'chirilsinmi? {r['rows']} ta yozuv, ota-onalarga "
                                 "ketgan bildirishnoma va xabarlar ham o'chadi. Buni qaytarib bo'lmaydi.",
                                 reply_markup=kb.as_markup())
@@ -2125,7 +2138,8 @@ async def cb_import_delete(cb: CallbackQuery, callback_data: ImpDelCb) -> None:
     await cb.answer("O'chirilmoqda…")
     st = await imports.delete(cb.bot, r["id"], uid)
     await cb.message.edit_text(
-        f"🗑 «{esc(r['file_name'] or '—')}» o'chirildi: {st['rows']} ta yozuv, {st['notifications']} ta bildirishnoma, "
+        f"🗑 «{esc(r['file_name'] or '—')}» o'chirildi: " + (f"{st['students']} ta talaba, " if st.get("students") else "")
+        + f"{st['rows']} ta yozuv, {st['notifications']} ta bildirishnoma, "
         f"Telegram'dan {st['messages']} ta xabar" + (f" ({st['messages_failed']} tasini Telegram o'chirishga ruxsat bermadi — "
                                                      "48 soatdan o'tgan)" if st["messages_failed"] else "") + ".")
 

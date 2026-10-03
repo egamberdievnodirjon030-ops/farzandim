@@ -522,7 +522,7 @@ class Database:
                          ("claimed_phone", "TEXT")):
             if col not in have:
                 await self.conn.execute(f"ALTER TABLE link_requests ADD COLUMN {col} {ddl}")
-        for t in IMPORT_TABLES:  # qaysi yuklangan fayldan kelgani (o'chirish uchun)
+        for t in IMPORT_TABLES + ("students",):  # qaysi yuklangan fayldan kelgani (o'chirish uchun)
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 if "import_id" not in {r[1] for r in await cur.fetchall()}:
                     await self.conn.execute(f"ALTER TABLE {t} ADD COLUMN import_id INTEGER")
@@ -604,6 +604,8 @@ class Database:
                 )
             if self_phones:
                 await self._replace_self_phones(sid, self_phones)
+        # talaba oxirgi marta qaysi fayldan kelgani — o'sha fayl o'chirilsa, faqat keyin qayta kelmaganlar o'chadi
+        await self._tag("students", "hemis_id = ?", [(r["hemis_id"],) for r in rows])
         # Oldin ro'yxatdan o'tgan, lekin endi raqami bazada paydo bo'lgan ota-onalarni avtomatik bog'lash
         new_links = await self.fetchall(
             """SELECT DISTINCT p.tg_id AS parent_id, sp.student_id
