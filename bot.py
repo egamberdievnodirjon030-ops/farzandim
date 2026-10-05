@@ -17,6 +17,7 @@ from aiogram.types import ErrorEvent
 from config import ADMIN_IDS, BOT_TOKEN, COURSES, DATA_DIR, DB_PATH, SUPERADMIN_IDS
 from database import db
 from handlers import admin, appgate, common, groups, mobileapp, parent, search, staff, studentconfirm, superadmin
+from handlers import integration as integration_h
 from keyboards import AttCb, ChildCb, DocGetCb, SchCb
 from middlewares import BlockedUserMiddleware, CourseMiddleware, LangMiddleware, register_parent_callbacks
 from botcommands import setup_commands
@@ -41,7 +42,7 @@ def build_dispatcher() -> Dispatcher:
     dp.callback_query.outer_middleware(BlockedUserMiddleware())
     # Tartib muhim: guruhlar -> super-admin -> kurs koordinatori menyusi -> ota-ona menyusi -> ro'yxatdan o'tish ->
     # admin buyruqlari -> ism bo'yicha qidiruv (oxirida)
-    dp.include_routers(groups.router, studentconfirm.router, mobileapp.router, superadmin.router, staff.router, appgate.router, parent.router, common.router, admin.router,
+    dp.include_routers(groups.router, studentconfirm.router, mobileapp.router, integration_h.router, superadmin.router, staff.router, appgate.router, parent.router, common.router, admin.router,
                        search.router)
     dp.errors.register(on_error)
     return dp
@@ -158,12 +159,15 @@ async def main() -> None:
     scheduler = asyncio.create_task(scheduler_loop(bot))
     from handlers.mobileapp import apk_loop
     apk_task = asyncio.create_task(apk_loop())  # telefon ilovasining yangi versiyasi (GitHub Releases)
+    import integration
+    integ_task = asyncio.create_task(integration.loop(bot))  # «Manage»: davomat va dars jadvali avtomatik
     web_runner = await webserver.start(bot)  # Telegram Web App (bot ichidagi ilova)
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         scheduler.cancel()
         apk_task.cancel()
+        integ_task.cancel()
         if web_runner:
             await web_runner.cleanup()
         await db.close()

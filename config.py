@@ -140,3 +140,25 @@ WEBAPP_DEV_USER = int(os.getenv("WEBAPP_DEV_USER", "0") or 0)  # faqat sinov: br
 # To'lov muddatidan necha kun oldin qarzdor talabalarning ota-onalariga eslatma yuboriladi va qaysi vaqtda
 PAY_REMIND_DAYS = sorted(set(_int_list(os.getenv("PAY_REMIND_DAYS", "7,3,1"))), reverse=True)
 PAY_REMIND_TIME = os.getenv("PAY_REMIND_TIME", "10:00")
+
+# ---------------------------------------------------------------- tashqi tizim bilan integratsiya («Manage»)
+# Davomat va dars jadvali universitet tizimidan avtomatik olinadi (integration.py). INTEGRATION_URL bo'sh — o'chiq.
+# Yo'llarda {from}, {to} (YYYY-MM-DD), {from_ts}, {to_ts} (unix), {since} (oxirgi muvaffaqiyatli olish) ishlatiladi.
+INTEGRATION_NAME = os.getenv("INTEGRATION_NAME", "Manage").strip() or "Manage"
+INTEGRATION_URL = os.getenv("INTEGRATION_URL", "").strip().rstrip("/")
+INTEGRATION_TOKEN = os.getenv("INTEGRATION_TOKEN", "").strip()
+# bearer | header:X-API-Key | query:api_key | basic (TOKEN = login:parol) | none
+INTEGRATION_AUTH = os.getenv("INTEGRATION_AUTH", "bearer").strip() or "bearer"
+INTEGRATION_ATTENDANCE = os.getenv("INTEGRATION_ATTENDANCE", "").strip()
+INTEGRATION_SCHEDULE = os.getenv("INTEGRATION_SCHEDULE", "").strip()
+INTEGRATION_INTERVAL = max(15, int(os.getenv("INTEGRATION_INTERVAL", "60") or 60))            # davomat, soniya
+INTEGRATION_SCHEDULE_INTERVAL = max(60, int(os.getenv("INTEGRATION_SCHEDULE_INTERVAL", "900") or 900))
+INTEGRATION_DAYS = max(1, int(os.getenv("INTEGRATION_DAYS", "7") or 7))  # davomat: oxirgi necha kun olinadi
+INTEGRATION_PAGE_PARAM = os.getenv("INTEGRATION_PAGE_PARAM", "page").strip()
+INTEGRATION_MAX_PAGES = int(os.getenv("INTEGRATION_MAX_PAGES", "500") or 500)
+INTEGRATION_TIMEOUT = int(os.getenv("INTEGRATION_TIMEOUT", "60") or 60)
+INTEGRATION_HEADERS = os.getenv("INTEGRATION_HEADERS", "").strip()   # qo'shimcha sarlavhalar: «A: 1; B: 2»
+# Manage o'zi ma'lumot yuborsa (webhook): POST /api/integration/attendance | /schedule, sarlavha X-Integration-Token
+INTEGRATION_WEBHOOK_SECRET = os.getenv("INTEGRATION_WEBHOOK_SECRET", "").strip()
+# Birinchi olishda ota-onalarga xabar yuborilmaydi (eski qoldirishlar «yangi» bo'lib ketmasligi uchun)
+INTEGRATION_FIRST_SILENT = os.getenv("INTEGRATION_FIRST_SILENT", "1").strip() != "0"

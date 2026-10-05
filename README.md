@@ -22,6 +22,8 @@ Telegram bot ota-onalarga farzandining qaysi kunlarda, qaysi fanlardan darsga qa
 
 **Kompyuter versiyasi:** kurs koordinatori va super-admin uchun brauzerdagi boshqaruv paneli — butun kurs bitta jadvalda (saralash, filtrlar), xabarlar va suhbat yonma-yon, so'rovlar, e'lon (uch tildagi ko'rinishi bilan), fayllarni sudrab yuklash, hisobotni yuklab olish; super-admin — barcha kurslar, kurslar va koordinatorlar, zaxira nusxa va xatolar jurnali. Kirish — botdagi «💻 Kompyuter versiyasi» tugmasi (parolsiz). Batafsil — «Kompyuter versiyasi» bo'limi.
 
+**Universitet tizimi bilan integratsiya:** davomat va dars jadvali «Manage» tizimidan avtomatik, real vaqtga yaqin olinadi (API kaliti yoki webhook; javob ko'rinishi va shabloni qat'iy emas). Batafsil — «Integratsiya» bo'limi.
+
 **Kurs koordinatori (admin) uchun:** Excel import, e'lon yuborish (hammaga yoki guruhlar bo'yicha, oldindan ko'rish bilan), bog'lash so'rovlarini tasdiqlash, savollarga javob, statistika, talaba qidirish, talaba bo'lib kirishga uringanlar haqida darhol xabar va ularni bloklash yoki xato bo'lsa ruxsat berish.
 
 ## Rollar: ota-ona, kurs koordinatori, super-admin
@@ -683,9 +685,30 @@ Cheklovlar: vaqtinchalik manzil har ishga tushirishda o'zgaradi va Cloudflare un
 
 Tekshirish: `curl https://ilova.example.uz/healthz` — `ok` qaytishi kerak. Keyin botda `/start` bosing: chat menyusida «📱 Ilova» tugmasi paydo bo'ladi.
 
+## Integratsiya: universitet tizimi («Manage»)
+
+**Davomat va dars jadvali** universitet tizimidan (Manage) avtomatik olinadi; **buxgalteriya (kontrakt, trimestr), baholar, akademik qarzdorlik, GPA, ogohlantirish va hujjatlar** avvalgidek qo'lda (Excel / PDF) kiritiladi. Integratsiya `integration.py` da; olingan ma'lumot Excel importi bilan **bir xil yo'ldan** o'tadi — talabaga bog'lash, kurslarga ajratish, ota-onaga darhol xabar, chegaralar, kunlik xulosa, ilovaning jonli yangilanishi o'zgarmaydi.
+
+**Ikki yo'l (birgalikda ham ishlaydi):**
+1. **API kaliti bilan (bot o'zi so'raydi).** `.env` da `INTEGRATION_URL`, `INTEGRATION_TOKEN`, `INTEGRATION_ATTENDANCE`, `INTEGRATION_SCHEDULE` ni to'ldiring. Davomat har `INTEGRATION_INTERVAL` (standart 60) soniyada, jadval har `INTEGRATION_SCHEDULE_INTERVAL` (900) soniyada olinadi. Kalit `Authorization: Bearer`, `X-API-Key` kabi sarlavha, so'rov parametri yoki login:parol (Basic) bilan yuboriladi (`INTEGRATION_AUTH`).
+2. **Manage o'zi yuboradi (webhook) — haqiqiy real vaqt.** `INTEGRATION_WEBHOOK_SECRET` ni qo'ying; Manage o'qituvchi davomatni belgilashi bilan `POST https://<ilova manzili>/api/integration/attendance` (jadval — `/schedule`) ga JSON, CSV yoki Excel yuboradi, sarlavhada `X-Integration-Token: <kalit>`. Javob: `{"ok": true, "records": …, "changed": …}`.
+
+**Ko'rinish va shablon qat'iy emas:**
+- JSON — istalgan ichma-ich tuzilma (`{"data": {"items": [...]}}`, `[...]`, `{"results": [...]}`), sahifalash o'zi aniqlanadi (`next` havolasi, `pageCount`, `totalPages`, `last_page` …); CSV (`,` `;` tab) yoki Excel (sarlavha istalgan qatorda).
+- Maydonlar nomi bo'yicha taniladi: `student.student_id_number`, `studentId`, «Talaba ID», «ФИО», `lesson_date`, `lessonPair.code`, `subject.name`, `employee.name`, `auditorium.name` va h.k. (Excel importidagi barcha nomlar ham).
+- Sana — unix vaqt, ISO (`2026-10-05T10:00:00+05:00`) yoki KK.OO.YYYY; holat — matn («Keldi», «Sababsiz», «НБ», `absent`, `excused`), belgi yoki `true/false`; holat maydoni bo'lmasa `explicable`, `absent_on`, `is_late` kabi maydonlardan aniqlanadi; juftlik raqami bo'lmasa — boshlanish vaqtidan.
+- Davomat dars bo'yicha yoki talaba bo'yicha jami (HEMIS statistikasi kabi) bo'lishi mumkin.
+- Jadval haftalik yoki **sanali darslar ro'yxati** bo'lishi mumkin: hafta kuni va toq/juft hafta sanadan aniqlanadi (shu va keyingi hafta olinadi).
+
+**Qanday ishlaydi:** har bir yozuv talabaga (HEMIS ID, bo'lmasa F.I.Sh. + guruh) va o'z kursiga ajratiladi; boshqa kurslar va bazada yo'q talabalar e'tiborsiz qoladi. Ma'lumot o'zgarmagan bo'lsa hech narsa qilinmaydi. Yangi qoldirish — ota-onaga darhol xabar; o'qituvchi davomatni to'g'rilasa (manbada qoldirish o'chirilsa) — botda ham «keldi» bo'ladi (oxirgi `INTEGRATION_DAYS` kun). Birinchi olishda xabar yuborilmaydi (`INTEGRATION_FIRST_SILENT`). Manba javob bermasa — bot ishlashda davom etadi, xato holatda ko'rinadi, 3 marta ketma-ket bo'lsa super-adminga xabar boradi.
+
+**Super-admin:** `/integratsiya` — holat (oxirgi olish, yozuvlar, har bir kurs bo'yicha natija, xatolar) va tugmalar: «🔄 Hozir yangilash», «🔍 Tekshirish» (birinchi sahifa, tanilgan maydonlar, namunaviy qatorlar, bazadagi talabalarga mosligi — bazaga yozilmaydi), «⏸ To'xtatish / ▶️ Yoqish». Biror maydon noto'g'ri tanilsa: `/integratsiya_moslash davomat sana=lesson_date juftlik=lessonPair.code` (`tozalash` — hammasi avtomatik). Terminalda tekshirish: `python integration.py davomat jadval`.
+
+Kalit berilganda: `.env` ni to'ldiring → botni qayta ishga tushiring → `/integratsiya` → «🔍 Tekshirish». Manage dasturchilari uchun qisqa talablar: `INTEGRATSIYA.md`. Integratsiya yoqilgandan keyin ham davomat va jadvalni Excel bilan yuklash mumkin (zaxira yo'l) — keyingi avtomatik yangilanishda manbadagi ma'lumot ustun.
+
 ## Cheklovlar va keyingi qadamlar
 
-Telegram bot orqali yuklanadigan fayl hajmi 20 MB dan oshmasligi kerak (katta fayllarni bir necha qismga bo'ling). Ma'lumotlar kurs koordinatori yuklagan paytdagi holatni aks ettiradi, shuning uchun «bugun» bo'limida yuklanmagan darslar ⚪ bilan ko'rinadi. Keyinchalik universitet IT bo'limi ruxsati bilan HEMIS bilan to'g'ridan-to'g'ri integratsiya qilinsa, qo'lda import o'rniga avtomatik yangilash qo'shish mumkin — buning uchun faqat `importer.py` o'rniga ma'lumotni API dan oluvchi modul yoziladi, qolgan qismlar o'zgarmaydi.
+Telegram bot orqali yuklanadigan fayl hajmi 20 MB dan oshmasligi kerak (katta fayllarni bir necha qismga bo'ling). Ma'lumotlar kurs koordinatori yuklagan paytdagi holatni aks ettiradi, shuning uchun «bugun» bo'limida yuklanmagan darslar ⚪ bilan ko'rinadi. Davomat va dars jadvali universitet tizimidan avtomatik olinishi mumkin — «Integratsiya» bo'limiga qarang.
 
 ## Fayllar tuzilishi
 
@@ -694,6 +717,7 @@ bot.py            — ishga tushirish, buyruqlar menyusi, rejalashtiruvchi
 config.py         — .env sozlamalari
 database.py       — SQLite jadvallari va so'rovlar
 importer.py       — Excel fayllarni o'qish (ustunlarni avtomatik aniqlash)
+integration.py    — universitet tizimi («Manage»): davomat va dars jadvali avtomatik (API yoki webhook)
 reports.py        — ota-onaga ko'rsatiladigan hisobotlar matni
 notifier.py       — darhol xabarlar, ogohlantirishlar, kunlik xulosa
 absence.py        — dars qoldirish chegaralari (18/36/54/74 soat) va choralar

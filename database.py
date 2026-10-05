@@ -479,6 +479,9 @@ class Database:
         for col, ddl in (("student_id", "INTEGER"), ("kind", "TEXT")):
             if col not in ncols:
                 await self.conn.execute(f"ALTER TABLE notifications ADD COLUMN {col} {ddl}")
+        async with self.conn.execute("PRAGMA table_info(attendance)") as cur:
+            if "source" not in {r[1] for r in await cur.fetchall()}:  # integratsiyadan kelgan yozuv ('integ')
+                await self.conn.execute("ALTER TABLE attendance ADD COLUMN source TEXT")
         async with self.conn.execute("PRAGMA table_info(grades)") as cur:
             if "credits" not in {r[1] for r in await cur.fetchall()}:
                 await self.conn.execute("ALTER TABLE grades ADD COLUMN credits REAL")

@@ -733,6 +733,11 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
             await snapshots.capture()
         except Exception:
             log.exception("Dinamika nuqtalari yozilmadi")
+    if user_id is not None and kind in ("attendance", "schedule"):
+        import integration
+        if integration.active(kind):
+            lines.append(f"\nℹ️ {esc(KIND_TITLES[kind])} {esc(integration.INTEGRATION_NAME)} tizimidan avtomatik olinadi — "
+                         "qo'lda yuklangan ma'lumot keyingi yangilanishda manbadagi bilan almashtirilishi mumkin.")
     parts = split_message("\n".join(lines))
     await progress.edit_text(parts[0])
     for extra in parts[1:]:

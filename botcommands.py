@@ -51,6 +51,7 @@ SUPER_COMMANDS = [
     BotCommand(command="yangi_kurs", description="➕ Yangi kurs"),
     BotCommand(command="umumiy", description="📊 Barcha kurslar holati"),
     BotCommand(command="shablonlar", description="📑 Shablonlar: o'zgartirish va qo'shish"),
+    BotCommand(command="integratsiya", description="🔌 Manage integratsiyasi: davomat va jadval"),
     BotCommand(command="zaxira", description="💾 Zaxira nusxa hozir"),
     BotCommand(command="xatolar", description="🧾 Xatolar jurnali"),
     BotCommand(command="ilova_ios", description="🍏 iPhone ilovasi havolasi (App Store/TestFlight)"),

@@ -83,7 +83,7 @@ async def _staff_name(uid: int) -> str:
 
 @web.middleware
 async def auth_middleware(request: web.Request, handler):
-    if not request.path.startswith("/api/") or request.path.startswith(("/api/app/login", "/api/app/info")):
+    if not request.path.startswith("/api/") or request.path.startswith(("/api/app/login", "/api/app/info", "/api/integration/")):
         return await handler(request)  # telefon ilovasining kirish so'rovi — hali seans yo'q
     user = verify_init_data(request.headers.get("X-Telegram-Init-Data", ""))
     auth = request.headers.get("Authorization", "")
@@ -621,6 +621,42 @@ async def api_app_info(request):
     resp = ok({"bot": await _bot_username(request), "url": WEBAPP_URL + "/" if WEBAPP_URL else ""})
     resp.headers["Access-Control-Allow-Origin"] = "*"  # ilovaning mahalliy sahifasi boshqa manbadan so'raydi
     return resp
+
+
+async def api_integration_push(request):
+    """Webhook: universitet tizimi («Manage») davomat yoki dars jadvalini o'zi yuboradi (JSON, CSV yoki Excel).
+    Sarlavha: X-Integration-Token: <INTEGRATION_WEBHOOK_SECRET> (yoki Authorization: Bearer …)."""
+    import integration
+    if not integration.INTEGRATION_WEBHOOK_SECRET:
+        return bad("disabled", 404)
+    given = request.headers.get("X-Integration-Token", "")
+    auth = request.headers.get("Authorization", "")
+    if not given and auth.lower().startswith("bearer "):
+        given = auth[7:].strip()
+    if not integration.check_secret(given):
+        log.warning("Integratsiya webhook: noto'g'ri kalit (%s)", request.remote)
+        return bad("unauthorized", 401)
+    kind = integration.KIND_WORDS.get(request.match_info["kind"].lower())
+    if not kind:
+        return bad("unknown_kind", 404)
+    if await integration.paused():
+        return bad("paused", 503)
+    body, ctype = await request.read(), request.content_type
+    if ctype.startswith("multipart/"):  # fayl sifatida yuborilgan
+        form = await request.post()
+        f = next((v for v in form.values() if hasattr(v, "file")), None)
+        if f is None:
+            return bad("no_file")
+        body, ctype = f.file.read(), f.content_type or ""
+    try:
+        res = await integration.push(request.app["bot"], kind, body, ctype)
+    except integration.IntegrationError as e:
+        return bad(str(e), 422)
+    except (ValueError, KeyError) as e:
+        return bad(f"bad_payload: {e}", 422)
+    return ok({"ok": True, "kind": kind, "records": res["records"], "changed": res["changed"],
+               "skipped_rows": res["errors"],
+               "courses": {k: {"rows": v["rows"], "changed": v["changed"]} for k, v in res["courses"].items()}})
 
 
 async def api_app_logout(request):
@@ -1594,6 +1630,7 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/app/login/{code}", api_app_login_poll)
     r.add_post("/api/app/logout", api_app_logout)
     r.add_get("/api/app/info", api_app_info)
+    r.add_post("/api/integration/{kind}", api_integration_push)
     r.add_get("/api/staff/panel", api_staff_panel)
     r.add_get("/api/staff/students", api_staff_students)
     r.add_get("/api/staff/student/{sid:\\d+}", api_staff_student)
