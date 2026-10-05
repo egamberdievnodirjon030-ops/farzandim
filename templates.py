@@ -36,12 +36,13 @@ BUILTIN: dict[str, tuple[str, str]] = {
     "10_trimestr_qarzdorligi.xlsx": ("Trimestr qarzdorligi", "debts_t"),
     "11_tarjimalar.xlsx": ("Tarjimalar (fan va fakultet nomlari)", "translations"),
     "12_akademik_qarzdorlar.xlsx": ("Akademik qarzdorlar (HEMIS ro'yxati)", "acad_debts"),
+    "13_gpa_hemis.xlsx": ("GPA (HEMIS «Performance GPA»)", "gpa"),
 }
 # Yangi shablon qo'shishda tanlanadigan import turlari
 NEW_KINDS = [("students", "👥 Talabalar"), ("attendance", "📊 Davomat"), ("schedule", "📅 Dars jadvali"),
              ("grades", "📝 Baholar"), ("enroll", "🎯 Tanlov/2-til: kim o'qiydi"), ("elsched", "🗓 Tanlov/2-til: jadval"),
              ("debts", "💰 Kontrakt qarzdorligi"), ("debts_t", "🗓 Trimestr qarzdorligi"),
-             ("acad_debts", "📚 Akademik qarzdorlar"),
+             ("acad_debts", "📚 Akademik qarzdorlar"), ("gpa", "🎓 GPA (HEMIS)"),
              ("phones", "📱 Talaba telefonlari"), ("translations", "🌐 Tarjimalar")]
 
 FIELD_LABELS = {

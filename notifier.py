@@ -376,7 +376,7 @@ def academic_keys(results: list[dict]) -> dict[tuple, dict]:
 
 
 async def notify_academic(bot: Bot, before: dict[int, dict], after: dict[int, dict]) -> int:
-    """Yangi akademik qarz (0–59 → «2») — «Muhim xabar»; qarz yopilsa (60+) — «Yaxshi xabar»."""
+    """Akademik qarzdorlar ro'yxati bo'yicha: yangi qarz — «Muhim xabar», yopilsa — «Yaxshi xabar»."""
     sent = 0
     for sid, now_map in after.items():
         old_map = before.get(sid, {})
@@ -486,8 +486,6 @@ async def notify_grades(bot: Bot, changed: list[dict]) -> int:
                 if academic.is_total(g):
                     gr = academic.five_point(g["score"])
                     score += f" → «{gr}»"
-                    if gr == 2:
-                        score += " " + tr("❗ akademik qarz")
                 lines.append(f"📚 {esc(loc.term(g['subject']))} — {esc(loc.term(g['control_type']))}: <b>{score}</b>")
             if len(items) > 25:
                 lines.append(tr("… va yana {n} ta. To'liq ro'yxat «📝 Baholar» bo'limida.", n=len(items) - 25))

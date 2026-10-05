@@ -1,6 +1,8 @@
-"""Akademik qarzdorlik: 100 ballik baho 5 baholik tizimga o'tkaziladi.
+"""Baholar va akademik qarzdorlik.
 
-    90–100 → «5»,  70–89 → «4»,  60–69 → «3»,  0–59 → «2» — shu fandan akademik qarzdor.
+100 ballik baho 5 baholik tizimga o'tkaziladi: 90–100 → «5», 70–89 → «4», 60–69 → «3», 0–59 → «2».
+AKADEMIK QARZ — faqat «Akademik qarzdorlar» ro'yxati (HEMIS / dekanat fayli) bo'yicha: baholardagi «2» qayta
+o'qish (qayta topshirish) bilan yopilgan bo'lishi mumkin, shuning uchun u qarz deb hisoblanmaydi (GPA ga esa kiradi).
 
 Ball 0,5 dan boshlab yuqoriga yaxlitlanadi: 69,5 → 70 → «4»; 59,5 → 60 → «3».
 Faqat fan bo'yicha 100 ballik umumiy (yakuniy) ball hisobga olinadi — masalan, HEMIS «O'rtacha ball».
@@ -56,8 +58,9 @@ def subject_results(grades: list[dict]) -> list[dict]:
     out = []
     for (sem, subject), g in best.items():
         grade = five_point(g["score"])
+        # debt — faqat qarzdorlar ro'yxati bo'yicha belgilanadi (apply_debt_list)
         out.append({"semester": sem, "subject": subject, "score": g["score"], "grade": grade,
-                    "debt": grade == 2, "control_type": g["control_type"], "credits": g.get("credits")})
+                    "debt": False, "control_type": g["control_type"], "credits": g.get("credits")})
     return sorted(out, key=lambda r: (r["semester"], r["subject"]))
 
 
@@ -89,25 +92,32 @@ def hemis_debts(rows: list[dict]) -> list[dict]:
             for r in rows]
 
 
-def merge_debts(grade_debts: list[dict], hemis_rows: list[dict]) -> list[dict]:
-    """Baholardan aniqlangan qarzlar (0–59 → «2») + HEMIS ro'yxati. Bir fan ikki manbada bo'lsa — bir marta
-    (balli yozuv qoladi). HEMIS ro'yxatida talaba necha marta (necha fan bilan) kelsa — shuncha qarzdor fan."""
-    out = list(grade_debts)
-    by_grades = {normalize_text(d["subject"]) for d in grade_debts}
+def apply_debt_list(results: list[dict], hemis_rows: list[dict]) -> list[dict]:
+    """Akademik qarzlar — FAQAT qarzdorlar ro'yxatidan. Talaba ro'yxatda necha marta (necha fan bilan) kelsa —
+    shuncha qarzdor fan. Baholarda shu fan bo'lsa, u «akademik qarz» deb belgilanadi (results ichida debt=True)."""
+    by_subj: dict[str, list[dict]] = defaultdict(list)
+    for r in results:
+        by_subj[normalize_text(r["subject"])].append(r)
+    out: list[dict] = []
     seen: set[tuple] = set()
     for h in hemis_debts(hemis_rows):
         subj = normalize_text(h["subject"])
         key = (str(h["semester"]), subj)
-        if subj in by_grades or key in seen:
+        if key in seen:
             continue
         seen.add(key)
+        same = [r for r in by_subj.get(subj, []) if not h["semester"] or str(r["semester"]) == str(h["semester"])]
+        for r in same:
+            r["debt"] = True
+        if not h.get("credits") and same and same[0].get("credits"):
+            h = {**h, "credits": same[0]["credits"]}
         out.append(h)
     return out
 
 
 async def summary(sid: int) -> dict:
     results = subject_results(await db.grades_for(sid))
-    debts = merge_debts([r for r in results if r["debt"]], await db.academic_debts_for(sid))
+    debts = apply_debt_list(results, await db.academic_debts_for(sid))
     return {"results": results, "debts": debts}
 
 
@@ -118,8 +128,9 @@ def by_semester(results: list[dict]) -> dict[str, list[dict]]:
     return d
 
 
-GPA_TEXT = N_("GPA — o'rtacha o'zlashtirish ko'rsatkichi: fanlar bo'yicha 5 baholik baholarning o'rtachasi "
-            "(kreditlar bo'lsa — kreditlar bo'yicha tortilgan).")
+GPA_TEXT = N_("GPA — HEMIS tizimidagi rasmiy o'zlashtirish ko'rsatkichi (dekanat yuklagan «Performance GPA» "
+            "ro'yxati bo'yicha).")
 GPA_RULE = N_("Umumiy GPA {min} dan past bo'lsa, talaba kursdan kursga o'tkazilmaydi (GPA yaxlitlanmaydi).")
-RULES_TEXT = N_("Baholash: 90–100 ball — «5», 70–89 — «4», 60–69 — «3», 0–59 — «2» (akademik qarz). "
-              "Ball 0,5 dan boshlab yuqoriga yaxlitlanadi (69,5 → 70 → «4»).")
+RULES_TEXT = N_("Baholash: 90–100 ball — «5», 70–89 — «4», 60–69 — «3», 0–59 — «2». Ball 0,5 dan boshlab yuqoriga "
+              "yaxlitlanadi (69,5 → 70 → «4»). Akademik qarz — dekanatning akademik qarzdorlar ro'yxati bo'yicha "
+              "(«2» qayta o'qishda yopilgan bo'lishi mumkin).")

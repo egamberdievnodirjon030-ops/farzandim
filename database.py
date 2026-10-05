@@ -145,6 +145,23 @@ CREATE TABLE IF NOT EXISTS grades (
     UNIQUE (student_id, subject, control_type, semester)
 );
 
+-- HEMIS «Performance GPA»: rasmiy GPA. Har yuklash — yangi yozuv (tarix); joriy GPA — talabaning eng oxirgi yozuvi.
+-- Fayl o'chirilsa, uning yozuvlari o'chadi va oldingi yuklamadagi GPA o'z-o'zidan joriy bo'ladi.
+CREATE TABLE IF NOT EXISTS gpa_records (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id  INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    gpa         REAL NOT NULL,
+    subjects    INTEGER,
+    credits     REAL,
+    debts       INTEGER,
+    method      TEXT,
+    year        TEXT,
+    changed_at  TEXT,
+    recorded_at TEXT NOT NULL,
+    import_id   INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_gpa_records_student ON gpa_records(student_id, id);
+
 -- HEMIS «Akadem qarzdorlar» ro'yxati: har bir qator — talabaning bitta qarzdor fani (import to'liq almashtiradi)
 CREATE TABLE IF NOT EXISTS academic_debts (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -424,7 +441,7 @@ PARENT_FLAGS = {"notify_instant", "notify_daily", "notify_warn", "notify_pay"}
 
 # Yuklangan fayldan keladigan ma'lumotlar jadvallari (import_id ustuni bilan) — fayl o'chirilsa shu yozuvlar o'chadi
 IMPORT_TABLES = ("attendance", "attendance_stats", "payments", "payment_reports", "grades", "grade_history",
-                 "academic_debts", "schedule", "elective_schedule", "student_subjects", "notifications")
+                 "academic_debts", "schedule", "elective_schedule", "student_subjects", "notifications", "gpa_records")
 
 
 def _imp() -> int | None:
@@ -1141,6 +1158,29 @@ class Database:
         await self.conn.commit()
         row = await self.fetchone("SELECT COUNT(*) AS n FROM academic_debts")
         return row["n"] if row else 0
+
+    # ------------------------------------------------------------ rasmiy GPA (HEMIS)
+    async def add_gpa(self, rows: list[dict]) -> int:
+        ts, imp = now_iso(), _imp()
+        await self.conn.executemany(
+            "INSERT INTO gpa_records (student_id, gpa, subjects, credits, debts, method, year, changed_at, recorded_at, "
+            "import_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            [(r["student_id"], r["gpa"], r.get("subjects"), r.get("credits"), r.get("debts"), r.get("method"),
+              r.get("year"), r.get("changed_at"), ts, imp) for r in rows])
+        await self.conn.commit()
+        return len(rows)
+
+    async def gpa_for(self, sid: int) -> dict | None:
+        return await self.fetchone("SELECT * FROM gpa_records WHERE student_id = ? ORDER BY id DESC LIMIT 1", (sid,))
+
+    async def gpa_history(self, sid: int) -> list[dict]:
+        return await self.fetchall("SELECT * FROM gpa_records WHERE student_id = ? ORDER BY id", (sid,))
+
+    async def bulk_gpa(self) -> dict[int, dict]:
+        rows = await self.fetchall(
+            """SELECT g.* FROM gpa_records g
+               JOIN (SELECT student_id, MAX(id) AS mid FROM gpa_records GROUP BY student_id) m ON g.id = m.mid""")
+        return {r["student_id"]: r for r in rows}
 
     async def academic_debts_for(self, sid: int) -> list[dict]:
         return await self.fetchall(

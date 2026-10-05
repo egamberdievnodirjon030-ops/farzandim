@@ -69,12 +69,12 @@ TR: dict[str, dict[str, str]] = {
     '📏 <b>Dars qoldirish chegaralari</b> (semestr davomida sababsiz qoldirilgan soatlar):': {
         'ru': '📏 <b>Пороги пропусков занятий</b> (за семестр, часы без уважительной причины):',
         'en': '📏 <b>Absence thresholds</b> (per semester, unexcused hours):'},
-    "GPA — o'rtacha o'zlashtirish ko'rsatkichi: fanlar bo'yicha 5 baholik baholarning o'rtachasi (kreditlar bo'lsa — kreditlar bo'yicha tortilgan).": {
-        'ru': 'GPA — средний показатель успеваемости: среднее оценок по 5-балльной шкале по всем предметам (если указаны кредиты — взвешенное по кредитам).',
-        'en': 'GPA — grade point average: the mean of 5-point grades across subjects (weighted by credits when credits are available).'},
-    'Baholash: 90–100 ball — «5», 70–89 — «4», 60–69 — «3», 0–59 — «2» (akademik qarz). Ball 0,5 dan boshlab yuqoriga yaxlitlanadi (69,5 → 70 → «4»).': {
-        'ru': 'Оценивание: 90–100 баллов — «5», 70–89 — «4», 60–69 — «3», 0–59 — «2» (академическая задолженность). Баллы от 0,5 округляются вверх (69,5 → 70 → «4»).',
-        'en': 'Grading: 90–100 points — “5”, 70–89 — “4”, 60–69 — “3”, 0–59 — “2” (academic debt). Scores of .5 and above are rounded up (69.5 → 70 → “4”).'},
+    "GPA — HEMIS tizimidagi rasmiy o'zlashtirish ko'rsatkichi (dekanat yuklagan «Performance GPA» ro'yxati bo'yicha).": {
+        'ru': 'GPA — официальный показатель успеваемости в системе HEMIS (по списку «Performance GPA», загруженному деканатом).',
+        'en': 'GPA — the official grade point average from HEMIS (per the «Performance GPA» list uploaded by the dean\'s office).'},
+    "Baholash: 90–100 ball — «5», 70–89 — «4», 60–69 — «3», 0–59 — «2». Ball 0,5 dan boshlab yuqoriga yaxlitlanadi (69,5 → 70 → «4»). Akademik qarz — dekanatning akademik qarzdorlar ro'yxati bo'yicha («2» qayta o'qishda yopilgan bo'lishi mumkin).": {
+        'ru': 'Оценивание: 90–100 баллов — «5», 70–89 — «4», 60–69 — «3», 0–59 — «2». Баллы от 0,5 округляются вверх (69,5 → 70 → «4»). Академическая задолженность — по списку должников деканата («2» могла быть закрыта при пересдаче).',
+        'en': 'Grading: 90–100 points — “5”, 70–89 — “4”, 60–69 — “3”, 0–59 — “2”. Scores of .5 and above are rounded up (69.5 → 70 → “4”). Academic debt is taken from the dean’s office list of debtors (a “2” may have been cleared at a retake).'},
     'Bekor qilindi.': {
         'ru': 'Отменено.',
         'en': 'Cancelled.'},

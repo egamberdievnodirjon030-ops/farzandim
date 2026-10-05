@@ -34,11 +34,12 @@ def _average(results: list[dict]) -> float | None:
     return sum(cur) / len(cur) if cur else None
 
 
-def build(st: dict, att_row, att_tot, grades: list[dict], pays: dict, dl: dict, hemis: list[dict] | None = None) -> dict:
+def build(st: dict, att_row, att_tot, grades: list[dict], pays: dict, dl: dict, hemis: list[dict] | None = None,
+          official: dict | None = None) -> dict:
     sm = absence.summary_from(att_row, att_tot)
     level = absence.level_index(sm["counted"]) if sm else -1
     results = academic.subject_results(grades)
-    debts = academic.merge_debts([r for r in results if r["debt"]], hemis or [])  # + HEMIS qarzdorlar ro'yxati
+    debts = academic.apply_debt_list(results, hemis or [])  # faqat akademik qarzdorlar ro'yxati bo'yicha
     t = today()
     issues = []
     if level >= 0:
@@ -54,12 +55,14 @@ def build(st: dict, att_row, att_tot, grades: list[dict], pays: dict, dl: dict, 
             issues.append(("💰 " + tr("Kontrakt qarzi: {v}", v=fmt_money(p['debt'])) if k == "kontrakt"
                            else "💳 " + tr("Trimestr qarzi: {v}", v=fmt_money(p['debt'])))
                           + (" — " + tr("muddat ({d}) o'tgan", d=fmt_date(dl[k], False)) if late else ""))
-    g, weighted = academic.gpa(results)
+    # GPA — faqat HEMIS «Performance GPA» faylidan (baholardan hisoblanmaydi); yuklanmagan bo'lsa — yo'q
+    g, weighted = (official["gpa"] if official else None), False
     low = academic.gpa_low(g)
     if low:
         issues.append(tr("🎓 GPA {v} — {min} dan past: kursdan kursga o'tmaydi", v=fmt_gpa(g), min=fmt_limit(GPA_MIN)))
     return {"student": st, "attendance": sm, "level": level, "results": results, "debts": debts,
-            "average": _average(results), "gpa": g, "gpa_weighted": weighted, "pays": pays, "issues": issues,
+            "average": _average(results), "gpa": g, "gpa_weighted": weighted,
+            "gpa_as_of": (official or {}).get("changed_at") or (official or {}).get("recorded_at"), "pays": pays, "issues": issues,
             "flags": {"att": level >= 0, "acad": bool(debts), "gpa": low,
                       "kontrakt": bool(pays.get("kontrakt") and pays["kontrakt"]["debt"] > 0),
                       "trimestr": bool(pays.get("trimestr") and pays["trimestr"]["debt"] > 0)}}
@@ -72,7 +75,7 @@ async def student_status(st: dict) -> dict:
                  await db.attendance_totals(st["id"], min(semester_start(), t).isoformat(), t.isoformat()),
                  await db.grades_for(st["id"]),
                  {k: await db.latest_payment(st["id"], k) for k in PAY_KINDS}, await deadlines(),
-                 await db.academic_debts_for(st["id"]))
+                 await db.academic_debts_for(st["id"]), await db.gpa_for(st["id"]))
 
 
 async def all_statuses(students: list[dict]) -> list[dict]:
@@ -84,5 +87,7 @@ async def all_statuses(students: list[dict]) -> list[dict]:
     pays = {k: await db.bulk_latest_payments(k) for k in PAY_KINDS}
     dl = await deadlines()
     hemis = await db.bulk_academic_debts()
+    gpas = await db.bulk_gpa()
     return [build(st, att.get(st["id"]), tot.get(st["id"]), grades.get(st["id"], []),
-                  {k: pays[k].get(st["id"]) for k in PAY_KINDS}, dl, hemis.get(st["id"], [])) for st in students]
+                  {k: pays[k].get(st["id"]) for k in PAY_KINDS}, dl, hemis.get(st["id"], []), gpas.get(st["id"]))
+            for st in students]

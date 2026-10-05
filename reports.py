@@ -505,7 +505,7 @@ async def payment_report(st: dict, kind: str = "kontrakt") -> str:
 async def academic_report(st: dict) -> str:
     parts = [student_header(st), "", tr("📚 <b>Akademik qarzdorlik</b>")]
     sm = await academic.summary(st["id"])
-    if sm["debts"]:  # baholardan (0–59 → «2») va HEMIS «Akadem qarzdorlar» ro'yxatidan
+    if sm["debts"]:  # faqat «Akademik qarzdorlar» ro'yxatidan (baholardagi «2» — qarz emas)
         parts.append("\n" + tr("❗ Jami <b>{n} ta fandan</b> akademik qarzdor:", n=len(sm['debts'])))
         for d in sm["debts"]:
             info = []
@@ -521,21 +521,19 @@ async def academic_report(st: dict) -> str:
                              + ("".join(" · " + x for x in info)))
     elif sm["results"]:
         parts.append("\n" + tr("✅ Akademik qarzdorlik yo'q."))
+    off = await db.gpa_for(st["id"])  # GPA — faqat HEMIS «Performance GPA» faylidan
+    if off:
+        parts.append("\n" + tr("🎓 <b>O'zlashtirish ko'rsatkichi (GPA): {v} / 5</b>", v=fmt_gpa(off["gpa"])) + " — HEMIS")
+        if academic.gpa_low(off["gpa"]):
+            parts.append(tr("🔴 GPA {min} dan past — talaba kursdan kursga o'tkazilmaydi.", min=fmt_limit(GPA_MIN)))
     if not sm["results"]:
         parts.append("\n" + tr("Fanlar bo'yicha 100 ballik umumiy baholar hali yuklanmagan."))
         parts.append(f"\n<i>{tr(academic.RULES_TEXT)}</i>")
         return "\n".join(parts)
-    total_gpa, weighted = academic.gpa(sm["results"])
-    parts.append("\n" + tr("🎓 <b>O'zlashtirish ko'rsatkichi (GPA): {v} / 5</b>", v=fmt_gpa(total_gpa))
-                 + (" " + tr("(kreditlar bo'yicha)") if weighted else ""))
-    if academic.gpa_low(total_gpa):
-        parts.append(tr("🔴 GPA {min} dan past — talaba kursdan kursga o'tkazilmaydi.", min=fmt_limit(GPA_MIN)))
-    sem_gpa = academic.semester_gpa(sm["results"])
     parts.append("\n" + tr("📊 <b>Baholar (5 baholik tizimda):</b>"))
     for sem, items in sorted(academic.by_semester(sm["results"]).items(), reverse=True):
         if sem:
-            parts.append("<b>" + (tr("{n}-semestr", n=esc(sem)) if str(sem).isdigit() else esc(sem)) + "</b>"
-                         + f" — GPA {fmt_gpa(sem_gpa.get(sem))}")
+            parts.append("<b>" + (tr("{n}-semestr", n=esc(sem)) if str(sem).isdigit() else esc(sem)) + "</b>")
         for r in items:
             mark = "❗" if r["debt"] else "▫️"
             parts.append(f"{mark} {esc(loc.term(r['subject']))} — {fmt_num(r['score'])} → «{r['grade']}»")

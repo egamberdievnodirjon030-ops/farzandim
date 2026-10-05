@@ -107,7 +107,7 @@ ADMIN_HELP = (
     "/panel — 📊 kurs holati: qarzdorlar, davomat muammolari, muammoli talabalar (masalan <code>/panel 3-kurs</code>)\n"
     "/muddat — kontrakt va trimestr to'lov muddatlari (eslatmalar shu asosda yuboriladi)\n"
     "/qarzdorlar — moliyaviy qarzdorlar: kontrakt va trimestr (masalan <code>/qarzdorlar trimestr 2-kurs</code>)\n"
-    "/akademik — akademik qarzdorlar: 0–59 ball («2») olgan fanlari bilan\n"
+    "/akademik — akademik qarzdorlar (dekanatning qarzdorlar ro'yxati bo'yicha)\n"
     f"/chegaralar — dars qoldirish chegaralariga yetgan talabalar ({'/'.join(fmt_num(x / HOURS_PER_PAIR) for x in absence.LEVELS)} para = "
     f"{'/'.join(map(str, absence.LEVELS))} soat)\n"
     "/hujjat — tushuntirish xati, dekan ogohlantirishi yoki hayfsanni (PDF) ota-onaga yuborish. "
@@ -580,7 +580,7 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
             d = (await academic.summary(sid))["debts"]
             if d:
                 n_st, n_subj = n_st + 1, n_subj + len(d)
-        lines.append(f"📚 Akademik qarzdorlar (0–59 ball → «2»): {n_st} ta talaba, {n_subj} ta fan"
+        lines.append(f"📚 Akademik qarzdorlar (qarzdorlar ro'yxati bo'yicha): {n_st} ta talaba, {n_subj} ta fan"
                      + (" — ro'yxat: /akademik" if n_st else ""))
 
     elif kind == "acad_debts":  # HEMIS «Akadem qarzdorlar»: talaba necha marta kelsa — shuncha qarzdor fan
@@ -610,6 +610,26 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
             lines.append(f"Yangi qarzdor fanlar: {n_new}, yopilgan (ro'yxatdan chiqqan): {n_closed}")
             if not silent and (n_new or n_closed):
                 lines.append(f"Ota-onalarga xabar: {await notify_acad_list(bot, before, after)}")
+        if missing:
+            lines.append(f"⚠️ Bazada topilmagan talabalar: {len(missing)} ta — "
+                         + ", ".join(missing[:8]) + (" …" if len(missing) > 8 else "")
+                         + ". «Talabalar» (kontingent) faylini yangilang.")
+        unknown = []
+
+    elif kind == "gpa":  # HEMIS «Performance GPA» — rasmiy GPA (baholardan hisoblanmaydi)
+        from config import GPA_MIN
+        rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
+        missing = sorted({u.split("(")[-1].rstrip(")") for u in unknown if "(" in u})
+        if not rows:
+            lines.append("❌ Fayldagi talabalarning birortasi ham bu kurs bazasida topilmadi — GPA saqlanmadi. "
+                         "Fayl boshqa kursga tegishli emasligini va «Talabalar» fayli yuklanganini tekshiring.")
+        else:
+            clean = [{k: r.get(k) for k in ("student_id", "gpa", "subjects", "credits", "debts", "method", "year",
+                                            "changed_at")} for r in rows]
+            await db.add_gpa(clean)
+            low = [r for r in clean if round(r["gpa"], 9) < GPA_MIN]
+            lines.append(f"🎓 GPA (HEMIS): {len(clean)} ta talaba, o'rtacha {sum(r['gpa'] for r in clean) / len(clean):.2f}")
+            lines.append(f"GPA {str(GPA_MIN).replace('.', ',')} dan past (kursdan o'tmaydi): {len(low)} ta talaba")
         if missing:
             lines.append(f"⚠️ Bazada topilmagan talabalar: {len(missing)} ta — "
                          + ", ".join(missing[:8]) + (" …" if len(missing) > 8 else "")

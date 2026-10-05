@@ -342,7 +342,7 @@ async function pPanel() {
     <a href="#/students"><div class="k">Talabalar</div><div class="v navy">${d.total}</div>
       <div class="s">ota-onasi ulangan: ${cover}%</div><div class="meter"><i style="width:${cover}%"></i></div></a>
     <a href="#/students?f=att"><div class="k">Davomat muammosi</div><div class="v ${tone(d.att)}">${d.att}</div><div class="s">chegaraga yetganlar</div></a>
-    <a href="#/students?f=acad"><div class="k">Akademik qarz</div><div class="v ${tone(d.acad)}">${d.acad}</div><div class="s">kamida bitta «2»</div></a>
+    <a href="#/students?f=acad"><div class="k">Akademik qarz</div><div class="v ${tone(d.acad)}">${d.acad}</div><div class="s">qarzdorlar ro‘yxati bo‘yicha</div></a>
     <a href="#/students?f=gpa"><div class="k">GPA past</div><div class="v ${tone(d.gpa)}">${d.gpa}</div><div class="s">${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi</div></a>
     <a href="#/students?f=prob"><div class="k">3+ masalali</div><div class="v ${tone(d.multi)}">${d.multi}</div><div class="s">birinchi navbatda</div></a>
     <a href="#/students?f=kontrakt"><div class="k">Kontrakt qarzi</div><div class="v ${tone(d.kontrakt.count, 'warn')}">${d.kontrakt.count}</div><div class="s num">${money(d.kontrakt.sum)}</div></a>

@@ -111,7 +111,14 @@ def _results_at(history: list[dict], when: str) -> list[dict]:
 async def grade_changes(st: dict) -> dict:
     history = await db.grade_history(st["id"])
     current = (await academic.summary(st["id"]))["results"]
-    out = {"ref": None, "month": False, "items": [], "gpa_old": None, "gpa_new": academic.gpa(current)[0]}
+    out = {"ref": None, "month": False, "items": [], "gpa_old": None, "gpa_new": None}
+    # GPA — faqat HEMIS «Performance GPA» yuklamalaridan: joriy va taxminan bir oy oldingi qiymat
+    gh = await db.gpa_history(st["id"])
+    if gh:
+        out["gpa_new"] = gh[-1]["gpa"]
+        month_ago_g = (now() - timedelta(days=30)).isoformat(timespec="seconds")
+        older = [x for x in gh[:-1] if x["recorded_at"] <= month_ago_g] or gh[:-1]
+        out["gpa_old"] = older[-1]["gpa"] if older else None
     if not history or not current:
         return out
     month_ago = (now() - timedelta(days=30)).isoformat(timespec="seconds")
@@ -125,13 +132,14 @@ async def grade_changes(st: dict) -> dict:
             items.append({"subject": r["subject"], "old": o["score"], "new": r["score"], "delta": r["score"] - o["score"],
                           "old_grade": o["grade"], "new_grade": r["grade"]})
     out.update(ref=ref, month=ref == month_ago, items=sorted(items, key=lambda x: x["delta"]),
-               gpa_old=academic.gpa(list(old.values()))[0] if old else None,
                compared=[(old.get((str(r["semester"]), normalize_text(r["subject"]))), r) for r in current])
     return out
 
 
 def grade_lines(g: dict) -> list[str]:
     lines = [tr("📚 <b>Baholar</b>")]
+    if g["gpa_old"] is not None and g["gpa_new"] is not None and abs(g["gpa_new"] - g["gpa_old"]) >= 0.01:
+        lines.append(tr("🎓 GPA (HEMIS): {old} → <b>{new}</b>.", old=fmt_gpa(g["gpa_old"]), new=fmt_gpa(g["gpa_new"])))
     if g["ref"] is None:
         lines.append(tr("Taqqoslash uchun baholar tarixi hali yo'q — keyingi yuklashlardan so'ng ko'rinadi."))
         return lines
@@ -151,9 +159,6 @@ def grade_lines(g: dict) -> list[str]:
     if rises:
         best = rises[-1]
         lines.append(tr("👍 «{subj}» fanidan ball {when} ko'tarildi.", subj=esc(loc.term(best["subject"])), when=when))
-    if g["gpa_old"] is not None and g["gpa_new"] is not None and abs(g["gpa_new"] - g["gpa_old"]) >= 0.01:
-        lines.append(tr("🎓 GPA: {old} → <b>{new}</b> ({when}).", old=fmt_gpa(g["gpa_old"]), new=fmt_gpa(g["gpa_new"]),
-                        when=when))
     return lines
 
 
@@ -217,7 +222,7 @@ async def by_semester(st: dict) -> list[dict]:
     out = []
     for sem in sorted(groups, key=key):
         items = groups[sem]
-        out.append({"semester": sem, "gpa": academic.gpa(items)[0], "avg": round(sum(i["score"] for i in items) / len(items), 1),
+        out.append({"semester": sem, "gpa": None, "avg": round(sum(i["score"] for i in items) / len(items), 1),
                     "subjects": len(items), "debts": sum(1 for i in items if i["debt"])})
     return out
 

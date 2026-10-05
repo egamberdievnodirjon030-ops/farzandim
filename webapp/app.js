@@ -604,7 +604,7 @@ async function viewGrades() {
   if (deskMode()) {
     const head = `<div class="dk-kpis">
       <div class="tile ${d.gpa_low ? 'bad' : ''}"><span class="k">${t('gpa_long')}</span><span class="v num">${d.gpa != null ? gpaNum(d.gpa) : '—'}<small class="of"> / 5</small></span>
-        <span class="s">${d.gpa_low ? t('gpa_low', { min: limNum(d.gpa_min) }) : t('gpa_hint')}</span></div>
+        <span class="s">${[d.gpa_as_of ? `HEMIS · ${dateLabel(d.gpa_as_of, true)}` : '', d.gpa_low ? t('gpa_low', { min: limNum(d.gpa_min) }) : (d.gpa_as_of ? '' : t('gpa_hint'))].filter(Boolean).join(' · ')}</span></div>
       <a class="tile ${d.debts ? 'bad' : 'ok'}" href="${d.debts ? '#/debts' : '#/grades'}"><span class="k">${t('acad')}</span>
         <span class="v">${d.debts ? `${d.debts}<small class="of"> ${esc(subjUnit(d.debts))}</small>` : t('no_debt')}</span><span class="s">${d.debts ? t('open') : ''}</span></a>
       <div class="tile"><span class="k">${t('grade_scale')}</span><div class="dk-scale">${[['90–100', 5], ['70–89', 4], ['60–69', 3], ['0–59', 2]].map(([r, g]) =>
@@ -618,7 +618,7 @@ async function viewGrades() {
     return page({ title: t('grades'), sub: c.name, active: '#/grades', wide: true, body: head + sems });
   }
   const body = switcher() + `<div class="card" style="display:flex;justify-content:space-between;align-items:center">
-      <div><div class="muted small">${t('gpa_long')}</div><div class="bigstat"><b class="num">${d.gpa != null ? gpaNum(d.gpa) : '—'}</b><span class="muted">/ 5</span></div>${d.gpa_low ? `<div class="small" style="color:var(--bordo-fg);font-weight:600;margin-top:2px">${t('gpa_low', { min: limNum(d.gpa_min) })}</div>` : ''}</div>
+      <div><div class="muted small">${t('gpa_long')}</div><div class="bigstat"><b class="num">${d.gpa != null ? gpaNum(d.gpa) : '—'}</b><span class="muted">/ 5</span></div>${d.gpa_as_of ? `<div class="small muted">HEMIS · ${dateLabel(d.gpa_as_of, true)}</div>` : ''}${d.gpa_low ? `<div class="small" style="color:var(--bordo-fg);font-weight:600;margin-top:2px">${t('gpa_low', { min: limNum(d.gpa_min) })}</div>` : ''}</div>
       ${d.debts ? `<a class="pill bordo" href="#/debts" style="font-size:14px;padding:8px 12px">${t('acad')}: ${d.debts} ${ic('chev')}</a>` : `<span class="pill ok" style="font-size:14px;padding:8px 12px">${t('acad')}: ${t('no_debt').toLowerCase()}</span>`}</div>
     ${d.semesters.map(s => `<section class="section"><div class="section-head"><h2>${t('semN', { n: s.semester })}</h2>${s.gpa != null ? `<span class="muted num">GPA ${gpaNum(s.gpa)}</span>` : ''}</div>
       <div class="list">${s.subjects.map(g => `<div class="subject ${g.debt ? 'debt' : ''}"><div><div style="font-weight:600">${esc(g.subject)}</div>
@@ -795,7 +795,7 @@ async function viewTrends() {
       <rect x="0" y="${y + 27}" width="${wNew}" height="9" rx="4" fill="${x.new < 60 ? 'var(--bordo-500)' : 'var(--navy-500)'}"/><text x="${wNew + 6}" y="${y + 35}">${num(x.new)}</text>`;
   }).join('')}<line x1="108" x2="108" y1="0" y2="${comp.length * 46 + 10}" stroke="var(--bordo-500)" stroke-dasharray="3 3"/></svg>
     <div class="chips small muted" style="margin-top:8px"><span><span class="pill" style="background:var(--line);color:var(--muted)">${g.month ? t('month_ago') : dateLabel(g.ref)}</span></span><span class="pill">${t('now')}</span><span class="small muted">60 — «3»</span></div>` : '';
-  const ups = d.uploads || [], sems = (d.semesters || []).filter(x => x.gpa != null);
+  const ups = d.uploads || [], sems = (d.semesters || []).filter(x => x.avg != null);
   S.gpaMin = d.gpa_min;
   // yuklangan fayllar bo'yicha: har bir ko'rsatkich — qiymat, o'zgarish, grafik va barcha nuqtalar (sana: qiymat)
   const upHtml = ups.length ? `<section class="section"><div class="section-head"><h2>${t('by_upload')}</h2></div><div class="card dyn">${ups.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">
@@ -803,10 +803,10 @@ async function viewTrends() {
       ${spark(it.points, dl.cls)}<div class="val"><b class="num">${esc(dynVal(it, it.value))}</b><span class="${dl.cls}">${esc(dl.txt)}</span></div></div>`; }).join('')}</div></section>` : '';
   // semestrlar bo'yicha: GPA ustunlari va har bir semestr — oldingisiga nisbatan
   const semHtml = sems.length ? `<section class="section"><div class="section-head"><h2>${t('by_semester')}</h2></div><div class="card">
-      ${sems.length > 1 ? `<div class="sem-bars">${sems.map(x => `<div class="sem-bar"><b class="num">${gpaNum(x.gpa)}</b><i style="height:${Math.max(6, Math.round(x.gpa / 5 * 90))}px" class="${x.gpa < (S.gpaMin || 2.6) ? 'low' : ''}"></i><span>${esc(semLabel(x.semester))}</span></div>`).join('')}</div>` : ''}
-      ${sems.map((x, i) => { const p = sems[i - 1]; const dg = p ? Math.round((x.gpa - p.gpa) * 100) / 100 : null;
-        return `<div class="kv" style="margin-top:${i ? 8 : 12}px"><span><b>${esc(semLabel(x.semester))}</b> · ${t('avg_score')} ${num(x.avg)}${x.debts ? ` · <span style="color:var(--bordo-fg)">«2»: ${x.debts}</span>` : ''}</span>
-          <b class="num">GPA ${gpaNum(x.gpa)}${dg ? ` <span style="color:${dg > 0 ? 'var(--ok)' : 'var(--bordo-fg)'}">${dg > 0 ? '▲' : '▼'} ${gpaNum(Math.abs(dg))}</span>` : ''}</b></div>`; }).join('')}</div></section>` : '';
+      ${sems.length > 1 ? `<div class="sem-bars">${sems.map(x => `<div class="sem-bar"><b class="num">${num(x.avg)}</b><i style="height:${Math.max(6, Math.round(x.avg / 100 * 90))}px" class="${x.avg < 60 ? 'low' : ''}"></i><span>${esc(semLabel(x.semester))}</span></div>`).join('')}</div>` : ''}
+      ${sems.map((x, i) => { const p = sems[i - 1]; const dg = p ? Math.round((x.avg - p.avg) * 10) / 10 : null;
+        return `<div class="kv" style="margin-top:${i ? 8 : 12}px"><span><b>${esc(semLabel(x.semester))}</b> · ${x.subjects} ${t('subj_h').toLowerCase()}</span>
+          <b class="num">${t('avg_score')} ${num(x.avg)}${dg ? ` <span style="color:${dg > 0 ? 'var(--ok)' : 'var(--bordo-fg)'}">${dg > 0 ? '▲' : '▼'} ${num(Math.abs(dg))}</span>` : ''}</b></div>`; }).join('')}</div></section>` : '';
   page({ title: t('trends'), sub: c.short, active: '', body: switcher() + `<h2 class="screen-title">${t('trends')}</h2>
     ${upHtml}${semHtml}
     ${d.periods.length > 1 ? `<section class="section"><div class="section-head"><h2>${t('by_week')}</h2></div><div class="card">${weekChart(d.periods)}</div></section>` : ''}
@@ -1077,7 +1077,7 @@ async function viewStaff() {
     <div class="grid2" style="margin-top:12px">
       ${tile('Talabalar', d.total, `ota-onasi ulangan: ${pctLinked}%`, '', '#/staff/students')}
       ${tile('Davomat muammosi', d.att, 'chegaraga yetganlar', d.att ? 'bad' : 'ok', '#/staff/students?filter=att')}
-      ${tile('Akademik qarz', d.acad, 'kamida bitta «2»', d.acad ? 'bad' : 'ok', '#/staff/students?filter=acad')}
+      ${tile('Akademik qarz', d.acad, 'qarzdorlar ro‘yxati bo‘yicha', d.acad ? 'bad' : 'ok', '#/staff/students?filter=acad')}
       ${tile('3+ muammoli', d.multi, 'birinchi navbatda', d.multi ? 'bad' : 'ok', '#/staff/students?filter=prob')}
       ${tile('GPA past', d.gpa, `${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi`, d.gpa ? 'bad' : 'ok', '#/staff/students?filter=gpa')}
       ${tile('Kontrakt qarzi', d.kontrakt.count, money(d.kontrakt.sum), d.kontrakt.count ? 'warn' : 'ok', '#/staff/students?filter=kontrakt')}

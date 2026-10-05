@@ -152,6 +152,18 @@ ALIASES: dict[str, dict[str, list[str]]] = {
         "semester": ["semestr", "semester"],
         "credits": ["kredit", "kreditlar", "kredit soni", "kreditlar soni", "credit", "credits", "zachetnye edinitsy"],
     },
+    # HEMIS «Performance GPA»: talabaning rasmiy GPA si
+    "gpa": {
+        "hemis_id": _ID,
+        "full_name": _NAME,
+        "group_name": _GROUP,
+        "gpa": ["gpa", "gpa ball", "umumiy gpa", "gpa bali", "srednij ball gpa"],
+        "load": ["fan kredit", "fan / kredit", "fanlar kredit", "fan va kredit"],
+        "debts": ["qarz", "qarzlar", "qarzdor fanlar", "qarzdor fanlar soni", "akademik qarz"],
+        "method": ["gpa usuli", "usul", "gpa turi"],
+        "changed": ["ozgartirilgan", "o zgartirilgan", "o zgartirilgan sana", "yangilangan", "sana"],
+        "course": ["kurs", "course"],
+    },
     # HEMIS «Akadem qarzdorlar» ro'yxati: har bir qator — talabaning bitta qarzdor fani
     "acad_debts": {
         "hemis_id": _ID,
@@ -176,8 +188,9 @@ REQUIRED = {
     "enroll": [],
     "elsched": ["subject", "weekday", "pair"],
     "acad_debts": ["subject"],
+    "gpa": ["gpa"],
 }
-NEED_STUDENT_REF = {"attendance", "grades", "phones", "attendance_stats", "enroll", "acad_debts"}  # HEMIS ID yoki F.I.Sh ustunidan biri bo'lishi shart
+NEED_STUDENT_REF = {"attendance", "grades", "phones", "attendance_stats", "enroll", "acad_debts", "gpa"}  # HEMIS ID yoki F.I.Sh ustunidan biri bo'lishi shart
 
 FIELD_TITLES = {
     "hemis_id": "HEMIS ID", "full_name": "F.I.Sh", "group_name": "Guruh", "date": "Sana",
@@ -190,7 +203,8 @@ KIND_TITLES = {"translations": "Tarjimalar (fan va fakultet nomlari)", "students
                "attendance_stats": "Davomat (HEMIS statistikasi)", "enroll": "Tanlov fanlari va 2-til (biriktirish)",
                "elsched": "Tanlov fanlari va 2-til jadvali",
                "phones": "Talaba telefonlari", "debts": "Kontrakt qarzdorligi",
-               "debts_t": "Trimestr qarzdorligi", "acad_debts": "Akademik qarzdorlar (HEMIS ro'yxati)"}
+               "debts_t": "Trimestr qarzdorligi", "acad_debts": "Akademik qarzdorlar (HEMIS ro'yxati)",
+               "gpa": "GPA (HEMIS)"}
 
 
 @dataclass
@@ -257,7 +271,7 @@ def parse_file(path: str, kind: str) -> ParseResult:
 COMPATIBLE = {"translations": {"translations"}, "students": {"students"}, "attendance": {"attendance"}, "schedule": {"schedule"},
               "elsched": {"elsched"}, "grades": {"grades"}, "enroll": {"enroll", "grades"},
               "phones": {"phones", "students"}, "debts": {"debts"}, "debts_t": {"debts_t"},
-              "acad_debts": {"acad_debts"}}
+              "acad_debts": {"acad_debts"}, "gpa": {"gpa"}}
 
 
 def detect_kinds(all_rows: list[tuple], file_name: str = "") -> list[str]:
@@ -265,6 +279,11 @@ def detect_kinds(all_rows: list[tuple], file_name: str = "") -> list[str]:
     fn = normalize_text(file_name)
     head = " ".join(normalize_text(cell_str(c)) for row in all_rows[:12] for c in row if c not in (None, ""))
     found: list[str] = []
+    # HEMIS «Performance GPA»: talaba + GPA ustuni. Unda HEMIS ID, F.I.Sh., guruh, kurs ham bor — talabalar ro'yxati
+    # deb adashmasligi uchun birinchi va yagona tur sifatida aniqlanadi
+    gpa_cols = set(_best_header(all_rows, ALIASES["gpa"])[0])
+    if "gpa" in gpa_cols and gpa_cols & {"hemis_id", "full_name"}:
+        return ["gpa"]
     debts = parse_debts(all_rows)
     if not debts.fatal:
         tri = ("trimestr" in fn or "trimestr" in head
@@ -362,7 +381,7 @@ def parse_rows(all_rows: list[tuple], kind: str) -> ParseResult:
 
     parser = {"students": _student, "attendance": _attendance, "schedule": _schedule, "grades": _grade,
               "phones": _self_phones, "attendance_stats": _att_stats, "enroll": _enroll, "translations": _translation,
-              "elsched": _elective, "acad_debts": _acad_debt}[kind]
+              "elsched": _elective, "acad_debts": _acad_debt, "gpa": _gpa}[kind]
     has_ref = kind == "students" or kind in NEED_STUDENT_REF
     # jadval ustidagi «Guruh: 3-1a-24» kabi qatorlar — qatorda guruh bo'sh bo'lsa shundan olinadi
     meta = {}
@@ -399,6 +418,32 @@ def parse_rows(all_rows: list[tuple], kind: str) -> ParseResult:
                          "Ularsiz ham bot ishlaydi, lekin talabaning raqami bo'yicha aniqlash va tug'ilgan sana "
                          "bo'yicha qo'lda bog'lash ishlamaydi (qo'lda bog'lashda HEMIS ID ishlatiladi).")
     return res
+
+
+def _gpa(g) -> dict:
+    """HEMIS «Performance GPA» qatori: «4.05», «25 / 120.0» (fanlar / kredit), «Qarz» (soni), o'zgartirilgan sana."""
+    raw = cell_str(g("gpa")).replace(",", ".").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"GPA noto'g'ri: «{raw or 'bo‘sh'}»")
+    if not 0 <= value <= 5:
+        raise ValueError(f"GPA 0–5 oralig'ida emas: {raw}")
+    subjects = credits = None
+    m = re.match(r"\s*(\d+)\s*/\s*([\d.,]+)", cell_str(g("load")))
+    if m:
+        subjects, credits = int(m.group(1)), float(m.group(2).replace(",", "."))
+    debts = re.search(r"\d+", cell_str(g("debts")))
+    changed = None
+    m = re.search(r"(\d{1,2})[./](\d{1,2})[./](\d{4})(?:\s+(\d{1,2}):(\d{2}))?", cell_str(g("changed")))
+    if m:
+        d, mo, y, hh, mm = m.groups()
+        changed = f"{y}-{int(mo):02d}-{int(d):02d}" + (f"T{int(hh):02d}:{mm}" if hh else "")
+    year = re.search(r"\d{4}\s*[-–]\s*\d{4}", cell_str(g("course")))
+    return {"hemis_id": cell_str(g("hemis_id")) or None, "full_name": nice_name(cell_str(g("full_name"))),
+            "group_name": cell_str(g("group_name")) or None, "gpa": value, "subjects": subjects, "credits": credits,
+            "debts": int(debts.group(0)) if debts else None, "method": cell_str(g("method")) or None,
+            "changed_at": changed, "year": year.group(0).replace(" ", "") if year else None}
 
 
 def _acad_debt(g) -> dict:

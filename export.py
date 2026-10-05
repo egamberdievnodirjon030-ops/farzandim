@@ -215,7 +215,7 @@ def build_xlsx(data: dict, only: str | None = None) -> bytes:
             ("3 va undan ortiq muammoli talabalar", f"=COUNTIF({ref('prob', 'E')},\">=3\")", None, "«Muammolar soni» ≥ 3"),
             ("Davomati past (chegaraga yetgan)", f"=COUNTA({ref('att', 'B')})", None,
              f"Sababsiz qoldirilgan ≥ {fmt_num(absence.LEVELS[0] / HOURS_PER_PAIR)} para ({absence.LEVELS[0]} soat)"),
-            ("Akademik qarzdorlar", f"=COUNTA({ref('acad', 'B')})", None, "Kamida bitta fandan «2» (0–59 ball)"),
+            ("Akademik qarzdorlar", f"=COUNTA({ref('acad', 'B')})", None, "Akademik qarzdorlar ro'yxati bo'yicha"),
             ("GPA past talabalar", f"=COUNTA({ref('gpa', 'B')})", None,
              f"Umumiy GPA {fmt_limit(GPA_MIN)} dan past — kursdan kursga o'tmaydi (yaxlitlanmaydi)"),
             ("Kontrakt qarzdorlari", f"=COUNTA({ref('kontrakt', 'B')})", f"=SUM({ref('kontrakt', 'H')})", "Oxirgi buxgalteriya hisoboti"),

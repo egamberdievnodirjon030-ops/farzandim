@@ -295,7 +295,7 @@ IMPORT_KINDS = (("👥 Talabalar", "students"), ("📊 Davomat", "attendance"),
                 ("📅 Dars jadvali (asosiy fanlar)", "schedule"), ("📝 Baholar", "grades"),
                 ("🎯 Tanlov/2-til: kim o'qiydi", "enroll"), ("🗓 Tanlov/2-til: jadval", "elsched"),
                 ("💰 Kontrakt qarzdorligi", "debts"), ("🗓 Trimestr qarzdorligi", "debts_t"),
-                ("📚 Akademik qarzdorlar", "acad_debts"),
+                ("📚 Akademik qarzdorlar", "acad_debts"), ("🎓 GPA (HEMIS)", "gpa"),
                 ("📱 Talaba telefonlari", "phones"), ("🌐 Tarjimalar", "translations"))
 
 
@@ -304,7 +304,7 @@ def import_kb() -> InlineKeyboardMarkup:
     kb.button(text="🤖 Aralash fayllar — turini bot o'zi aniqlaydi", callback_data=ImpCb(kind="auto"))
     for text, kind in IMPORT_KINDS:
         kb.button(text=text, callback_data=ImpCb(kind=kind))
-    kb.adjust(1, 2, 2, 2, 2, 1, 2)
+    kb.adjust(1, 2, 2, 2, 2, 2, 2)
     return kb.as_markup()
 
 

@@ -348,11 +348,11 @@ async def api_grades(request):
         sems.setdefault(sem, []).append({"subject": loc.term(r["subject"]), "score": r["score"], "grade": r["grade"],
                                          "debt": r["debt"], "credits": r.get("credits"),
                                          "items": detail.get((sem, normalize_text(r["subject"])), [])})
-    gpa, weighted = academic.gpa(results)
-    by_sem = academic.semester_gpa(results)
-    return ok({"gpa": _gpa(gpa), "gpa_low": academic.gpa_low(gpa), "gpa_min": GPA_MIN, "weighted": weighted,
-               "semesters": [{"semester": k, "gpa": _gpa(by_sem.get(k)), "subjects": v}
-                                                              for k, v in sorted(sems.items(), reverse=True)],
+    off = await db.gpa_for(st["id"])  # GPA — faqat HEMIS «Performance GPA» faylidan
+    gpa = off["gpa"] if off else None
+    return ok({"gpa": _gpa(gpa), "gpa_low": academic.gpa_low(gpa), "gpa_min": GPA_MIN, "weighted": False,
+               "gpa_as_of": (off or {}).get("changed_at") or (off or {}).get("recorded_at"),
+               "semesters": [{"semester": k, "gpa": None, "subjects": v} for k, v in sorted(sems.items(), reverse=True)],
                "debts": len(summary["debts"]), "debt_list": [_debt(d) for d in summary["debts"]]})
 
 
