@@ -774,11 +774,17 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
             return
         url, _ = await build_url(kind, st["hemis_id"] if st else None, monday)
         async with sem:
+            if fatal:  # boshqa so'rov kalit yoki manzil xatosini topdi — qolganlari yuborilmaydi
+                return
             try:
                 recs, i, body = await _fetch_url(session, url, limit, probe)
             except IntegrationError as e:
                 info["failed"] += 1
-                if e.status in (401, 403) or not per_student(kind):  # kalit noto'g'ri — davom etishdan foyda yo'q
+                if e.status == 404 and "cannot get" in str(e).lower():  # manzil (yo'l) umuman yo'q — talabaga bog'liq emas
+                    fatal.append(IntegrationError(f"bunday manzil Manage'da yo'q (HTTP 404: Cannot GET): {_safe_url(url)}. "
+                                                  f".env dagi INTEGRATION_{'ATTENDANCE' if kind == 'attendance' else 'SCHEDULE'} "
+                                                  "qatorini tekshiring", status=404))
+                elif e.status in (401, 403) or not per_student(kind):  # kalit noto'g'ri — davom etishdan foyda yo'q
                     fatal.append(e)
                 elif info["failed"] <= 3:
                     log.warning("%s: %s (%s) — %s", INTEGRATION_NAME, TITLES[kind], st and st["hemis_id"], e)
@@ -1103,8 +1109,7 @@ async def probe(kind: str) -> str:
     try:
         records, info = await fetch(kind, max_pages=1)
     except Exception as e:
-        url = _safe_url((await build_url(kind))[0])
-        return f"<b>{TITLES[kind]}</b>\n❌ {esc(_err_text(e))}\nManzil: <code>{esc(url)}</code>"
+        return f"<b>{TITLES[kind]}</b>\n❌ {esc(_err_text(e))}"
     lines = [f"<b>{TITLES[kind]}</b> — <code>{esc(info['url'])}</code>",
              f"Javob: {esc(info['format'] or '—')}, birinchi sahifada {len(records)} ta yozuv"]
     if not records:
