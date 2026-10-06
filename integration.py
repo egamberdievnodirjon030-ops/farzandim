@@ -399,8 +399,40 @@ def auto_map(keys: list[str], kind: str) -> dict[str, str]:
     return out
 
 
-def mapping_for(keys: list[str], kind: str) -> dict[str, str]:
+# «11 lesson», «Lesson 3», «5-dars», «12-mavzu», «3» — bu fan nomi emas (darsning tartib raqami)
+_NOT_SUBJECT = re.compile(r"^\s*(\d+\s*[-.]?\s*(lesson|dars|mavzu|zanyatie|urok|lecture|seminar|topic)?|"
+                          r"(lesson|dars|mavzu|zanyatie|urok|topic)\s*[-№#]?\s*\d+)\s*$", re.I)
+_SUBJECT_KEYS = ("title", "subject", "discipline", "fan", "predmet", "course", "name")
+
+
+def _bad_subject(values: list) -> bool:
+    vals = [normalize_text(v) for v in values if v not in (None, "")]
+    return bool(vals) and sum(1 for v in vals if _NOT_SUBJECT.match(v)) * 2 > len(vals)
+
+
+def fix_subject(m: dict, records: list[dict], keys: list[str]) -> dict:
+    """Fan maydonidagi qiymatlar «11 lesson» kabi bo'lsa — fan nomi boshqa maydondan (masalan, title) olinadi."""
+    if "subject" not in m or not records:
+        return m
+    sample = records[:300]
+    if not _bad_subject([r.get(m["subject"]) for r in sample]):
+        return m
+    used = set(m.values())
+    for word in _SUBJECT_KEYS:
+        for k in keys:
+            h = humanize(k)
+            if k in used or k.startswith("_ctx") or word not in h.split():
+                continue
+            vals = [r.get(k) for r in sample]
+            if any(isinstance(v, str) and v.strip() for v in vals) and not _bad_subject(vals):
+                return {**m, "subject": k}
+    return m
+
+
+def mapping_for(keys: list[str], kind: str, records: list[dict] | None = None) -> dict[str, str]:
     m = auto_map(keys, kind)
+    if records:
+        m = fix_subject(m, records, keys)
     for fld, key in overrides().get(kind, {}).items():
         if key == "-":
             m.pop(fld, None)
@@ -526,7 +558,7 @@ def build_table(records: list[dict], kind: str) -> tuple[list[tuple], dict]:
     """Yozuvlar → importer tushunadigan jadval (sarlavha + qatorlar) va ma'lumot (moslik, tanilmagan kalitlar)."""
     records = [flatten(r) if any(isinstance(v, (dict, list)) for v in r.values()) else r for r in records]
     keys = list(dict.fromkeys(k for r in records for k in r))
-    m = mapping_for(keys, kind)
+    m = mapping_for(keys, kind, records)
     info = {"mapping": m, "unmapped": [k for k in keys if k not in m.values()], "records": len(records),
             "mode": kind}
     if kind == "attendance":
