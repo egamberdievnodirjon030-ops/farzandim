@@ -58,16 +58,46 @@ if (-not (Test-Path -LiteralPath $py)) {
 }
 
 # ---------------------------------------------------------------- 3. cloudflared
+function Test-Exe([string]$path) {
+    # to'liq yuklangan Windows dasturimi: "MZ" bilan boshlanadi va hajmi kamida 10 MB
+    # (chala yuklangan fayl - disk to'lgan, internet uzilgan yoki antivirus - "not a valid Win32 application" beradi)
+    try {
+        $fi = Get-Item -LiteralPath $path -ErrorAction Stop
+        if ($fi.Length -lt 10MB) { return $false }
+        $fs = [System.IO.File]::OpenRead($path); $b = New-Object byte[] 2
+        [void]$fs.Read($b, 0, 2); $fs.Close()
+        return ($b[0] -eq 0x4D -and $b[1] -eq 0x5A)
+    } catch { return $false }
+}
 $cmd = Get-Command cloudflared -ErrorAction SilentlyContinue
-if ($cmd) { $cf = $cmd.Source } else {
+if ($cmd -and (Test-Exe $cmd.Source)) { $cf = $cmd.Source } else {
     $cf = Join-Path $PSScriptRoot 'cloudflared.exe'
+    if ((Test-Path -LiteralPath $cf) -and -not (Test-Exe $cf)) {
+        Say "cloudflared.exe buzilgan yoki chala yuklangan - o'chirilib, qayta yuklanadi." 'Yellow'
+        Remove-Item -LiteralPath $cf -Force
+    }
     if (-not (Test-Path -LiteralPath $cf)) {
         $arch = if ([Environment]::Is64BitOperatingSystem) { 'amd64' } else { '386' }
         Say "cloudflared yuklab olinmoqda (rasmiy GitHub sahifasidan, taxminan 60 MB)..." 'Cyan'
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $ProgressPreference = 'SilentlyContinue'
-        Invoke-WebRequest -UseBasicParsing -OutFile $cf `
-            -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-$arch.exe"
+        $tmp = "$cf.part"
+        try {
+            Invoke-WebRequest -UseBasicParsing -OutFile $tmp `
+                -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-$arch.exe"
+        } catch {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+            Say "cloudflared yuklab olinmadi: $($_.Exception.Message)" 'Red'
+            Say "Diskda bo'sh joy (kamida 100 MB) va internetni tekshiring yoki cloudflared-windows-$arch.exe ni qo'lda yuklab, shu papkaga cloudflared.exe nomi bilan qo'ying." 'Yellow'
+            exit 1
+        }
+        if (-not (Test-Exe $tmp)) {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+            Say "cloudflared chala yuklandi (diskda joy yetmagan yoki antivirus to'sgan bo'lishi mumkin)." 'Red'
+            Say "Diskda joy bo'shating va qayta ishga tushiring." 'Yellow'
+            exit 1
+        }
+        Move-Item -LiteralPath $tmp -Destination $cf -Force
     }
 }
 
@@ -75,8 +105,19 @@ if ($cmd) { $cf = $cmd.Source } else {
 $log = Join-Path ([System.IO.Path]::GetTempPath()) 'ota_ona_cloudflared.log'
 if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force }
 Say "Tunnel ochilmoqda: https://...trycloudflare.com  ->  http://127.0.0.1:$port" 'Cyan'
-$tunnel = Start-Process -FilePath $cf -ArgumentList @('tunnel', '--no-autoupdate', '--url', "http://127.0.0.1:$port") `
-    -RedirectStandardError $log -NoNewWindow -PassThru
+try {
+    $tunnel = Start-Process -FilePath $cf -ArgumentList @('tunnel', '--no-autoupdate', '--url', "http://127.0.0.1:$port") `
+        -RedirectStandardError $log -NoNewWindow -PassThru
+} catch {
+    Say "cloudflared ishga tushmadi: $($_.Exception.Message)" 'Red'
+    if ($cf -eq (Join-Path $PSScriptRoot 'cloudflared.exe')) {
+        Remove-Item -LiteralPath $cf -Force -ErrorAction SilentlyContinue
+        Say "Buzilgan cloudflared.exe o'chirildi - skriptni qayta ishga tushiring, u yangidan yuklanadi." 'Yellow'
+    } else {
+        Say "Tizimdagi cloudflared ($cf) ishlamayapti - uni qayta o'rnating." 'Yellow'
+    }
+    exit 1
+}
 
 $url = $null
 for ($i = 0; $i -lt 90 -and -not $url; $i++) {
