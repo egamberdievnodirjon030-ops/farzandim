@@ -9,7 +9,7 @@ from datetime import date, datetime, time, timedelta
 from difflib import SequenceMatcher
 
 from i18n import get_lang, tr
-from config import HOURS_PER_PAIR, PAIR_TIMES, SEMESTER_START, TZ
+from config import CREDIT_CODE_PATTERN, HOURS_PER_PAIR, PAIR_TIMES, SEMESTER_START, TZ
 
 # ---------------------------------------------------------------- matn
 _APOSTROPHES = "'`ʻʼ‘’´ʹ′"
@@ -525,3 +525,13 @@ def fmt_pairs(hours) -> str:
     if lang == "ru":
         return f"{ps} {_ru_pairs(p)} ({hs} ч)"
     return f"{ps} para ({hs} soat)"
+
+
+def credits_from_code(code) -> int | None:
+    """Fan kodidan kredit: «CTIR25C4-21-11» → 4, «NFPSRUZ15C4-31» → 4, «CONF12C6-31» → 6 (topilmasa — None)."""
+    m = re.match(CREDIT_CODE_PATTERN, cell_str(code).strip())
+    try:
+        c = int(m.group(1)) if m else 0
+    except (IndexError, ValueError):
+        return None
+    return c if 1 <= c <= 30 else None

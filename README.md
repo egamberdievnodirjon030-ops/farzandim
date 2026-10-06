@@ -500,9 +500,9 @@ Fanga ajratilgan auditoriya soatining **25%** va undan ortig'ini sababsiz qoldir
 
 Sababsiz qoldirishlar fan bo'yicha kunlik davomat yoki fan bo'yicha HEMIS statistikasidan olinadi (sababli darslar hisobga olinmaydi). Hamma joyda «kelmadi: 3 / 5 para» ko'rinishida chiqadi: ota-ona «Davomat» bo'limida, jadval va bugungi darslarda, talaba kartasida, «Jadval va fanlar» sahifasida (har bir fan bo'yicha chegaraga yetgan talabalar soni, fan bosilganda — talabalar holati). Chegaragacha **1 para** qolganda ota-onaga ogohlantirish, chegaraga yetganda «⛔ yakuniy nazoratga kiritilmaydi» xabari boradi (har biri bir marta, «Muhim ogohlantirishlar» sozlamasi bo'yicha); farzand sahifasidagi masalalar ro'yxatida ham ko'rinadi. Kurs koordinatoriga import natijasida chegaraga yetganlar ro'yxati chiqadi.
 
-**Fan krediti** baholar faylidagi «kredit» ustunidan, bo'lmasa akademik qarzdorlar ro'yxatidan olinadi. Topilmasa (yoki boshqacha bo'lsa) kurs koordinatori «Jadval va fanlar» sahifasida fan qatoridagi ✎ tugmasi bilan kiritadi (0 — avtomatik). Kredit noma'lum fan uchun chegara ko'rsatilmaydi.
+**Fan krediti avtomatik aniqlanadi.** Manage dars jadvalidagi fan kodida kredit bor: `CTIR25C4-21` → 4 kredit, `CONF12C6-31` → 6 kredit, `NFPSRUZ15C4-31` → 4 kredit (kodning birinchi qismidagi oxirgi harfdan keyingi son). Jadval Manage'dan olinganda (yoki jadval faylida «Fan kodi» ustuni bo'lsa) kreditlar shu koddan yoziladi va import hisobotida «Fan kreditlari fan kodidan aniqlandi» deb ko'rsatiladi. Ustunlik tartibi: koordinator qo'lda kiritgani → baholar fayli («kredit» ustuni) → Manage fan kodi → akademik qarzdorlar ro'yxati. «Jadval va fanlar» sahifasida kredit ustiga kursor olib borilsa — qayerdan olingani ko'rinadi. Topilmasa (yoki boshqacha bo'lsa) kurs koordinatori «Jadval va fanlar» sahifasida fan qatoridagi ✎ tugmasi bilan kiritadi (0 — avtomatik). Kredit noma'lum fan uchun chegara ko'rsatilmaydi.
 
-Sozlamalar (`.env`): `SUBJECT_LIMIT_PERCENT=25`, `AUDITORIUM_PAIRS_PER_CREDIT=5`, `SUBJECT_LIMIT_PAIRS=2=2,4=5,6=7` (kredit → para jadvali; formuladan ustun).
+Sozlamalar (`.env`): `SUBJECT_LIMIT_PERCENT=25`, `AUDITORIUM_PAIRS_PER_CREDIT=5`, `SUBJECT_LIMIT_PAIRS=2=2,4=5,6=7` (kredit → para jadvali; formuladan ustun), `CREDIT_CODE_PATTERN` (fan kodidan kreditni ajratuvchi regex; 1-guruh — kredit).
 
 ## Rasmiy hujjatlar (PDF)
 

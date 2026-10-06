@@ -845,12 +845,14 @@ def _scope_sql(group: str) -> tuple[str, list] | None:
 async def _subject_rows(where: str, params: list | None = None) -> list[dict]:
     """Fanlar kesimidagi davomat (semestr boshidan): darslar, keldi %, sababsiz, sababli, qoldirgan talabalar."""
     import subject_limits
-    cred = await subject_limits.credits_map()
+    info = await subject_limits.credits_info()
+    cred = {k: v["credits"] for k, v in info.items()}
     merged: dict[str, dict] = {}
     for (_, k), o in (await per_student_subjects(where, params or ())).items():
         m = merged.setdefault(k, {"subject": loc.term(o["subject"] or ""), "key": k, "total": 0, "came": 0, "kelmadi": 0,
                                   "sababli": 0, "students": 0, "missed_students": 0, "over_students": 0, "warn_students": 0,
-                                  **subject_limits.evaluate(0, cred.get(k))})
+                                  **subject_limits.evaluate(0, cred.get(k)),
+                                  "credits_src": (info.get(k) or {}).get("src"), "code": (info.get(k) or {}).get("code")})
         ev = subject_limits.evaluate(o["kelmadi"], cred.get(k))
         m["over_students"] += ev["state"] == "over"
         m["warn_students"] += ev["state"] == "warn"

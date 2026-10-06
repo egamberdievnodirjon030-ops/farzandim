@@ -99,6 +99,8 @@ HINTS: dict[str, dict[str, list[str]]] = {
         "room": ["auditorium name", "auditorium", "room name", "room", "classroom", "xona", "auditoriya"],
         "week_type": ["week type", "parity", "week parity", "hafta turi", "toq juft"],
         "subgroup": ["subgroup", "sub group", "subgroup name", "seminar raqami", "kichik guruh", "podgruppa"],
+        # fan kodi: «CTIR25C4-21» — undan fan krediti (C4 → 4 kredit) va sababsiz qoldirish chegarasi aniqlanadi
+        "code": ["subject code", "course code", "discipline code", "code", "fan kodi", "kod"],
     },
 }
 # jadvalga yoziladigan sarlavha (importer shu nomni aniq taniydi)
@@ -107,7 +109,7 @@ CANON = {
     "subject": "Fan", "lesson_type": "Mashg'ulot turi", "teacher": "O'qituvchi", "status": "Holat", "hours": "Soat",
     "weekday": "Hafta kuni", "start_time": "Boshlanish", "end_time": "Tugash", "time_range": "Vaqt", "room": "Xona",
     "week_type": "Hafta turi", "subgroup": "Seminar raqami", "attended": "Qatnashganlar soni",
-    "absent": "Qatnashmaganlar soni", "excused": "Sabablilar soni",
+    "absent": "Qatnashmaganlar soni", "excused": "Sabablilar soni", "code": "Fan kodi",
 }
 FIELD_NAMES = {
     "hemis_id": "talaba ID (HEMIS)", "full_name": "F.I.Sh.", "group_name": "guruh", "date": "sana", "pair": "juftlik",
@@ -115,6 +117,7 @@ FIELD_NAMES = {
     "hours": "soat", "weekday": "hafta kuni", "start_time": "boshlanish vaqti", "end_time": "tugash vaqti",
     "time_range": "vaqt", "room": "xona", "week_type": "hafta turi", "subgroup": "kichik guruh",
     "attended": "qatnashgan", "absent": "qatnashmagan (jami)", "excused": "sababli (jami)",
+    "code": "fan kodi (kredit)",
 }
 # holat maydoni bo'lmasa — shu so'zli maydonlardan aniqlanadi (HEMIS: explicable, absent_on, absent_off …)
 _W_EXCUSED = ("explicable", "excused", "sababli", "uzrli", "reason", "uvazh", "justified")
@@ -576,7 +579,7 @@ def build_table(records: list[dict], kind: str) -> tuple[list[tuple], dict]:
                       "status", "hours"]
     else:
         fields = ["group_name", "weekday", "pair", "start_time", "end_time", "time_range", "subject", "lesson_type",
-                  "teacher", "room", "week_type", "subgroup"]
+                  "teacher", "room", "week_type", "subgroup", "code"]
     get = lambda r, f: r.get(m[f]) if f in m else None  # noqa: E731
 
     def start_of(r) -> str | None:  # boshlanish vaqti yoki «13:30-14:50» dagi birinchi vaqt
@@ -597,7 +600,7 @@ def build_table(records: list[dict], kind: str) -> tuple[list[tuple], dict]:
                 v = to_status(v, m.get("status", ""))
             elif f == "lesson_type" and isinstance(v, str):
                 v = LESSON_TYPES.get(normalize_text(v), " ".join(v.split()))
-            elif f in ("subject", "teacher", "room", "group_name") and isinstance(v, str):
+            elif f in ("subject", "teacher", "room", "group_name", "code") and isinstance(v, str):
                 v = " ".join(v.replace('"', " ").split()) if f == "group_name" else " ".join(v.split())
             elif f == "pair" and v not in (None, ""):
                 n = parse_int(re.sub(r"\D+", " ", cell_str(v)).split()[0]) if re.search(r"\d", cell_str(v)) else None

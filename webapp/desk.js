@@ -612,6 +612,8 @@ function limChip(x) {
   return x.state === 'over' ? '<span class="chip bordo" title="Yakuniy nazoratga kiritilmaydi, akademik qarzdor hisoblanadi">Chegaradan oshdi</span>'
     : x.state === 'warn' ? `<span class="chip warn">${x.left} para qoldi</span>` : '';
 }
+const credSrc = x => ({ manual: 'Kredit qo‘lda kiritilgan', grades: 'Kredit baholar faylidan', debts: 'Kredit qarzdorlar ro‘yxatidan',
+  code: `Kredit Manage fan kodidan (${x.code || ''})` })[x.credits_src] || '';
 function subjRow(x) {
   return `<div class="subj${x.state === 'over' ? ' over' : ''}"><div class="sn"><b>${esc(x.subject)}</b><span>${x.total} ta dars${x.kelmadi ? ` · <em>${x.kelmadi} sababsiz</em>` : ''}${x.limit != null ? ` / chegara ${x.limit} para (${x.credits} kredit)` : ''}${x.sababli ? ` · ${x.sababli} sababli` : ''}</span>${limChip(x)}</div>
     ${pctCell(x.pct)}</div>`;
@@ -655,7 +657,7 @@ async function pSubjects(parts, q) {
       ${d.subjects.map(x => `<tr class="click" data-subj="${esc(x.key)}" data-name="${esc(x.subject)}"><td class="name"><b>${esc(x.subject)}</b></td><td class="r">${x.total}</td><td>${pctCell(x.pct)}</td>
         <td class="r">${x.kelmadi ? `<span class="icnt bad">${ic('calx')}${x.kelmadi}</span>` : '<span class="dash">0</span>'}</td><td class="r">${x.sababli || '<span class="dash">0</span>'}</td>
         <td class="r">${x.missed_students ? `${x.missed_students} / ${x.students}` : `<span class="dash">0 / ${x.students}</span>`}</td>
-        <td class="r nowrap">${x.limit != null ? `${x.credits} kr · <b>${x.limit} para</b>` : '<span class="dash">kredit yo‘q</span>'}${canCred ? ` <button class="btn sm ghost" data-cred="${esc(x.key)}" data-cv="${x.credits || ''}" data-cn="${esc(x.subject)}" title="Kreditni kiritish">${ic('edit')}</button>` : ''}</td>
+        <td class="r nowrap">${x.limit != null ? `<span title="${esc(credSrc(x))}">${x.credits} kr · <b>${x.limit} para</b></span>` : '<span class="dash">kredit yo‘q</span>'}${canCred ? ` <button class="btn sm ghost" data-cred="${esc(x.key)}" data-cv="${x.credits || ''}" data-cn="${esc(x.subject)}" title="Kreditni kiritish">${ic('edit')}</button>` : ''}</td>
         <td class="r">${x.over_students ? `<span class="icnt bad">${ic('alert')}${x.over_students}</span>` : '<span class="dash">0</span>'}${x.warn_students ? ` <span class="chip warn" title="1 para qoldi">+${x.warn_students}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>`
     : emptyBox('cal', 'Davomat ma’lumoti yo‘q', 'Kunlik davomat (dars bo‘yicha) yuklanganda fanlar kesimi shu yerda ko‘rinadi.');
   view(head('Jadval va fanlar', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
@@ -665,7 +667,7 @@ async function pSubjects(parts, q) {
     ${st.group ? `<section class="sec"><header>${H('cal', `Haftalik jadval — ${esc(st.group)}`, 'att')}</header><div class="pad">${grid || emptyBox('cal', 'Jadval topilmadi', 'Bu guruh uchun dars jadvali hali yuklanmagan yoki Manage’dan olinmagan.')}</div></section>`
       : `<p class="hint scope">${ic('info')}Haftalik jadvalni ko‘rish uchun guruhni tanlang. Quyida — ${myGroups().length ? 'guruhlaringiz' : 'butun kurs'} bo‘yicha fanlar kesimidagi davomat (semestr boshidan).</p>`}
     <section class="sec" style="margin-top:18px"><header>${H('activity', `Fanlar kesimida davomat${st.group ? ' — ' + esc(st.group) : ''}`, 'att')}<span class="hint">semestr boshidan · fanni bosing — talabalar</span></header>${subj}
-      <p class="hint scope lim-note">${ic('info')}Fanga ajratilgan auditoriya soatining 25% va undan ortig‘ini sababsiz qoldirgan talaba shu fandan yakuniy nazoratga kiritilmaydi (akademik qarzdor): 2 kredit — 2 para, 4 kredit — 5 para, 6 kredit — 7 para. Kredit baholar fayli yoki qarzdorlar ro‘yxatidan olinadi${canCred ? ', topilmasa ✎ tugmasi bilan kiriting' : ''}.</p></section>`);
+      <p class="hint scope lim-note">${ic('info')}Fanga ajratilgan auditoriya soatining 25% va undan ortig‘ini sababsiz qoldirgan talaba shu fandan yakuniy nazoratga kiritilmaydi (akademik qarzdor): 2 kredit — 2 para, 4 kredit — 5 para, 6 kredit — 7 para. Kredit avtomatik aniqlanadi: Manage dars jadvalidagi fan kodidan (CTIR25C4 → 4 kredit), baholar fayli yoki qarzdorlar ro‘yxatidan${canCred ? '; topilmasa yoki noto‘g‘ri bo‘lsa — ✎ tugmasi bilan kiriting' : ''}.</p></section>`);
   $('#sg').addEventListener('change', e => { st.group = e.target.value; st.week = ''; route(); });
   $$('[data-w]').forEach(b => b.addEventListener('click', () => { st.week = b.dataset.w; route(); }));
   $$('[data-subj]').forEach(r => r.addEventListener('click', () => openSubject(r.dataset.subj, r.dataset.name, st.group)));

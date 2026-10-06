@@ -98,6 +98,7 @@ ALIASES: dict[str, dict[str, list[str]]] = {
         "teacher": ["oqituvchi", "teacher", "prepodavatel"],
         "room": ["xona", "auditoriya", "room", "aud", "xonasi"],
         "week_type": ["hafta turi", "hafta", "toq juft"],
+        "code": ["fan kodi", "kod", "code", "fan kod", "subject code", "kodi"],
         "subgroup": ["seminar raqami", "seminar guruhi", "seminar nomeri", "kichik guruh", "kichik guruhi", "guruhcha",
                      "podgruppa", "subgroup", "kichik guruh raqami"],
     },
@@ -115,6 +116,7 @@ ALIASES: dict[str, dict[str, list[str]]] = {
         "teacher": ["oqituvchi", "teacher", "prepodavatel"],
         "room": ["xona", "auditoriya", "room", "aud", "xonasi"],
         "week_type": ["hafta turi", "hafta", "toq juft"],
+        "code": ["fan kodi", "kod", "code", "fan kod", "subject code", "kodi"],
     },
     # Talabaning shaxsiy fanlari: tanlov fanlari, ikkinchi chet tili, oqim
     "enroll": {
@@ -592,7 +594,7 @@ def _lesson_base(g) -> dict:
     week_type = "toq" if wt.startswith("toq") else "juft" if wt.startswith("juft") else "har"
     return {"weekday": wd, "pair": pair, "start_time": start, "end_time": end, "subject": subject,
             "lesson_type": cell_str(g("lesson_type")) or None, "teacher": cell_str(g("teacher")) or None,
-            "room": cell_str(g("room")) or None, "week_type": week_type}
+            "room": cell_str(g("room")) or None, "week_type": week_type, "code": cell_str(g("code")) or None}
 
 
 def _translation(g) -> dict:

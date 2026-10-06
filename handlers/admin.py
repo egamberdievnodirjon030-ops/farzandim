@@ -46,7 +46,8 @@ import loc
 import termsheet
 import status
 from reports import UPDATE_KEYS, last_update, schedule_report
-from utils import (CONTRACT, GRANT, normalize_phone, fmt_pairs, fmt_dt, now_iso, detect_doc_type, fmt_money, doc_keywords, doc_title, esc, fmt_date, fmt_num, fmt_phone, fmt_size,
+from subject_limits import limit_pairs
+from utils import (CONTRACT, credits_from_code, GRANT, normalize_phone, fmt_pairs, fmt_dt, now_iso, detect_doc_type, fmt_money, doc_keywords, doc_title, esc, fmt_date, fmt_num, fmt_phone, fmt_size,
                    group_key, name_score, normalize_text, parse_course, parse_date, parse_user_dates, split_message,
                    today, fmt_gpa, fmt_limit,
                    week_bounds)
@@ -568,6 +569,7 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         subs = sum(1 for r in result.rows if r.get("subgroup"))
         if subs:
             lines.append(f"Kichik guruhga tegishli darslar: {subs}")
+        lines += _code_credit_lines(result.rows)
 
     elif kind == "elsched":
         n, subjects = await db.replace_elective_schedule(result.rows)
@@ -575,6 +577,7 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         for r in result.rows:
             streams.setdefault(r["subject"], set()).add(r.get("stream") or "")
         lines.append(f"Darslar: {n}, fanlar: {len(subjects)} (fayldagi fanlarning eski darslari almashtirildi)")
+        lines += _code_credit_lines(result.rows)
         lines.append("Fanlar: " + ", ".join(
             esc(sj) + (f" ({len([x for x in streams[sj] if x])} oqim)" if any(streams[sj]) else "") for sj in subjects))
         lines.append("Bu darslar guruhga bog'lanmagan: ular faqat shu fanga biriktirilgan talabalarning shaxsiy "
@@ -784,6 +787,19 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
     for extra in parts[1:]:
         await progress.answer(extra)
     return True
+
+
+def _code_credit_lines(rows: list[dict]) -> list[str]:
+    """Jadvaldagi fan kodlaridan aniqlangan kreditlar (fan bo'yicha sababsiz qoldirish chegarasi shundan)."""
+    found: dict[str, int] = {}
+    for r in rows:
+        c = credits_from_code(r.get("code"))
+        if c:
+            found.setdefault(r["subject"], c)
+    if not found:
+        return []
+    return [f"Fan kreditlari fan kodidan aniqlandi ({len(found)} ta fan): " + ", ".join(
+        f"{esc(s)} — {c} kr. (chegara {limit_pairs(c)} para)" for s, c in sorted(found.items()))]
 
 
 def _subject_limit_lines(overs: list[dict], sent: int) -> list[str]:

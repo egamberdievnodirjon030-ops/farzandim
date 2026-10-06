@@ -125,6 +125,10 @@ SUBJECT_LIMIT_PAIRS: dict[float, int] = {
                                   if "=" in x and x.split("=", 1)[0].strip().replace(".", "", 1).isdigit()
                                   and x.split("=", 1)[1].strip().isdigit())}
 
+# Fan krediti fan kodidan (Manage/HEMIS: «CTIR25C4-21» → 4 kredit, «CONF12C6-31» → 6 kredit): kodning birinchi
+# qismidagi oxirgi harfdan keyingi son. Boshqa tuzilishdagi kodlar uchun o'z regex ingizni bering (1-guruh — kredit).
+CREDIT_CODE_PATTERN = os.getenv("CREDIT_CODE_PATTERN", r"^[A-Za-z]{2,}\d{1,3}[A-Za-z](\d{1,2})(?:[-_ .]|$)")
+
 # Faylda "soat" ustuni bo'lmasa, bitta juftlik necha akademik soat hisoblanadi
 HOURS_PER_PAIR = float(os.getenv("HOURS_PER_PAIR", "2"))
 

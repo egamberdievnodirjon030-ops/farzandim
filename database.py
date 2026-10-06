@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import re
 import aiosqlite
 
 from tenancy import central, current_course
 
-from utils import group_key, normalize_text, now_iso, subject_key
+from utils import credits_from_code, group_key, normalize_text, now_iso, subject_key
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS students (
@@ -296,6 +297,15 @@ CREATE TABLE IF NOT EXISTS attendance_stats (
 
 -- HEMIS davomat statistikasi BITTA FAN bo'yicha («O'quvchilarni … fanidan darslarga qatnashish statistikasi»).
 -- Umumiy davomatga (attendance_stats) qo'shilmaydi — faqat fanlar kesimida ko'rsatiladi. Birliklar — HEMIS'dagidek (para).
+-- Fan krediti fan kodidan (Manage jadvali yoki jadval faylidagi «Fan kodi»: «CTIR25C4-21» → 4 kredit)
+CREATE TABLE IF NOT EXISTS subject_credits (
+    subject_key TEXT PRIMARY KEY,
+    subject     TEXT NOT NULL,
+    credits     REAL NOT NULL,
+    code        TEXT,
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS subject_att_stats (
     student_id  INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     subject     TEXT NOT NULL,
@@ -1014,8 +1024,27 @@ class Database:
             [{"subgroup": None, **r} for r in rows],
         )
         await self._tag("schedule", "group_key = ?", [(k,) for k in keys])
+        await self.store_code_credits(rows, commit=False)
         await self.conn.commit()
         return len(rows), len(keys)
+
+    async def store_code_credits(self, rows: list[dict], commit: bool = True) -> dict[str, tuple[str, float, str]]:
+        """Jadval qatorlaridagi fan kodidan kreditni yozadi. Qaytaradi: fan kaliti → (fan, kredit, kod)."""
+        found: dict[str, tuple[str, float, str]] = {}
+        for r in rows:
+            c = credits_from_code(r.get("code"))
+            k = subject_key(r.get("subject")) or normalize_text(r.get("subject"))
+            if c and k:
+                found.setdefault(k, (r["subject"], c, re.split(r"[-_ .]", str(r["code"]).strip())[0]))
+        if found:
+            await self.conn.executemany(
+                """INSERT INTO subject_credits (subject_key, subject, credits, code) VALUES (?, ?, ?, ?)
+                   ON CONFLICT(subject_key) DO UPDATE SET subject = excluded.subject, credits = excluded.credits,
+                   code = excluded.code, updated_at = datetime('now')""",
+                [(k, *v) for k, v in found.items()])
+            if commit:
+                await self.conn.commit()
+        return found
 
     async def schedule_for(self, gkey: str, weekday: int, week_type: str) -> list[dict]:
         return await self.fetchall(
@@ -1043,6 +1072,7 @@ class Database:
              for r in rows],
         )
         await self._tag("elective_schedule", "subject_key = ?", [(k,) for k in keys])
+        await self.store_code_credits(rows, commit=False)
         await self.conn.commit()
         return len(rows), sorted({r["subject"] for r in rows})
 
