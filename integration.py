@@ -1043,10 +1043,41 @@ async def status_text() -> str:
     return "\n".join(lines)
 
 
+def env_report() -> str:
+    """Sozlamalar nega o'qilmaganini topish uchun: .env qayerda, bormi va qaysi qatorlar ko'rindi (parol ko'rsatilmaydi)."""
+    from config import BASE_DIR
+    env = BASE_DIR / ".env"
+    lines = [f".env fayli: {env} — {'bor' if env.exists() else 'TOPILMADI'}"]
+    for alt in (".env.txt", ".env.env", "env.txt"):
+        if (BASE_DIR / alt).exists():
+            lines.append(f"⚠️ {BASE_DIR / alt} ham bor — Blocknot faylni shu nom bilan saqlagan bo'lishi mumkin; "
+                         "sozlamalarni .env ga o'tkazing")
+    found = {}
+    if env.exists():
+        try:
+            for raw in env.read_text("utf-8-sig", errors="replace").splitlines():
+                k = raw.split("=", 1)[0].strip()
+                if k.startswith("INTEGRATION_"):
+                    found.setdefault(k, []).append(raw.split("=", 1)[1].strip() if "=" in raw else "")
+        except OSError:
+            pass
+    for k in ("INTEGRATION_URL", "INTEGRATION_AUTH", "INTEGRATION_TOKEN", "INTEGRATION_SCHEDULE", "INTEGRATION_ATTENDANCE"):
+        vals = found.get(k)
+        if not vals:
+            lines.append(f"  {k}: .env da yo'q")
+            continue
+        last = vals[-1]
+        shown = "(kiritilgan)" if k == "INTEGRATION_TOKEN" and last else (last or "bo'sh")
+        lines.append(f"  {k}: {shown}" + (f"  — ⚠️ {len(vals)} marta yozilgan, oxirgisi olinadi" if len(vals) > 1 else ""))
+    lines.append(f"Bot o'qigani: URL={'bor' if INTEGRATION_URL else 'yoq'}, SCHEDULE={'bor' if INTEGRATION_SCHEDULE else 'yoq'}, "
+                 f"ATTENDANCE={'bor' if INTEGRATION_ATTENDANCE else 'yoq'}, AUTH={INTEGRATION_AUTH}")
+    return "\n".join(lines)
+
+
 async def probe(kind: str) -> str:
     """Ulanishni tekshirish: birinchi sahifa, tanilgan maydonlar va namunaviy qatorlar (bazaga yozilmaydi)."""
     if not configured(kind):
-        return f"<b>{TITLES[kind]}</b>: manzil sozlanmagan (INTEGRATION_{'ATTENDANCE' if kind == 'attendance' else 'SCHEDULE'})."
+        return f"<b>{TITLES[kind]}</b>: manzil sozlanmagan (INTEGRATION_{'ATTENDANCE' if kind == 'attendance' else 'SCHEDULE'}).\n" + esc(env_report())
     try:
         records, info = await fetch(kind, max_pages=1)
     except Exception as e:
