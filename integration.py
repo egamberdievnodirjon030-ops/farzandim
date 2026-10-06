@@ -673,6 +673,14 @@ def mondays(kind: str) -> list[date]:
     return out
 
 
+PROBE_HEMIS: str | None = None  # tekshirishda aniq talaba: python integration.py jadval --hemis=381231100123
+
+
+def real_hemis(hid) -> bool:
+    """Haqiqiy HEMIS ID — faqat raqamlar (12 xonali). DEMO0001 kabi namunaviy ID lar so'ralmaydi."""
+    return bool(re.fullmatch(r"\d{6,}", str(hid or "").strip()))
+
+
 async def targets(kind: str) -> list[dict]:
     """{hemis_id} uchun talabalar: davomat — hammasi, jadval — har bir guruhdan bittasi (jadval guruhga bir xil)."""
     out, groups = [], set()
@@ -681,6 +689,8 @@ async def targets(kind: str) -> list[dict]:
             rows = await db.fetchall("SELECT hemis_id, full_name, group_name, group_key FROM students "
                                      "WHERE COALESCE(hemis_id, '') != '' ORDER BY group_key, id")
         for r in rows:
+            if not real_hemis(r["hemis_id"]):  # namunaviy (DEMO0001) yoki qo'lda yozilgan ID — Manage'da yo'q
+                continue
             if kind == "schedule" and INTEGRATION_SCHEDULE_PER_GROUP:
                 if r["group_key"] in groups:
                     continue
@@ -743,11 +753,13 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
     probe = max_pages is not None
     limit = max_pages or INTEGRATION_MAX_PAGES
     tg = (await targets(kind)) if per_student(kind) else [None]
-    if per_student(kind) and not tg:
-        raise IntegrationError("bazada HEMIS ID li talaba yo'q — avval «Talabalar» faylini yuklang")
+    if per_student(kind) and not tg and not (probe and PROBE_HEMIS):
+        raise IntegrationError("bazada haqiqiy (raqamli) HEMIS ID li talaba yo'q — DEMO0001 kabi namunaviy talabalar "
+                               "so'ralmaydi. «Talabalar» (kontingent) faylini yuklang yoki --hemis=381231100123 bilan sinang")
     weeks = mondays(kind)
-    if probe:
-        tg, weeks = tg[:1], weeks[:1]
+    if probe:  # tekshirish: bitta hafta; javob bo'sh bo'lsa — keyingi talaba (5 tagacha)
+        weeks = weeks[:1]
+        tg = [{"hemis_id": PROBE_HEMIS, "full_name": "", "group_name": ""}] if PROBE_HEMIS and per_student(kind) else tg[:5]
     url0, complete = await build_url(kind, tg[0]["hemis_id"] if tg[0] else None, weeks[0])
     info = {"pages": 0, "format": "", "complete": complete, "truncated": False, "url": _safe_url(url0),
             "requests": 0, "failed": 0, "sample": b""}
@@ -776,6 +788,8 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
                     fatal.append(e)
                 return
         info["requests"] += 1
+        if recs and not records:
+            info["url"] = _safe_url(url)
         info["pages"] += i["pages"]
         info["format"] = i["format"] or info["format"]
         info["truncated"] = info["truncated"] or i["truncated"]
@@ -790,7 +804,14 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
         records.extend(recs)
 
     async with aiohttp.ClientSession(timeout=timeout) as session:  # timeout — har bir so'rov uchun
-        await asyncio.gather(*(one(session, st, m) for st in tg for m in weeks))
+        if probe:
+            for st in tg:
+                await one(session, st, weeks[0])
+                if records or fatal:
+                    break
+            tg = tg[:max(1, info["requests"] + info["failed"])]
+        else:
+            await asyncio.gather(*(one(session, st, m) for st in tg for m in weeks))
     if fatal:
         raise fatal[0]
     total = len(tg) * len(weeks)
@@ -1086,7 +1107,10 @@ async def probe(kind: str) -> str:
     lines = [f"<b>{TITLES[kind]}</b> — <code>{esc(info['url'])}</code>",
              f"Javob: {esc(info['format'] or '—')}, birinchi sahifada {len(records)} ta yozuv"]
     if not records:
-        lines.append("Yozuv kelmadi — sanalar oralig'ida ma'lumot bo'lmasligi yoki yo'l noto'g'ri bo'lishi mumkin.")
+        lines.append("Yozuv kelmadi — sanalar oralig'ida ma'lumot bo'lmasligi yoki yo'l noto'g'ri bo'lishi mumkin."
+                     + (" Talabaning HEMIS ID si Manage'dagi bilan bir xilligini tekshiring yoki aniq talaba bilan sinang: "
+                        "python integration.py jadval --hemis=381231100123 --dump (javob data papkasidagi faylga saqlanadi)."
+                        if per_student(kind) else ""))
         return "\n".join(lines)
     table, binfo = build_table(records, kind)
     m = binfo["mapping"]
@@ -1155,7 +1179,9 @@ if __name__ == "__main__":
     async def _main() -> None:
         from bot import open_storage
         await open_storage()
+        global PROBE_HEMIS
         args = [a for a in sys.argv[1:] if not a.startswith("--")]
+        PROBE_HEMIS = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--hemis=")), None)
         for kind in [KIND_WORDS.get(a, a) for a in args] or [k for k in KINDS if configured(k)] or list(KINDS):
             print(re.sub(r"<[^>]+>", "", (await probe(kind)).replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")))
             if "--dump" in sys.argv and configured(kind):
