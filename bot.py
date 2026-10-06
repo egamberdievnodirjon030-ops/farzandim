@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramUnauthorizedError
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -153,6 +153,19 @@ async def main() -> None:
     await open_storage()
     await loc.reload()  # kurs koordinatori kiritgan fan/fakultet tarjimalari
     bot = Bot(BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    try:  # token noto'g'ri yoki bekor qilingan bo'lsa — tushunarli xabar bilan to'xtaymiz
+        me = await bot.get_me()
+    except TelegramUnauthorizedError:
+        await bot.session.close()
+        await db.close()
+        await central.close()
+        raise SystemExit(
+            "\nTelegram BOT_TOKEN ni qabul qilmadi (Unauthorized).\n"
+            "Sabablari: token noto'g'ri ko'chirilgan (bo'sh joy, qo'shtirnoq, yetishmayotgan belgi), "
+            "@BotFather da token yangilangan (/revoke) yoki bot o'chirilgan.\n"
+            "Yechim: @BotFather → /mybots → botingiz → API Token — tokenni nusxalab, .env dagi "
+            "BOT_TOKEN= qatoriga qo'ying va botni qayta ishga tushiring.")
+    logging.info("Bot: @%s (id %s)", me.username, me.id)
     alert_handler.attach(bot)
     dp = build_dispatcher()
     await setup_commands(bot)
