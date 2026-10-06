@@ -51,7 +51,7 @@ async def summary(sid: int) -> dict | None:
 def summary_from(row: dict | None, tot: dict | None) -> dict | None:
     """summary() ning bazasiz qismi: HEMIS statistikasi qatori va kunlik davomat yig'indisidan."""
     if row:
-        return {"source": "hemis", "as_of": row["as_of"], **stats_hours(row)}
+        return {"source": "hemis", "as_of": row["as_of"], "subjects": row.get("subjects"), **stats_hours(row)}
     t = today()
     if not tot or not tot["total"]:
         return None
@@ -75,6 +75,8 @@ def hemis_periods(hist: list[dict]) -> list[dict]:
 
 
 def source_note(sm: dict) -> str:
+    if sm["source"] == "hemis" and sm.get("subjects"):
+        return tr("HEMIS: {n} ta fan bo'yicha yig'indi, {d} holatiga", n=sm["subjects"], d=fmt_date(sm['as_of'], False))
     return (tr("HEMIS ma'lumoti, {d} holatiga", d=fmt_date(sm['as_of'], False)) if sm["source"] == "hemis"
             else tr("kunlik davomat bo'yicha"))
 

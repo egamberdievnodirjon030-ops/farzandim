@@ -890,7 +890,39 @@ class Database:
         rows = await self.fetchall(
             """SELECT a.* FROM attendance_stats a WHERE a.as_of = (SELECT MAX(b.as_of) FROM attendance_stats b
                WHERE b.student_id = a.student_id AND b.as_of >= ?)""", (since,))
+        overall = {r["student_id"]: r for r in rows}
+        subj = await self._subject_sums(since)
+        return {sid: self._effective_stats(overall.get(sid), subj.get(sid)) for sid in set(overall) | set(subj)}
+
+    # ------------------------------------------------------------ umumiy davomat = fanlar yig'indisi (yoki umumiy fayl)
+    async def _subject_sums(self, since: str, sid: int | None = None, until: str | None = None) -> dict[int, dict]:
+        """Fan bo'yicha HEMIS statistikalari yig'indisi: har bir fan — oxirgi (until gacha) yozuvi."""
+        cond, params = "", [since]
+        if until:
+            cond += " AND y.as_of <= ?"
+            params.append(until)
+        outer = " AND x.student_id = ?" if sid is not None else ""
+        rows = await self.fetchall(
+            f"""SELECT x.student_id, SUM(x.attended) AS attended, SUM(x.absent) AS absent, SUM(x.excused) AS excused,
+                       MAX(x.as_of) AS as_of, MAX(x.imported_at) AS imported_at, COUNT(*) AS subjects
+                FROM subject_att_stats x
+                WHERE x.as_of = (SELECT MAX(y.as_of) FROM subject_att_stats y WHERE y.student_id = x.student_id
+                                 AND y.subject_key = x.subject_key AND y.as_of >= ?{cond}){outer}
+                GROUP BY x.student_id""", (*params, *([sid] if sid is not None else [])))
         return {r["student_id"]: r for r in rows}
+
+    @staticmethod
+    def _effective_stats(overall: dict | None, subj: dict | None) -> dict | None:
+        """Umumiy davomat: HEMIS'ning barcha fanlar bo'yicha fayli yoki fan bo'yicha fayllar yig'indisi — qaysi biri ko'proq
+        darsni qamrasa (ikkalasi birga qo'shilmaydi: umumiy fayl fanlarni allaqachon o'z ichiga oladi)."""
+        if not subj:
+            return overall
+        size = lambda r: (r["attended"] or 0) + (r["absent"] or 0)  # noqa: E731
+        if overall and size(overall) >= size(subj):
+            return overall
+        return {"student_id": subj["student_id"], "as_of": subj["as_of"], "attended": subj["attended"] or 0,
+                "absent": subj["absent"] or 0, "excused": subj["excused"] or 0, "self_marked": None, "teacher_marked": None,
+                "imported_at": subj["imported_at"], "subjects": subj["subjects"]}
 
     # ------------------------------------------------------------ to'lov hisobotlari qamrovi
     async def add_payment_report(self, kind: str, as_of: str, groups: set[str] | None) -> None:
@@ -1469,16 +1501,29 @@ class Database:
         return out
 
     async def latest_att_stats(self, sid: int, since: str | None = None) -> dict | None:
-        """Oxirgi holat; since berilsa — faqat shu sanadan keyingi (joriy semestr) yozuvlar."""
-        return await self.fetchone(
-            "SELECT * FROM attendance_stats WHERE student_id = ? AND as_of >= ? ORDER BY as_of DESC LIMIT 1",
-            (sid, since or "0000-00-00"))
+        """Oxirgi holat; since berilsa — faqat shu sanadan keyingi (joriy semestr) yozuvlar. Fan bo'yicha statistikalar
+        yuklangan bo'lsa — ularning yig'indisi (umumiy fayldan ko'proq darsni qamrasa)."""
+        since = since or "0000-00-00"
+        overall = await self.fetchone(
+            "SELECT * FROM attendance_stats WHERE student_id = ? AND as_of >= ? ORDER BY as_of DESC LIMIT 1", (sid, since))
+        return self._effective_stats(overall, (await self._subject_sums(since, sid)).get(sid))
 
     async def att_stats_history(self, sid: int, since: str, limit: int = 10) -> list[dict]:
         rows = await self.fetchall(
             "SELECT * FROM attendance_stats WHERE student_id = ? AND as_of >= ? ORDER BY as_of DESC LIMIT ?",
             (sid, since, limit))
-        return list(reversed(rows))
+        rows = list(reversed(rows))
+        dates = [r["as_of"] for r in await self.fetchall(
+            "SELECT DISTINCT as_of FROM subject_att_stats WHERE student_id = ? AND as_of >= ? ORDER BY as_of", (sid, since))]
+        if not dates:
+            return rows
+        out = []  # har bir yuklash sanasida — o'sha kungacha bo'lgan umumiy holat (umumiy fayl yoki fanlar yig'indisi)
+        for d in sorted({r["as_of"] for r in rows} | set(dates)):
+            overall = next((r for r in reversed(rows) if r["as_of"] <= d), None)
+            eff = self._effective_stats(overall, (await self._subject_sums(since, sid, d)).get(sid))
+            if eff:
+                out.append({**eff, "as_of": d})
+        return out[-limit:]
 
     # ------------------------------------------------------------ to'lov shakli va kontrakt qarzdorligi
     async def set_payment_forms(self, forms: dict[int, str]) -> int:

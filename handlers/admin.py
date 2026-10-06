@@ -471,18 +471,31 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
         errors += unknown
         as_of = _stats_date(caption, file_name)
+        before = {r["student_id"]: await absence.summary(r["student_id"]) for r in rows}
         changes = await db.upsert_subject_stats(rows, stats_subj, as_of)
+        after = {sid: await absence.summary(sid) for sid in before}
         k = HEMIS_STATS_HOURS_PER_UNIT
         unexc = lambda r: max((r["absent"] or 0) - (r["excused"] or 0), 0)  # noqa: E731
         grew = [(sid, prev, new) for sid, prev, new in changes if prev and unexc(new) > unexc(prev) or not prev and unexc(new) > 0]
-        lines.append(f"📚 Fan: <b>{esc(stats_subject_title(stats_subj))}</b> — fan bo'yicha davomat (umumiy davomatga qo'shilmadi)")
+        n_subj = (await db.fetchone("SELECT COUNT(DISTINCT subject_key) n FROM subject_att_stats"))["n"]
+        lines.append(f"📚 Fan: <b>{esc(stats_subject_title(stats_subj))}</b> — fanlar kesimiga yozildi va umumiy davomatga "
+                     f"qo'shildi (umumiy davomat — yuklangan {n_subj} ta fan bo'yicha yig'indi)")
         lines.append(f"Talabalar: {len(rows)}, holat sanasi: {fmt_date(as_of, False)}; sababsiz qoldirganlar: "
                      f"{sum(1 for r in rows if unexc(r) > 0)} ta talaba")
         if silent:
             lines.append("🔕 Jim rejim: ota-onalarga xabar yuborilmadi.")
-        elif grew:
-            from notifier import notify_subject_stats
-            lines.append(f"Ota-onalarga xabar (fan bo'yicha yangi sababsiz qoldirish): {await notify_subject_stats(bot, stats_subj, grew, k)}")
+        else:
+            if grew:
+                from notifier import notify_subject_stats
+                lines.append(f"Ota-onalarga xabar (fan bo'yicha yangi sababsiz qoldirish): "
+                             f"{await notify_subject_stats(bot, stats_subj, grew, k)}")
+            warned, crossings = await check_thresholds(bot, set(before))  # umumiy chegaralar (18/36/54/74)
+            if warned:
+                lines.append(f"Chegara bo'yicha ogohlantirishlar: {warned}")
+            lines += _crossings_lines(crossings)
+        lines += await _levels_overview(set(before))
+        dec_sent, drops = await notify_absence_decrease(bot, before, after, notify=not silent)
+        lines += _drops_lines(drops, dec_sent, silent)
 
     elif kind == "attendance" and result.kind == "attendance_stats":
         rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))

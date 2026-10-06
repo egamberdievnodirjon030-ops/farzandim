@@ -5,6 +5,9 @@ Tarjimasi yo'q matn o'zbekcha ko'rsatiladi. {nomli} o'rinlar va HTML teglar tarj
 """
 
 TR: dict[str, dict[str, str]] = {
+    "HEMIS: {n} ta fan bo'yicha yig'indi, {d} holatiga": {'ru': 'HEMIS: сумма по {n} предметам, на {d}',
+                                                         'en': 'HEMIS: total of {n} subjects, as of {d}'},
+
     "📚 <b>Fan bo'yicha davomat</b>": {'ru': '📚 <b>Посещаемость по предмету</b>', 'en': '📚 <b>Attendance by subject</b>'},
     "Fan: {s}": {'ru': 'Предмет: {s}', 'en': 'Subject: {s}'},
     "Sababsiz qoldirilgan: {n}": {'ru': 'Пропущено без уважительной причины: {n}', 'en': 'Missed without a valid reason: {n}'},
