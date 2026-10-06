@@ -158,6 +158,10 @@ INTEGRATION_PAGE_PARAM = os.getenv("INTEGRATION_PAGE_PARAM", "page").strip()
 INTEGRATION_MAX_PAGES = int(os.getenv("INTEGRATION_MAX_PAGES", "500") or 500)
 INTEGRATION_TIMEOUT = int(os.getenv("INTEGRATION_TIMEOUT", "60") or 60)
 INTEGRATION_HEADERS = os.getenv("INTEGRATION_HEADERS", "").strip()   # qo'shimcha sarlavhalar: «A: 1; B: 2»
+# Manzilda {hemis_id} bo'lsa — har bir talaba uchun alohida so'rov; bir vaqtda nechta so'rov yuboriladi
+INTEGRATION_CONCURRENCY = max(1, int(os.getenv("INTEGRATION_CONCURRENCY", "4") or 4))
+# Jadval talaba bo'yicha so'ralsa: 1 — har bir guruhdan bitta talaba (jadval guruhga bir xil), 0 — hamma talaba
+INTEGRATION_SCHEDULE_PER_GROUP = os.getenv("INTEGRATION_SCHEDULE_PER_GROUP", "1").strip() != "0"
 # Manage o'zi ma'lumot yuborsa (webhook): POST /api/integration/attendance | /schedule, sarlavha X-Integration-Token
 INTEGRATION_WEBHOOK_SECRET = os.getenv("INTEGRATION_WEBHOOK_SECRET", "").strip()
 # Birinchi olishda ota-onalarga xabar yuborilmaydi (eski qoldirishlar «yangi» bo'lib ketmasligi uchun)

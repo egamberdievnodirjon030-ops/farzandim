@@ -37,12 +37,13 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from config import (DATA_DIR, INTEGRATION_ATTENDANCE, INTEGRATION_AUTH, INTEGRATION_DAYS, INTEGRATION_FIRST_SILENT,
                     INTEGRATION_HEADERS, INTEGRATION_INTERVAL, INTEGRATION_MAX_PAGES, INTEGRATION_NAME,
                     INTEGRATION_PAGE_PARAM, INTEGRATION_SCHEDULE, INTEGRATION_SCHEDULE_INTERVAL, INTEGRATION_TIMEOUT,
-                    INTEGRATION_TOKEN, INTEGRATION_URL, INTEGRATION_WEBHOOK_SECRET, PAIR_TIMES, TZ)
+                    INTEGRATION_TOKEN, INTEGRATION_URL, INTEGRATION_WEBHOOK_SECRET, PAIR_TIMES, TZ,
+                    INTEGRATION_CONCURRENCY, INTEGRATION_SCHEDULE_PER_GROUP)
 from database import db
 from importer import ALIASES, parse_rows, resolve_students
 from tenancy import central, use_course
 from utils import WEEKDAYS, cell_str, esc, fmt_dt, group_key, normalize_status, normalize_text, now_iso, parse_date, \
-    parse_float, parse_int, parse_time, today, week_type_of
+    parse_float, parse_int, parse_time, parse_weekday, today, week_type_of
 
 log = logging.getLogger("integration")
 
@@ -280,6 +281,26 @@ def _decode(body: bytes) -> str:
     return body.decode("utf-8", "replace")
 
 
+def explode(rec: dict, depth: int = 0) -> list[dict]:
+    """Ichma-ich yozuvlar: {"date": …, "lessons": [{…}, {…}]} → har bir dars alohida yozuv (kun maydonlari bilan).
+    Faqat «yozuvga o'xshash» ro'yxatlar ochiladi (elementida 3+ maydon); [{"name": "3-1a-24"}] kabilar — birlashtiriladi."""
+    if depth > 3:
+        return [rec]
+    best, size = None, 0
+    for k, v in rec.items():
+        if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+            avg = sum(len(x) for x in v) / len(v)
+            if avg >= 3 and len(v) * avg > size:
+                best, size = k, len(v) * avg
+    if best is None:
+        return [rec]
+    parent = {k: v for k, v in rec.items() if k != best}
+    out = []
+    for child in rec[best]:
+        out += explode({**parent, **child}, depth + 1)
+    return out
+
+
 def parse_payload(body: bytes, ctype: str = "") -> tuple[list[dict], object, str]:
     """Javob tanasi → (yozuvlar, JSON (sahifalash uchun) yoki None, yozuvlar yo'li / format)."""
     ct = (ctype or "").lower()
@@ -298,7 +319,12 @@ def parse_payload(body: bytes, ctype: str = "") -> tuple[list[dict], object, str
         recs, path = find_records(payload)
         if not recs and isinstance(payload, dict) and payload and not any(isinstance(v, list) for v in payload.values()):
             recs = [payload]  # bitta yozuv
-        return [flatten(r) for r in recs], payload, path or "json"
+        out = [x for r in recs for x in explode(r)]
+        # ichidagi ro'yxati bo'sh yozuvlar (masalan, darssiz kun: "lessons": []) — tashlab yuboriladi
+        nested = {k for r in recs for k, v in r.items() if isinstance(v, list) and v and all(isinstance(i, dict) for i in v)
+                  and sum(len(i) for i in v) / len(v) >= 3}
+        out = [x for x in out if not any(isinstance(x.get(k), list) and not x[k] for k in nested)]
+        return [flatten(x) for x in out], payload, path or "json"
     if not st:
         return [], None, "bo'sh"
     sample = text[:4096]
@@ -545,6 +571,9 @@ def build_table(records: list[dict], kind: str) -> tuple[list[tuple], dict]:
                 x["pair"] = _pair_by_time(start_of(r), starts)
         if kind == "schedule":
             d = to_date(get(r, "date"))
+            if not d and r.get("_ctx_week") and x.get("weekday"):  # {monday} haftasi + hafta kuni
+                wd = parse_weekday(x["weekday"])
+                d = (to_date(r["_ctx_week"]) + timedelta(days=wd - 1)) if wd else None
             if d:
                 x["_date"] = d
             if not x.get("weekday") and d:
@@ -626,7 +655,41 @@ def window(kind: str) -> tuple[date, date]:
     return monday, monday + timedelta(days=13)  # shu va keyingi hafta: toq/juft hafta aniqlanadi
 
 
-async def build_url(kind: str) -> tuple[str, bool]:
+def per_student(kind: str) -> bool:
+    """Manzilda {hemis_id} bor — har bir talaba (jadval uchun: har guruhdan bittasi) uchun alohida so'rov."""
+    return "{hemis_id}" in endpoint(kind)
+
+
+def mondays(kind: str) -> list[date]:
+    """{monday} bo'lsa — oraliqdagi haftalar dushanbalari (jadval: shu va keyingi hafta, davomat: oxirgi kunlar)."""
+    if "{monday}" not in endpoint(kind):
+        return [None]
+    d1, d2 = window(kind)
+    m = d1 - timedelta(days=d1.weekday())
+    out = []
+    while m <= d2:
+        out.append(m)
+        m += timedelta(days=7)
+    return out
+
+
+async def targets(kind: str) -> list[dict]:
+    """{hemis_id} uchun talabalar: davomat — hammasi, jadval — har bir guruhdan bittasi (jadval guruhga bir xil)."""
+    out, groups = [], set()
+    for key in db.keys():
+        with use_course(key):
+            rows = await db.fetchall("SELECT hemis_id, full_name, group_name, group_key FROM students "
+                                     "WHERE COALESCE(hemis_id, '') != '' ORDER BY group_key, id")
+        for r in rows:
+            if kind == "schedule" and INTEGRATION_SCHEDULE_PER_GROUP:
+                if r["group_key"] in groups:
+                    continue
+                groups.add(r["group_key"])
+            out.append(r)
+    return out
+
+
+async def build_url(kind: str, hemis: str | None = None, monday: date | None = None) -> tuple[str, bool]:
     """To'liq manzil va «to'liq oraliqmi» (incremental {since} bo'lsa — yo'q)."""
     path = endpoint(kind)
     url = path if path.startswith("http") else f"{INTEGRATION_URL}/{path.lstrip('/')}"
@@ -636,44 +699,105 @@ async def build_url(kind: str) -> tuple[str, bool]:
     since = await _since(kind) if "{since}" in url else ""
     vals = {"from": d1.isoformat(), "to": d2.isoformat(), "from_ts": ts(d1), "to_ts": ts(d2, True),
             "since": since or f"{d1.isoformat()}T00:00:00", "from_dmy": d1.strftime("%d.%m.%Y"),
-            "to_dmy": d2.strftime("%d.%m.%Y")}
+            "to_dmy": d2.strftime("%d.%m.%Y"), "hemis_id": hemis or "", "monday": monday.isoformat() if monday else ""}
     for k, v in vals.items():
         url = url.replace("{" + k + "}", str(v))
     return url, "{since}" not in path
 
 
-async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], dict]:
-    """Barcha sahifalarni olib, yozuvlarni qaytaradi."""
-    import aiohttp
-    url, complete = await build_url(kind)
-    limit = max_pages or INTEGRATION_MAX_PAGES
+async def _fetch_url(session, url: str, limit: int, probe: bool) -> tuple[list[dict], dict, bytes]:
+    """Bitta manzil: barcha sahifalari. Qaytaradi: yozuvlar, ma'lumot, birinchi javob tanasi (tekshirish uchun)."""
     records: list[dict] = []
-    info = {"pages": 0, "format": "", "complete": complete, "truncated": False, "url": _safe_url(url)}
+    info = {"pages": 0, "format": "", "truncated": False}
     seen: set[str] = set()
+    first = b""
+    page, cur = 1, url
+    while cur:
+        headers, real = _headers_and_url(cur)
+        async with session.get(real, headers=headers) as r:
+            body = await r.read()
+            if r.status >= 400:
+                raise IntegrationError(f"HTTP {r.status}: {_short(body)}", status=r.status)
+            ctype = r.headers.get("Content-Type", "")
+        first = first or body
+        recs, payload, fmt = parse_payload(body, ctype)
+        digest = hashlib.sha256(json.dumps(recs, default=str, sort_keys=True).encode()).hexdigest()
+        if digest in seen:  # API sahifa parametrini e'tiborsiz qoldirdi
+            break
+        seen.add(digest)
+        records += recs
+        info["pages"], info["format"] = page, fmt
+        if not recs:
+            break
+        nxt = next_page(payload, cur, page)
+        if nxt and page >= limit:
+            info["truncated"] = not probe
+            break
+        cur, page = nxt, page + 1
+    return records, info, first
+
+
+async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], dict]:
+    """Barcha sahifalarni (va {hemis_id}/{monday} bo'lsa — har bir talaba va hafta uchun) olib, yozuvlarni qaytaradi."""
+    import aiohttp
+    probe = max_pages is not None
+    limit = max_pages or INTEGRATION_MAX_PAGES
+    tg = (await targets(kind)) if per_student(kind) else [None]
+    if per_student(kind) and not tg:
+        raise IntegrationError("bazada HEMIS ID li talaba yo'q — avval «Talabalar» faylini yuklang")
+    weeks = mondays(kind)
+    if probe:
+        tg, weeks = tg[:1], weeks[:1]
+    url0, complete = await build_url(kind, tg[0]["hemis_id"] if tg[0] else None, weeks[0])
+    info = {"pages": 0, "format": "", "complete": complete, "truncated": False, "url": _safe_url(url0),
+            "requests": 0, "failed": 0, "sample": b""}
+    records: list[dict] = []
+    sem = asyncio.Semaphore(INTEGRATION_CONCURRENCY)
     timeout = aiohttp.ClientTimeout(total=INTEGRATION_TIMEOUT)
-    async with aiohttp.ClientSession(timeout=timeout) as s:
-        page, cur = 1, url
-        while cur:
-            headers, real = _headers_and_url(cur)
-            async with s.get(real, headers=headers) as r:
-                body = await r.read()
-                if r.status >= 400:
-                    raise IntegrationError(f"HTTP {r.status}: {_short(body)}", status=r.status)
-                ctype = r.headers.get("Content-Type", "")
-            recs, payload, fmt = parse_payload(body, ctype)
-            digest = hashlib.sha256(json.dumps(recs, default=str, sort_keys=True).encode()).hexdigest()
-            if digest in seen:  # API sahifa parametrini e'tiborsiz qoldirdi
-                break
-            seen.add(digest)
-            records += recs
-            info["pages"], info["format"] = page, fmt
-            if not recs:
-                break
-            nxt = next_page(payload, cur, page)
-            if nxt and page >= limit:
-                info["truncated"] = max_pages is None
-                break
-            cur, page = nxt, page + 1
+    fatal: list[Exception] = []
+
+    async def one(session, st, monday):
+        if fatal:
+            return
+        url, _ = await build_url(kind, st["hemis_id"] if st else None, monday)
+        async with sem:
+            try:
+                recs, i, body = await _fetch_url(session, url, limit, probe)
+            except IntegrationError as e:
+                info["failed"] += 1
+                if e.status in (401, 403) or not per_student(kind):  # kalit noto'g'ri — davom etishdan foyda yo'q
+                    fatal.append(e)
+                elif info["failed"] <= 3:
+                    log.warning("%s: %s (%s) — %s", INTEGRATION_NAME, TITLES[kind], st and st["hemis_id"], e)
+                return
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                info["failed"] += 1
+                if not per_student(kind):
+                    fatal.append(e)
+                return
+        info["requests"] += 1
+        info["pages"] += i["pages"]
+        info["format"] = i["format"] or info["format"]
+        info["truncated"] = info["truncated"] or i["truncated"]
+        info["sample"] = info["sample"] or body
+        for r in recs:  # javobda talaba/guruh/hafta bo'lmasa — so'rovdagisi qo'shiladi
+            if st:
+                r.setdefault("_ctx.hemis_id", st["hemis_id"])
+                r.setdefault("_ctx.full_name", st["full_name"])
+                r.setdefault("_ctx.group", st["group_name"])
+            if monday:
+                r.setdefault("_ctx_week", monday.isoformat())
+        records.extend(recs)
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:  # timeout — har bir so'rov uchun
+        await asyncio.gather(*(one(session, st, m) for st in tg for m in weeks))
+    if fatal:
+        raise fatal[0]
+    total = len(tg) * len(weeks)
+    if info["failed"] and info["failed"] * 2 > total:
+        raise IntegrationError(f"so'rovlarning ko'pi bajarilmadi: {info['failed']} / {total}")
+    if info["failed"]:
+        info["complete"] = False  # ba'zi talabalar olinmadi — «manbada yo'q» deb hisoblab bo'lmaydi
     return records, info
 
 
@@ -992,15 +1116,33 @@ def parse_field(word: str) -> str | None:
     return FIELD_WORDS.get(normalize_text(word)) or FIELD_WORDS.get(word.strip())
 
 
-if __name__ == "__main__":  # python integration.py — ulanishni terminalda tekshirish (bazaga yozilmaydi)
+if __name__ == "__main__":
+    # python integration.py [davomat] [jadval] [--dump] — ulanishni terminalda tekshirish (bazaga yozilmaydi).
+    # --dump: birinchi javobni data/integration_sample_<tur>.json ga saqlaydi (tuzilmasini ko'rish uchun).
     import sys
 
     async def _main() -> None:
         from bot import open_storage
         await open_storage()
-        for kind in (sys.argv[1:] or list(KINDS)):
-            kind = KIND_WORDS.get(kind, kind)
+        args = [a for a in sys.argv[1:] if not a.startswith("--")]
+        for kind in [KIND_WORDS.get(a, a) for a in args] or [k for k in KINDS if configured(k)] or list(KINDS):
             print(re.sub(r"<[^>]+>", "", (await probe(kind)).replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")))
+            if "--dump" in sys.argv and configured(kind):
+                try:
+                    _, info = await fetch(kind, max_pages=1)
+                except Exception as e:  # noqa: BLE001
+                    print("Saqlanmadi:", _err_text(e))
+                else:
+                    out = DATA_DIR / f"integration_sample_{kind}.json"
+                    raw = info["sample"]
+                    try:
+                        raw = json.dumps(json.loads(_decode(raw)), ensure_ascii=False, indent=2).encode()
+                    except ValueError:
+                        pass
+                    out.write_bytes(raw)
+                    print(f"Javob saqlandi: {out}")
             print()
+        await db.close()
+        await central.close()
 
     asyncio.run(_main())
