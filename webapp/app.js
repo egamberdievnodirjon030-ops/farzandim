@@ -225,6 +225,11 @@ function safeHtml(html) {
 
 /* ================================================================ ikonalar (24×24, chiziqli) */
 const P = {
+  dollar: 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 18V6',
+  receipt: 'M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1zM15 8h-4.5a1.75 1.75 0 0 0 0 3.5h3a1.75 1.75 0 0 1 0 3.5H9M12 6.5v11',
+  bookx: 'M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20M14.5 7l-5 5M9.5 7l5 5',
+  calx: 'M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM16 2v4M8 2v4M3 10h18M14 14l-4 4M10 14l4 4',
+  flame: 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z',
   sun: 'M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
   moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
   auto: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 3v18M12 7h4.5M12 11h6M12 15h5.5',
@@ -1072,16 +1077,19 @@ async function viewStaff() {
   try { d = await api('/api/staff/panel'); } catch (e) { return page({ title: 'Kurs holati', active: '#/staff', body: errorBox() }); }
   S.staffUnread = d.unread;
   const pctLinked = d.total ? Math.round(100 * d.linked / d.total) : 0;
-  const tile = (k, v, s, tone, href) => `<a class="tile ${tone}" href="${href}"><span class="k">${k}</span><span class="v num">${v}</span><span class="s">${s}</span></a>`;
+  // har bir ko'rsatkich — o'z belgisi (ma'lumot turi rangida); summalar ixcham, to'liq summa — izohda
+  const tile = (k, v, s, tone, href, icon, c) => `<a class="tile st-tile ${tone}" href="${href}"><span class="k"><span class="t-ic c-${c}" aria-hidden="true">${ic(icon)}</span>${k}</span><span class="v num">${v}</span><span class="s">${s}</span></a>`;
+  const mshort = x => (x >= 1e6 ? `${(Math.round(x / 1e5) / 10).toString().replace('.', ',')}<small class="of"> mln so‘m</small>` : `${Math.round(x).toLocaleString('ru-RU')}<small class="of"> so‘m</small>`);
   const body = `${d.scope ? `<p class="small muted" style="margin:0 0 10px">${esc(d.scope)}</p>` : ''}${d.unread || d.link_requests ? `<div class="alert warn"><div class="bar"></div><div>${d.unread ? `<b>${d.unread} ta o‘qilmagan xabar</b> — <a href="#/staff/inbox">ochish</a><br>` : ''}${d.link_requests ? `<b>${d.link_requests} ta bog‘lash so‘rovi</b> — <a href="#/staff/requests">ko‘rib chiqish</a>` : ''}</div></div>` : ''}
     <div class="grid2" style="margin-top:12px">
-      ${tile('Talabalar', d.total, `ota-onasi ulangan: ${pctLinked}%`, '', '#/staff/students')}
-      ${tile('Davomat muammosi', d.att, 'chegaraga yetganlar', d.att ? 'bad' : 'ok', '#/staff/students?filter=att')}
-      ${tile('Akademik qarz', d.acad, 'qarzdorlar ro‘yxati bo‘yicha', d.acad ? 'bad' : 'ok', '#/staff/students?filter=acad')}
-      ${tile('3+ muammoli', d.multi, 'birinchi navbatda', d.multi ? 'bad' : 'ok', '#/staff/students?filter=prob')}
-      ${tile('GPA past', d.gpa, `${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi`, d.gpa ? 'bad' : 'ok', '#/staff/students?filter=gpa')}
-      ${tile('Kontrakt qarzi', d.kontrakt.count, money(d.kontrakt.sum), d.kontrakt.count ? 'warn' : 'ok', '#/staff/students?filter=kontrakt')}
-      ${tile('Trimestr qarzi', d.trimestr.count, money(d.trimestr.sum), d.trimestr.count ? 'warn' : 'ok', '#/staff/students?filter=trimestr')}</div>
+      ${tile('Talabalar', d.total, `ota-onasi ulangan: ${pctLinked}%`, '', '#/staff/students', 'users', 'people')}
+      ${tile('Davomat muammosi', d.att, 'chegaraga yetganlar', d.att ? 'bad' : 'ok', '#/staff/students?filter=att', 'calx', 'att')}
+      ${tile('Akademik qarz', d.acad, 'qarzdorlar ro‘yxati bo‘yicha', d.acad ? 'bad' : 'ok', '#/staff/students?filter=acad', 'bookx', 'acad')}
+      ${tile('3+ muammoli', d.multi, 'birinchi navbatda', d.multi ? 'bad' : 'ok', '#/staff/students?filter=prob', 'flame', 'risk')}
+      ${tile('GPA past', d.gpa, `${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi`, d.gpa ? 'bad' : 'ok', '#/staff/students?filter=gpa', 'grade', 'gpa')}
+      ${tile('Kontrakt qarzi', mshort(d.kontrakt.sum), `${d.kontrakt.count} ta talaba`, d.kontrakt.count ? 'warn' : 'ok', '#/staff/students?filter=kontrakt', 'dollar', 'money')}
+      ${tile('Trimestr qarzi', mshort(d.trimestr.sum), `${d.trimestr.count} ta talaba`, d.trimestr.count ? 'warn' : 'ok', '#/staff/students?filter=trimestr', 'receipt', 'money2')}
+      ${tile('Xabarlar', d.unread, `bog‘lash so‘rovlari: ${d.link_requests}`, d.unread ? 'bad' : 'ok', '#/staff/inbox', 'chat', 'msg')}</div>
     ${dynCard(d.dynamics)}
     <section class="section"><div class="section-head"><h2>Muammoli talabalar</h2><a href="#/staff/students?filter=prob">Barchasi</a></div>
       <div class="list">${d.top.length ? d.top.slice(0, 12).map(staffRow).join('') : empty('ok', 'Muammoli talaba yo‘q')}</div></section>

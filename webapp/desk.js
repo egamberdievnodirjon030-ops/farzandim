@@ -48,6 +48,24 @@ const P = {
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
   db: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.7-4 3-9 3s-9-1.3-9-3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/>',
   telegram: '<path d="m22 3-9.5 17.5-2.8-7.7L2 10.2z"/><path d="M22 3 9.7 12.8"/>',
+  // ko'rsatkichlar: har bir ma'lumot turi — o'z belgisi
+  dollar: '<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/>',
+  receipt: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M15 8h-4.5a1.75 1.75 0 0 0 0 3.5h3a1.75 1.75 0 0 1 0 3.5H9"/><path d="M12 6.5v11"/>',
+  cap: '<path d="M21.4 10.9a1 1 0 0 0 0-1.8L12.8 5.2a2 2 0 0 0-1.7 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.7 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  bookx: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="m14.5 7-5 5M9.5 7l5 5"/>',
+  calx: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M14 14l-4 4M10 14l4 4"/>',
+  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  layers: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
+  up: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+  down: '<path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  userx: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5M22 8l-5 5"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  server: '<rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 6.5h.01M6 17.5h.01"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
 };
 const ic = n => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
 
@@ -168,9 +186,32 @@ const emptyBox = (icon, title, text = '', action = '') =>
   `<div class="empty">${ic(icon)}<b>${esc(title)}</b>${text ? `<div>${text}</div>` : ''}${action ? `<div style="margin-top:14px">${action}</div>` : ''}</div>`;
 const skel = (h = 120, n = 1) => Array.from({ length: n }, () => `<div class="skel" style="height:${h}px;margin-bottom:16px"></div>`).join('');
 const main = () => $('#main');
+const PAGE_IC = { 'Kurs holati': 'panel', 'Talabalar': 'users', 'Xabarlar': 'chat', 'Bog‘lanish so‘rovlari': 'req', 'So‘rovlar': 'req',
+  'E’lon yuborish': 'mega', 'Rasmiy hujjat yuborish': 'file', 'So‘rovnomalar': 'poll', 'So‘rovnoma': 'poll', 'Yangi so‘rovnoma': 'poll',
+  'Ma’lumot va hisobot': 'upload', 'Barcha kurslar': 'chart', 'Kurslar va koordinatorlar': 'building', 'Ichki nizomlar': 'book',
+  'Tizim': 'shield', 'Xatolik': 'alert' };
 function head(title, sub, actions = '') {
-  return `<header class="ph"><div><h1>${esc(title)}</h1><p>${sub}</p></div><div class="ph-act">${actions}</div></header>`;
+  const pi = PAGE_IC[title];
+  return `<header class="ph">${pi ? `<span class="ph-ic" aria-hidden="true">${ic(pi)}</span>` : ''}<div class="ph-t"><h1>${esc(title)}</h1><p>${sub}</p></div><div class="ph-act">${actions}</div></header>`;
 }
+/* bo'lim sarlavhasi belgisi bilan: H('dollar', 'Kontrakt', 'money') */
+const H = (icon, title, c = 'people') => `<h2><span class="h-ic c-${c}" aria-hidden="true">${ic(icon)}</span>${title}</h2>`;
+/* Ko'rsatkich kartochkasi: belgi (ma'lumot turi rangida) · nom · holat (belgi + so'z, faqat rang emas) · qiymat · izoh.
+   Qiymat matni doim asosiy siyoh rangida; holatni yonidagi belgili yorliq aytadi. */
+function kpi({ href, icon, c = 'people', label, value, unit = '', sub = '', state = null, meter = null, title = '' }) {
+  const tag = href ? 'a' : 'div';
+  const st = state === 'bad' ? `<span class="st bad">${ic('alert')}e’tibor</span>`
+    : state === 'warn' ? `<span class="st warn">${ic('alert')}qarz bor</span>`
+    : state === 'ok' ? `<span class="st ok">${ic('check')}joyida</span>` : '';
+  return `<${tag} class="kpi c-${c}"${href ? ` href="${href}"` : ''}${title ? ` title="${esc(title)}"` : ''}>
+    <div class="kpi-top"><span class="kpi-ic c-${c}" aria-hidden="true">${ic(icon)}</span><span class="kpi-k">${label}</span>${st}</div>
+    <div class="kpi-v num">${value}${unit ? `<small>${unit}</small>` : ''}</div>
+    ${meter != null ? `<div class="meter c-${c}"><i style="width:${Math.max(0, Math.min(100, meter))}%"></i></div>` : ''}
+    <div class="kpi-s">${sub}</div></${tag}>`;
+}
+/* pul: ixcham (83,6 mln), to'liq summa — sarlavha (title) va izohda */
+const moneyShort = x => { const v = Number(x || 0); return v >= 1e9 ? [num(v / 1e9, 2), 'mlrd so‘m'] : v >= 1e6 ? [num(v / 1e6, 1), 'mln so‘m'] : [num(v, 0), 'so‘m']; };
+const probState = (n, w = 'bad') => (n ? w : 'ok');
 const myGroups = () => (S.me.staff && S.me.staff.groups) || [];
 const courseSub = () => `${S.me.staff.title ? esc(S.me.staff.title) + ', ' : ''}${myGroups().length ? 'guruhlar: ' + esc(myGroups().join(', ')) + ', ' : ''}${todayLabel()}`;
 function view(html) { main().innerHTML = `<div class="wrap">${html}</div>`; }
@@ -338,39 +379,50 @@ async function pPanel() {
   view(head('Kurs holati', courseSub()) + skel(110) + skel(360));
   const [d, ib, rq] = await Promise.all([api('/api/staff/panel'), api('/api/staff/inbox'), api('/api/staff/requests')]);
   const cover = pct(d.linked, d.total);
-  const band = (d.scope ? `<p class="hint" style="margin:-10px 0 14px">${esc(d.scope)}</p>` : '') + `<section class="band" style="--cols:7" aria-label="Asosiy ko‘rsatkichlar">
-    <a href="#/students"><div class="k">Talabalar</div><div class="v navy">${d.total}</div>
-      <div class="s">ota-onasi ulangan: ${cover}%</div><div class="meter"><i style="width:${cover}%"></i></div></a>
-    <a href="#/students?f=att"><div class="k">Davomat muammosi</div><div class="v ${tone(d.att)}">${d.att}</div><div class="s">chegaraga yetganlar</div></a>
-    <a href="#/students?f=acad"><div class="k">Akademik qarz</div><div class="v ${tone(d.acad)}">${d.acad}</div><div class="s">qarzdorlar ro‘yxati bo‘yicha</div></a>
-    <a href="#/students?f=gpa"><div class="k">GPA past</div><div class="v ${tone(d.gpa)}">${d.gpa}</div><div class="s">${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi</div></a>
-    <a href="#/students?f=prob"><div class="k">3+ masalali</div><div class="v ${tone(d.multi)}">${d.multi}</div><div class="s">birinchi navbatda</div></a>
-    <a href="#/students?f=kontrakt"><div class="k">Kontrakt qarzi</div><div class="v ${tone(d.kontrakt.count, 'warn')}">${d.kontrakt.count}</div><div class="s num">${money(d.kontrakt.sum)}</div></a>
-    <a href="#/students?f=trimestr"><div class="k">Trimestr qarzi</div><div class="v ${tone(d.trimestr.count, 'warn')}">${d.trimestr.count}</div><div class="s num">${money(d.trimestr.sum)}</div></a>
+  const unread = ib.items.reduce((a, i) => a + (i.unread || 0), 0);
+  const share = n => (d.total ? `${pct(n, d.total)}% talabalar` : '');
+  const [km, ku] = moneyShort(d.kontrakt.sum), [tm, tu] = moneyShort(d.trimestr.sum);
+  const band = (d.scope ? `<p class="hint scope">${ic('info')}${esc(d.scope.replace(/^\s*ℹ️?\s*/u, ''))}</p>` : '') + `<section class="kpis" aria-label="Asosiy ko‘rsatkichlar">
+    ${kpi({ href: '#/students', icon: 'users', c: 'people', label: 'Talabalar', value: num(d.total, 0), unit: 'ta',
+      sub: `${ic('link')} ota-onasi ulangan: <b>${d.linked}</b> · ${cover}%`, meter: cover })}
+    ${kpi({ href: '#/students?f=att', icon: 'calx', c: 'att', label: 'Davomat muammosi', value: d.att, unit: 'ta', state: probState(d.att),
+      sub: d.att ? `chegaraga yetganlar · ${share(d.att)}` : 'chegaraga yetgan talaba yo‘q' })}
+    ${kpi({ href: '#/students?f=acad', icon: 'bookx', c: 'acad', label: 'Akademik qarz', value: d.acad, unit: 'ta', state: probState(d.acad),
+      sub: 'qarzdorlar ro‘yxati bo‘yicha' })}
+    ${kpi({ href: '#/students?f=gpa', icon: 'cap', c: 'gpa', label: 'GPA past', value: d.gpa, unit: 'ta', state: probState(d.gpa),
+      sub: `${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi` })}
+    ${kpi({ href: '#/students?f=prob', icon: 'flame', c: 'risk', label: '3+ masalali', value: d.multi, unit: 'ta', state: probState(d.multi),
+      sub: 'birinchi navbatda e’tibor' })}
+    ${kpi({ href: '#/students?f=kontrakt', icon: 'dollar', c: 'money', label: 'Kontrakt qarzi', value: km, unit: ku, state: probState(d.kontrakt.count, 'warn'),
+      sub: `${d.kontrakt.count} ta talaba${d.kontrakt.count ? ` · o‘rtacha ${mlnPlain(d.kontrakt.sum / d.kontrakt.count)}` : ''}`, title: money(d.kontrakt.sum) })}
+    ${kpi({ href: '#/students?f=trimestr', icon: 'receipt', c: 'money2', label: 'Trimestr qarzi', value: tm, unit: tu, state: probState(d.trimestr.count, 'warn'),
+      sub: `${d.trimestr.count} ta talaba${d.trimestr.count ? ` · o‘rtacha ${mlnPlain(d.trimestr.sum / d.trimestr.count)}` : ''}`, title: money(d.trimestr.sum) })}
+    ${kpi({ href: '#/inbox', icon: 'inbox', c: 'msg', label: 'Javobsiz xabarlar', value: unread, unit: 'ta', state: unread ? 'bad' : 'ok',
+      sub: `${ic('req')} bog‘lanish so‘rovlari: <b>${rq.items.length}</b>` })}
   </section>`;
   const top = d.top.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Talaba</th><th>Masalalar</th><th class="r">Davomat</th></tr></thead>
     <tbody>${d.top.map(r => `<tr class="click" data-student="${r.id}"><td class="name"><b>${esc(r.name)}</b><span>${esc(r.group)}${r.hemis_id ? ', HEMIS ' + esc(r.hemis_id) : ''}</span></td>
       <td><div class="wrapc">${issueChips(r)}</div></td><td class="r">${r.percent != null ? r.percent + '%' : '<span class="dash">—</span>'}</td></tr>`).join('')}</tbody></table></div>`
     : emptyBox('ok', 'Muammoli talaba yo‘q', 'Davomat, baholar va to‘lovlar bo‘yicha e’tibor talab qiladigan holat topilmadi.');
-  const unread = ib.items.filter(i => i.unread).slice(0, 6);
-  const msgs = unread.length ? `<ul class="list">${unread.map(i => `<li><a href="#/inbox/${i.sid}/${i.pid}">
+  const fresh = ib.items.filter(i => i.unread).slice(0, 6);
+  const msgs = fresh.length ? `<ul class="list">${fresh.map(i => `<li><a href="#/inbox/${i.sid}/${i.pid}"><span class="av-s">${esc(initials(i.parent))}</span>
       <div class="t"><b>${esc(i.parent)} <span class="chip bordo" style="height:20px;margin-left:4px">${i.unread}</span></b><p>${esc(i.student)}: ${esc(i.last)}</p></div><time>${when(i.at)}</time></a></li>`).join('')}</ul>`
     : `<div class="pad"><div class="note ok">${ic('ok')}<span>Javob kutayotgan xabar yo‘q.</span></div></div>`;
   view(head('Kurs holati', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + band + dynSection(d.dynamics) + `
     <div class="grid-2">
-      <section class="sec"><header><h2>E’tibor talab qiladigan talabalar</h2><a href="#/students?f=prob">Barchasi</a></header>${top}</section>
+      <section class="sec"><header>${H('target', 'E’tibor talab qiladigan talabalar', 'risk')}<a href="#/students?f=prob">Barchasi ${ic('arrow')}</a></header>${top}</section>
       <div class="stack">
-        <section class="sec"><header><h2>Yangi xabarlar</h2><a href="#/inbox">Xabarlar</a></header>${msgs}</section>
-        <section class="sec"><header><h2>Bog‘lanish so‘rovlari</h2></header><div class="pad">${rq.items.length
+        <section class="sec"><header>${H('chat', 'Yangi xabarlar', 'msg')}<a href="#/inbox">Xabarlar ${ic('arrow')}</a></header>${msgs}</section>
+        <section class="sec"><header>${H('req', 'Bog‘lanish so‘rovlari', 'people')}</header><div class="pad">${rq.items.length
           ? `<div class="note warn">${ic('req')}<span><b>${rq.items.length} ta</b> ota-ona farzandini bog‘lashni so‘rayapti.</span></div>
              <div style="margin-top:12px"><a class="btn primary" href="#/requests">Ko‘rib chiqish</a></div>`
           : `<div class="note ok">${ic('ok')}<span>Kutilayotgan so‘rov yo‘q.</span></div>`}</div></section>
-        <section class="sec"><header><h2>Hisobot</h2></header><div class="pad actions">
+        <section class="sec"><header>${H('download', 'Hisobot', 'people')}</header><div class="pad actions">
           <button class="btn" data-act="export" data-fmt="x">${ic('download')} Excel yuklab olish</button>
           <button class="btn" data-act="export" data-fmt="p">${ic('file')} PDF yuklab olish</button></div></section>
       </div>
     </div>
-    <p class="foot">Ma’lumotlar oxirgi marta yangilangan: ${d.updated ? when(d.updated) : 'hali yuklanmagan'}.</p>`);
+    <p class="foot">${ic('clock')} Ma’lumotlar oxirgi marta yangilangan: ${d.updated ? when(d.updated) : 'hali yuklanmagan'}.</p>`);
 }
 /* Dinamika: kichik grafik (sparkline) — oxirgi nuqta ajratib ko'rsatiladi */
 function spark(points, cls) {
@@ -383,35 +435,39 @@ function spark(points, cls) {
   return `<svg class="spark ${cls}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${points.map(p => p.label + ': ' + p.value).join(', ')}">
     <path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lx}" cy="${ly}" r="3" fill="currentColor"/></svg>`;
 }
-function dynVal(it, v) { return v == null ? '—' : it.unit === '%' ? `${v}%` : it.unit === 'so\'m' ? money(v) : `${v} ta`; }
+function dynVal(it, v) { return v == null ? '—' : it.unit === '%' ? `${v}%` : it.unit === 'so\'m' ? moneyShort(v).join(' ') : `${v} ta`; }
 function dynDelta(it) {
   const d = it.delta;
   if (d == null) return { cls: 'flat', txt: 'taqqoslash uchun ma’lumot kam' };
   if (!d) return { cls: 'flat', txt: 'o‘zgarmadi' };
   const good = (d > 0) === (it.better === 'up');
   const mag = it.unit === '%' ? `${Math.abs(Math.round(d * 10) / 10)} p.p.` : dynVal(it, Math.abs(d));
-  return { cls: good ? 'good' : 'bad', txt: `${d > 0 ? '▲' : '▼'} ${mag}` };
+  return { cls: good ? 'good' : 'bad', txt: mag, dir: d > 0 ? 'up' : 'down' };
 }
 function dynSection(items) {
   if (!items || !items.length) return '';
-  return `<section class="dyn" aria-label="Dinamika">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-card">
-    <div class="k">${esc(it.title)}</div>
+  const meta = it => it.unit === '%' ? ['activity', 'att'] : it.unit === 'so\'m' ? (/trimestr/i.test(it.title) ? ['receipt', 'money2'] : ['dollar', 'money'])
+    : /chegara/i.test(it.title) ? ['userx', 'risk'] : ['chart', 'people'];
+  return `<section class="dyn" aria-label="Dinamika">${items.map(it => { const dl = dynDelta(it); const [mi, mc] = meta(it); return `<div class="dyn-card">
+    <div class="k"><span class="h-ic sm c-${mc}" aria-hidden="true">${ic(mi)}</span>${esc(it.title)}</div>
     <div class="row"><div><div class="v num">${esc(dynVal(it, it.value))}</div>
-      <div class="d ${dl.cls}" title="${esc(it.caption)}">${esc(dl.txt)}</div></div>${spark(it.points, dl.cls)}</div>
+      <div class="d ${dl.cls}" title="${esc(it.caption)}">${dl.dir ? ic(dl.dir) : ''}${esc(dl.txt)}</div></div>${spark(it.points, dl.cls)}</div>
     <div class="s">${it.note ? esc(it.note) + ' · ' : ''}${esc(it.caption)}</div></div>`; }).join('')}</section>`;
 }
 function issueChips(r) {
   const out = [];
-  if (r.flags.att) out.push(`<span class="chip bordo">${esc(r.action || 'Davomat')}</span>`);
-  if (r.flags.acad) out.push(`<span class="chip bordo" title="${esc(r.debts.join(', '))}">Akademik: ${r.debts.length} fan</span>`);
-  if (r.flags.gpa) out.push(`<span class="chip bordo" title="Kursdan kursga o‘tmaydi">GPA ${gpaFmt(r.gpa)}</span>`);
-  if (r.flags.kontrakt) out.push(`<span class="chip warn">Kontrakt: ${money(r.kontrakt)}</span>`);
-  if (r.flags.trimestr) out.push(`<span class="chip warn">Trimestr: ${money(r.trimestr)}</span>`);
+  if (r.flags.att) out.push(`<span class="chip bordo">${ic('calx')}${esc(r.action || 'Davomat')}</span>`);
+  if (r.flags.acad) out.push(`<span class="chip bordo" title="${esc(r.debts.join(', '))}">${ic('bookx')}Akademik: ${r.debts.length} fan</span>`);
+  if (r.flags.gpa) out.push(`<span class="chip bordo" title="Kursdan kursga o‘tmaydi">${ic('cap')}GPA ${gpaFmt(r.gpa)}</span>`);
+  if (r.flags.kontrakt) out.push(`<span class="chip warn" title="Kontrakt qarzi: ${money(r.kontrakt)}">${ic('dollar')}${mlnPlain(r.kontrakt)} so‘m</span>`);
+  if (r.flags.trimestr) out.push(`<span class="chip warn" title="Trimestr qarzi: ${money(r.trimestr)}">${ic('receipt')}${mlnPlain(r.trimestr)} so‘m</span>`);
   return out.join('') || '<span class="dash">—</span>';
 }
 
 /* ================================================================ talabalar */
-const FILTERS = [['', 'Hammasi'], ['prob', 'Muammoli'], ['att', 'Davomat'], ['acad', 'Akademik qarz'], ['gpa', 'GPA past'], ['kontrakt', 'Kontrakt'], ['trimestr', 'Trimestr']];
+const FILTERS = [['', 'Hammasi', 'users'], ['prob', 'Muammoli', 'flame'], ['att', 'Davomat', 'calx'], ['acad', 'Akademik qarz', 'bookx'],
+  ['gpa', 'GPA past', 'cap'], ['kontrakt', 'Kontrakt', 'dollar'], ['trimestr', 'Trimestr', 'receipt']];
+const COL_IC = {};  // ustun sarlavhalarida belgi yo'q — jadval ekranga sig'sin (belgilar kataklarda)
 const COLS = [['name', 'Talaba'], ['group', 'Guruh'], ['percent', 'Davomat'], ['action', 'Chora'],
   ['debts', 'Akademik qarz'], ['gpa', 'GPA', 'r'], ['kontrakt', 'Kontrakt', 'r'], ['trimestr', 'Trimestr', 'r'], ['problems', 'Masala', 'r']];
 const norm = s => String(s || '').toLowerCase().replace(/[‘’ʻʼ'`]/g, '').replace(/\s+/g, ' ').trim();
@@ -446,7 +502,7 @@ async function pStudents(parts, q) {
     ${sup ? `<div class="seg" id="scope" style="margin-bottom:14px"><button data-s="0" class="${st.all ? '' : 'on'}">Joriy kurs</button><button data-s="1" class="${st.all ? 'on' : ''}">Barcha kurslar</button></div>` : ''}
     <div class="toolbar">
       <div class="search">${ic('search')}<input class="input" id="q" type="search" placeholder="Ism, guruh yoki HEMIS ID" value="${esc(st.q)}" aria-label="Qidirish"></div>
-      <div class="seg" id="flt">${FILTERS.map(([k, l]) => `<button data-f="${k}" class="${st.f === k ? 'on' : ''}">${l}<span class="n">${rows.filter(r => matchFilter(r, k)).length}</span></button>`).join('')}</div>
+      <div class="seg" id="flt">${FILTERS.map(([k, l, i]) => `<button data-f="${k}" class="${st.f === k ? 'on' : ''}">${ic(i)}${l}<span class="n">${rows.filter(r => matchFilter(r, k)).length}</span></button>`).join('')}</div>
       ${st.all ? `<select class="select" id="crs" aria-label="Kurs"><option value="">Barcha kurslar</option>${courses.map(([k, t]) => `<option value="${esc(k)}" ${k === st.c ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}
       <select class="select" id="grp" aria-label="Guruh"><option value="">Barcha guruhlar</option>${groups.map(g => `<option ${g === st.g ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>
       <span class="grow"></span><span class="count" id="cnt"></span>
@@ -467,7 +523,7 @@ async function pStudents(parts, q) {
     });
     $('#cnt').textContent = `${list.length} ta talaba`;
     $('#tw').innerHTML = list.length ? `<table class="tbl"><thead><tr>${cols.map(([k, l, c]) =>
-      `<th class="sort ${c || ''}" data-sort="${k}" aria-sort="${key === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'}">${l}${key === k ? `<span class="arr">${dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr></thead>
+      `<th class="sort ${c || ''}" data-sort="${k}" aria-sort="${key === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'}">${COL_IC[k] ? `<span class="th-i">${ic(COL_IC[k])}</span>` : ''}${l}${key === k ? `<span class="arr">${dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr></thead>
       <tbody>${list.map(r => stuRow(r, st.all)).join('')}</tbody></table>`
       : emptyBox('search', 'Hech kim topilmadi', 'Qidiruv so‘zini yoki filtrni o‘zgartiring.');
   };
@@ -493,9 +549,9 @@ function stuRow(r, all = false) {
     <td>${pctCell(r.percent)}${r.counted_hours ? `<div class="sub-l">sababsiz ${num(r.counted_hours / 2)} para</div>` : ''}</td>
     <td>${r.action ? `<span class="chip bordo act">${esc(r.action)}</span>` : dash}</td>
     <td>${r.debts.length ? `<div class="debts" title="${esc(r.debts.join(', '))}"><span class="chip bordo">${r.debts.length} fan</span><span class="sub">${esc(r.debts.join(', '))}</span></div>` : dash}</td>
-    <td class="r">${r.gpa != null ? gpaFmt(r.gpa) : dash}</td>
-    <td class="r nowrap">${r.kontrakt ? `<span class="money" title="${money(r.kontrakt)}">${mlnPlain(r.kontrakt)}</span>` : dash}</td>
-    <td class="r nowrap">${r.trimestr ? `<span class="money" title="${money(r.trimestr)}">${mlnPlain(r.trimestr)}</span>` : dash}</td>
+    <td class="r">${r.gpa != null ? (r.flags.gpa ? `<span class="gpa-low" title="Kursdan kursga o‘tmaydi">${ic('alert')}${gpaFmt(r.gpa)}</span>` : gpaFmt(r.gpa)) : dash}</td>
+    <td class="r nowrap">${r.kontrakt ? `<span class="money" title="Kontrakt qarzi: ${money(r.kontrakt)}">${ic('dollar')}${mlnPlain(r.kontrakt)}</span>` : dash}</td>
+    <td class="r nowrap">${r.trimestr ? `<span class="money" title="Trimestr qarzi: ${money(r.trimestr)}">${ic('receipt')}${mlnPlain(r.trimestr)}</span>` : dash}</td>
     <td class="r"><span class="cnt ${r.problems >= 3 ? 'bordo' : r.problems ? '' : 'zero'}">${r.problems || 0}</span></td></tr>`;
 }
 
@@ -648,7 +704,7 @@ async function pAnnounce() {
   const sel = new Set();
   let tab = 'uz';
   view(head('E’lon yuborish', courseSub()) + `<div class="cols">
-    <section class="sec"><header><h2>Matn</h2></header><div class="pad">
+    <section class="sec"><header>${H('edit', 'Matn', 'people')}</header><div class="pad">
       <label class="field"><span>E’lon</span><textarea class="textarea" id="txt" rows="12" placeholder="Ota-onalar yig‘ilishi shanba kuni soat 10:00 da bo‘lib o‘tadi.
 ---ru
 Родительское собрание состоится в субботу в 10:00."></textarea>
@@ -656,7 +712,7 @@ async function pAnnounce() {
       ${S.me.role === 'super' ? `<div class="field"><span>Qaysi kurslarga</span><div class="seg" id="scopeA"><button data-a="0" class="on">«${esc(S.me.staff.title || 'Joriy kurs')}» kursi</button><button data-a="1">Barcha kurslar</button></div></div>` : ''}
       <div class="field" id="grpField"><span>Kimga</span><div class="groups" id="grps"><button data-g="" class="on">${myGroups().length ? 'Barcha guruhlarim' : 'Butun kurs'}</button>${groups.map(g => `<button data-g="${esc(g)}">${esc(g)}</button>`).join('')}</div></div>
       <button class="btn primary" id="send">${ic('send')} E’lonni yuborish</button></div></section>
-    <section class="sec"><header><h2>Ota-ona nimani ko‘radi</h2></header><div class="pad">
+    <section class="sec"><header>${H('chat', 'Ota-ona nimani ko‘radi', 'msg')}</header><div class="pad">
       <div class="tabs" id="tabs"><button data-l="uz" class="on">O‘zbekcha</button><button data-l="ru">Русский</button><button data-l="en">English</button></div>
       <div class="tg"><div class="bub" id="pv"></div></div><div id="pvn" style="margin-top:12px"></div></div></section></div>`);
   const draw = () => {
@@ -710,7 +766,7 @@ const SECTIONS_EXP = [['all', 'To‘liq hisobot'], ['prob', 'Muammoli talabalar'
 async function pFiles() {
   document.title = 'Ma’lumot va hisobot — Boshqaruv paneli';
   view(head('Ma’lumot va hisobot', courseSub()) + `<div class="cols">
-    <section class="sec"><header><h2>Excel fayllarni yuklash</h2></header><div class="pad">
+    <section class="sec"><header>${H('upload', 'Excel fayllarni yuklash', 'att')}</header><div class="pad">
       <label class="dz" id="dz"><input type="file" id="files" accept=".xlsx,.xlsm" multiple hidden>
         <span class="ic">${ic('upload')}</span><b>Fayllarni shu yerga tashlang</b><span>yoki bosib tanlang — .xlsx, bir nechta faylni birga</span></label>
       <div class="toolbar" style="margin:16px 0 0"><label class="field" style="margin:0;flex:1"><span>Fayl turi</span>
@@ -718,13 +774,13 @@ async function pFiles() {
       <label class="switch" style="margin-top:14px"><span><b style="font-weight:600">Ota-onalarga xabar yubormaslik</b><br><span class="hint">Eski ma’lumotni qayta yuklaganda yoki tuzatish kiritganda</span></span><input type="checkbox" id="silent"></label>
       <ul class="queue" id="queue"></ul>
       <p class="hint" style="margin-top:14px">HEMIS va buxgalteriya fayllari o‘zgartirilmasdan yuklanadi. Namunalar: botda «📑 Shablonlar».</p></div></section>
-    <section class="sec"><header><h2>Hisobot</h2></header><div class="pad">
+    <section class="sec"><header>${H('download', 'Hisobot', 'people')}</header><div class="pad">
       <div class="radio" style="margin-bottom:14px"><label><input type="radio" name="fmt" value="x" checked><span><b>Excel</b><span>har bo‘lim alohida varaqda, jami — formulalar bilan</span></span></label>
         <label><input type="radio" name="fmt" value="p"><span><b>PDF</b><span>dekanat yig‘ilishi va rahbariyat uchun</span></span></label></div>
       <label class="field"><span>Bo‘lim</span><select class="select" id="sec">${SECTIONS_EXP.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></label>
       <div class="actions"><button class="btn primary" id="dl">${ic('download')} Yuklab olish</button>
         <button class="btn" id="tgsend">${ic('telegram')} Telegram chatimga yuborish</button></div></div></section></div>
-    <section class="sec" style="margin-top:22px"><header><h2>Yuklangan fayllar</h2><span class="hint">${S.me.role === 'super' ? 'barcha koordinatorlar' : 'siz yuklaganlar'}</span></header><div id="imports">${skel(80)}</div></section>`);
+    <section class="sec" style="margin-top:22px"><header>${H('layers', 'Yuklangan fayllar', 'people')}<span class="hint">${S.me.role === 'super' ? 'barcha koordinatorlar' : 'siz yuklaganlar'}</span></header><div id="imports">${skel(80)}</div></section>`);
   loadImports();
   const dz = $('#dz');
   ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
@@ -816,11 +872,11 @@ async function pDocs() {
   const j = S.docJob;
   if (!j) {
     view(head('Rasmiy hujjat yuborish', courseSub()) + `<div class="cols">
-      <section class="sec"><header><h2>PDF hujjat</h2></header><div class="pad">
+      <section class="sec"><header>${H('file', 'PDF hujjat', 'acad')}</header><div class="pad">
         <label class="dz" id="dz"><input type="file" id="pdf" accept="application/pdf,.pdf" hidden>
           <span class="ic">${ic('file')}</span><b>PDF faylni shu yerga tashlang</b><span>yoki bosib tanlang — buyruq, ogohlantirish, hayfsan</span></label>
         <div id="dzs" style="margin-top:14px"></div></div></section>
-      <section class="sec"><header><h2>Qanday ishlaydi</h2></header><div class="pad"><ol class="steps-l">
+      <section class="sec"><header>${H('info', 'Qanday ishlaydi', 'people')}</header><div class="pad"><ol class="steps-l">
         <li>Hujjat o‘qiladi va undagi talabalar avtomatik topiladi — kerak bo‘lsa qo‘lda qo‘shasiz.</li>
         <li>Har bir talaba uchun alohida nusxa tayyorlanadi: boshqa talabalarning F.I.Sh., guruhi va ID si qora rang bilan yopiladi.</li>
         <li>Nusxalarni ko‘rib chiqasiz, hujjat turini tanlaysiz va yuborasiz.</li>
@@ -834,7 +890,7 @@ async function pDocs() {
   }
   const n = j.sel.size;
   view(head('Rasmiy hujjat yuborish', courseSub(), `<button class="btn" data-act="doc-reset">${ic('file')} Boshqa hujjat</button>`) + `<div class="cols">
-    <section class="sec"><header><h2>Talabalar</h2><span class="count" id="dcount">${n} ta tanlandi</span></header><div class="pad">
+    <section class="sec"><header>${H('users', 'Talabalar', 'people')}<span class="count" id="dcount">${n} ta tanlandi</span></header><div class="pad">
       <div class="note ${j.readable ? '' : 'warn'}" style="margin-bottom:12px">${ic(j.readable ? 'file' : 'alert')}<span><b>${esc(j.file_name)}</b><br>${j.readable
         ? `${j.pages} sahifa · hujjatda ${j.found.filter(x => x.auto).length} ta talaba topildi`
         : 'Hujjat matnini o‘qib bo‘lmadi — nusxalar asl holida yuboriladi (boshqa talabalar yopilmaydi).'}</span></div>
@@ -957,26 +1013,30 @@ async function pSuperOverview() {
   const d = await api('/api/super/overview');
   const tot = d.courses.reduce((a, c) => ({ total: a.total + c.total, linked: a.linked + c.linked, prob: a.prob + c.prob, multi: a.multi + c.multi,
     k: a.k + c.kontrakt.sum, t: a.t + c.trimestr.sum }), { total: 0, linked: 0, prob: 0, multi: 0, k: 0, t: 0 });
+  const kc = d.courses.reduce((a, c) => a + c.kontrakt.count, 0), tc = d.courses.reduce((a, c) => a + c.trimestr.count, 0);
+  const [km, ku] = moneyShort(tot.k), [tm, tu] = moneyShort(tot.t);
+  const cover = pct(tot.linked, tot.total);
+  const moneyCell = (m, icon) => m.count ? `<span class="mcell" title="${money(m.sum)}">${ic(icon)}<b>${mlnPlain(m.sum)}</b><small>${m.count} ta talaba</small></span>` : '<span class="dash">—</span>';
+  const countCell = (n, icon, cls) => n ? `<span class="icnt ${cls}">${ic(icon)}${n}</span>` : '<span class="dash">0</span>';
   view(head('Barcha kurslar', todayLabel(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
-    <section class="band">
-      <a href="#/super/courses"><div class="k">Kurslar</div><div class="v navy">${d.courses.length}</div><div class="s">kurs koordinatorlari: ${d.coordinators}</div></a>
-      <div><div class="k">Talabalar</div><div class="v navy">${tot.total}</div><div class="s">ota-onasi ulangan: ${pct(tot.linked, tot.total)}%</div><div class="meter"><i style="width:${pct(tot.linked, tot.total)}%"></i></div></div>
-      <div><div class="k">Muammoli talabalar</div><div class="v ${tone(tot.prob)}">${tot.prob}</div><div class="s">3 va undan ko‘p masala: ${tot.multi}</div></div>
-      <div title="${money(tot.k)}"><div class="k">Kontrakt qarzi</div><div class="v ${tone(tot.k, 'warn')}">${mln(tot.k)}</div><div class="s">${d.courses.reduce((a, c) => a + c.kontrakt.count, 0)} ta talaba</div></div>
-      <div title="${money(tot.t)}"><div class="k">Trimestr qarzi</div><div class="v ${tone(tot.t, 'warn')}">${mln(tot.t)}</div><div class="s">${d.courses.reduce((a, c) => a + c.trimestr.count, 0)} ta talaba</div></div>
-      <a href="#/super/system"><div class="k">Tizim</div><div class="v ${tone(d.errors_24h)}">${d.errors_24h ? d.errors_24h + '<small> ta xato</small>' : 'Barqaror'}</div>
-        <div class="s">zaxira: ${d.last_backup ? when(d.last_backup) : 'hali olinmagan'}</div></a>
+    <section class="kpis k3" aria-label="Universitet bo‘yicha ko‘rsatkichlar">
+      ${kpi({ href: '#/super/courses', icon: 'layers', c: 'people', label: 'Kurslar', value: d.courses.length, unit: 'ta', sub: `${ic('users')} kurs koordinatorlari: <b>${d.coordinators}</b>` })}
+      ${kpi({ icon: 'users', c: 'people', label: 'Talabalar', value: num(tot.total, 0), unit: 'ta', sub: `${ic('link')} ota-onasi ulangan: <b>${num(tot.linked, 0)}</b> · ${cover}%`, meter: cover })}
+      ${kpi({ icon: 'flame', c: 'risk', label: 'Muammoli talabalar', value: tot.prob, unit: 'ta', state: probState(tot.multi), sub: `3 va undan ko‘p masala: <b>${tot.multi}</b>` })}
+      ${kpi({ icon: 'dollar', c: 'money', label: 'Kontrakt qarzi', value: km, unit: ku, state: probState(kc, 'warn'), sub: `${kc} ta talaba`, title: money(tot.k) })}
+      ${kpi({ icon: 'receipt', c: 'money2', label: 'Trimestr qarzi', value: tm, unit: tu, state: probState(tc, 'warn'), sub: `${tc} ta talaba`, title: money(tot.t) })}
+      ${kpi({ href: '#/super/system', icon: 'server', c: 'sys', label: 'Tizim', value: d.errors_24h ? d.errors_24h : 'Barqaror', unit: d.errors_24h ? 'ta xato' : '',
+        state: d.errors_24h ? 'bad' : 'ok', sub: `${ic('db')} zaxira: ${d.last_backup ? when(d.last_backup) : 'hali olinmagan'}` })}
     </section>
-    <section class="sec"><header><h2>Kurslar kesimida</h2><a href="#/super/courses">Kurslarni boshqarish</a></header>
-      ${d.courses.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Kurs</th><th>Kurs koordinatorlari</th><th class="r">Talabalar</th><th class="r">Ota-onasi ulangan</th>
-        <th class="r">Muammoli</th><th class="r">Davomat</th><th class="r">Akademik</th><th class="r">Kontrakt</th><th class="r">Trimestr</th><th></th></tr></thead><tbody>
-        ${d.courses.map(c => `<tr><td class="name"><b>${esc(c.title)}</b></td>
-          <td>${c.admins.length ? c.admins.map(a => esc(a.label)).join(', ') : '<span class="chip warn">tayinlanmagan</span>'}</td>
-          <td class="r">${c.total}</td><td class="r">${pctCell(c.total ? pct(c.linked, c.total) : null)}</td>
-          <td class="r"><span class="cnt ${c.multi ? 'bordo' : c.prob ? '' : 'zero'}">${c.prob}</span></td><td class="r">${c.att}</td><td class="r">${c.acad}</td>
-          <td class="r">${c.kontrakt.count ? `${c.kontrakt.count} ta<br><span class="hint">${money(c.kontrakt.sum)}</span>` : '<span class="dash">—</span>'}</td>
-          <td class="r">${c.trimestr.count ? `${c.trimestr.count} ta<br><span class="hint">${money(c.trimestr.sum)}</span>` : '<span class="dash">—</span>'}</td>
-          <td class="r"><button class="btn sm" data-act="enter" data-key="${esc(c.key)}">Kursga kirish</button></td></tr>`).join('')}</tbody></table></div>`
+    <section class="sec"><header>${H('layers', 'Kurslar kesimida', 'people')}<a href="#/super/courses">Kurslarni boshqarish ${ic('arrow')}</a></header>
+      ${d.courses.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl courses"><thead><tr><th>Kurs</th><th>Kurs koordinatorlari</th><th class="r">Talabalar</th><th>Ota-onasi ulangan</th>
+        <th class="r">Muammoli</th><th class="r">Davomat</th><th class="r">Akademik</th><th class="r">Kontrakt qarzi</th><th class="r">Trimestr qarzi</th><th></th></tr></thead><tbody>
+        ${d.courses.map(c => `<tr><td class="name"><div class="cname"><span class="h-ic sm c-people" aria-hidden="true">${ic('layers')}</span><b>${esc(c.title)}</b></div></td>
+          <td>${c.admins.length ? `<div class="people">${c.admins.map(a => `<span class="person"><span class="av-s">${/^\p{L}/u.test(a.label) && !/^ID\b/.test(a.label) ? esc(initials(a.label)) : ic('users')}</span>${esc(a.label)}</span>`).join('')}</div>` : `<span class="chip warn">${ic('alert')}tayinlanmagan</span>`}</td>
+          <td class="r">${c.total}</td><td>${pctCell(c.total ? pct(c.linked, c.total) : null)}</td>
+          <td class="r">${countCell(c.prob, 'flame', c.multi ? 'bad' : '')}</td><td class="r">${countCell(c.att, 'calx', 'bad')}</td><td class="r">${countCell(c.acad, 'bookx', 'bad')}</td>
+          <td class="r">${moneyCell(c.kontrakt, 'dollar')}</td><td class="r">${moneyCell(c.trimestr, 'receipt')}</td>
+          <td class="r"><button class="btn sm" data-act="enter" data-key="${esc(c.key)}">Kirish ${ic('arrow')}</button></td></tr>`).join('')}</tbody></table></div>`
         : emptyBox('building', 'Hali kurs yo‘q', '', `<a class="btn primary" href="#/super/courses">${ic('plus')} Kurs yaratish</a>`)}</section>`);
 }
 async function pSuperCourses() {
@@ -998,16 +1058,16 @@ async function pSuperSystem() {
   view(head('Tizim', todayLabel()) + skel(160) + skel(300));
   const [o, e, pt] = await Promise.all([api('/api/super/overview'), api('/api/super/errors'), api('/api/super/pair_times')]);
   view(head('Tizim', todayLabel(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `<div class="cols">
-    <section class="sec"><header><h2>Zaxira nusxa</h2></header><div class="pad">
+    <section class="sec"><header>${H('db', 'Zaxira nusxa', 'sys')}</header><div class="pad">
       <div class="kv" style="margin-bottom:14px"><span>Oxirgi zaxira nusxa</span><b>${o.last_backup ? when(o.last_backup) : 'hali olinmagan'}</b>
         <span>Avtomatik</span><b>har kuni 03:00, 14 kun saqlanadi</b><span>Shifrlash</span><b>AES-256</b></div>
       <button class="btn primary" data-act="backup">${ic('db')} Hozir zaxira nusxa olish</button>
       <p class="hint">Barcha kurs bazalari va umumiy ro‘yxat bitta shifrlangan arxivga yig‘iladi va Telegram chatingizga yuboriladi.</p>
       <div id="bk"></div></div></section>
-    <section class="sec"><header><h2>Xatolar jurnali</h2><span class="chip ${e.count_24h ? 'bordo' : 'ok'}">so‘nggi 24 soatda: ${e.count_24h}</span></header><div class="pad">
+    <section class="sec"><header>${H('alert', 'Xatolar jurnali', 'risk')}<span class="chip ${e.count_24h ? 'bordo' : 'ok'}">so‘nggi 24 soatda: ${e.count_24h}</span></header><div class="pad">
       ${e.tail.trim() ? `<pre class="log">${esc(e.tail)}</pre>` : `<div class="note ok">${ic('ok')}<span>Jurnal bo‘sh — tizim xatosiz ishlayapti.</span></div>`}
       <p class="hint">To‘liq jurnal serverda: logs/errors.log. Yangi tizim xatosi haqida bot sizga darhol xabar beradi.</p></div></section></div>
-    <section class="sec" style="margin-top:22px"><header><h2>Juftlik vaqtlari</h2>${Object.keys(pt.times).length ? '<span class="chip ok">kiritilgan</span>' : '<span class="chip warn">kiritilmagan</span>'}</header><div class="pad">
+    <section class="sec" style="margin-top:22px"><header>${H('clock', 'Juftlik vaqtlari', 'att')}${Object.keys(pt.times).length ? '<span class="chip ok">kiritilgan</span>' : '<span class="chip warn">kiritilmagan</span>'}</header><div class="pad">
       <p class="hint" style="margin-top:0">Dars jadvalida har bir juftlikning boshlanish va tugash vaqti ko‘rsatiladi (ota-ona ilovasida ham). HEMIS jadvalida vaqt bo‘lsa, o‘sha ustun turadi. Bo‘sh qoldirilgan juftlik — faqat raqami bilan.</p>
       <div class="ptimes">${Array.from({ length: 8 }, (_, i) => { const v = pt.times[String(i + 1)] || ['', ''];
         return `<div><b>${i + 1}-juftlik</b><input class="input" type="time" data-pt="${i + 1}" data-k="0" value="${esc(v[0])}" aria-label="${i + 1}-juftlik boshlanishi"><span>—</span>
@@ -1060,13 +1120,13 @@ function drawSurveyBuilder() {
     : q.kind === 'scale' ? '<p class="hint">Ota-ona 1 dan 5 gacha baho beradi (1 — yomon, 5 — a’lo); natijada o‘rtacha baho ko‘rsatiladi.</p>'
     : '<p class="hint">Ota-ona o‘z so‘zlari bilan yozadi.</p>'}</div>`;
   view(head('Yangi so‘rovnoma', courseSub(), `<a class="btn" href="#/surveys">Bekor qilish</a>`) + `<div class="grid-2" id="svb">
-    <section class="sec"><header><h2>Savollar</h2></header><div class="pad">
+    <section class="sec"><header>${H('poll', 'Savollar', 'gpa')}</header><div class="pad">
       <label class="field"><span>Sarlavha</span><input class="input" data-g="title" value="${esc(v.title)}" placeholder="Masalan: Ota-onalar yig‘ilishi vaqti" maxlength="200"></label>
       <label class="field"><span>Izoh (ixtiyoriy)</span><textarea class="input" data-g="description" rows="2" maxlength="2000" placeholder="Nima uchun so‘rayapmiz, qachongacha">${esc(v.description)}</textarea></label>
       ${v.questions.map(qHtml).join('')}
       <div class="toolbar" style="margin-top:12px">${SV_KINDS.map(([k, l]) => `<button class="btn sm" data-act="sv-add" data-kind="${k}">${ic('plus')} ${l}</button>`).join('')}</div>
     </div></section>
-    <div class="stack"><section class="sec"><header><h2>Kimga va qachongacha</h2></header><div class="pad">
+    <div class="stack"><section class="sec"><header>${H('users', 'Kimga va qachongacha', 'people')}</header><div class="pad">
       <div class="field"><span>Guruhlar ${myGroups().length ? '(faqat sizning guruhlaringiz)' : ''}</span>
         <div class="groups">${S.svGroups.length ? S.svGroups.map(g => `<button data-act="sv-grp" data-g="${esc(g)}" class="${v.groups.has(g) ? 'on' : ''}">${esc(g)}</button>`).join('') : '<span class="hint">Talabalar hali yuklanmagan</span>'}</div>
         <small class="hint">Hech biri tanlanmasa — ${myGroups().length ? 'barcha guruhlaringiz' : 'butun kurs'}.</small></div>
@@ -1139,7 +1199,7 @@ async function pSurveyResults(id) {
     } else {
       body = q.texts.length ? `<ul class="answers">${q.texts.map(x => `<li>${esc(x.text)}${x.student ? `<span class="hint"> — ${esc(x.student)}, ${esc(x.group || '')}</span>` : ''}</li>`).join('')}</ul>` : '<p class="hint">Hali javob yo‘q</p>';
     }
-    return `<section class="sec"><header><h2>${i + 1}. ${esc(q.text)}</h2><span class="hint">${q.answered} ta javob</span></header><div class="pad">${body}</div></section>`;
+    return `<section class="sec"><header>${H('poll', `${i + 1}. ${esc(q.text)}`, 'gpa')}<span class="hint">${q.answered} ta javob</span></header><div class="pad">${body}</div></section>`;
   };
   view(head(d.title, `${d.groups.length ? esc(d.groups.join(', ')) : 'butun kurs'} · ${when(d.created_at)}${d.closes_at ? ' · ' + esc(d.closes_at) + ' gacha' : ''}`,
     `<button class="btn" data-act="svr-export" data-id="${id}">${ic('download')} Excel</button>
@@ -1169,11 +1229,11 @@ async function pSuperRegs() {
   view(head('Ichki nizomlar', todayLabel()) + skel(260));
   const d = await api('/api/regulations');
   view(head('Ichki nizomlar', todayLabel()) + `<p class="hint" style="margin:-10px 0 18px">Barcha kurslar ota-onalari ilovada — bosh sahifadagi «Ichki nizomlar» tugmasidan ko‘radi. PDF ilovaning o‘zida sahifalab ochiladi; havola — brauzerda. Nomni uch tilda yozish mumkin: alohida qatordan <code>---ru</code> va <code>---en</code>.</p>
-    <div class="grid-2"><section class="sec"><header><h2>Nizomlar</h2><span class="hint">${d.items.length} ta</span></header>
+    <div class="grid-2"><section class="sec"><header>${H('book', 'Nizomlar', 'acad')}<span class="hint">${d.items.length} ta</span></header>
       ${d.items.length ? `<ul class="list">${d.items.map(r => `<li style="display:flex;align-items:flex-start;gap:12px"><div class="t" style="flex:1"><b>${ic(r.kind === 'pdf' ? 'file' : 'book')} ${esc(r.title)}</b>${r.description ? `<p>${esc(r.description)}</p>` : ''}<p>${r.kind === 'pdf' ? `<button class="btn sm" data-act="reg-pdf" data-id="${r.id}">${ic('download')} PDF</button>` : `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a>`}</p></div>
         <button class="btn sm ghost" data-act="reg-del" data-id="${r.id}" data-title="${esc(r.title)}" aria-label="O‘chirish">${ic('x')}</button></li>`).join('')}</ul>`
         : `<div class="pad">${emptyBox('book', 'Hali nizom yo‘q', 'O‘ng tomondagi shakl orqali PDF yoki havola qo‘shing.')}</div>`}</section>
-    <section class="sec"><header><h2>Yangi nizom</h2></header><form class="pad" id="regForm">
+    <section class="sec"><header>${H('plus', 'Yangi nizom', 'people')}</header><form class="pad" id="regForm">
       <label class="field"><span>Nomi</span><textarea class="input" name="title" rows="2" required minlength="3" placeholder="Masalan: Talabalar odob-axloq qoidalari"></textarea></label>
       <label class="field"><span>Qisqa izoh (ixtiyoriy)</span><input class="input" name="description" maxlength="1000"></label>
       <label class="field"><span>PDF fayl</span><input class="input" type="file" name="file" accept="application/pdf"></label>

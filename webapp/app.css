@@ -647,3 +647,17 @@ main.dk-form { max-width: 460px; width: 100%; margin: auto; padding: 48px 28px; 
 .dk-form .hero-center h2 { font-size: 26px; }
 .dk svg.chart { display: block; width: 100%; max-width: 620px; max-height: 280px; margin: 0 auto; }
 .dk-me { position: sticky; bottom: -14px; margin-bottom: -14px; padding-bottom: 14px; background: #0F2242; }
+
+/* kurs koordinatori paneli: har bir ko'rsatkich — o'z belgisi (ma'lumot turi rangida) */
+.c-people { --c: #2F4FA8; --cb: #E8EDFB; } .c-att { --c: #0F766E; --cb: #DDF3F0; } .c-acad { --c: #9E2A52; --cb: #F8E8EF; }
+.c-gpa { --c: #6D3FC4; --cb: #EFE9FB; } .c-risk { --c: #B42318; --cb: #FDE9E7; } .c-money { --c: #9A6A00; --cb: #FCF1D2; }
+.c-money2 { --c: #B54708; --cb: #FDEBDC; } .c-msg { --c: #0B6AA2; --cb: #E1F0FA; }
+html[data-theme="dark"] .c-people { --c: #9DB4F2; --cb: rgba(157,180,242,.14); } html[data-theme="dark"] .c-att { --c: #5ED3C4; --cb: rgba(94,211,196,.13); }
+html[data-theme="dark"] .c-acad { --c: #EE8DB0; --cb: rgba(238,141,176,.14); } html[data-theme="dark"] .c-gpa { --c: #B9A0F5; --cb: rgba(185,160,245,.14); }
+html[data-theme="dark"] .c-risk { --c: #F59A8F; --cb: rgba(245,154,143,.14); } html[data-theme="dark"] .c-money { --c: #F2C661; --cb: rgba(242,198,97,.13); }
+html[data-theme="dark"] .c-money2 { --c: #F7A56A; --cb: rgba(247,165,106,.13); } html[data-theme="dark"] .c-msg { --c: #7CC4F0; --cb: rgba(124,196,240,.13); }
+.st-tile .k { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.t-ic { width: 30px; height: 30px; border-radius: 9px; display: inline-grid; place-items: center; flex: none; background: var(--cb); color: var(--c); }
+.t-ic svg { width: 17px !important; height: 17px !important; }
+.st-tile .v { margin-top: 6px; white-space: nowrap; }
+.st-tile .v .of { font-size: 13px; }
