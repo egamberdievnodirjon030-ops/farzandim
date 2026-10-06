@@ -20,7 +20,7 @@ const T = {
     news: 'E’lonlar', settings: 'Sozlamalar', info: 'Foydali ma’lumot', group: 'Guruh', year: 'Kurs', faculty: 'Fakultet',
     yearN: '{n}-kurs', student: 'Talaba', ok_title: 'Hammasi joyida', ok_sub: 'Davomat, baholar va to‘lovlar bo‘yicha muammo yo‘q.',
     issues: '{n} ta masala e’tibor talab qiladi', gpa: 'GPA', of5: '5 dan', gpa_hint: 'o‘zlashtirish ko‘rsatkichi', acad: 'Akademik qarz', none: 'yo‘q',
-    subjectsN: '{n} ta fan', kontrakt: 'Kontrakt', trimestr: 'Trimestr', no_debt: 'Mavjud emas', grant: 'Davlat granti',
+    subjectsN: '{n} ta fan', mln_unit: 'mln so‘m', debt_clear_s: 'qarz yo‘q', kontrakt: 'Kontrakt', trimestr: 'Trimestr', no_debt: 'Mavjud emas', grant: 'Davlat granti',
     no_data: 'Ma’lumot yo‘q', unexcused: 'sababsiz', excused: 'sababli', today_lessons: 'Bugungi darslar', no_lessons_today: 'Bugun dars yo‘q',
     all: 'Hammasi', coordinator: 'Kurs koordinatori', write: 'Yozish', call: 'Qo‘ng‘iroq', updated: 'Yangilangan: {t}',
     since_start: 'Semestr boshidan', next_level: 'Keyingi chegara: {a} — yana {left}', max_level: 'Eng yuqori chegaraga yetgan',
@@ -63,7 +63,7 @@ const T = {
     news: 'Объявления', settings: 'Настройки', info: 'Полезная информация', group: 'Группа', year: 'Курс', faculty: 'Факультет',
     yearN: '{n} курс', student: 'Студент', ok_title: 'Всё в порядке', ok_sub: 'Проблем с посещаемостью, оценками и оплатой нет.',
     issues: 'Требуют внимания: {n}', gpa: 'GPA', of5: 'из 5', gpa_hint: 'средний балл', acad: 'Академ. задолженность', none: 'нет',
-    subjectsN: 'предметов: {n}', kontrakt: 'Контракт', trimestr: 'Триместр', no_debt: 'Отсутствует', grant: 'Госгрант',
+    subjectsN: 'предметов: {n}', mln_unit: 'млн сум', debt_clear_s: 'задолженности нет', kontrakt: 'Контракт', trimestr: 'Триместр', no_debt: 'Отсутствует', grant: 'Госгрант',
     no_data: 'Нет данных', unexcused: 'без уважит. причины', excused: 'по уважит. причине', today_lessons: 'Занятия сегодня', no_lessons_today: 'Сегодня занятий нет',
     all: 'Все', coordinator: 'Куратор курса', write: 'Написать', call: 'Позвонить', updated: 'Обновлено: {t}',
     since_start: 'С начала семестра', next_level: 'Следующий порог: {a} — ещё {left}', max_level: 'Достигнут высший порог',
@@ -106,7 +106,7 @@ const T = {
     news: 'Announcements', settings: 'Settings', info: 'Useful information', group: 'Group', year: 'Year', faculty: 'Faculty',
     yearN: 'Year {n}', student: 'Student', ok_title: 'All good', ok_sub: 'No problems with attendance, grades or payments.',
     issues: '{n} issue(s) need attention', gpa: 'GPA', of5: 'of 5', gpa_hint: 'grade point average', acad: 'Academic debt', none: 'none',
-    subjectsN: '{n} subject(s)', kontrakt: 'Tuition', trimestr: 'Trimester', no_debt: 'None', grant: 'State grant',
+    subjectsN: '{n} subject(s)', mln_unit: 'M UZS', debt_clear_s: 'no debt', kontrakt: 'Tuition', trimestr: 'Trimester', no_debt: 'None', grant: 'State grant',
     no_data: 'No data', unexcused: 'unexcused', excused: 'excused', today_lessons: 'Today’s classes', no_lessons_today: 'No classes today',
     all: 'All', coordinator: 'Course coordinator', write: 'Write', call: 'Call', updated: 'Updated: {t}',
     since_start: 'Since the start of the semester', next_level: 'Next threshold: {a} — {left} more', max_level: 'Highest threshold reached',
@@ -254,6 +254,19 @@ const P = {
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
 };
+/* bo'lim sarlavhalari belgisi: kalit — tarjima kaliti yoki o'zbekcha sarlavha */
+const HI = { today_lessons: ['cal', 'people'], levels: ['alert', 'risk'], by_week: ['trend', 'att'], by_subject: ['book', 'gpa'],
+  trends: ['trend', 'people'], semN: ['grade', 'gpa'], missed: ['calx', 'att'], missed_list: ['calx', 'att'], grade_scale: ['grade', 'gpa'], flags: ['alert', 'risk'],
+  coordinator: ['users', 'people'], by_upload: ['trend', 'msg'], by_semester: ['grade', 'gpa'], answered: ['ok', 'att'], theme: ['sun', 'people'],
+  lang: ['chat', 'msg'], 'Dinamika': ['trend', 'people'], 'Muammoli talabalar': ['flame', 'risk'], 'Akademik qarzdorlik': ['bookx', 'acad'],
+  'Talabalar': ['users', 'people'], 'Ota-onalar': ['users', 'people'], 'Hisobot': ['file', 'people'], 'Yuklangan fayllar': ['file', 'people'],
+  'Hujjat turi': ['file', 'acad'], 'HEMIS': ['grade', 'gpa'] };
+const hi = k => HI[k] ? `<span class="h-ic c-${HI[k][1]}" aria-hidden="true">${ic(HI[k][0])}</span>` : '';
+/* ixcham summa: 5 500 000 → «5,5 mln so‘m» (to'liq summa — title da) */
+const mShort = x => (x >= 1e6 ? `${(Math.floor(x / 1e5) / 10).toString().replace('.', S.lang === 'en' ? '.' : ',')}<small class="of"> ${esc(t('mln_unit'))}</small>`
+  : esc(money(x)));
+/* kartochka nomi belgisi bilan */
+const tk = (label, icon, c) => `<span class="k"><span class="t-ic c-${c}" aria-hidden="true">${ic(icon)}</span>${label}</span>`;
 const ic = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[name]}"/></svg>`;
 
 /* ================================================================ API */
@@ -393,15 +406,19 @@ function verdict(o) {
   const n = o.issues.length;
   if (!n) return `<div class="verdict ok">${ic('ok')}<div><b>${t('ok_title')}</b><p>${t('ok_sub')}</p></div></div>`;
   const tone = (o.attendance && o.attendance.level >= 1) || o.academic.count ? 'bad' : 'warn';
-  return `<div class="verdict ${tone}">${ic('alert')}<div><b>${t('issues', { n })}</b><p>${o.issues.map(esc).join('<br>')}</p></div></div>`;
+  const kind = s => /^📚/u.test(s) ? ['bookx', 'acad', '#/debts'] : /^💰/u.test(s) ? ['dollar', 'money', '#/finance']
+    : /^💳/u.test(s) ? ['receipt', 'money2', '#/finance'] : /^🎓/u.test(s) ? ['grade', 'gpa', '#/grades'] : ['calx', 'att', '#/attendance'];
+  const rows = o.issues.map(s => { const [i, c, h] = kind(s); return `<a class="issue" href="${h}"><span class="t-ic c-${c}" aria-hidden="true">${ic(i)}</span>
+    <span class="tx">${esc(s.replace(/^[^\p{L}\p{N}]+/u, ''))}</span>${ic('chev', 'chev')}</a>`; }).join('');
+  return `<div class="verdict ${tone}">${ic('alert')}<div style="flex:1;min-width:0"><b>${t('issues', { n })}</b><div class="issues">${rows}</div></div></div>`;
 }
 function payTile(kind, p) {
-  const label = t(kind);
-  if (!p || p.state === 'none') return `<a class="tile" href="#/finance"><span class="k">${label}</span><span class="v muted" style="font-size:18px">${t('no_data')}</span></a>`;
-  if (p.state === 'grant') return `<a class="tile ok" href="#/finance"><span class="k">${label}</span><span class="v" style="font-size:19px">${t('grant')}</span></a>`;
-  if (p.state === 'clear') return `<a class="tile ok" href="#/finance"><span class="k">${label}</span><span class="v" style="font-size:20px">${t('no_debt')}</span></a>`;
+  const label = tk(t(kind), kind === 'trimestr' ? 'receipt' : 'dollar', kind === 'trimestr' ? 'money2' : 'money');
+  if (!p || p.state === 'none') return `<a class="tile st-tile" href="#/finance">${label}<span class="v muted" style="font-size:18px">${t('no_data')}</span></a>`;
+  if (p.state === 'grant') return `<a class="tile st-tile ok" href="#/finance">${label}<span class="v" style="font-size:19px">${t('grant')}</span><span class="s state ok">${ic('ok')}${t('no_debt')}</span></a>`;
+  if (p.state === 'clear') return `<a class="tile st-tile ok" href="#/finance">${label}<span class="v" style="font-size:20px">${t('no_debt')}</span><span class="s state ok">${ic('ok')}${t('debt_clear_s')}</span></a>`;
   const late = p.days_left != null && p.days_left < 0;
-  return `<a class="tile bad" href="#/finance"><span class="k">${label}</span><span class="v num money">${money(p.debt)}</span>
+  return `<a class="tile st-tile bad" href="#/finance" title="${esc(money(p.debt))}">${label}<span class="v num">${mShort(p.debt)}</span>
     <span class="s">${p.days_left != null ? (late ? t('overdue') : t('days_left', { n: p.days_left })) : t('debt')}</span></a>`;
 }
 function lessonRow(l) {
@@ -419,22 +436,22 @@ async function viewHome() {
   catch (e) { return page({ title: t('home'), active: '#/', body: errorBox() }); }
   S.pendingSurveys = sv.pending.length;
   const a = o.attendance;
-  const attTile = a ? `<a class="tile ${a.percent >= 90 ? 'ok' : a.percent >= 75 ? 'warn' : 'bad'}" href="#/attendance"><span class="k">${t('attendance')}</span>
+  const attTile = a ? `<a class="tile st-tile ${a.percent >= 90 ? 'ok' : a.percent >= 75 ? 'warn' : 'bad'}" href="#/attendance">${tk(t('attendance'), 'att', 'att')}
       <div class="ring-wrap">${ring(a.percent, 54, 7)}<span class="v num">${a.percent != null ? a.percent + '%' : '—'}</span></div>
       <span class="s">${t('unexcused')}<br><b class="nowrap">${pairs(a.counted_hours)}</b></span></a>`
-    : `<a class="tile" href="#/attendance"><span class="k">${t('attendance')}</span><span class="v muted" style="font-size:18px">${t('no_data')}</span></a>`;
-  const gpaTile = `<a class="tile ${o.gpa_low ? 'bad' : ''}" href="#/grades"><span class="k">${t('gpa')}</span><span class="v num">${o.gpa != null ? gpaNum(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${o.gpa_low ? t('gpa_low', { min: limNum(o.gpa_min) }) : t('gpa_hint')}</span></a>`;
-  const acadTile = `<a class="tile ${o.academic.count ? 'bad' : 'ok'}" href="${o.academic.count ? '#/debts' : '#/grades'}"><span class="k">${t('acad')}</span>
+    : `<a class="tile st-tile" href="#/attendance">${tk(t('attendance'), 'att', 'att')}<span class="v muted" style="font-size:18px">${t('no_data')}</span></a>`;
+  const gpaTile = `<a class="tile st-tile ${o.gpa_low ? 'bad' : ''}" href="#/grades">${tk(t('gpa'), 'grade', 'gpa')}<span class="v num">${o.gpa != null ? gpaNum(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${o.gpa_low ? t('gpa_low', { min: limNum(o.gpa_min) }) : t('gpa_hint')}</span></a>`;
+  const acadTile = `<a class="tile st-tile ${o.academic.count ? 'bad' : 'ok'}" href="${o.academic.count ? '#/debts' : '#/grades'}">${tk(t('acad'), 'bookx', 'acad')}
       <span class="v" style="font-size:${o.academic.count ? 26 : 22}px">${o.academic.count ? `${o.academic.count}<small class="of"> ${esc(subjUnit(o.academic.count))}</small>` : t('no_debt')}</span>
       <span class="s clamp3">${o.academic.count ? esc(o.academic.debts.map(d => d.subject).join(', ')) : ''}</span></a>`;
   const tutor = c.tutor || {};
   if (deskMode()) {  // kompyuter: chapda — talaba va holat, o'ngda — bugungi darslar, so'rovnomalar, koordinator
     const kpis = `<div class="dk-kpis">${attTile}${gpaTile}${acadTile}${payTile('kontrakt', o.pays.kontrakt)}${o.pays.trimestr && o.pays.trimestr.state !== 'none' ? payTile('trimestr', o.pays.trimestr) : ''}</div>`;
-    const tutorCard = tutor.name || tutor.phone ? `<section class="card dk-tutor"><h3>${t('coordinator')}</h3>
+    const tutorCard = tutor.name || tutor.phone ? `<section class="card dk-tutor"><h3 class="dk-h3">${hi('coordinator')}${t('coordinator')}</h3>
       <div class="chat-head" style="padding:0;box-shadow:none;background:none"><div class="av">${esc((tutor.name || '?').trim().charAt(0))}</div>
       <div><b>${esc(tutor.name || '')}</b><div class="muted small">${esc(fmtPhone(tutor.phone))}</div></div></div>
       <a class="btn block" href="#/chat" style="margin-top:14px">${ic('chat')}${t('write')}</a></section>` : '';
-    const lessons = `<section class="section"><div class="section-head"><h2>${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
+    const lessons = `<section class="section"><div class="section-head"><h2>${hi('today_lessons')}${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
       <div class="list">${o.today.length ? o.today.map(l => lessonRow(l)).join('') : `<div class="empty" style="padding:22px">${t('no_lessons_today')}</div>`}</div></section>`;
     // 1-qator: talaba kartasi | holat va koordinator; 2-qator: ko'rsatkichlar; 3-qator: dinamika | bugungi darslar
     page({ title: t('home'), sub: `${c.name}${c.group ? ' · ' + c.group : ''}`, active: '#/', wide: true, body: `
@@ -455,9 +472,9 @@ async function viewHome() {
     <div class="grid2" style="margin-top:14px">${attTile}${gpaTile}${acadTile}${payTile('kontrakt', o.pays.kontrakt)}</div>
     ${o.pays.trimestr && o.pays.trimestr.state === 'debt' ? `<div style="margin-top:12px">${payTile('trimestr', o.pays.trimestr)}</div>` : ''}
     ${parentDyn(o.dynamics)}
-    <section class="section"><div class="section-head"><h2>${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
+    <section class="section"><div class="section-head"><h2>${hi('today_lessons')}${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
       <div class="list">${o.today.length ? o.today.map(l => lessonRow(l)).join('') : `<div class="empty" style="padding:22px">${t('no_lessons_today')}</div>`}</div></section>
-    ${tutor.name || tutor.phone ? `<section class="section"><div class="section-head"><h2>${t('coordinator')}</h2></div>
+    ${tutor.name || tutor.phone ? `<section class="section"><div class="section-head"><h2>${hi('coordinator')}${t('coordinator')}</h2></div>
       <div class="card" style="display:flex;align-items:center;gap:12px"><div class="chat-head" style="padding:0;box-shadow:none;flex:1;background:none">
       <div class="av">${esc((tutor.name || '?').trim().charAt(0))}</div><div><b>${esc(tutor.name || '')}</b><div class="muted small">${esc(fmtPhone(tutor.phone))}</div></div></div>
       ${tutor.phone ? `<a class="icon-btn" style="background:var(--tint-navy);color:var(--accent)" href="tel:+${esc(tutor.phone)}" aria-label="${t('call_tutor')}">${ic('phone')}</a>` : ''}
@@ -510,13 +527,13 @@ async function viewAttendance() {
         <div class="kv" style="margin-top:12px"><span>${t('unexcused')}</span><b class="num">${pairs(a.counted_hours)}</b></div>
         <div class="kv"><span>${t('excused')}</span><b class="num">${pairs(a.excused_hours)}</b></div>
         <p class="small muted" style="margin:6px 0 0">${esc(a.note)}</p></div></div>`;
-    const levels = `<div class="card"><h3 class="dk-h3">${t('levels')}</h3>${ladder(a)}<p style="margin:12px 0 0" class="${a.level >= 0 ? '' : 'muted'}">${esc(next)}</p></div>`;
-    const weeks = d.weeks && d.weeks.length > 1 ? `<div class="card"><h3 class="dk-h3">${t('by_week')}</h3>${weekChart(d.weeks)}</div>` : '';
-    const subj = d.subjects.length ? `<div class="card"><h3 class="dk-h3">${t('by_subject')}</h3><div class="list flat">${d.subjects.map(s => {
+    const levels = `<div class="card"><h3 class="dk-h3">${hi('levels')}${t('levels')}</h3>${ladder(a)}<p style="margin:12px 0 0" class="${a.level >= 0 ? '' : 'muted'}">${esc(next)}</p></div>`;
+    const weeks = d.weeks && d.weeks.length > 1 ? `<div class="card"><h3 class="dk-h3">${hi('by_week')}${t('by_week')}</h3>${weekChart(d.weeks)}</div>` : '';
+    const subj = d.subjects.length ? `<div class="card"><h3 class="dk-h3">${hi('by_subject')}${t('by_subject')}</h3><div class="list flat">${d.subjects.map(s => {
       const pct = s.total ? Math.round(100 * (s.keldi + s.kechikdi) / s.total) : 0;
       return `<div class="subject"><div><div class="t" style="font-weight:600">${esc(s.subject)}</div><div class="small muted">${t('kelmadi')}: ${s.kelmadi} · ${t('sababli')}: ${s.sababli}</div></div>
         <b class="num">${pct}%</b><div class="meter"><i style="width:${pct}%"></i></div></div>`; }).join('')}</div></div>` : '';
-    const missed = d.absences.length ? `<div class="card"><h3 class="dk-h3">${t('missed_list')}</h3><table class="dk-tbl"><thead><tr><th>${t('date_h')}</th><th>${t('pair_h')}</th><th>${t('subj_h')}</th><th class="r">${t('status_h')}</th></tr></thead>
+    const missed = d.absences.length ? `<div class="card"><h3 class="dk-h3">${hi('missed_list')}${t('missed_list')}</h3><table class="dk-tbl"><thead><tr><th>${t('date_h')}</th><th>${t('pair_h')}</th><th>${t('subj_h')}</th><th class="r">${t('status_h')}</th></tr></thead>
         <tbody>${d.absences.slice(0, 60).map(x => `<tr><td>${esc(x.weekday)}, ${dateLabel(x.date)}</td><td class="num">${esc(t('pairN', { n: x.pair }))}</td><td>${esc(x.subject)}</td>
           <td class="r"><span class="pill ${x.status === 'kelmadi' ? 'bordo' : 'warn'}">${t(x.status)}</span></td></tr>`).join('')}</tbody></table></div>`
       : `<div class="card">${empty('ok', t('nothing_missed'))}</div>`;
@@ -531,10 +548,10 @@ async function viewAttendance() {
       <div class="kv" style="margin-top:14px"><span>${t('unexcused')}</span><b class="num">${pairs(a.counted_hours)}</b></div>
       <div class="kv"><span>${t('excused')}</span><b class="num">${pairs(a.excused_hours)}</b></div>
       <p class="small muted" style="margin:8px 0 0">${esc(a.note)}</p></div>
-    <section class="section"><div class="section-head"><h2>${t('levels')}</h2></div>
+    <section class="section"><div class="section-head"><h2>${hi('levels')}${t('levels')}</h2></div>
       <div class="card">${ladder(a)}<p style="margin:12px 0 0" class="${a.level >= 0 ? '' : 'muted'}">${esc(next)}</p></div></section>
-    ${d.weeks && d.weeks.length > 1 ? `<section class="section"><div class="section-head"><h2>${t('by_week')}</h2><a href="#/trends">${t('trends')}</a></div><div class="card">${weekChart(d.weeks)}</div></section>` : ''}
-    <section class="section"><div class="section-head"><h2>${t('missed')}</h2></div>
+    ${d.weeks && d.weeks.length > 1 ? `<section class="section"><div class="section-head"><h2>${hi('by_week')}${t('by_week')}</h2><a href="#/trends">${t('trends')}</a></div><div class="card">${weekChart(d.weeks)}</div></section>` : ''}
+    <section class="section"><div class="section-head"><h2>${hi('missed')}${t('missed')}</h2></div>
       ${d.absences.length ? `<div class="list">${Object.entries(byDate).slice(0, 30).map(([day, items]) => `<div class="row" style="cursor:default;align-items:flex-start">
         <div class="body"><div class="t">${esc(items[0].weekday)}, ${dateLabel(day)}</div>${items.map(x => `<div class="d">${t('pairN', { n: x.pair })} — ${esc(x.subject)}</div>`).join('')}</div>
         <div class="end">${items.map(x => `<div><span class="pill ${x.status === 'kelmadi' ? 'bordo' : 'warn'}">${t(x.status)}</span></div>`).join('')}</div></div>`).join('')}</div>`
@@ -545,12 +562,12 @@ async function viewAttendance() {
               ${p.excused ? `<div class="small muted" style="margin-top:4px">${t('excused_n', { b: pairs(p.excused) })}</div>` : ''}</div></div>`).join('')}</div>
             <p class="small muted" style="margin:8px 4px 0">${t('hemis_missed_note')}</p>`
         : `<div class="list">${empty('ok', t('nothing_missed'))}</div>`}</section>
-    ${d.subjects.length ? `<section class="section"><div class="section-head"><h2>${t('by_subject')}</h2></div><div class="list">${d.subjects.map(s => {
+    ${d.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}${t('by_subject')}</h2></div><div class="list">${d.subjects.map(s => {
       const pct = s.total ? Math.round(100 * (s.keldi + s.kechikdi) / s.total) : 0;
       return `<div class="subject"><div><div class="t" style="font-weight:600">${esc(s.subject)}</div><div class="small muted">${t('kelmadi')}: ${s.kelmadi} · ${t('sababli')}: ${s.sababli}</div></div>
         <b class="num">${pct}%</b><div class="meter"><i style="width:${pct}%"></i></div></div>`;
     }).join('')}</div></section>` : ''}
-    ${d.hemis.length ? `<section class="section"><div class="section-head"><h2>HEMIS</h2></div><div class="list">${d.hemis.slice().reverse().map(h =>
+    ${d.hemis.length ? `<section class="section"><div class="section-head"><h2>${hi('HEMIS')}HEMIS</h2></div><div class="list">${d.hemis.slice().reverse().map(h =>
       `<div class="row" style="cursor:default"><div class="body"><div class="t">${dateLabel(h.as_of, true)}</div><div class="d">${t('unexcused')}: ${pairs(h.counted)}</div></div></div>`).join('')}</div></section>` : ''}`;
   page({ title: t('attendance'), sub: c.short, active: '#/attendance', body });
   animateRings();
@@ -608,13 +625,13 @@ async function viewGrades() {
     + empty('grade', t('no_data')) });
   if (deskMode()) {
     const head = `<div class="dk-kpis">
-      <div class="tile ${d.gpa_low ? 'bad' : ''}"><span class="k">${t('gpa_long')}</span><span class="v num">${d.gpa != null ? gpaNum(d.gpa) : '—'}<small class="of"> / 5</small></span>
+      <div class="tile st-tile ${d.gpa_low ? 'bad' : ''}">${tk(t('gpa_long'), 'grade', 'gpa')}<span class="v num">${d.gpa != null ? gpaNum(d.gpa) : '—'}<small class="of"> / 5</small></span>
         <span class="s">${[d.gpa_as_of ? `HEMIS · ${dateLabel(d.gpa_as_of, true)}` : '', d.gpa_low ? t('gpa_low', { min: limNum(d.gpa_min) }) : (d.gpa_as_of ? '' : t('gpa_hint'))].filter(Boolean).join(' · ')}</span></div>
-      <a class="tile ${d.debts ? 'bad' : 'ok'}" href="${d.debts ? '#/debts' : '#/grades'}"><span class="k">${t('acad')}</span>
+      <a class="tile st-tile ${d.debts ? 'bad' : 'ok'}" href="${d.debts ? '#/debts' : '#/grades'}">${tk(t('acad'), 'bookx', 'acad')}
         <span class="v">${d.debts ? `${d.debts}<small class="of"> ${esc(subjUnit(d.debts))}</small>` : t('no_debt')}</span><span class="s">${d.debts ? t('open') : ''}</span></a>
-      <div class="tile"><span class="k">${t('grade_scale')}</span><div class="dk-scale">${[['90–100', 5], ['70–89', 4], ['60–69', 3], ['0–59', 2]].map(([r, g]) =>
+      <div class="tile st-tile">${tk(t('grade_scale'), 'grade', 'people')}<div class="dk-scale">${[['90–100', 5], ['70–89', 4], ['60–69', 3], ['0–59', 2]].map(([r, g]) =>
         `<span><i class="grade g${g}">${g}</i><small class="num">${r}</small></span>`).join('')}</div></div></div>`;
-    const sems = d.semesters.map(sm => `<section class="card"><div class="section-head" style="margin:0 0 4px"><h2>${t('semN', { n: sm.semester })}</h2>${sm.gpa != null ? `<span class="muted num">GPA ${gpaNum(sm.gpa)}</span>` : ''}</div>
+    const sems = d.semesters.map(sm => `<section class="card"><div class="section-head" style="margin:0 0 4px"><h2>${hi('semN')}${t('semN', { n: sm.semester })}</h2>${sm.gpa != null ? `<span class="muted num">GPA ${gpaNum(sm.gpa)}</span>` : ''}</div>
       <table class="dk-tbl"><thead><tr><th>${t('subj_h')}</th><th class="r">${t('credits_h')}</th><th style="width:38%">${t('score_h')}</th><th class="r">${t('grade_h')}</th></tr></thead><tbody>
       ${sm.subjects.map(g => `<tr class="${g.debt ? 'debt' : ''}"><td><b>${esc(g.subject)}</b>${g.debt ? `<div class="small" style="color:var(--bordo-fg)">${t('debt_subject')}</div>` : ''}</td>
         <td class="r num">${g.credits ? num(g.credits) : '—'}</td>
@@ -625,11 +642,11 @@ async function viewGrades() {
   const body = switcher() + `<div class="card" style="display:flex;justify-content:space-between;align-items:center">
       <div><div class="muted small">${t('gpa_long')}</div><div class="bigstat"><b class="num">${d.gpa != null ? gpaNum(d.gpa) : '—'}</b><span class="muted">/ 5</span></div>${d.gpa_as_of ? `<div class="small muted">HEMIS · ${dateLabel(d.gpa_as_of, true)}</div>` : ''}${d.gpa_low ? `<div class="small" style="color:var(--bordo-fg);font-weight:600;margin-top:2px">${t('gpa_low', { min: limNum(d.gpa_min) })}</div>` : ''}</div>
       ${d.debts ? `<a class="pill bordo" href="#/debts" style="font-size:14px;padding:8px 12px">${t('acad')}: ${d.debts} ${ic('chev')}</a>` : `<span class="pill ok" style="font-size:14px;padding:8px 12px">${t('acad')}: ${t('no_debt').toLowerCase()}</span>`}</div>
-    ${d.semesters.map(s => `<section class="section"><div class="section-head"><h2>${t('semN', { n: s.semester })}</h2>${s.gpa != null ? `<span class="muted num">GPA ${gpaNum(s.gpa)}</span>` : ''}</div>
+    ${d.semesters.map(s => `<section class="section"><div class="section-head"><h2>${hi('semN')}${t('semN', { n: s.semester })}</h2>${s.gpa != null ? `<span class="muted num">GPA ${gpaNum(s.gpa)}</span>` : ''}</div>
       <div class="list">${s.subjects.map(g => `<div class="subject ${g.debt ? 'debt' : ''}"><div><div style="font-weight:600">${esc(g.subject)}</div>
         <div class="small muted num">${num(g.score)} / 100${g.credits ? ' · ' + num(g.credits) + ' ' + t('credits') : ''}${g.debt ? ' · <span style="color:var(--bordo-fg)">' + t('debt_subject') + '</span>' : ''}</div></div>
         <div class="grade g${g.grade}">${g.grade}</div><div class="meter"><i style="width:${Math.min(100, g.score)}%"></i></div></div>`).join('')}</div></section>`).join('')}
-    <section class="section"><div class="card"><div class="section-head" style="margin:0 0 8px"><h2>${t('grade_scale')}</h2></div>
+    <section class="section"><div class="card"><div class="section-head" style="margin:0 0 8px"><h2>${hi('grade_scale')}${t('grade_scale')}</h2></div>
       <div class="grid2" style="grid-template-columns:repeat(4,1fr);gap:8px">${[['90–100', 5], ['70–89', 4], ['60–69', 3], ['0–59', 2]].map(([r, g]) =>
         `<div style="text-align:center"><div class="grade g${g}" style="margin:0 auto 4px">${g}</div><span class="small muted num">${r}</span></div>`).join('')}</div></div></section>`;
   page({ title: t('grades'), sub: c.short, active: '#/grades', body });
@@ -753,7 +770,8 @@ async function viewNews() {
 }
 
 /* ================================================================ moliya, hujjatlar, dinamika */
-function moneyCard(title, p) {
+function moneyCard(title, p, icon = 'dollar', c = 'money') {
+  title = `<span class="mc-t"><span class="t-ic c-${c}" aria-hidden="true">${ic(icon)}</span>${title}</span>`;
   if (!p || p.state === 'none') return `<div class="card money"><div class="muted small">${title}</div><p class="muted">${t('not_loaded')}</p></div>`;
   if (p.state === 'grant') return `<div class="card money"><div class="muted small">${title}</div><p><span class="pill ok">${t('grant_note')}</span></p></div>`;
   const pct = p.percent != null ? Math.round(p.percent) : null;
@@ -773,7 +791,7 @@ async function viewFinance() {
   try { d = await api(childPath(c, 'finance')); } catch (e) { return page({ title: t('finance'), body: errorBox() }); }
   page({ title: t('finance'), sub: deskMode() ? `${c.name}${d.payment_form ? ' · ' + d.payment_form : ''}` : c.short, active: '', wide: deskMode(),
     body: switcher() + `<h2 class="screen-title">${t('finance')}</h2>${d.payment_form && !deskMode() ? `<p class="screen-sub">${esc(d.payment_form)}</p>` : ''}
-    <div class="dk-pair">${moneyCard(t('contract_pay'), d.kontrakt)}${moneyCard(t('trimester_pay'), d.trimestr)}</div>` });
+    <div class="dk-pair">${moneyCard(t('contract_pay'), d.kontrakt)}${moneyCard(t('trimester_pay'), d.trimestr, 'receipt', 'money2')}</div>` });
 }
 async function viewDocs() {
   const c = S.child;
@@ -803,19 +821,19 @@ async function viewTrends() {
   const ups = d.uploads || [], sems = (d.semesters || []).filter(x => x.avg != null);
   S.gpaMin = d.gpa_min;
   // yuklangan fayllar bo'yicha: har bir ko'rsatkich — qiymat, o'zgarish, grafik va barcha nuqtalar (sana: qiymat)
-  const upHtml = ups.length ? `<section class="section"><div class="section-head"><h2>${t('by_upload')}</h2></div><div class="card dyn">${ups.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">
+  const upHtml = ups.length ? `<section class="section"><div class="section-head"><h2>${hi('by_upload')}${t('by_upload')}</h2></div><div class="card dyn">${ups.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">${dynIc(it)}
       <div class="body"><div class="t">${esc(it.title)}</div><div class="d">${it.points.map(p => `${esc(p.label)}: ${esc(dynVal(it, p.value))}`).join(' → ')}</div></div>
       ${spark(it.points, dl.cls)}<div class="val"><b class="num">${esc(dynVal(it, it.value))}</b><span class="${dl.cls}">${esc(dl.txt)}</span></div></div>`; }).join('')}</div></section>` : '';
   // semestrlar bo'yicha: GPA ustunlari va har bir semestr — oldingisiga nisbatan
-  const semHtml = sems.length ? `<section class="section"><div class="section-head"><h2>${t('by_semester')}</h2></div><div class="card">
+  const semHtml = sems.length ? `<section class="section"><div class="section-head"><h2>${hi('by_semester')}${t('by_semester')}</h2></div><div class="card">
       ${sems.length > 1 ? `<div class="sem-bars">${sems.map(x => `<div class="sem-bar"><b class="num">${num(x.avg)}</b><i style="height:${Math.max(6, Math.round(x.avg / 100 * 90))}px" class="${x.avg < 60 ? 'low' : ''}"></i><span>${esc(semLabel(x.semester))}</span></div>`).join('')}</div>` : ''}
       ${sems.map((x, i) => { const p = sems[i - 1]; const dg = p ? Math.round((x.avg - p.avg) * 10) / 10 : null;
         return `<div class="kv" style="margin-top:${i ? 8 : 12}px"><span><b>${esc(semLabel(x.semester))}</b> · ${x.subjects} ${t('subj_h').toLowerCase()}</span>
           <b class="num">${t('avg_score')} ${num(x.avg)}${dg ? ` <span style="color:${dg > 0 ? 'var(--ok)' : 'var(--bordo-fg)'}">${dg > 0 ? '▲' : '▼'} ${num(Math.abs(dg))}</span>` : ''}</b></div>`; }).join('')}</div></section>` : '';
   page({ title: t('trends'), sub: c.short, active: '', body: switcher() + `<h2 class="screen-title">${t('trends')}</h2>
     ${upHtml}${semHtml}
-    ${d.periods.length > 1 ? `<section class="section"><div class="section-head"><h2>${t('by_week')}</h2></div><div class="card">${weekChart(d.periods)}</div></section>` : ''}
-    ${g.items.length ? `<section class="section"><div class="section-head"><h2>${t('by_subject')}</h2>${g.gpa_old != null && g.gpa_new != null ? `<span class="muted num">GPA ${gpaNum(g.gpa_old)} → <b>${gpaNum(g.gpa_new)}</b></span>` : ''}</div>
+    ${d.periods.length > 1 ? `<section class="section"><div class="section-head"><h2>${hi('by_week')}${t('by_week')}</h2></div><div class="card">${weekChart(d.periods)}</div></section>` : ''}
+    ${g.items.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}${t('by_subject')}</h2>${g.gpa_old != null && g.gpa_new != null ? `<span class="muted num">GPA ${gpaNum(g.gpa_old)} → <b>${gpaNum(g.gpa_new)}</b></span>` : ''}</div>
       <div class="list">${g.items.map(x => `<div class="row" style="cursor:default"><div class="ic ${x.delta < 0 ? 'bordo' : ''}">${ic('trend')}</div><div class="body"><div class="t">${esc(x.subject)}</div>
         <div class="d num">${num(x.old)} → ${num(x.new)}${x.old_grade !== x.new_grade ? ` · «${x.old_grade}» → «${x.new_grade}»` : ''}</div></div>
         <b class="num" style="color:${x.delta < 0 ? 'var(--bordo-fg)' : 'var(--ok)'}">${x.delta > 0 ? '+' : '−'}${num(Math.abs(x.delta))}</b></div>`).join('')}</div></section>` : ''}
@@ -837,11 +855,11 @@ async function viewSettings() {
   try { d = await api('/api/settings'); } catch (e) { return page({ title: t('settings'), body: errorBox() }); }
   const langs = [['uz', 'O‘zbekcha'], ['ru', 'Русский'], ['en', 'English']];
   page({ title: t('settings'), active: '', body: `<h2 class="screen-title">${t('settings')}</h2>
-    <section class="section"><div class="section-head"><h2>${t('lang')}</h2></div><div class="seg">${langs.map(([k, l]) =>
+    <section class="section"><div class="section-head"><h2>${hi('lang')}${t('lang')}</h2></div><div class="seg">${langs.map(([k, l]) =>
       `<button data-act="lang" data-lang="${k}" aria-pressed="${S.lang === k}">${l}</button>`).join('')}</div></section>
-    <section class="section"><div class="section-head"><h2>${t('theme')}</h2></div><div class="seg">${['auto', 'light', 'dark'].map(k =>
+    <section class="section"><div class="section-head"><h2>${hi('theme')}${t('theme')}</h2></div><div class="seg">${['auto', 'light', 'dark'].map(k =>
       `<button data-act="theme-set" data-v="${k}" aria-pressed="${themePref() === k}">${t('th_' + k)}</button>`).join('')}</div></section>
-    <section class="section"><div class="section-head"><h2>${t('flags')}</h2></div><div class="list">${Object.entries(d.flags).map(([k, v]) =>
+    <section class="section"><div class="section-head"><h2>${hi('flags')}${t('flags')}</h2></div><div class="list">${Object.entries(d.flags).map(([k, v]) =>
       `<label class="row"><div class="body"><div class="t">${t(k)}</div></div><span class="switch"><input type="checkbox" data-act="flag" data-key="${k}" ${v ? 'checked' : ''}><i></i></span></label>`).join('')}</div></section>
     ${logoutBlock()}` });
 }
@@ -857,9 +875,9 @@ async function viewInfo() {
     ${d.tutors.map(x => `<div class="card" style="display:flex;align-items:center;gap:12px"><div class="chat-head" style="padding:0;box-shadow:none;background:none;flex:1">
       <div class="av">${esc((x.name || '?').charAt(0))}</div><div><b>${esc(x.name || '')}</b><div class="small muted">${t('coordinator')} — ${esc(x.children.join(', '))}</div></div></div>
       ${x.phone ? `<a class="btn ghost" href="tel:+${esc(x.phone)}">${ic('phone')}${t('call')}</a>` : ''}</div>`).join('')}
-    <section class="section"><div class="section-head"><h2>${t('levels')}</h2></div><div class="list">${d.levels.map((l, i) =>
+    <section class="section"><div class="section-head"><h2>${hi('levels')}${t('levels')}</h2></div><div class="list">${d.levels.map((l, i) =>
       `<div class="row" style="cursor:default"><div class="ic ${i === d.levels.length - 1 ? 'bordo' : ''}"><b class="num">${i + 1}</b></div><div class="body"><div class="t num">${pairs(l.hours)}</div><div class="d">${esc(l.action)}</div></div></div>`).join('')}</div></section>
-    <section class="section"><div class="section-head"><h2>${t('grade_scale')}</h2></div><div class="list">${d.grades.map(g =>
+    <section class="section"><div class="section-head"><h2>${hi('grade_scale')}${t('grade_scale')}</h2></div><div class="list">${d.grades.map(g =>
       `<div class="row" style="cursor:default"><div class="grade g${g.grade}">${g.grade}</div><div class="body"><div class="t num">${g.range}</div></div></div>`).join('')}</div></section>
     ${d.texts.map(x => `<div class="card" style="margin-top:16px;white-space:pre-wrap">${safeHtml(x)}</div>`).join('')}` });
 }
@@ -1043,7 +1061,7 @@ function dynVal(it, v) {
   if (it.unit === 'gpa') return gpaNum(v);
   if (it.unit === 'pairs') return pairs(v);
   if (it.unit === 'subjects') return v ? t('subjectsN', { n: v }) : t('no_debt');
-  if (it.unit === 'so\'m' || it.unit === 'money') return v ? money(v) : t('no_debt');
+  if (it.unit === 'so\'m' || it.unit === 'money') return v ? (v >= 1e6 ? `${(Math.floor(v / 1e5) / 10).toString().replace('.', S.lang === 'en' ? '.' : ',')} ${t('mln_unit')}` : money(v)) : t('no_debt');
   return `${v} ta`;
 }
 function dynDelta(it) {
@@ -1051,21 +1069,28 @@ function dynDelta(it) {
   if (d == null) return { cls: 'flat', txt: t('dyn_first') };
   if (!d) return { cls: 'flat', txt: t('dyn_same') };
   const good = (d > 0) === (it.better === 'up');
-  const mag = it.unit === '%' ? `${num(Math.abs(d))} p.p.` : it.unit === 'gpa' ? gpaNum(Math.abs(d)) : it.unit === 'pairs' ? pairs(Math.abs(d)) : it.unit === 'subjects' ? t('subjectsN', { n: Math.abs(d) }) : it.unit === 'money' || it.unit === 'so\'m' ? money(Math.abs(d)) : dynVal(it, Math.abs(d));
+  const mag = it.unit === '%' ? `${num(Math.abs(d))} p.p.` : it.unit === 'gpa' ? gpaNum(Math.abs(d)) : it.unit === 'pairs' ? pairs(Math.abs(d)) : it.unit === 'subjects' ? t('subjectsN', { n: Math.abs(d) }) : it.unit === 'money' || it.unit === 'so\'m' ? dynVal(it, Math.abs(d)) : dynVal(it, Math.abs(d));
   return { cls: good ? 'good' : 'bad', txt: `${d > 0 ? '▲' : '▼'} ${mag}` };
 }
 const semLabel = s => /^\d+$/.test(String(s)) ? t('semN', { n: s }) : String(s || '—');
+/* dinamika qatori belgisi: ko'rsatkich turi bo'yicha */
+function dynIc(it) {
+  const money = it.unit === "so'm" || it.unit === 'money', tri = /trimestr/i.test(it.key || '') || /trimestr|триместр|trimester/i.test(it.title);
+  const [i, c] = it.unit === '%' ? ['att', 'att'] : money ? (tri ? ['receipt', 'money2'] : ['dollar', 'money']) : it.unit === 'gpa' ? ['grade', 'gpa']
+    : it.unit === 'subjects' ? ['bookx', 'acad'] : it.unit === 'pairs' ? ['calx', 'risk'] : ['trend', 'people'];
+  return `<span class="t-ic c-${c}" aria-hidden="true">${ic(i)}</span>`;
+}
 function parentDyn(items) {
   // ota-ona bosh sahifasi: davomat, GPA, kontrakt qarzi — qiymat, o'zgarish va kichik grafik; bosilsa — batafsil
-  return `<section class="section"><div class="section-head"><h2>${t('trends')}</h2><a href="#/trends">${t('more')}</a></div>
-    ${items && items.length ? `<a class="card dyn" href="#/trends" style="display:block;color:inherit;text-decoration:none">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">
+  return `<section class="section"><div class="section-head"><h2>${hi('trends')}${t('trends')}</h2><a href="#/trends">${t('more')}</a></div>
+    ${items && items.length ? `<a class="card dyn" href="#/trends" style="display:block;color:inherit;text-decoration:none">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">${dynIc(it)}
       <div class="body"><div class="t">${esc(it.title)}</div><div class="d">${esc(it.caption)}</div></div>
       ${spark(it.points, dl.cls)}<div class="val"><b class="num">${esc(dynVal(it, it.value))}</b><span class="${dl.cls}">${esc(dl.txt)}</span></div></div>`; }).join('')}</a>`
       : `<div class="card muted small">${t('dyn_none')}</div>`}</section>`;
 }
 function dynCard(items) {
   if (!items || !items.length) return '';
-  return `<section class="section"><div class="section-head"><h2>Dinamika</h2></div><div class="card dyn">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">
+  return `<section class="section"><div class="section-head"><h2>${hi('Dinamika')}Dinamika</h2></div><div class="card dyn">${items.map(it => { const dl = dynDelta(it); return `<div class="dyn-row">${dynIc(it)}
     <div class="body"><div class="t">${esc(it.title)}</div><div class="d">${esc(it.note || it.caption)}</div></div>
     ${spark(it.points, dl.cls)}<div class="val"><b class="num">${esc(dynVal(it, it.value))}</b><span class="${dl.cls}">${esc(dl.txt)}</span></div></div>`; }).join('')}</div></section>`;
 }
@@ -1091,7 +1116,7 @@ async function viewStaff() {
       ${tile('Trimestr qarzi', mshort(d.trimestr.sum), `${d.trimestr.count} ta talaba`, d.trimestr.count ? 'warn' : 'ok', '#/staff/students?filter=trimestr', 'receipt', 'money2')}
       ${tile('Xabarlar', d.unread, `bog‘lash so‘rovlari: ${d.link_requests}`, d.unread ? 'bad' : 'ok', '#/staff/inbox', 'chat', 'msg')}</div>
     ${dynCard(d.dynamics)}
-    <section class="section"><div class="section-head"><h2>Muammoli talabalar</h2><a href="#/staff/students?filter=prob">Barchasi</a></div>
+    <section class="section"><div class="section-head"><h2>${hi('Muammoli talabalar')}Muammoli talabalar</h2><a href="#/staff/students?filter=prob">Barchasi</a></div>
       <div class="list">${d.top.length ? d.top.slice(0, 12).map(staffRow).join('') : empty('ok', 'Muammoli talaba yo‘q')}</div></section>
     <section class="section"><div class="list">
       <a class="row" href="#/staff/surveys"><div class="ic">${ic('poll')}</div><div class="body"><div class="t">So‘rovnomalar</div><div class="d">Ota-onalar fikri — tuzish va natijalar</div></div>${ic('chev', 'chev')}</a>
@@ -1136,9 +1161,9 @@ async function viewStaffStudent(sid) {
       <div class="tile"><span class="k">Davomat</span><span class="v num">${a && a.percent != null ? a.percent + '%' : '—'}</span><span class="s">${a ? `sababsiz<br><b class="nowrap">${pairs(a.counted_hours)}</b>` : ''}</span></div>
       <div class="tile"><span class="k">GPA</span><span class="v num">${o.gpa != null ? gpaNum(o.gpa) : '—'}<small class="of"> / 5</small></span><span class="s">${o.gpa_low ? `<b>${limNum(o.gpa_min)} dan past — kursdan kursga o‘tmaydi</b><br>` : ''}akademik qarz: ${o.academic.count ? o.academic.count + ' ta fan' : 'mavjud emas'}</span></div>
       ${payTile('kontrakt', o.pays.kontrakt)}${payTile('trimestr', o.pays.trimestr)}</div>
-    ${o.academic.count ? `<section class="section"><div class="section-head"><h2>Akademik qarzdorlik</h2><span class="muted small">${o.academic.count} ta fan</span></div>
+    ${o.academic.count ? `<section class="section"><div class="section-head"><h2>${hi('Akademik qarzdorlik')}Akademik qarzdorlik</h2><span class="muted small">${o.academic.count} ta fan</span></div>
       <div class="list">${o.academic.debts.map(debtRow).join('')}</div></section>` : ''}
-    <section class="section"><div class="section-head"><h2>Ota-onalar</h2></div><div class="list">${o.parents.length ? o.parents.map(p =>
+    <section class="section"><div class="section-head"><h2>${hi('Ota-onalar')}Ota-onalar</h2></div><div class="list">${o.parents.length ? o.parents.map(p =>
       `<div class="row" style="cursor:default"><div class="ic">${ic('users')}</div><div class="body"><div class="t">${esc(p.tg_name || '')}</div><div class="d">${esc(fmtPhone(p.phone))} — ${p.lang.toUpperCase()}${p.active ? '' : ' — nofaol'}</div></div>
       <a class="icon-btn" style="color:var(--accent)" href="tel:+${esc(p.phone)}" aria-label="Qo‘ng‘iroq">${ic('phone')}</a>
       <a class="icon-btn" style="color:var(--accent)" href="#/staff/chat/${encodeURIComponent(c.course)}/${c.id}/${p.tg_id}" aria-label="Yozish">${ic('chat')}</a></div>`).join('') : empty('users', 'Ota-ona hali ulanmagan')}</div></section>`;
@@ -1282,9 +1307,9 @@ function viewStaffFiles() {
       <label class="field"><span>Fayl turi</span><select class="input" name="kind">${kinds.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></label>
       <label class="row" style="padding:12px 0 0;min-height:0"><div class="body">Ota-onalarga xabar yubormaslik (jim)</div><span class="switch"><input type="checkbox" name="silent"><i></i></span></label>
       <button class="btn block" style="margin-top:16px">${ic('upload')}Yuklash</button></form><div id="result"></div>
-    <section class="section"><div class="section-head"><h2>Hisobot</h2></div><div class="card"><p class="muted small" style="margin-top:0">Hisobot Telegram chatingizga fayl bo‘lib keladi.</p>
+    <section class="section"><div class="section-head"><h2>${hi('Hisobot')}Hisobot</h2></div><div class="card"><p class="muted small" style="margin-top:0">Hisobot Telegram chatingizga fayl bo‘lib keladi.</p>
       <div class="grid2"><button class="btn ghost" data-act="export" data-fmt="x">Excel</button><button class="btn ghost" data-act="export" data-fmt="p">PDF</button></div></div></section>
-    <section class="section"><div class="section-head"><h2>Yuklangan fayllar</h2></div><div class="list" id="imports">${loading()}</div></section>` });
+    <section class="section"><div class="section-head"><h2>${hi('Yuklangan fayllar')}Yuklangan fayllar</h2></div><div class="list" id="imports">${loading()}</div></section>` });
   loadImportsApp();
 }
 async function loadImportsApp() {
@@ -1417,7 +1442,7 @@ async function viewSurveys() {
     <div class="body"><div class="t">${esc(x.title)}</div><div class="d">${x.answered ? t('answered') : t('q_n', { n: x.questions })}${!x.open ? ' · ' + t('survey_closed') : x.closes_at ? ' · ' + t('closes', { d: dateLabel(x.closes_at) }) : ''}</div></div>${ic('chev', 'chev')}</a>`;
   page({ title: t('surveys'), active: '', body: `<h2 class="screen-title">${t('surveys')}</h2>
     ${d.pending.length ? d.pending.map(surveyCta).join('') : ''}
-    ${d.done.length ? `<section class="section"><div class="section-head"><h2>${t('answered')}</h2></div><div class="list">${d.done.map(row).join('')}</div></section>` : ''}
+    ${d.done.length ? `<section class="section"><div class="section-head"><h2>${hi('answered')}${t('answered')}</h2></div><div class="list">${d.done.map(row).join('')}</div></section>` : ''}
     ${!d.pending.length && !d.done.length ? `<div class="list">${empty('poll', t('no_surveys'))}</div>` : ''}` });
 }
 async function viewSurvey(course, sid) {
@@ -1591,14 +1616,14 @@ function viewStaffDocs() {
     <div class="card"><b>📄 ${esc(j.file_name)}</b><div class="small muted" style="margin-top:4px">${j.readable
       ? `${j.pages} sahifa, hujjatda ${j.found.filter(x => x.auto).length} ta talaba topildi`
       : '⚠️ Hujjat matnini o‘qib bo‘lmadi — nusxalar asl holida yuboriladi (boshqa talabalar yopilmaydi)'}</div></div>
-    <section class="section"><div class="section-head"><h2>Talabalar</h2><span class="muted small">${sel.length} ta tanlandi</span></div>
+    <section class="section"><div class="section-head"><h2>${hi('Talabalar')}Talabalar</h2><span class="muted small">${sel.length} ta tanlandi</span></div>
       <div class="list">${j.found.length ? j.found.map(x => `<label class="row"><span class="switch"><input type="checkbox" data-act="doc-sel" data-id="${x.id}" ${j.sel.has(x.id) ? 'checked' : ''}><i></i></span>
         <div class="body"><div class="t">${esc(x.name)}</div><div class="d">${esc(x.group)}${x.hemis_id ? ', HEMIS ' + esc(x.hemis_id) : ''}</div>${x.note ? `<div class="d" style="color:var(--bordo-fg);font-weight:600">⚠️ ${esc(x.note)}</div>` : ''}</div>
         <button class="btn ghost" type="button" style="min-height:36px;padding:0 10px" data-act="doc-preview" data-id="${x.id}">Ko‘rish</button></label>`).join('')
         : empty('users', 'Talaba topilmadi', 'Pastdan qidirib qo‘shing')}</div>
       <form data-act="doc-find" style="display:flex;gap:8px;margin-top:10px"><input class="input" name="q" placeholder="Talabani qo‘shish: familiya yoki HEMIS ID"><button class="btn" aria-label="Qidirish">${ic('search')}</button></form>
       <div id="docFind"></div></section>
-    <section class="section"><div class="section-head"><h2>Hujjat turi</h2></div>
+    <section class="section"><div class="section-head"><h2>${hi('Hujjat turi')}Hujjat turi</h2></div>
       <div class="seg wrap">${DOC_KINDS.map(([k, l]) => `<button data-act="doc-type" data-v="${k}" aria-pressed="${j.dtype === k}">${l}</button>`).join('')}</div>
       <input class="input" id="docComment" style="margin-top:10px" value="${esc(j.comment || '')}" placeholder="Izoh: buyruq raqami va sanasi (ixtiyoriy)"></section>
     <div id="docPreview"></div>
