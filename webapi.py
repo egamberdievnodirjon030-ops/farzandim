@@ -43,7 +43,7 @@ from tenancy import (central, coordinator_groups, course_keys, course_title, cur
                      in_scope, reload_registry, scope_label,
                      scope_students, use_course, viewer_scope)
 from utils import (WEEKDAYS, truncate2, doc_title, group_key, lesson_kind, name_score, normalize_text, parse_user_dates,
-                   semester_start, today, week_bounds, week_type_of)
+                   semester_start, subject_key, today, week_bounds, week_type_of)
 
 log = logging.getLogger("webapp")
 LANGS = ("uz", "ru", "en")
@@ -207,22 +207,44 @@ async def overview(st: dict, key: str) -> dict:
     s = await status.student_status(st)
     dl = await status.deadlines()
     lessons = await individual.lessons_on(st, today())
+    subj = await subject_attendance(st["id"])
+    marks = {(r["pair"], normalize_text(r["subject"] or "")): r["status"] for r in await db.fetchall(
+        "SELECT pair, subject, status FROM attendance WHERE student_id = ? AND date = ?", (st["id"], today().isoformat()))}
     return {"child": await child_card(st, key), "attendance": _attendance(s["attendance"]),
             "academic": {"count": len(s["debts"]), "debts": [_debt(d) for d in s["debts"]]},
             "gpa": _gpa(s["gpa"]), "gpa_low": s["flags"]["gpa"], "gpa_min": GPA_MIN,
             "pays": await _payments(st, s["pays"], dl), "issues": s["issues"],
-            "trend": await trends.short_line(st), "dynamics": await trends.mini(st), "today": [_lesson(x) for x in lessons],
+            "trend": await trends.short_line(st), "dynamics": await trends.mini(st), "today": [_lesson(x, marks, subj) for x in lessons],
             "updated": await _last_update()}
 
 
-def _lesson(x: dict, att: dict | None = None) -> dict:
+async def subject_attendance(sid: int) -> dict[str, dict]:
+    """Semestr boshidan fanlar bo'yicha davomat: fan kaliti → {pct, kelmadi, sababli, total} (jadvaldagi darsda ko'rsatish
+    uchun; fan nomi jadval va davomatda biroz farq qilsa ham — «Fransuz tili I» / «Fransuz tili» — mos tushadi)."""
+    out: dict[str, dict] = {}
+    for r in await db.subject_stats(sid, semester_start().isoformat(), today().isoformat()):
+        k = subject_key(r["subject"])
+        if not k or not r["total"]:
+            continue
+        o = out.setdefault(k, {"total": 0, "came": 0, "kelmadi": 0, "sababli": 0})
+        o["total"] += r["total"]
+        o["came"] += r["keldi"] + r["kechikdi"]
+        o["kelmadi"] += r["kelmadi"]
+        o["sababli"] += r["sababli"]
+    for o in out.values():
+        o["pct"] = round(100 * o.pop("came") / o["total"])
+    return out
+
+
+def _lesson(x: dict, att: dict | None = None, subj: dict | None = None) -> dict:
     kind = lesson_kind(x.get("lesson_type"))
     pt = PAIR_TIMES.get(x.get("pair")) or ("", "")
     return {"pair": x.get("pair"), "start": x.get("start_time") or pt[0], "end": x.get("end_time") or pt[1],
             "subject": loc.term(x.get("subject") or ""),
             "type": tr("Leksiya") if kind == "leksiya" else tr("Seminar") if kind == "seminar" else (x.get("lesson_type") or ""),
             "teacher": loc.person(x.get("teacher")) if x.get("teacher") else "", "room": loc.term(x.get("room") or ""),
-            "subgroup": x.get("subgroup"), "status": (att or {}).get((x.get("pair"), normalize_text(x.get("subject") or "")))}
+            "subgroup": x.get("subgroup"), "status": (att or {}).get((x.get("pair"), normalize_text(x.get("subject") or ""))),
+            "att": (subj or {}).get(subject_key(x.get("subject") or ""))}
 
 
 # ================================================================ ota-ona: shaxs va farzandlar
@@ -322,11 +344,12 @@ async def api_schedule(request):
     for r in rows:
         marks.setdefault(r["date"], {})[(r["pair"], normalize_text(r["subject"] or ""))] = r["status"]
     days = []
+    subj = await subject_attendance(st["id"])
     for i in range(6):
         d = monday + timedelta(days=i)
         lessons = await individual.lessons_on(st, d, ctx)
         days.append({"date": d.isoformat(), "weekday": tr(WEEKDAYS[i]), "today": d == today(),
-                     "lessons": [_lesson(x, marks.get(d.isoformat())) for x in lessons]})
+                     "lessons": [_lesson(x, marks.get(d.isoformat()), subj) for x in lessons]})
     return ok({"monday": monday.isoformat(), "week_type": week_type_of(monday), "days": days,
                "prev": (monday - timedelta(days=7)).isoformat(), "next": (monday + timedelta(days=7)).isoformat()})
 

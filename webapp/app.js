@@ -16,7 +16,7 @@ const S = { me: null, lang: 'uz', child: null, cache: {}, timer: null, staffCour
 const T = {
   uz: {
     home: 'Asosiy', schedule: 'Jadval', attendance: 'Davomat', grades: 'Baholar', messages: 'Xabarlar',
-    menu: 'Menyu', notes_all: 'Barcha xabarlar', notes_unread: 'O‘qilmagan', notes_updated: 'Oxirgi yangilanish: {t}', note_new: 'Yangi', notes_read_all: 'Hammasi o‘qildi', notifications: 'Bildirishnomalar', finance: 'To‘lovlar', documents: 'Hujjatlar', trends: 'Dinamika',
+    menu: 'Menyu', subj_att: 'Davomat', subj_att_hint: 'Semestr boshidan shu fan bo‘yicha: {n} ta dars', unexc_n: '{n} ta sababsiz', notes_all: 'Barcha xabarlar', notes_unread: 'O‘qilmagan', notes_updated: 'Oxirgi yangilanish: {t}', note_new: 'Yangi', notes_read_all: 'Hammasi o‘qildi', notifications: 'Bildirishnomalar', finance: 'To‘lovlar', documents: 'Hujjatlar', trends: 'Dinamika',
     news: 'E’lonlar', settings: 'Sozlamalar', info: 'Foydali ma’lumot', group: 'Guruh', year: 'Kurs', faculty: 'Fakultet',
     yearN: '{n}-kurs', student: 'Talaba', ok_title: 'Hammasi joyida', ok_sub: 'Davomat, baholar va to‘lovlar bo‘yicha muammo yo‘q.',
     issues: '{n} ta masala e’tibor talab qiladi', gpa: 'GPA', of5: '5 dan', gpa_hint: 'o‘zlashtirish ko‘rsatkichi', acad: 'Akademik qarz', none: 'yo‘q',
@@ -59,7 +59,7 @@ const T = {
   },
   ru: {
     home: 'Главная', schedule: 'Расписание', attendance: 'Посещаемость', grades: 'Оценки', messages: 'Сообщения',
-    menu: 'Меню', notes_all: 'Все уведомления', notes_unread: 'Непрочитанные', notes_updated: 'Последнее обновление: {t}', note_new: 'Новое', notes_read_all: 'Все прочитаны', notifications: 'Уведомления', finance: 'Оплата', documents: 'Документы', trends: 'Динамика',
+    menu: 'Меню', subj_att: 'Посещаемость', subj_att_hint: 'С начала семестра по этому предмету: занятий {n}', unexc_n: 'без ув. причины: {n}', notes_all: 'Все уведомления', notes_unread: 'Непрочитанные', notes_updated: 'Последнее обновление: {t}', note_new: 'Новое', notes_read_all: 'Все прочитаны', notifications: 'Уведомления', finance: 'Оплата', documents: 'Документы', trends: 'Динамика',
     news: 'Объявления', settings: 'Настройки', info: 'Полезная информация', group: 'Группа', year: 'Курс', faculty: 'Факультет',
     yearN: '{n} курс', student: 'Студент', ok_title: 'Всё в порядке', ok_sub: 'Проблем с посещаемостью, оценками и оплатой нет.',
     issues: 'Требуют внимания: {n}', gpa: 'GPA', of5: 'из 5', gpa_hint: 'средний балл', acad: 'Академ. задолженность', none: 'нет',
@@ -102,7 +102,7 @@ const T = {
   },
   en: {
     home: 'Home', schedule: 'Timetable', attendance: 'Attendance', grades: 'Grades', messages: 'Messages',
-    menu: 'Menu', notes_all: 'All notifications', notes_unread: 'Unread', notes_updated: 'Last update: {t}', note_new: 'New', notes_read_all: 'All read', notifications: 'Notifications', finance: 'Payments', documents: 'Documents', trends: 'Trends',
+    menu: 'Menu', subj_att: 'Attendance', subj_att_hint: 'Since the start of the semester in this subject: {n} classes', unexc_n: '{n} unexcused', notes_all: 'All notifications', notes_unread: 'Unread', notes_updated: 'Last update: {t}', note_new: 'New', notes_read_all: 'All read', notifications: 'Notifications', finance: 'Payments', documents: 'Documents', trends: 'Trends',
     news: 'Announcements', settings: 'Settings', info: 'Useful information', group: 'Group', year: 'Year', faculty: 'Faculty',
     yearN: 'Year {n}', student: 'Student', ok_title: 'All good', ok_sub: 'No problems with attendance, grades or payments.',
     issues: '{n} issue(s) need attention', gpa: 'GPA', of5: 'of 5', gpa_hint: 'grade point average', acad: 'Academic debt', none: 'none',
@@ -422,12 +422,19 @@ function payTile(kind, p) {
   return `<a class="tile st-tile bad" href="#/finance" title="${esc(money(p.debt))}">${label}<span class="v num">${mShort(p.debt)}</span>
     <span class="s">${p.days_left != null ? (late ? t('overdue') : t('days_left', { n: p.days_left })) : t('debt')}</span></a>`;
 }
+/* darsdagi fan bo'yicha davomat (semestr boshidan): foiz, chiziq va sababsiz qoldirilganlar */
+function lessonAtt(a) {
+  if (!a || !a.total) return '';
+  const tone = a.pct >= 90 ? 'ok' : a.pct >= 75 ? 'warn' : 'bad';
+  return `<div class="latt ${tone}" title="${esc(t('subj_att_hint', { n: a.total }))}"><span>${t('subj_att')}</span><b class="num">${a.pct}%</b>
+    <span class="lbar"><i style="width:${a.pct}%"></i></span>${a.kelmadi ? `<span class="lmiss">${t('unexc_n', { n: a.kelmadi })}</span>` : ''}</div>`;
+}
 function lessonRow(l) {
   const st = l.status ? `<span class="pill ${l.status === 'keldi' ? 'ok' : l.status === 'kelmadi' ? 'bordo' : 'warn'}">${t(l.status)}</span>` : '';
   const time = l.start ? `${esc(l.start)}<small>${esc(l.end || '')}</small>` : (l.pair ? `<span class="pairno">${esc(t('pairN', { n: l.pair }))}</span>` : '');
   return `<div class="lesson"><div class="time">${time}${l.start && l.pair ? `<small class="pairno-s">${esc(t('pairN', { n: l.pair }))}</small>` : ''}</div>
     <div><div class="subj">${esc(l.subject)}</div><div class="meta">${l.type ? `<span class="pill">${esc(l.type)}${l.subgroup ? ' ' + esc(l.subgroup) : ''}</span>` : ''}
-    ${l.room ? `<span>${esc(l.room)}</span>` : ''}${l.teacher ? `<span>${esc(l.teacher)}</span>` : ''}${st}</div></div></div>`;
+    ${l.room ? `<span>${esc(l.room)}</span>` : ''}${l.teacher ? `<span>${esc(l.teacher)}</span>` : ''}${st}</div>${lessonAtt(l.att)}</div></div>`;
 }
 async function viewHome() {
   const c = S.child;
@@ -598,7 +605,7 @@ function renderSchedule() {
         <div class="tm num">${l.start ? `${esc(l.start)}–${esc(l.end || '')}` : esc(t('pairN', { n: l.pair }))}</div>
         <b>${esc(l.subject)}</b>
         <div class="meta">${l.type ? `<span class="pill">${esc(l.type)}${l.subgroup ? ' ' + esc(l.subgroup) : ''}</span>` : ''}${st(l)}</div>
-        ${l.room || l.teacher ? `<small>${[l.room, l.teacher].filter(Boolean).map(esc).join(' · ')}</small>` : ''}</article>`).join('')
+        ${l.room || l.teacher ? `<small>${[l.room, l.teacher].filter(Boolean).map(esc).join(' · ')}</small>` : ''}${lessonAtt(l.att)}</article>`).join('')
         : `<div class="dk-free">${t('no_lessons_short')}</div>`}</section>`).join('')}</div>`;
     page({ title: t('schedule'), sub: c.name, active: '#/schedule', wide: true, body: nav + grid });
     return;
