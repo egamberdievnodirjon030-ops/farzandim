@@ -682,3 +682,24 @@ html[data-theme="dark"] .c-money2 { --c: #F7A56A; --cb: rgba(247,165,106,.13); }
 .dk-h3 { display: flex; align-items: center; gap: 9px; }
 .mc-t { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; color: var(--ink); font-size: 14px; }
 @media (max-width: 480px) { .dyn-row .spark { width: 52px; } .dyn-row .val { min-width: 70px; } .dyn-row .d { font-size: 11.5px; } }
+
+/* bildirishnomalar markazi: tepada hisob (Manage uslubida), kartochkalarda «Yangi» yorlig'i */
+.nsum { position: relative; overflow: hidden; border-radius: 22px; padding: 18px 16px 14px; margin: 4px 0 16px; color: #fff;
+  background: linear-gradient(140deg, #1B3A6B, #0E2240); box-shadow: 0 10px 26px rgba(14, 34, 64, .22); }
+.nsum::after { content: ''; position: absolute; right: -40px; top: -50px; width: 180px; height: 180px; border-radius: 40px;
+  background: rgba(255, 255, 255, .06); transform: rotate(25deg); }
+.nsum-row { display: grid; grid-template-columns: 1fr 1fr; position: relative; z-index: 1; }
+.nsum-row > div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px 8px; }
+.nsum-row > div + div { border-left: 1px solid rgba(255, 255, 255, .22); }
+.nsum-ic svg { width: 20px; height: 20px; opacity: .8; }
+.nsum-row b { font-size: 34px; line-height: 1.1; font-weight: 700; }
+.nsum-row span:last-child { font-size: 14px; opacity: .8; }
+.nsum-upd { position: relative; z-index: 1; margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 7px;
+  font-size: 13px; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .16); }
+.nsum-upd svg { width: 15px; height: 15px; }
+.ncard .ndot { position: absolute; right: 14px; top: 16px; width: 9px; height: 9px; border-radius: 50%; background: var(--bordo-500); }
+.ncard.unread .ntitle { padding-right: 16px; }
+.nfoot time { display: inline-flex; align-items: center; gap: 5px; }
+.nfoot time svg { width: 14px; height: 14px; }
+.nnew { font-size: 13px; font-weight: 600; color: var(--bordo-fg); }
+.nic.ok svg { stroke-width: 2.4; }

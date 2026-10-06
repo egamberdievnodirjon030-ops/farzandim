@@ -133,12 +133,46 @@ async def notify_new_absences(bot: Bot) -> int:
                      f"📅 {fmt_date(d)}"]
             for a in items:
                 lines.append(f"{STATUS_ICON[a['status']]} " + tr("{p}-juftlik", p=a['pair'])
-                             + f" — {esc(loc.term(a['subject']))}: <b>{tr(STATUS_TEXT[a['status']])}</b>")
+                             + f" — {esc(loc.term(a['subject']))}: <b>{tr(STATUS_TEXT[a['status']])}</b>"
+                             + ("\n     " + tr("O'qituvchi: {t}", t=esc(" ".join(a['teacher'].split())))
+                                if a.get('teacher') else ""))
             lines.append("\n" + tr("Savol bo'lsa, «✉️ Kurs koordinatoriga savol» bo'limi orqali yozishingiz mumkin."))
             return "\n".join(lines)
         sent += await send_each(bot, parents, build, sid, "att", "att_new")
     await db.mark_notified([r["id"] for r in rows])
     return sent
+
+
+async def notify_present_marks(bot: Bot) -> int:
+    """Real vaqtdagi davomat (Manage integratsiyasi): o'qituvchi talabani «darsga keldi» deb belgiladi.
+    Har bir dars — ota-ona ilovasidagi bildirishnomalar markazida alohida «Yo'qlama» kartochkasi (Manage talabaga
+    ko'rsatadigan kabi). Telegram'ga yuborilmaydi — kuniga bir necha dars bo'ladi; qoldirilgan dars esa Telegram'ga
+    ham boradi (notify_new_absences)."""
+    import live
+    rows = await db.fetchall(
+        """SELECT a.*, s.full_name, s.full_name_cyr, s.group_name FROM attendance a JOIN students s ON s.id = a.student_id
+           WHERE a.notified = 0 AND a.status = 'keldi' ORDER BY a.date, a.pair""")
+    if not rows:
+        return 0
+    course = current_course() or "_"
+    n = 0
+    for r in rows:
+        sid = r["student_id"]
+        for pid in await db.parents_of_student(sid, "notify_instant"):
+            with use_lang(await central.get_lang(pid) or "uz"):
+                teacher = " ".join((r.get("teacher") or "").split())
+                subj = esc(loc.term(r["subject"]))
+                body = (tr("Professor-o'qituvchi {t} «{s}» fanidan {p}-juftlikda farzandingizni darsga keldi deb belgiladi.",
+                           t=esc(teacher), s=subj, p=r["pair"]) if teacher else
+                        tr("«{s}» fanidan {p}-juftlikda farzandingiz darsga keldi deb belgilandi.", s=subj, p=r["pair"]))
+                text = (tr("✅ <b>Yo'qlama</b>") + f"\n\n👨‍🎓 {esc(loc.student_name(r))} ({esc(r['group_name'] or '')})\n"
+                        + f"📅 {fmt_date(r['date'])}\n{body}")
+            await db.add_notification(pid, text, sid, "present")
+            live.publish(pid, {"type": "notification", "kind": "present", "course": course, "student_id": sid,
+                               "text": text[:300], "route": f"/go/att/{course}/{sid}"})
+            n += 1
+    await db.mark_notified([r["id"] for r in rows])
+    return n
 
 
 # ---------------------------------------------------------------- chegara ogohlantirishlari

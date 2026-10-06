@@ -36,7 +36,7 @@ import redact
 from keyboards import (MENU_TEXTS, ExpCb, ImpOkCb, ImpPickCb, PanelCb, export_kb, imp_confirm_kb, imp_pick_kb, panel_kb, AnsCb, BcCb, DocActCb, DocPickCb, DocRevCb, DocStuCb, DocTypeCb, GroupCb, GuardCb,
                        ImpCb, LinkCb, broadcast_confirm_kb, broadcast_target_kb, doc_confirm_kb, doc_pick_kb,
                        doc_revoke_kb, doc_students_kb, doc_type_kb, guard_kb, import_kb)
-from notifier import (academic_keys, check_thresholds, notify_absence_decrease, notify_academic, notify_grades, notify_links, notify_new_absences, notify_payments,
+from notifier import (academic_keys, check_thresholds, notify_absence_decrease, notify_academic, notify_grades, notify_links, notify_new_absences, notify_present_marks, notify_payments,
                       notify_stats_changes,
                       safe_send)
 import chat
@@ -498,9 +498,12 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
         errors += unknown
         cutoff = (today() - timedelta(days=NOTIFY_MAX_AGE_DAYS)).isoformat()
+        # real vaqtdagi manba (Manage integratsiyasi): «darsga keldi» belgilari ham ota-ona ilovasiga boradi;
+        # Excel fayldagi yuzlab «keldi» qatorlari esa xabarsiz yoziladi
+        realtime = "integ" in caption.lower().split()
         tuples = [
             (r["student_id"], r["date"], r["pair"], r["subject"], r["lesson_type"], r["teacher"], r["status"],
-             r["hours"], 1 if (silent or r["status"] == "keldi" or r["date"] < cutoff) else 0)
+             r["hours"], 1 if (silent or r["date"] < cutoff or (r["status"] == "keldi" and not realtime)) else 0)
             for r in rows
         ]
         before = {sid: await absence.summary(sid) for sid in {r["student_id"] for r in rows}}
@@ -515,6 +518,8 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
             lines.append("🔕 Jim rejim: ota-onalarga xabar yuborilmadi.")
         else:
             sent = await notify_new_absences(bot)
+            if realtime:
+                sent += await notify_present_marks(bot)
             warned, crossings = await check_thresholds(bot, affected)
             lines.append(f"Darhol xabarlar: {sent}, ogohlantirishlar: {warned}")
             lines += _crossings_lines(crossings)

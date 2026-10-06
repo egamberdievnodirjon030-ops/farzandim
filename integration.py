@@ -941,7 +941,7 @@ async def ingest(bot, kind: str, records: list[dict], complete_window: tuple[dat
             first = prev is None
             silent = first and INTEGRATION_FIRST_SILENT
             rep = _Report()
-            ok = await _process_import_body(bot, rep, kind, sub, "jim" if silent else "",
+            ok = await _process_import_body(bot, rep, kind, sub, "jim integ" if silent else "integ",
                                             f"{INTEGRATION_NAME} (avtomatik)", None, None)
             if not ok:
                 raise IntegrationError(" ".join(rep.parts)[:300] or "import bajarilmadi")

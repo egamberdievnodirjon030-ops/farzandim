@@ -16,7 +16,7 @@ const S = { me: null, lang: 'uz', child: null, cache: {}, timer: null, staffCour
 const T = {
   uz: {
     home: 'Asosiy', schedule: 'Jadval', attendance: 'Davomat', grades: 'Baholar', messages: 'Xabarlar',
-    menu: 'Menyu', notifications: 'Bildirishnomalar', finance: 'To‘lovlar', documents: 'Hujjatlar', trends: 'Dinamika',
+    menu: 'Menyu', notes_all: 'Barcha xabarlar', notes_unread: 'O‘qilmagan', notes_updated: 'Oxirgi yangilanish: {t}', note_new: 'Yangi', notes_read_all: 'Hammasi o‘qildi', notifications: 'Bildirishnomalar', finance: 'To‘lovlar', documents: 'Hujjatlar', trends: 'Dinamika',
     news: 'E’lonlar', settings: 'Sozlamalar', info: 'Foydali ma’lumot', group: 'Guruh', year: 'Kurs', faculty: 'Fakultet',
     yearN: '{n}-kurs', student: 'Talaba', ok_title: 'Hammasi joyida', ok_sub: 'Davomat, baholar va to‘lovlar bo‘yicha muammo yo‘q.',
     issues: '{n} ta masala e’tibor talab qiladi', gpa: 'GPA', of5: '5 dan', gpa_hint: 'o‘zlashtirish ko‘rsatkichi', acad: 'Akademik qarz', none: 'yo‘q',
@@ -59,7 +59,7 @@ const T = {
   },
   ru: {
     home: 'Главная', schedule: 'Расписание', attendance: 'Посещаемость', grades: 'Оценки', messages: 'Сообщения',
-    menu: 'Меню', notifications: 'Уведомления', finance: 'Оплата', documents: 'Документы', trends: 'Динамика',
+    menu: 'Меню', notes_all: 'Все уведомления', notes_unread: 'Непрочитанные', notes_updated: 'Последнее обновление: {t}', note_new: 'Новое', notes_read_all: 'Все прочитаны', notifications: 'Уведомления', finance: 'Оплата', documents: 'Документы', trends: 'Динамика',
     news: 'Объявления', settings: 'Настройки', info: 'Полезная информация', group: 'Группа', year: 'Курс', faculty: 'Факультет',
     yearN: '{n} курс', student: 'Студент', ok_title: 'Всё в порядке', ok_sub: 'Проблем с посещаемостью, оценками и оплатой нет.',
     issues: 'Требуют внимания: {n}', gpa: 'GPA', of5: 'из 5', gpa_hint: 'средний балл', acad: 'Академ. задолженность', none: 'нет',
@@ -102,7 +102,7 @@ const T = {
   },
   en: {
     home: 'Home', schedule: 'Timetable', attendance: 'Attendance', grades: 'Grades', messages: 'Messages',
-    menu: 'Menu', notifications: 'Notifications', finance: 'Payments', documents: 'Documents', trends: 'Trends',
+    menu: 'Menu', notes_all: 'All notifications', notes_unread: 'Unread', notes_updated: 'Last update: {t}', note_new: 'New', notes_read_all: 'All read', notifications: 'Notifications', finance: 'Payments', documents: 'Documents', trends: 'Trends',
     news: 'Announcements', settings: 'Settings', info: 'Useful information', group: 'Group', year: 'Year', faculty: 'Faculty',
     yearN: 'Year {n}', student: 'Student', ok_title: 'All good', ok_sub: 'No problems with attendance, grades or payments.',
     issues: '{n} issue(s) need attention', gpa: 'GPA', of5: 'of 5', gpa_hint: 'grade point average', acad: 'Academic debt', none: 'none',
@@ -225,6 +225,7 @@ function safeHtml(html) {
 
 /* ================================================================ ikonalar (24×24, chiziqli) */
 const P = {
+  clock: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 7v5l3 2', checks: 'M2 12.5l4 4L15 7.5M10 16.5l1 1L22 6.5',
   dollar: 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 18V6',
   receipt: 'M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1zM15 8h-4.5a1.75 1.75 0 0 0 0 3.5h3a1.75 1.75 0 0 1 0 3.5H9M12 6.5v11',
   bookx: 'M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20M14.5 7l-5 5M9.5 7l5 5',
@@ -693,6 +694,7 @@ async function refreshChat(first) {
 /* ================================================================ bildirishnomalar, e'lonlar */
 /* bildirishnoma turi → belgi, rang va ochiladigan bo'lim */
 const NOTE_KIND = {
+  present: { icon: 'ok', route: '/attendance', tone: 'ok' },
   att: { icon: 'att', route: '/attendance', tone: 'navy' }, pay: { icon: 'wallet', route: '/finance', tone: 'bordo' },
   grade: { icon: 'grade', route: '/grades', tone: 'navy' }, acad: { icon: 'grade', route: '/debts', tone: 'bordo' },
   doc: { icon: 'file', route: '/documents', tone: 'bordo' },
@@ -729,7 +731,8 @@ function cleanBody(lines) {
 function noteCard(n) {
   const plain = n.text.replace(/<[^>]+>/g, '');
   const kind = n.kind || guessKind(plain);
-  const meta = NOTE_KIND[kind] || { icon: 'bell', tone: 'navy' };
+  const meta = kind === 'att' && /❌|sababsiz|прогул|unexcused/i.test(plain) ? { ...NOTE_KIND.att, icon: 'alert', tone: 'bordo' }
+    : NOTE_KIND[kind] || { icon: 'bell', tone: 'navy' };
   const lines = n.text.split('\n');
   while (lines.length && !lines[0].replace(/<[^>]+>/g, '').trim()) lines.shift();
   const title = (lines.shift() || '').replace(/^((?:<[^>]+>)*)([\p{Extended_Pictographic}\uFE0F\u200D\s]+)/u, '$1');
@@ -742,19 +745,24 @@ function noteCard(n) {
   }
   const body = cleanBody(rest);
   const href = kind && n.student_id && n.course ? `#/go/${kind}/${encodeURIComponent(n.course)}/${n.student_id}` : (meta.route ? '#' + meta.route : '');
-  return `<article class="ncard ${n.read ? '' : 'unread'}">
+  return `<article class="ncard ${n.read ? '' : 'unread'}">${n.read ? '' : '<i class="ndot" aria-hidden="true"></i>'}
     <span class="nic ${meta.tone}">${ic(meta.icon)}</span>
     <div class="nbody"><div class="ntitle">${safeHtml(title)}</div>
       ${child ? `<div class="nchild">${esc(child)}</div>` : ''}
       ${body.length ? `<div class="ntext">${safeHtml(body.join('\n')).replace(/\n/g, '<br>')}</div>` : ''}
-      <div class="nfoot"><time>${when(n.at)}</time>${href ? `<a class="nopen" href="${href}">${t('open')}${ic('chev')}</a>` : ''}</div>
+      <div class="nfoot"><time>${ic('clock')}${when(n.at)}</time>${!n.read ? `<span class="nnew">${t('note_new')}</span>` : href ? `<a class="nopen" href="${href}">${t('open')}${ic('chev')}</a>` : ''}</div>
     </div></article>`;
 }
 async function viewNotifications() {
   page({ title: t('notifications'), body: loading(), noNav: false, active: '' });
   let d;
   try { d = await api('/api/notifications'); } catch (e) { return page({ title: t('notifications'), body: errorBox() }); }
-  const body = `<h2 class="screen-title">${t('notifications')}</h2>
+  const unread = d.items.filter(n => !n.read).length;
+  const summary = `<section class="nsum" aria-label="${t('notifications')}">
+    <div class="nsum-row"><div><span class="nsum-ic">${ic('bell')}</span><b class="num">${d.items.length}</b><span>${t('notes_all')}</span></div>
+      <div><span class="nsum-ic">${ic('checks')}</span><b class="num">${unread}</b><span>${t('notes_unread')}</span></div></div>
+    <div class="nsum-upd">${ic('clock')}${t('notes_updated', { t: d.items.length ? when(d.items[0].at) : '—' })}</div></section>`;
+  const body = `<h2 class="screen-title">${t('notifications')}</h2>${summary}
     ${d.items.length ? `<div class="nlist">${d.items.map(noteCard).join('')}</div>`
       : `<div class="list">${empty('bell', t('no_notes'), t('no_notes_sub'))}</div>`}`;
   page({ title: t('notifications'), body, active: '' });

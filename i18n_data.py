@@ -5,6 +5,15 @@ Tarjimasi yo'q matn o'zbekcha ko'rsatiladi. {nomli} o'rinlar va HTML teglar tarj
 """
 
 TR: dict[str, dict[str, str]] = {
+    "✅ <b>Yo'qlama</b>": {'ru': '✅ <b>Отметка посещаемости</b>', 'en': '✅ <b>Attendance check</b>'},
+    "Professor-o'qituvchi {t} «{s}» fanidan {p}-juftlikda farzandingizni darsga keldi deb belgiladi.": {
+        'ru': 'Преподаватель {t} отметил(а) вашего ребёнка присутствующим на {p}-й паре по предмету «{s}».',
+        'en': 'Lecturer {t} marked your child as present at class {p} of «{s}».'},
+    "«{s}» fanidan {p}-juftlikda farzandingiz darsga keldi deb belgilandi.": {
+        'ru': 'Ваш ребёнок отмечен присутствующим на {p}-й паре по предмету «{s}».',
+        'en': 'Your child was marked present at class {p} of «{s}».'},
+    "O'qituvchi: {t}": {'ru': 'Преподаватель: {t}', 'en': 'Lecturer: {t}'},
+
     # HEMIS akademik qarzdorlar ro'yxati
     "HEMIS ro'yxati": {'ru': 'список HEMIS', 'en': 'HEMIS list'},
     "HEMIS akademik qarzdorlar ro'yxatiga ko'ra farzandingizda quyidagi fanlardan akademik qarz bor:": {
