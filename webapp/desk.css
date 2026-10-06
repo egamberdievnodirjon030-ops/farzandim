@@ -545,3 +545,49 @@ p.hint.scope svg.i { width: 15px; height: 15px; }
 .gpa-low { display: inline-flex; align-items: center; gap: 4px; color: var(--bordo-600); font-weight: 700; }
 .gpa-low svg.i { width: 14px; height: 14px; }
 .tbl .chip.act { min-width: 130px; }
+
+/* =====================================================================
+   Jadval va fanlar: guruh haftalik jadvali (fan bo'yicha davomat bilan), fanlar kesimi, talaba kartasida jadval
+   ===================================================================== */
+.subj-list { display: grid; gap: 2px; }
+.subj { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line-2); }
+.subj:first-child { border-top: 0; }
+.subj .sn b { display: block; font-weight: 600; font-size: 14px; }
+.subj .sn span { font-size: 12.5px; color: var(--muted); }
+.subj .sn em { font-style: normal; color: var(--bordo-600); font-weight: 600; }
+.wk-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.wk-day { padding: 8px 0; border-top: 1px solid var(--line-2); }
+.wk-day:first-of-type { border-top: 0; }
+.wk-day h5 { margin: 0 0 4px; font-size: 13px; color: var(--ink); }
+.wk-day.today h5 { color: var(--accent); }
+.wk-les { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 0; }
+.wk-les .tm { font-size: 12px; color: var(--muted); }
+.wk-les .wl b { display: block; font-size: 13.5px; font-weight: 600; }
+.wk-les .wl small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wk-les .wr { display: flex; gap: 5px; align-items: center; }
+.wk-les .chip { height: 20px; font-size: 11.5px; }
+.pc { font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-2); }
+.pc.ok { color: var(--ok); } .pc.warn { color: var(--warn); } .pc.bad { color: var(--bordo-600); background: var(--bordo-50); border-color: transparent; }
+.wk-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.wk-col { background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 14px; padding: 10px; min-width: 0; }
+.wk-col.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.wk-col header { display: flex; flex-direction: column; margin-bottom: 8px; }
+.wk-col header b { font-size: 14px; }
+.wk-col header span { font-size: 12px; color: var(--muted); }
+.wk-card { background: var(--surface); border: 1px solid var(--line-2); border-radius: 11px; padding: 9px 10px; margin-bottom: 8px;
+  display: flex; flex-direction: column; gap: 4px; }
+.wk-card .tm { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.wk-card b { font-size: 13.5px; line-height: 1.25; }
+.wk-card .chip { align-self: flex-start; height: 20px; font-size: 11.5px; }
+.wk-card small { font-size: 11.5px; color: var(--muted); }
+.wk-att { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 2px; }
+.wk-att .bar { width: 36px; height: 5px; border-radius: 3px; background: var(--line-2); overflow: hidden; }
+.wk-att .bar i { display: block; height: 100%; border-radius: 3px; }
+.wk-att.ok b { color: var(--ok); } .wk-att.ok .bar i { background: var(--ok); }
+.wk-att.warn b { color: var(--warn); } .wk-att.warn .bar i { background: var(--warn); }
+.wk-att.bad b { color: var(--bordo-600); } .wk-att.bad .bar i { background: var(--bordo-500); }
+.wk-att em { font-style: normal; color: var(--bordo-600); font-weight: 600; font-size: 11.5px; }
+.wk-free { font-size: 12.5px; color: var(--faint); text-align: center; padding: 14px 0; }
+@media (max-width: 1250px) { .wk-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.wk-att { flex-wrap: wrap; row-gap: 2px; }
+.wk-att em { white-space: nowrap; }

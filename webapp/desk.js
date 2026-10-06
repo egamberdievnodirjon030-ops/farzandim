@@ -66,6 +66,8 @@ const P = {
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   server: '<rect x="2" y="3" width="20" height="7" rx="2"/><rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 6.5h.01M6 17.5h.01"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h2M14 14h2M8 18h2"/>',
+  chevl: '<path d="m15 18-6-6 6-6"/>', chevr: '<path d="m9 18 6-6-6-6"/>',
 };
 const ic = n => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
 
@@ -186,7 +188,7 @@ const emptyBox = (icon, title, text = '', action = '') =>
   `<div class="empty">${ic(icon)}<b>${esc(title)}</b>${text ? `<div>${text}</div>` : ''}${action ? `<div style="margin-top:14px">${action}</div>` : ''}</div>`;
 const skel = (h = 120, n = 1) => Array.from({ length: n }, () => `<div class="skel" style="height:${h}px;margin-bottom:16px"></div>`).join('');
 const main = () => $('#main');
-const PAGE_IC = { 'Kurs holati': 'panel', 'Talabalar': 'users', 'Xabarlar': 'chat', 'Bog‘lanish so‘rovlari': 'req', 'So‘rovlar': 'req',
+const PAGE_IC = { 'Kurs holati': 'panel', 'Talabalar': 'users', 'Jadval va fanlar': 'cal', 'Xabarlar': 'chat', 'Bog‘lanish so‘rovlari': 'req', 'So‘rovlar': 'req',
   'E’lon yuborish': 'mega', 'Rasmiy hujjat yuborish': 'file', 'So‘rovnomalar': 'poll', 'So‘rovnoma': 'poll', 'Yangi so‘rovnoma': 'poll',
   'Ma’lumot va hisobot': 'upload', 'Barcha kurslar': 'chart', 'Kurslar va koordinatorlar': 'building', 'Ichki nizomlar': 'book',
   'Tizim': 'shield', 'Xatolik': 'alert' };
@@ -289,7 +291,7 @@ document.addEventListener('click', async e => {
 }, true);
 
 /* ---------------------------------------------------------------- karkas: yon menyu */
-const NAV_COURSE = [['#/panel', 'panel', 'Kurs holati'], ['#/students', 'users', 'Talabalar'], ['#/inbox', 'chat', 'Xabarlar', 'unread'],
+const NAV_COURSE = [['#/panel', 'panel', 'Kurs holati'], ['#/students', 'users', 'Talabalar'], ['#/subjects', 'cal', 'Jadval va fanlar'], ['#/inbox', 'chat', 'Xabarlar', 'unread'],
   ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar'], ['#/files', 'upload', 'Ma’lumot va hisobot']];
 const NAV_SUPER = [['#/super', 'chart', 'Barcha kurslar'], ['#/super/courses', 'building', 'Kurslar va koordinatorlar'], ['#/super/regs', 'book', 'Ichki nizomlar'], ['#/super/system', 'shield', 'Tizim']];
 
@@ -354,7 +356,7 @@ async function route() {
   const sup = S.me.role === 'super';
   if (!parts.length) { location.replace(sup ? '#/super' : '#/panel'); return; }
   markNav();
-  const pages = { panel: pPanel, students: pStudents, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles, surveys: pSurveys };
+  const pages = { panel: pPanel, students: pStudents, subjects: pSubjects, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles, surveys: pSurveys };
   try {
     if (parts[0] === 'super') {
       if (!sup) { location.replace('#/panel'); return; }
@@ -588,6 +590,8 @@ async function openStudent(id, course = null) {
     ${d.academic.count ? `<div class="box"><h4>Akademik qarzlar — ${d.academic.count} ta fan</h4><div class="kv">${d.academic.debts.map(x =>
       `<span>${esc(x.subject)}${x.semester ? ` (${esc(x.semester)}-semestr)` : ''}</span><b style="color:var(--bordo-600)">${x.source === 'hemis'
         ? `${x.credits ? num(x.credits) + ' kredit · ' : ''}HEMIS ro‘yxati` : `${x.score != null ? num(x.score) + ' ball' : ''} «${esc(x.grade || 2)}»`}</b>`).join('')}</div></div>` : ''}
+    ${d.subjects && d.subjects.length ? `<div class="box"><h4>Fanlar bo‘yicha davomat</h4><div class="subj-list">${d.subjects.map(subjRow).join('')}</div></div>` : ''}
+    <div class="box"><h4>Haftalik jadval</h4><div id="stu-week">${skel(80)}</div></div>
     <div class="box"><h4>To‘lovlar</h4><div class="kv">${payLine('Kontrakt', k)}${payLine('Trimestr', t)}</div></div>
     ${d.trend ? `<div class="box"><h4>Dinamika</h4><div>${safeHtml(String(d.trend).replace(/^📈\s*/, ''))}</div></div>` : ''}
     <div class="box"><h4>Ota-onalar</h4>${d.parents.length ? d.parents.map(p => `<div class="parent">
@@ -595,6 +599,79 @@ async function openStudent(id, course = null) {
         ${p.active ? `<a class="btn sm" href="#/inbox/${id}/${p.tg_id}"${course ? ` data-course="${esc(course)}"` : ''}>${ic('chat')} Yozish</a>` : ''}</div>`).join('')
       : `<div class="hint">Ota-onasi hali botga ulanmagan.</div>`}</div>`;
   $('#drawer header b').textContent = c.name;
+  loadStudentWeek(id, course, '');
+}
+/* fan qatori: nomi, davomat chizig'i va foizi, sababsiz/sababli */
+function attTone(p) { return p == null ? '' : p >= 90 ? 'ok' : p >= 75 ? 'warn' : 'bad'; }
+function subjRow(x) {
+  return `<div class="subj"><div class="sn"><b>${esc(x.subject)}</b><span>${x.total} ta dars${x.kelmadi ? ` · <em>${x.kelmadi} sababsiz</em>` : ''}${x.sababli ? ` · ${x.sababli} sababli` : ''}</span></div>
+    ${pctCell(x.pct)}</div>`;
+}
+/* talabaning haftalik jadvali (yon panelda): har bir darsda — shu kungi belgi va fan bo'yicha davomat */
+async function loadStudentWeek(id, course, week) {
+  const box = $('#stu-week'); if (!box) return;
+  let d;
+  try { d = await api(`/api/staff/student/${id}/schedule${week ? '?week=' + week : ''}`, { course }); }
+  catch (e) { box.innerHTML = '<div class="hint">Jadvalni yuklab bo‘lmadi.</div>'; return; }
+  const mark = s => s ? `<span class="chip ${s === 'keldi' ? 'ok' : s === 'kelmadi' ? 'bordo' : 'warn'}">${{ keldi: 'keldi', kelmadi: 'sababsiz', sababli: 'sababli', kechikdi: 'kechikdi' }[s] || s}</span>` : '';
+  const days = d.days.filter(x => x.lessons.length);
+  box.innerHTML = `<div class="wk-nav"><button class="btn sm ghost" data-wk="${d.prev}" aria-label="Oldingi hafta">${ic('chevl')}</button>
+      <span>${esc(dayLabel(d.monday))} · ${d.week_type} hafta</span><button class="btn sm ghost" data-wk="${d.next}" aria-label="Keyingi hafta">${ic('chevr')}</button></div>
+    ${days.length ? days.map(x => `<div class="wk-day${x.today ? ' today' : ''}"><h5>${esc(x.weekday)}${x.today ? ' · bugun' : ''}</h5>
+      ${x.lessons.map(l => `<div class="wk-les"><span class="tm num">${l.pair ? l.pair + '-j' : ''}${l.start ? ' ' + esc(l.start) : ''}</span>
+        <div class="wl"><b>${esc(l.subject)}</b><small>${[l.type, l.room, l.teacher].filter(Boolean).map(esc).join(' · ')}</small></div>
+        <div class="wr">${mark(l.status)}${l.att ? `<span class="pc ${attTone(l.att.pct)}" title="Shu fan bo‘yicha davomat (semestr)">${l.att.pct}%</span>` : ''}</div></div>`).join('')}</div>`).join('')
+      : '<div class="hint">Bu haftada dars yo‘q.</div>'}`;
+  box.querySelectorAll('[data-wk]').forEach(b => b.addEventListener('click', () => loadStudentWeek(id, course, b.dataset.wk)));
+}
+const dayLabel = iso => { const d = parseDate(iso); return d ? `${d.getDate()}-${MONTHS[d.getMonth()]}` : ''; };
+
+/* ================================================================ jadval va fanlar (guruh bo'yicha) */
+async function pSubjects(parts, q) {
+  document.title = 'Jadval va fanlar — Boshqaruv paneli';
+  const st = S.subjState = S.subjState || { group: '', week: '' };
+  if (q && q.has('group')) st.group = q.get('group');
+  view(head('Jadval va fanlar', courseSub()) + skel(60) + skel(320));
+  const qs = new URLSearchParams(); if (st.group) qs.set('group', st.group); if (st.group && st.week) qs.set('week', st.week);
+  const d = await api('/api/staff/subjects' + (qs.toString() ? '?' + qs : ''));
+  const sch = d.schedule;
+  const grid = sch ? `<div class="wk-grid">${sch.days.map(x => `<section class="wk-col${x.today ? ' today' : ''}"><header><b>${esc(x.weekday)}</b><span>${dayLabel(x.date)}${x.today ? ' · bugun' : ''}</span></header>
+      ${x.lessons.length ? x.lessons.map(l => `<article class="wk-card"><div class="tm num">${l.pair ? l.pair + '-juftlik' : ''}${l.start ? ` · ${esc(l.start)}–${esc(l.end || '')}` : ''}</div>
+        <b>${esc(l.subject)}</b>${l.type ? `<span class="chip muted">${esc(l.type)}${l.subgroup ? ' ' + esc(l.subgroup) : ''}</span>` : ''}
+        <small>${[l.room, l.teacher].filter(Boolean).map(esc).join(' · ')}</small>
+        ${l.att ? `<div class="wk-att ${attTone(l.att.pct)}" title="Guruhning shu fan bo‘yicha davomati (semestr boshidan)"><span class="bar"><i style="width:${l.att.pct}%"></i></span><b>${l.att.pct}%</b>${l.att.kelmadi ? `<em>${l.att.kelmadi} sababsiz</em>` : ''}</div>` : ''}</article>`).join('')
+        : '<div class="wk-free">Dars yo‘q</div>'}</section>`).join('')}</div>` : '';
+  const subj = d.subjects.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Fan</th><th class="r">Darslar</th><th>Davomat</th>
+      <th class="r">Sababsiz</th><th class="r">Sababli</th><th class="r">Qoldirgan talabalar</th></tr></thead><tbody>
+      ${d.subjects.map(x => `<tr class="click" data-subj="${esc(x.key)}" data-name="${esc(x.subject)}"><td class="name"><b>${esc(x.subject)}</b></td><td class="r">${x.total}</td><td>${pctCell(x.pct)}</td>
+        <td class="r">${x.kelmadi ? `<span class="icnt bad">${ic('calx')}${x.kelmadi}</span>` : '<span class="dash">0</span>'}</td><td class="r">${x.sababli || '<span class="dash">0</span>'}</td>
+        <td class="r">${x.missed_students ? `${x.missed_students} / ${x.students}` : `<span class="dash">0 / ${x.students}</span>`}</td></tr>`).join('')}</tbody></table></div>`
+    : emptyBox('cal', 'Davomat ma’lumoti yo‘q', 'Kunlik davomat (dars bo‘yicha) yuklanganda fanlar kesimi shu yerda ko‘rinadi.');
+  view(head('Jadval va fanlar', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
+    <div class="toolbar"><select class="select" id="sg" aria-label="Guruh"><option value="">Barcha guruhlar — faqat fanlar kesimi</option>
+      ${d.groups.map(g => `<option value="${esc(g.name)}" ${group_key(g.name) === group_key(st.group) ? 'selected' : ''}>${esc(g.name)} (${g.students} talaba)</option>`).join('')}</select>
+      ${sch ? `<div class="seg"><button data-w="${sch.prev}">${ic('chevl')} Oldingi</button><button disabled class="on">${dayLabel(sch.monday)} · ${sch.week_type} hafta</button><button data-w="${sch.next}">Keyingi ${ic('chevr')}</button></div>` : ''}</div>
+    ${st.group ? `<section class="sec"><header>${H('cal', `Haftalik jadval — ${esc(st.group)}`, 'att')}</header><div class="pad">${grid || emptyBox('cal', 'Jadval topilmadi', 'Bu guruh uchun dars jadvali hali yuklanmagan yoki Manage’dan olinmagan.')}</div></section>`
+      : `<p class="hint scope">${ic('info')}Haftalik jadvalni ko‘rish uchun guruhni tanlang. Quyida — ${myGroups().length ? 'guruhlaringiz' : 'butun kurs'} bo‘yicha fanlar kesimidagi davomat (semestr boshidan).</p>`}
+    <section class="sec" style="margin-top:18px"><header>${H('activity', `Fanlar kesimida davomat${st.group ? ' — ' + esc(st.group) : ''}`, 'att')}<span class="hint">semestr boshidan · fanni bosing — talabalar</span></header>${subj}</section>`);
+  $('#sg').addEventListener('change', e => { st.group = e.target.value; st.week = ''; route(); });
+  $$('[data-w]').forEach(b => b.addEventListener('click', () => { st.week = b.dataset.w; route(); }));
+  $$('[data-subj]').forEach(r => r.addEventListener('click', () => openSubject(r.dataset.subj, r.dataset.name, st.group)));
+}
+const group_key = g => String(g || '').toLowerCase().replace(/[^0-9a-zа-яёўқғҳ]+/gi, '');
+async function openSubject(key, name, group) {
+  const dr = $('#drawer'); if (!dr) return;
+  $('#dbody').innerHTML = skel(300);
+  dr.classList.add('on'); $('#scrim').classList.add('on'); dr.setAttribute('aria-hidden', 'false');
+  $('#drawer header b').textContent = name;
+  let d;
+  try { d = await api(`/api/staff/subjects/students?subject=${encodeURIComponent(key)}${group ? '&group=' + encodeURIComponent(group) : ''}`); }
+  catch (e) { $('#dbody').innerHTML = emptyBox('alert', 'Yuklab bo‘lmadi'); return; }
+  $('#dbody').innerHTML = `<p class="hint" style="margin-top:0">${esc(group || 'Barcha guruhlar')} · semestr boshidan · eng past davomat yuqorida. Talabani bossangiz — kartasi ochiladi.</p>
+    ${d.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Talaba</th><th>Davomat</th><th class="r">Sababsiz</th><th class="r">Sababli</th></tr></thead><tbody>
+      ${d.items.map(x => `<tr class="click" data-student="${x.id}"><td class="name"><b>${esc(x.name)}</b><span>${esc(x.group || '')} · ${x.total} ta dars</span></td><td>${pctCell(x.pct)}</td>
+        <td class="r">${x.kelmadi ? `<span class="icnt bad">${x.kelmadi}</span>` : '<span class="dash">0</span>'}</td><td class="r">${x.sababli || '<span class="dash">0</span>'}</td></tr>`).join('')}</tbody></table></div>`
+      : emptyBox('cal', 'Ma’lumot yo‘q')}`;
 }
 
 /* ================================================================ xabarlar */

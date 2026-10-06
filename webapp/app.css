@@ -715,3 +715,4 @@ html[data-theme="dark"] .c-money2 { --c: #F7A56A; --cb: rgba(247,165,106,.13); }
 .dk-lesson .latt { margin-top: 6px; font-size: 11.5px; gap: 5px; }
 .dk-lesson .latt .lbar { width: 30px; }
 .dk-lesson .latt .lmiss { font-size: 11px; padding: 0 6px; }
+.toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px; }

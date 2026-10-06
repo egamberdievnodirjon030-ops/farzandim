@@ -1134,6 +1134,7 @@ async function viewStaff() {
     <section class="section"><div class="section-head"><h2>${hi('Muammoli talabalar')}Muammoli talabalar</h2><a href="#/staff/students?filter=prob">Barchasi</a></div>
       <div class="list">${d.top.length ? d.top.slice(0, 12).map(staffRow).join('') : empty('ok', 'Muammoli talaba yo‘q')}</div></section>
     <section class="section"><div class="list">
+      <a class="row" href="#/staff/subjects"><div class="ic">${ic('cal')}</div><div class="body"><div class="t">Jadval va fanlar</div><div class="d">Guruh jadvali va fanlar kesimidagi davomat</div></div>${ic('chev', 'chev')}</a>
       <a class="row" href="#/staff/surveys"><div class="ic">${ic('poll')}</div><div class="body"><div class="t">So‘rovnomalar</div><div class="d">Ota-onalar fikri — tuzish va natijalar</div></div>${ic('chev', 'chev')}</a>
       <a class="row" href="#/staff/docs"><div class="ic bordo">${ic('file')}</div><div class="body"><div class="t">Rasmiy hujjat yuborish</div><div class="d">Buyruq yoki xat — har bir ota-onaga o‘z farzandining nusxasi</div></div>${ic('chev', 'chev')}</a>
       <a class="row" href="#/staff/requests"><div class="ic">${ic('users')}</div><div class="body"><div class="t">Bog‘lash so‘rovlari</div><div class="d">${d.link_requests ? d.link_requests + ' ta kutilmoqda' : 'Kutilayotgan so‘rov yo‘q'}</div></div>${d.link_requests ? `<span class="pill bordo">${d.link_requests}</span>` : ''}${ic('chev', 'chev')}</a>
@@ -1178,11 +1179,39 @@ async function viewStaffStudent(sid) {
       ${payTile('kontrakt', o.pays.kontrakt)}${payTile('trimestr', o.pays.trimestr)}</div>
     ${o.academic.count ? `<section class="section"><div class="section-head"><h2>${hi('Akademik qarzdorlik')}Akademik qarzdorlik</h2><span class="muted small">${o.academic.count} ta fan</span></div>
       <div class="list">${o.academic.debts.map(debtRow).join('')}</div></section>` : ''}
+    ${o.subjects && o.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}Fanlar bo‘yicha davomat</h2></div>
+      <div class="list">${o.subjects.map(x => `<div class="row" style="cursor:default"><div class="body"><div class="t">${esc(x.subject)}</div>
+        ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi })}</div></div>`).join('')}</div></section>` : ''}
+    ${o.today && o.today.length ? `<section class="section"><div class="section-head"><h2>${hi('today_lessons')}Bugungi darslar</h2></div>
+      <div class="list">${o.today.map(l => lessonRow(l)).join('')}</div></section>` : ''}
     <section class="section"><div class="section-head"><h2>${hi('Ota-onalar')}Ota-onalar</h2></div><div class="list">${o.parents.length ? o.parents.map(p =>
       `<div class="row" style="cursor:default"><div class="ic">${ic('users')}</div><div class="body"><div class="t">${esc(p.tg_name || '')}</div><div class="d">${esc(fmtPhone(p.phone))} — ${p.lang.toUpperCase()}${p.active ? '' : ' — nofaol'}</div></div>
       <a class="icon-btn" style="color:var(--accent)" href="tel:+${esc(p.phone)}" aria-label="Qo‘ng‘iroq">${ic('phone')}</a>
       <a class="icon-btn" style="color:var(--accent)" href="#/staff/chat/${encodeURIComponent(c.course)}/${c.id}/${p.tg_id}" aria-label="Yozish">${ic('chat')}</a></div>`).join('') : empty('users', 'Ota-ona hali ulanmagan')}</div></section>`;
   page({ title: 'Talaba', sub: c.group, active: '#/staff/students', body });
+}
+/* kurs koordinatori (telefon): guruh haftalik jadvali va fanlar kesimidagi davomat */
+async function viewStaffSubjects(params) {
+  const group = params.get('group') || '', week = params.get('week') || '';
+  page({ title: 'Jadval va fanlar', active: '#/staff', body: loading() });
+  let d;
+  try { d = await api(`/api/staff/subjects?${new URLSearchParams({ ...(group ? { group } : {}), ...(group && week ? { week } : {}) })}`); }
+  catch (e) { return page({ title: 'Jadval va fanlar', active: '#/staff', body: errorBox() }); }
+  const sch = d.schedule;
+  const nav = sch ? `<div class="toolbar-row"><a class="btn ghost" href="#/staff/subjects?group=${encodeURIComponent(group)}&week=${sch.prev}">${ic('left')}</a>
+      <span class="muted small">${dateLabel(sch.monday)} · ${sch.week_type} hafta</span>
+      <a class="btn ghost" href="#/staff/subjects?group=${encodeURIComponent(group)}&week=${sch.next}">${ic('chev')}</a></div>` : '';
+  const days = sch ? sch.days.filter(x => x.lessons.length).map(x => `<section class="section"><div class="section-head"><h2>${esc(x.weekday)}${x.today ? ' · bugun' : ''}</h2></div>
+      <div class="list">${x.lessons.map(l => lessonRow(l)).join('')}</div></section>`).join('') : '';
+  const subj = d.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}Fanlar kesimida davomat</h2></div>
+      <div class="list">${d.subjects.map(x => `<div class="row" style="cursor:default"><div class="body"><div class="t">${esc(x.subject)}</div>
+        ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi })}<div class="d">${x.missed_students} / ${x.students} talaba qoldirgan</div></div></div>`).join('')}</div></section>`
+    : `<div class="list">${empty('cal', 'Davomat ma’lumoti yo‘q')}</div>`;
+  const body = `<select class="input" id="sgm" aria-label="Guruh" style="margin-bottom:12px"><option value="">Barcha guruhlar — faqat fanlar kesimi</option>
+      ${d.groups.map(g => `<option value="${esc(g.name)}" ${g.name === group ? 'selected' : ''}>${esc(g.name)} (${g.students})</option>`).join('')}</select>
+    ${nav}${group ? (days || `<div class="list">${empty('cal', 'Bu guruh uchun jadval yo‘q')}</div>`) : '<p class="muted small">Haftalik jadvalni ko‘rish uchun guruhni tanlang.</p>'}${subj}`;
+  page({ title: 'Jadval va fanlar', sub: group || '', active: '#/staff', body });
+  document.getElementById('sgm')?.addEventListener('change', e => { location.hash = `#/staff/subjects${e.target.value ? '?group=' + encodeURIComponent(e.target.value) : ''}`; });
 }
 async function viewStaffInbox() {
   page({ title: 'Xabarlar', active: '#/staff/inbox', body: loading() });
@@ -1706,6 +1735,7 @@ async function route() {
     if (parts[1] === 'requests') return viewStaffRequests();
     if (parts[1] === 'docs') return viewStaffDocs();
     if (parts[1] === 'surveys') return parts[2] === 'new' ? viewStaffSurveyNew() : parts[2] ? viewStaffSurvey(parts[2]) : viewStaffSurveys();
+    if (parts[1] === 'subjects') return viewStaffSubjects(params);
     return viewStaff();
   }
   if (role === 'new') return viewWelcome();

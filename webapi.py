@@ -329,12 +329,16 @@ async def api_attendance(request):
 
 @child_route
 async def api_schedule(request):
-    st = request["student"]
+    return ok(await week_schedule(request["student"], request.query.get("week", "")))
+
+
+async def week_schedule(st: dict, week: str = "") -> dict:
+    """Talabaning haftalik shaxsiy jadvali: har bir darsda — shu kungi belgi va fan bo'yicha davomat."""
     try:
-        base = date.fromisoformat(request.query.get("week", "")) if request.query.get("week") else today()
+        base = date.fromisoformat(week) if week else today()
     except ValueError:
         base = today()
-    if not request.query.get("week") and base.weekday() == 6:
+    if not week and base.weekday() == 6:
         base += timedelta(days=1)  # yakshanba — kelasi hafta
     monday = week_bounds(base)[0]
     ctx = await individual.load(st)
@@ -350,8 +354,8 @@ async def api_schedule(request):
         lessons = await individual.lessons_on(st, d, ctx)
         days.append({"date": d.isoformat(), "weekday": tr(WEEKDAYS[i]), "today": d == today(),
                      "lessons": [_lesson(x, marks.get(d.isoformat()), subj) for x in lessons]})
-    return ok({"monday": monday.isoformat(), "week_type": week_type_of(monday), "days": days,
-               "prev": (monday - timedelta(days=7)).isoformat(), "next": (monday + timedelta(days=7)).isoformat()})
+    return {"monday": monday.isoformat(), "week_type": week_type_of(monday), "days": days,
+            "prev": (monday - timedelta(days=7)).isoformat(), "next": (monday + timedelta(days=7)).isoformat()}
 
 
 @child_route
@@ -799,7 +803,124 @@ async def api_staff_student(request):
     parents = await db.fetchall("SELECT p.tg_id, p.tg_name, p.phone, p.active FROM parent_students ps "
                                 "JOIN parents p ON p.tg_id = ps.parent_id WHERE ps.student_id = ?", (st["id"],))
     data["parents"] = [{**p, "lang": await central.get_lang(p["tg_id"]) or "uz"} for p in parents]
+    data["subjects"] = await _subject_rows(f"a.student_id = {int(st['id'])}")
     return ok(data)
+
+
+@staff_route
+async def api_staff_student_schedule(request):
+    st = await db.get_student(int(request.match_info["sid"]))
+    if not _visible(st):
+        return bad("not_found", 404)
+    return ok(await week_schedule(st, request.query.get("week", "")))
+
+
+def _scope_sql(group: str) -> tuple[str, list] | None:
+    """Tanlangan guruh yoki koordinator doirasidagi guruhlar bo'yicha shart (None — ruxsat yo'q)."""
+    scope = viewer_scope()
+    if group:
+        gk = group_key(group)
+        if scope is not None and gk not in scope:
+            return None
+        return "s.group_key = ?", [gk]
+    if scope is None:
+        return "1 = 1", []
+    return f"s.group_key IN ({','.join('?' * len(scope))})" if scope else "0 = 1", sorted(scope)
+
+
+async def _subject_rows(where: str, params: list | None = None) -> list[dict]:
+    """Fanlar kesimidagi davomat (semestr boshidan): darslar, keldi %, sababsiz, sababli, qoldirgan talabalar."""
+    rows = await db.fetchall(
+        f"""SELECT a.subject, COUNT(*) AS total, SUM(a.status IN ('keldi', 'kechikdi')) AS came,
+                   SUM(a.status = 'kelmadi') AS kelmadi, SUM(a.status = 'sababli') AS sababli,
+                   SUM(CASE WHEN a.status = 'kelmadi' THEN a.hours ELSE 0 END) AS kelmadi_hours,
+                   COUNT(DISTINCT a.student_id) AS students,
+                   COUNT(DISTINCT CASE WHEN a.status = 'kelmadi' THEN a.student_id END) AS missed_students
+            FROM attendance a JOIN students s ON s.id = a.student_id
+            WHERE {where} AND a.date BETWEEN ? AND ? GROUP BY a.subject""",
+        (*(params or []), semester_start().isoformat(), today().isoformat()))
+    merged: dict[str, dict] = {}
+    for r in rows:  # «Fransuz tili I» va «Fransuz tili» — bitta fan
+        k = subject_key(r["subject"]) or normalize_text(r["subject"])
+        m = merged.setdefault(k, {"subject": loc.term(r["subject"] or ""), "key": k, "total": 0, "came": 0, "kelmadi": 0,
+                                  "sababli": 0, "kelmadi_hours": 0, "students": 0, "missed_students": 0})
+        for f in ("total", "came", "kelmadi", "sababli", "kelmadi_hours", "students", "missed_students"):
+            m[f] += r[f] or 0
+    out = []
+    for m in merged.values():
+        m["pct"] = round(100 * m["came"] / m["total"]) if m["total"] else None
+        out.append(m)
+    return sorted(out, key=lambda x: (x["pct"] if x["pct"] is not None else 101, x["subject"]))
+
+
+@staff_route
+async def api_staff_subjects(request):
+    """«Jadval va fanlar»: guruhlar, fanlar kesimidagi davomat; guruh tanlansa — uning haftalik jadvali."""
+    group = request.query.get("group", "").strip()
+    cond = _scope_sql(group)
+    if cond is None:
+        return bad("forbidden", 403)
+    scope = viewer_scope()
+    groups = [{"key": k, "name": v["name"], "students": v["students"]} for k, v in (await db.group_counts()).items()
+              if scope is None or k in scope]
+    subjects = await _subject_rows(*cond)
+    out = {"groups": groups, "group": group, "subjects": subjects, "schedule": None}
+    if group:
+        gk = group_key(group)
+        try:
+            base = date.fromisoformat(request.query["week"]) if request.query.get("week") else today()
+        except ValueError:
+            base = today()
+        if not request.query.get("week") and base.weekday() == 6:
+            base += timedelta(days=1)
+        monday = week_bounds(base)[0]
+        wt = week_type_of(monday)
+        by_subj = {x["key"]: x for x in subjects}
+        rows = [r for r in await db.group_schedule(gk) if r["week_type"] in ("har", wt)]
+        days = []
+        for i in range(6):
+            d = monday + timedelta(days=i)
+            les = sorted((r for r in rows if r["weekday"] == i + 1), key=lambda r: (r["pair"], r.get("subgroup") or ""))
+            items = []
+            for x in les:
+                le = _lesson(x)
+                a = by_subj.get(subject_key(x.get("subject") or ""))
+                le["att"] = {"pct": a["pct"], "kelmadi": a["kelmadi"], "total": a["total"]} if a and a["pct"] is not None else None
+                items.append(le)
+            days.append({"date": d.isoformat(), "weekday": tr(WEEKDAYS[i]), "today": d == today(), "lessons": items})
+        out["schedule"] = {"monday": monday.isoformat(), "week_type": wt, "days": days,
+                           "prev": (monday - timedelta(days=7)).isoformat(), "next": (monday + timedelta(days=7)).isoformat()}
+    return ok(out)
+
+
+@staff_route
+async def api_staff_subject_students(request):
+    """Bitta fan bo'yicha talabalar davomati (eng pastdan) — guruh yoki koordinator doirasida."""
+    key = request.query.get("subject", "").strip()
+    cond = _scope_sql(request.query.get("group", "").strip())
+    if cond is None or not key:
+        return bad("forbidden", 403)
+    where, params = cond
+    rows = await db.fetchall(
+        f"""SELECT s.id, s.full_name, s.group_name, s.hemis_id, a.subject, a.status FROM attendance a
+            JOIN students s ON s.id = a.student_id WHERE {where} AND a.date BETWEEN ? AND ?""",
+        (*params, semester_start().isoformat(), today().isoformat()))
+    per: dict[int, dict] = {}
+    for r in rows:
+        if (subject_key(r["subject"]) or normalize_text(r["subject"])) != key:
+            continue
+        p = per.setdefault(r["id"], {"id": r["id"], "name": r["full_name"], "group": r["group_name"], "hemis_id": r["hemis_id"],
+                                     "total": 0, "came": 0, "kelmadi": 0, "sababli": 0})
+        p["total"] += 1
+        p["came"] += r["status"] in ("keldi", "kechikdi")
+        if r["status"] in ("kelmadi", "sababli"):
+            p[r["status"]] += 1
+    items = []
+    for p in per.values():
+        p["pct"] = round(100 * p["came"] / p["total"]) if p["total"] else None
+        items.append(p)
+    items.sort(key=lambda x: (x["pct"], -x["kelmadi"], x["name"]))
+    return ok({"items": items})
 
 
 @staff_route
@@ -1657,6 +1778,9 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/staff/panel", api_staff_panel)
     r.add_get("/api/staff/students", api_staff_students)
     r.add_get("/api/staff/student/{sid:\\d+}", api_staff_student)
+    r.add_get("/api/staff/student/{sid:\\d+}/schedule", api_staff_student_schedule)
+    r.add_get("/api/staff/subjects", api_staff_subjects)
+    r.add_get("/api/staff/subjects/students", api_staff_subject_students)
     r.add_get("/api/staff/inbox", api_staff_inbox)
     r.add_get("/api/staff/thread/{sid:\\d+}/{pid:\\d+}", api_staff_thread)
     r.add_post("/api/staff/thread/{sid:\\d+}/{pid:\\d+}", api_staff_reply)
