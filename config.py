@@ -115,6 +115,15 @@ SUBJECT_WARN_PERCENT = float(os.getenv("SUBJECT_WARN_PERCENT", "25"))
 # Umumiy GPA shundan past bo'lsa — talaba kursdan kursga o'tmaydi (GPA yaxlitlanmaydi: 2,599 — o'tmaydi)
 GPA_MIN = float(os.getenv("GPA_MIN", "2.6"))
 SUBJECT_WARN_MIN_LESSONS = int(os.getenv("SUBJECT_WARN_MIN_LESSONS", "4"))
+# Fan bo'yicha sababsiz qoldirish chegarasi: auditoriya soatining SUBJECT_LIMIT_PERCENT foizi (pastga yaxlitlanadi),
+# 1 kredit = AUDITORIUM_PAIRS_PER_CREDIT para. Chegaraga yetgan talaba yakuniy nazoratga kiritilmaydi (akademik qarzdor).
+# 2 kredit → 2 para, 4 kredit → 5 para, 6 kredit → 7 para. Aniq jadval kerak bo'lsa: SUBJECT_LIMIT_PAIRS=2=2,4=5,6=7
+SUBJECT_LIMIT_PERCENT = float(os.getenv("SUBJECT_LIMIT_PERCENT", "25"))
+AUDITORIUM_PAIRS_PER_CREDIT = float(os.getenv("AUDITORIUM_PAIRS_PER_CREDIT", "5"))
+SUBJECT_LIMIT_PAIRS: dict[float, int] = {
+    float(k): int(v) for k, v in (x.split("=", 1) for x in os.getenv("SUBJECT_LIMIT_PAIRS", "").replace(";", ",").split(",")
+                                  if "=" in x and x.split("=", 1)[0].strip().replace(".", "", 1).isdigit()
+                                  and x.split("=", 1)[1].strip().isdigit())}
 
 # Faylda "soat" ustuni bo'lmasa, bitta juftlik necha akademik soat hisoblanadi
 HOURS_PER_PAIR = float(os.getenv("HOURS_PER_PAIR", "2"))

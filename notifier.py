@@ -143,6 +143,48 @@ async def notify_new_absences(bot: Bot) -> int:
     return sent
 
 
+async def check_subject_limits(bot: Bot, student_ids, notify: bool = True) -> tuple[int, list[dict]]:
+    """Fan bo'yicha sababsiz qoldirish chegarasi (auditoriya soatining 25%): 1 para qolganda — ogohlantirish,
+    chegaraga yetganda — yakuniy nazoratga kiritilmasligi haqida. Har bir holat bir marta (semestr ichida).
+    Qaytaradi: (yuborilgan xabarlar, chegaraga yetganlar ro'yxati — kurs koordinatori hisobotiga)."""
+    import subject_limits
+    cred = await subject_limits.credits_map()
+    sent, overs = 0, []
+    for sid in student_ids:
+        subs = await subject_limits.per_student_subjects("s.id = ?", (sid,))
+        for (_, k), o in subs.items():
+            ev = subject_limits.evaluate(o["kelmadi"], cred.get(k))
+            if ev["state"] not in ("warn", "over"):
+                continue
+            mark = f"{SEMESTER_START}:{k}:{ev['state']}"
+            if await db.warning_sent(sid, "subj_limit", mark):
+                continue
+            await db.mark_warning(sid, "subj_limit", mark)
+            if ev["state"] == "over":
+                await db.mark_warning(sid, "subj_limit", f"{SEMESTER_START}:{k}:warn")
+                overs.append({"sid": sid, "name": o["name"], "group": o["group"] or "", "subject": o["subject"],
+                              "unexcused": round(o["kelmadi"]), "limit": ev["limit"]})
+            if not notify:
+                continue
+            parents = await db.parents_of_student(sid, "notify_warn")
+            if not parents:
+                continue
+            st = await db.get_student(sid)
+
+            async def build(st=st, o=o, ev=ev) -> str:
+                head = (tr("⛔ <b>Fan bo'yicha chegaraga yetildi</b>") if ev["state"] == "over"
+                        else tr("⚠️ <b>Fan bo'yicha ogohlantirish</b>"))
+                body = (tr("«{s}» fanidan sababsiz qoldirilgan: <b>{u} para</b> (chegara — {l} para, fan auditoriya soatining "
+                           "25%). Talaba bu fandan yakuniy nazoratga kiritilmaydi va akademik qarzdor hisoblanadi.",
+                           s=esc(loc.term(o["subject"])), u=round(o["kelmadi"]), l=ev["limit"]) if ev["state"] == "over" else
+                        tr("«{s}» fanidan sababsiz qoldirilgan: <b>{u} para</b>. Yana {left} para sababsiz qoldirsa (chegara — "
+                           "{l} para), talaba yakuniy nazoratga kiritilmaydi va akademik qarzdor hisoblanadi.",
+                           s=esc(loc.term(o["subject"])), u=round(o["kelmadi"]), left=ev["left"], l=ev["limit"]))
+                return head + f"\n\n👨‍🎓 {esc(loc.student_name(st))} ({esc(st['group_name'] or '')})\n" + body
+            sent += await send_each(bot, parents, build, sid, "att", "threshold")
+    return sent, overs
+
+
 async def notify_subject_stats(bot: Bot, subject: str, changes: list, unit_hours: float) -> int:
     """Fan bo'yicha HEMIS statistikasi: sababsiz qoldirishlar ko'paygan talabalar ota-onalariga xabar."""
     sent = 0

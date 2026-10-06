@@ -603,8 +603,17 @@ async function openStudent(id, course = null) {
 }
 /* fan qatori: nomi, davomat chizig'i va foizi, sababsiz/sababli */
 function attTone(p) { return p == null ? '' : p >= 90 ? 'ok' : p >= 75 ? 'warn' : 'bad'; }
+/* sababsiz qoldirish chegarasi (fan kreditining 25%): "3 / 5" va holat belgisi */
+function limCell(x) {
+  if (x.limit == null) return x.kelmadi ? `<span class="icnt bad">${x.kelmadi}</span>` : '<span class="dash">0</span>';
+  return `<span class="lim-c ${x.state || ''}" title="Sababsiz qoldirilgan / chegara (para). Chegaraga yetsa — yakuniy nazoratga kiritilmaydi">${x.kelmadi || 0} / ${x.limit}</span>`;
+}
+function limChip(x) {
+  return x.state === 'over' ? '<span class="chip bordo" title="Yakuniy nazoratga kiritilmaydi, akademik qarzdor hisoblanadi">Chegaradan oshdi</span>'
+    : x.state === 'warn' ? `<span class="chip warn">${x.left} para qoldi</span>` : '';
+}
 function subjRow(x) {
-  return `<div class="subj"><div class="sn"><b>${esc(x.subject)}</b><span>${x.total} ta dars${x.kelmadi ? ` · <em>${x.kelmadi} sababsiz</em>` : ''}${x.sababli ? ` · ${x.sababli} sababli` : ''}</span></div>
+  return `<div class="subj${x.state === 'over' ? ' over' : ''}"><div class="sn"><b>${esc(x.subject)}</b><span>${x.total} ta dars${x.kelmadi ? ` · <em>${x.kelmadi} sababsiz</em>` : ''}${x.limit != null ? ` / chegara ${x.limit} para (${x.credits} kredit)` : ''}${x.sababli ? ` · ${x.sababli} sababli` : ''}</span>${limChip(x)}</div>
     ${pctCell(x.pct)}</div>`;
 }
 /* talabaning haftalik jadvali (yon panelda): har bir darsda — shu kungi belgi va fan bo'yicha davomat */
@@ -634,18 +643,20 @@ async function pSubjects(parts, q) {
   view(head('Jadval va fanlar', courseSub()) + skel(60) + skel(320));
   const qs = new URLSearchParams(); if (st.group) qs.set('group', st.group); if (st.group && st.week) qs.set('week', st.week);
   const d = await api('/api/staff/subjects' + (qs.toString() ? '?' + qs : ''));
-  const sch = d.schedule;
+  const sch = d.schedule, canCred = !myGroups().length;
   const grid = sch ? `<div class="wk-grid">${sch.days.map(x => `<section class="wk-col${x.today ? ' today' : ''}"><header><b>${esc(x.weekday)}</b><span>${dayLabel(x.date)}${x.today ? ' · bugun' : ''}</span></header>
       ${x.lessons.length ? x.lessons.map(l => `<article class="wk-card"><div class="tm num">${l.pair ? l.pair + '-juftlik' : ''}${l.start ? ` · ${esc(l.start)}–${esc(l.end || '')}` : ''}</div>
         <b>${esc(l.subject)}</b>${l.type ? `<span class="chip muted">${esc(l.type)}${l.subgroup ? ' ' + esc(l.subgroup) : ''}</span>` : ''}
         <small>${[l.room, l.teacher].filter(Boolean).map(esc).join(' · ')}</small>
-        ${l.att ? `<div class="wk-att ${attTone(l.att.pct)}" title="Guruhning shu fan bo‘yicha davomati (semestr boshidan)"><span class="bar"><i style="width:${l.att.pct}%"></i></span><b>${l.att.pct}%</b>${l.att.kelmadi ? `<em>${l.att.kelmadi} sababsiz</em>` : ''}</div>` : ''}</article>`).join('')
+        ${l.att ? `<div class="wk-att ${attTone(l.att.pct)}" title="Guruhning shu fan bo‘yicha davomati (semestr boshidan)"><span class="bar"><i style="width:${l.att.pct}%"></i></span><b>${l.att.pct}%</b>${l.att.kelmadi ? `<em>${l.att.kelmadi} sababsiz</em>` : ''}</div>` : ''}${l.att && l.att.over_students ? `<div class="wk-over" title="Sababsiz qoldirish chegarasiga yetgan talabalar (yakuniy nazoratga kiritilmaydi)">${ic('alert')}${l.att.over_students} talaba chegarada</div>` : ''}</article>`).join('')
         : '<div class="wk-free">Dars yo‘q</div>'}</section>`).join('')}</div>` : '';
   const subj = d.subjects.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Fan</th><th class="r">Darslar</th><th>Davomat</th>
-      <th class="r">Sababsiz</th><th class="r">Sababli</th><th class="r">Qoldirgan talabalar</th></tr></thead><tbody>
+      <th class="r">Sababsiz</th><th class="r">Sababli</th><th class="r">Qoldirgan talabalar</th><th class="r" title="Fan krediti va sababsiz qoldirish chegarasi (auditoriya soatining 25%)">Kredit · chegara</th><th class="r" title="Chegaraga yetgan — yakuniy nazoratga kiritilmaydi">Chegaradan oshgan</th></tr></thead><tbody>
       ${d.subjects.map(x => `<tr class="click" data-subj="${esc(x.key)}" data-name="${esc(x.subject)}"><td class="name"><b>${esc(x.subject)}</b></td><td class="r">${x.total}</td><td>${pctCell(x.pct)}</td>
         <td class="r">${x.kelmadi ? `<span class="icnt bad">${ic('calx')}${x.kelmadi}</span>` : '<span class="dash">0</span>'}</td><td class="r">${x.sababli || '<span class="dash">0</span>'}</td>
-        <td class="r">${x.missed_students ? `${x.missed_students} / ${x.students}` : `<span class="dash">0 / ${x.students}</span>`}</td></tr>`).join('')}</tbody></table></div>`
+        <td class="r">${x.missed_students ? `${x.missed_students} / ${x.students}` : `<span class="dash">0 / ${x.students}</span>`}</td>
+        <td class="r nowrap">${x.limit != null ? `${x.credits} kr · <b>${x.limit} para</b>` : '<span class="dash">kredit yo‘q</span>'}${canCred ? ` <button class="btn sm ghost" data-cred="${esc(x.key)}" data-cv="${x.credits || ''}" data-cn="${esc(x.subject)}" title="Kreditni kiritish">${ic('edit')}</button>` : ''}</td>
+        <td class="r">${x.over_students ? `<span class="icnt bad">${ic('alert')}${x.over_students}</span>` : '<span class="dash">0</span>'}${x.warn_students ? ` <span class="chip warn" title="1 para qoldi">+${x.warn_students}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>`
     : emptyBox('cal', 'Davomat ma’lumoti yo‘q', 'Kunlik davomat (dars bo‘yicha) yuklanganda fanlar kesimi shu yerda ko‘rinadi.');
   view(head('Jadval va fanlar', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
     <div class="toolbar"><select class="select" id="sg" aria-label="Guruh"><option value="">Barcha guruhlar — faqat fanlar kesimi</option>
@@ -653,10 +664,19 @@ async function pSubjects(parts, q) {
       ${sch ? `<div class="seg"><button data-w="${sch.prev}">${ic('chevl')} Oldingi</button><button disabled class="on">${dayLabel(sch.monday)} · ${sch.week_type} hafta</button><button data-w="${sch.next}">Keyingi ${ic('chevr')}</button></div>` : ''}</div>
     ${st.group ? `<section class="sec"><header>${H('cal', `Haftalik jadval — ${esc(st.group)}`, 'att')}</header><div class="pad">${grid || emptyBox('cal', 'Jadval topilmadi', 'Bu guruh uchun dars jadvali hali yuklanmagan yoki Manage’dan olinmagan.')}</div></section>`
       : `<p class="hint scope">${ic('info')}Haftalik jadvalni ko‘rish uchun guruhni tanlang. Quyida — ${myGroups().length ? 'guruhlaringiz' : 'butun kurs'} bo‘yicha fanlar kesimidagi davomat (semestr boshidan).</p>`}
-    <section class="sec" style="margin-top:18px"><header>${H('activity', `Fanlar kesimida davomat${st.group ? ' — ' + esc(st.group) : ''}`, 'att')}<span class="hint">semestr boshidan · fanni bosing — talabalar</span></header>${subj}</section>`);
+    <section class="sec" style="margin-top:18px"><header>${H('activity', `Fanlar kesimida davomat${st.group ? ' — ' + esc(st.group) : ''}`, 'att')}<span class="hint">semestr boshidan · fanni bosing — talabalar</span></header>${subj}
+      <p class="hint scope lim-note">${ic('info')}Fanga ajratilgan auditoriya soatining 25% va undan ortig‘ini sababsiz qoldirgan talaba shu fandan yakuniy nazoratga kiritilmaydi (akademik qarzdor): 2 kredit — 2 para, 4 kredit — 5 para, 6 kredit — 7 para. Kredit baholar fayli yoki qarzdorlar ro‘yxatidan olinadi${canCred ? ', topilmasa ✎ tugmasi bilan kiriting' : ''}.</p></section>`);
   $('#sg').addEventListener('change', e => { st.group = e.target.value; st.week = ''; route(); });
   $$('[data-w]').forEach(b => b.addEventListener('click', () => { st.week = b.dataset.w; route(); }));
   $$('[data-subj]').forEach(r => r.addEventListener('click', () => openSubject(r.dataset.subj, r.dataset.name, st.group)));
+  $$('[data-cred]').forEach(b => b.addEventListener('click', async e => {
+    e.stopPropagation();
+    const v = prompt(`«${b.dataset.cn}» fanining krediti (masalan 2, 4, 6; 0 — avtomatik):`, b.dataset.cv);
+    if (v == null) return;
+    try { const r = await api('/api/staff/subjects/credits', { method: 'POST', json: { key: b.dataset.cred, credits: v.trim() || 0 } });
+      toast(r.limit ? `Saqlandi: chegara — ${r.limit} para` : 'Saqlandi'); route(); }
+    catch (err) { toast('Saqlanmadi: kredit 0–30 oralig‘ida bo‘lsin', true); }
+  }));
 }
 const group_key = g => String(g || '').toLowerCase().replace(/[^0-9a-zа-яёўқғҳ]+/gi, '');
 async function openSubject(key, name, group) {
@@ -668,9 +688,9 @@ async function openSubject(key, name, group) {
   try { d = await api(`/api/staff/subjects/students?subject=${encodeURIComponent(key)}${group ? '&group=' + encodeURIComponent(group) : ''}`); }
   catch (e) { $('#dbody').innerHTML = emptyBox('alert', 'Yuklab bo‘lmadi'); return; }
   $('#dbody').innerHTML = `<p class="hint" style="margin-top:0">${esc(group || 'Barcha guruhlar')} · semestr boshidan · eng past davomat yuqorida. Talabani bossangiz — kartasi ochiladi.</p>
-    ${d.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Talaba</th><th>Davomat</th><th class="r">Sababsiz</th><th class="r">Sababli</th></tr></thead><tbody>
-      ${d.items.map(x => `<tr class="click" data-student="${x.id}"><td class="name"><b>${esc(x.name)}</b><span>${esc(x.group || '')} · ${x.total} ta dars</span></td><td>${pctCell(x.pct)}</td>
-        <td class="r">${x.kelmadi ? `<span class="icnt bad">${x.kelmadi}</span>` : '<span class="dash">0</span>'}</td><td class="r">${x.sababli || '<span class="dash">0</span>'}</td></tr>`).join('')}</tbody></table></div>`
+    ${d.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Talaba</th><th>Davomat</th><th class="r">${d.items[0] && d.items[0].limit != null ? `Sababsiz / ${d.items[0].limit}` : 'Sababsiz'}</th><th class="r">Sababli</th></tr></thead><tbody>
+      ${d.items.map(x => `<tr class="click${x.state === 'over' ? ' row-over' : ''}" data-student="${x.id}"><td class="name"><b>${esc(x.name)}</b><span>${esc(x.group || '')} · ${x.total} ta dars</span>${limChip(x)}</td><td>${pctCell(x.pct)}</td>
+        <td class="r">${limCell(x)}</td><td class="r">${x.sababli || '<span class="dash">0</span>'}</td></tr>`).join('')}</tbody></table></div>`
       : emptyBox('cal', 'Ma’lumot yo‘q')}`;
 }
 

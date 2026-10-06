@@ -716,3 +716,14 @@ html[data-theme="dark"] .c-money2 { --c: #F7A56A; --cb: rgba(247,165,106,.13); }
 .dk-lesson .latt .lbar { width: 30px; }
 .dk-lesson .latt .lmiss { font-size: 11px; padding: 0 6px; }
 .toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px; }
+
+/* fan bo'yicha chegara (auditoriya soatining 25%) */
+.lim { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  padding: 6px 9px; border-radius: 10px; }
+.lim svg { width: 15px !important; height: 15px !important; flex: none; margin-top: 1px; }
+.lim.over { background: var(--tint-bordo); color: var(--bordo-fg); }
+.lim.warn { background: var(--tint-warn); color: var(--warn); }
+.latt .lmiss.ok { background: var(--tint-ok, #E6F3EC); color: var(--ok); }
+.latt .lmiss.warn { background: var(--tint-warn); color: var(--warn); }
+.latt .lmiss.over { background: var(--bordo-500); color: #fff; }
+.subject .lim { grid-column: 1 / -1; }

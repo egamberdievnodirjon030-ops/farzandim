@@ -5,6 +5,18 @@ Tarjimasi yo'q matn o'zbekcha ko'rsatiladi. {nomli} o'rinlar va HTML teglar tarj
 """
 
 TR: dict[str, dict[str, str]] = {
+    "⛔ <b>Fan bo'yicha chegaraga yetildi</b>": {'ru': '⛔ <b>Достигнут предел пропусков по предмету</b>', 'en': '⛔ <b>Subject absence limit reached</b>'},
+    "⚠️ <b>Fan bo'yicha ogohlantirish</b>": {'ru': '⚠️ <b>Предупреждение по предмету</b>', 'en': '⚠️ <b>Subject attendance warning</b>'},
+    "«{s}» fanidan sababsiz qoldirilgan: <b>{u} para</b> (chegara — {l} para, fan auditoriya soatining 25%). Talaba bu fandan yakuniy nazoratga kiritilmaydi va akademik qarzdor hisoblanadi.": {
+        'ru': 'По предмету «{s}» пропущено без уважительной причины: <b>{u} пар</b> (предел — {l} пар, 25% аудиторных часов). Студент не допускается к итоговому контролю по этому предмету и считается академическим должником.',
+        'en': 'Unexcused absences in «{s}»: <b>{u} classes</b> (limit — {l} classes, 25% of contact hours). The student is not admitted to the final exam in this subject and is considered to have an academic debt.'},
+    "«{s}» fanidan sababsiz qoldirilgan: <b>{u} para</b>. Yana {left} para sababsiz qoldirsa (chegara — {l} para), talaba yakuniy nazoratga kiritilmaydi va akademik qarzdor hisoblanadi.": {
+        'ru': 'По предмету «{s}» пропущено без уважительной причины: <b>{u} пар</b>. Если пропустить ещё {left} (предел — {l} пар), студент не будет допущен к итоговому контролю и станет академическим должником.',
+        'en': 'Unexcused absences in «{s}»: <b>{u} classes</b>. {left} more unexcused absence(s) (limit — {l}) and the student will not be admitted to the final exam and will have an academic debt.'},
+    "⛔ «{s}» fanidan sababsiz {u} para (chegara — {l} para): yakuniy nazoratga kiritilmaydi, akademik qarzdor hisoblanadi": {
+        'ru': '⛔ «{s}»: {u} пар без уважительной причины (предел — {l}): не допускается к итоговому контролю, академический долг',
+        'en': '⛔ «{s}»: {u} unexcused absences (limit — {l}): not admitted to the final exam, academic debt'},
+
     "HEMIS: {n} ta fan bo'yicha yig'indi, {d} holatiga": {'ru': 'HEMIS: сумма по {n} предметам, на {d}',
                                                          'en': 'HEMIS: total of {n} subjects, as of {d}'},
 

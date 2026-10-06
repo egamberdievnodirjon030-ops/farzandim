@@ -36,7 +36,7 @@ import redact
 from keyboards import (MENU_TEXTS, ExpCb, ImpOkCb, ImpPickCb, PanelCb, export_kb, imp_confirm_kb, imp_pick_kb, panel_kb, AnsCb, BcCb, DocActCb, DocPickCb, DocRevCb, DocStuCb, DocTypeCb, GroupCb, GuardCb,
                        ImpCb, LinkCb, broadcast_confirm_kb, broadcast_target_kb, doc_confirm_kb, doc_pick_kb,
                        doc_revoke_kb, doc_students_kb, doc_type_kb, guard_kb, import_kb)
-from notifier import (academic_keys, check_thresholds, notify_absence_decrease, notify_academic, notify_grades, notify_links, notify_new_absences, notify_present_marks, notify_payments,
+from notifier import (academic_keys, check_thresholds, notify_absence_decrease, notify_academic, notify_grades, notify_links, notify_new_absences, notify_present_marks, check_subject_limits, notify_payments,
                       notify_stats_changes,
                       safe_send)
 import chat
@@ -489,6 +489,8 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
                 from notifier import notify_subject_stats
                 lines.append(f"Ota-onalarga xabar (fan bo'yicha yangi sababsiz qoldirish): "
                              f"{await notify_subject_stats(bot, stats_subj, grew, k)}")
+            sl_sent, overs = await check_subject_limits(bot, set(before))
+            lines += _subject_limit_lines(overs, sl_sent)
             warned, crossings = await check_thresholds(bot, set(before))  # umumiy chegaralar (18/36/54/74)
             if warned:
                 lines.append(f"Chegara bo'yicha ogohlantirishlar: {warned}")
@@ -552,6 +554,8 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
             sent = await notify_new_absences(bot)
             if realtime:
                 sent += await notify_present_marks(bot)
+            sl_sent, overs = await check_subject_limits(bot, affected)
+            lines += _subject_limit_lines(overs, sl_sent)
             warned, crossings = await check_thresholds(bot, affected)
             lines.append(f"Darhol xabarlar: {sent}, ogohlantirishlar: {warned}")
             lines += _crossings_lines(crossings)
@@ -780,6 +784,19 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
     for extra in parts[1:]:
         await progress.answer(extra)
     return True
+
+
+def _subject_limit_lines(overs: list[dict], sent: int) -> list[str]:
+    """Kurs koordinatoriga: fan bo'yicha chegaraga (auditoriya soatining 25%) yetgan talabalar."""
+    if not overs:
+        return [f"Fan bo'yicha ogohlantirishlar: {sent}"] if sent else []
+    out = [f"\n⛔ <b>Fan bo'yicha chegaraga yetganlar</b> (yakuniy nazoratga kiritilmaydi): {len(overs)} ta"
+           + (f", ota-onalarga xabar: {sent}" if sent else "")]
+    out += [f"• {esc(o['name'])} ({esc(o['group'])}) — {esc(o['subject'])}: {o['unexcused']} / {o['limit']} para"
+            for o in overs[:15]]
+    if len(overs) > 15:
+        out.append(f"… va yana {len(overs) - 15} ta")
+    return out
 
 
 def stats_subject_title(name: str) -> str:

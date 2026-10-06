@@ -488,6 +488,22 @@ Endi bu hech qaysi chegaradan past — «Dekan nomiga tushuntirish xati» talab 
 
 Yuqoriroq chegaradan pastroqqa tushsa — hozir amaldagi chegara aytiladi (masalan, «dekan ogohlantirishi» → «tushuntirish xati»). Xabar «Muhim ogohlantirishlar» sozlamasi bo'yicha, ota-onaning tilida boradi; avval hech qaysi chegaraga yetmagan talabalar uchun yuborilmaydi. Kurs koordinatoriga import natijasida «⬇️ Sababsiz qoldirishlari kamayganlar» ro'yxati (avval → endi) chiqadi. Chegaradan pastga tushgan talaba keyinroq yana oshsa, ota-ona qayta ogohlantiriladi. Kunlik davomatda ham xuddi shunday ishlaydi.
 
+### Fan bo'yicha chegara: yakuniy nazoratga kiritilmaslik
+
+Fanga ajratilgan auditoriya soatining **25%** va undan ortig'ini sababsiz qoldirgan talaba shu fan(lar)dan yakuniy nazoratga kiritilmaydi va kreditlarni o'zlashtirmagan (akademik qarzdor) hisoblanadi. Chegara kreditdan hisoblanadi (1 kredit = 5 para auditoriya mashg'uloti, 25% pastga yaxlitlanadi):
+
+| Fan krediti | Chegara (sababsiz) |
+|---|---|
+| 2 kredit | 2 para (2,5 ga to'g'ri kelsa ham 2) |
+| 4 kredit | 5 para |
+| 6 kredit | 7 para |
+
+Sababsiz qoldirishlar fan bo'yicha kunlik davomat yoki fan bo'yicha HEMIS statistikasidan olinadi (sababli darslar hisobga olinmaydi). Hamma joyda «kelmadi: 3 / 5 para» ko'rinishida chiqadi: ota-ona «Davomat» bo'limida, jadval va bugungi darslarda, talaba kartasida, «Jadval va fanlar» sahifasida (har bir fan bo'yicha chegaraga yetgan talabalar soni, fan bosilganda — talabalar holati). Chegaragacha **1 para** qolganda ota-onaga ogohlantirish, chegaraga yetganda «⛔ yakuniy nazoratga kiritilmaydi» xabari boradi (har biri bir marta, «Muhim ogohlantirishlar» sozlamasi bo'yicha); farzand sahifasidagi masalalar ro'yxatida ham ko'rinadi. Kurs koordinatoriga import natijasida chegaraga yetganlar ro'yxati chiqadi.
+
+**Fan krediti** baholar faylidagi «kredit» ustunidan, bo'lmasa akademik qarzdorlar ro'yxatidan olinadi. Topilmasa (yoki boshqacha bo'lsa) kurs koordinatori «Jadval va fanlar» sahifasida fan qatoridagi ✎ tugmasi bilan kiritadi (0 — avtomatik). Kredit noma'lum fan uchun chegara ko'rsatilmaydi.
+
+Sozlamalar (`.env`): `SUBJECT_LIMIT_PERCENT=25`, `AUDITORIUM_PAIRS_PER_CREDIT=5`, `SUBJECT_LIMIT_PAIRS=2=2,4=5,6=7` (kredit → para jadvali; formuladan ustun).
+
 ## Rasmiy hujjatlar (PDF)
 
 Tushuntirish xati, dekan ogohlantirishi, hayfsan yoki boshqa rasmiy hujjat PDF ko'rinishida talabaning ota-onalariga yuboriladi va farzand sahifasidagi «📄 Hujjatlar» bo'limida saqlanadi.
@@ -572,7 +588,7 @@ Bog'lash so'rovlari va ota-ona savollari kurs koordinatoriga tugmalar bilan kela
 
 ## Sozlamalar (.env)
 
-`ABSENCE_WARN_LEVELS`, `ABSENCE_WARN_ACTIONS`, `ABSENCE_COUNT_EXCUSED`, `HEMIS_STATS_HOURS_PER_UNIT` — dars qoldirish chegaralari («Dars qoldirish chegaralari» bo'limi). `SUBJECT_WARN_PERCENT` (25%) — bitta fandan sababsiz qoldirishlar ulushi (faqat kunlik davomatda). `DAILY_DIGEST_TIME` — kunlik xulosa vaqti, `DIGEST_DAY_OFFSET=1` qilsangiz xulosa kechagi kun bo'yicha yuboriladi (davomat kechroq yuklanadigan bo'lsa qulay). `PAIR_TIMES` — jadval faylida vaqt ustuni bo'lmasa juftlik vaqtlari (rasmiy qo'ng'iroq jadvali bo'yicha to'ldiring). `HOURS_PER_PAIR` — «Soat» ustuni bo'lmasa bitta juftlik necha soat hisoblanishi.
+`ABSENCE_WARN_LEVELS`, `ABSENCE_WARN_ACTIONS`, `ABSENCE_COUNT_EXCUSED`, `HEMIS_STATS_HOURS_PER_UNIT` — dars qoldirish chegaralari («Dars qoldirish chegaralari» bo'limi). `SUBJECT_WARN_PERCENT` (25%) — bitta fandan sababsiz qoldirishlar ulushi (faqat kunlik davomatda). `SUBJECT_LIMIT_PERCENT`, `AUDITORIUM_PAIRS_PER_CREDIT`, `SUBJECT_LIMIT_PAIRS` — fan bo'yicha yakuniy nazoratga kiritilmaslik chegarasi («Fan bo'yicha chegara»). `DAILY_DIGEST_TIME` — kunlik xulosa vaqti, `DIGEST_DAY_OFFSET=1` qilsangiz xulosa kechagi kun bo'yicha yuboriladi (davomat kechroq yuklanadigan bo'lsa qulay). `PAIR_TIMES` — jadval faylida vaqt ustuni bo'lmasa juftlik vaqtlari (rasmiy qo'ng'iroq jadvali bo'yicha to'ldiring). `HOURS_PER_PAIR` — «Soat» ustuni bo'lmasa bitta juftlik necha soat hisoblanishi.
 
 `WEBAPP_URL`, `WEBAPP_HOST`, `WEBAPP_PORT`, `WEBAPP_AUTH_TTL` — Telegram Web App («Telegram Web App» bo'limi). `WEBAPP_DEV_USER` — faqat sinov uchun (ilovani brauzerda Telegram'siz ochish); serverda bo'sh qoldiring.
 

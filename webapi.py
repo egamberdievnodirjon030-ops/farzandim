@@ -210,54 +210,33 @@ async def overview(st: dict, key: str) -> dict:
     subj = await subject_attendance(st["id"])
     marks = {(r["pair"], normalize_text(r["subject"] or "")): r["status"] for r in await db.fetchall(
         "SELECT pair, subject, status FROM attendance WHERE student_id = ? AND date = ?", (st["id"], today().isoformat()))}
+    issues = list(s["issues"])
+    for a in sorted(subj.values(), key=lambda x: x["subject"]):
+        if a.get("state") == "over":
+            issues.append(tr("⛔ «{s}» fanidan sababsiz {u} para (chegara — {l} para): yakuniy nazoratga kiritilmaydi, "
+                             "akademik qarzdor hisoblanadi", s=a["subject"], u=a["kelmadi"], l=a["limit"]))
     return {"child": await child_card(st, key), "attendance": _attendance(s["attendance"]),
             "academic": {"count": len(s["debts"]), "debts": [_debt(d) for d in s["debts"]]},
             "gpa": _gpa(s["gpa"]), "gpa_low": s["flags"]["gpa"], "gpa_min": GPA_MIN,
-            "pays": await _payments(st, s["pays"], dl), "issues": s["issues"],
+            "pays": await _payments(st, s["pays"], dl), "issues": issues,
             "trend": await trends.short_line(st), "dynamics": await trends.mini(st), "today": [_lesson(x, marks, subj) for x in lessons],
             "updated": await _last_update()}
 
 
-async def per_student_subjects(where: str, params=()) -> dict[tuple[int, str], dict]:
-    """Talaba × fan: semestr boshidan kunlik davomat va fan bo'yicha HEMIS statistikasi (qaysi biri ko'proq darsni
-    qamrasa — o'sha). Qaytaradi: (talaba, fan kaliti) → {subject, total, came, kelmadi, sababli, …} (darslar/para)."""
-    out: dict[tuple[int, str], dict] = {}
-    rows = await db.fetchall(
-        f"""SELECT a.student_id, s.full_name, s.group_name, s.hemis_id, a.subject, COUNT(*) AS total,
-                   SUM(a.status IN ('keldi', 'kechikdi')) AS came, SUM(a.status = 'kelmadi') AS kelmadi,
-                   SUM(a.status = 'sababli') AS sababli
-            FROM attendance a JOIN students s ON s.id = a.student_id
-            WHERE {where} AND a.date BETWEEN ? AND ? GROUP BY a.student_id, a.subject""",
-        (*params, semester_start().isoformat(), today().isoformat()))
-    for r in rows:
-        k = subject_key(r["subject"]) or normalize_text(r["subject"])
-        o = out.setdefault((r["student_id"], k), {"sid": r["student_id"], "name": r["full_name"], "group": r["group_name"],
-                                                  "hemis_id": r["hemis_id"], "subject": r["subject"], "key": k, "total": 0,
-                                                  "came": 0, "kelmadi": 0, "sababli": 0, "source": "daily"})
-        for f in ("total", "came", "kelmadi", "sababli"):
-            o[f] += r[f] or 0
-    for r in await db.latest_subject_stats(where, params):
-        if r["as_of"] < semester_start().isoformat():
-            continue
-        total = (r["attended"] or 0) + (r["absent"] or 0)
-        cur = out.get((r["student_id"], r["subject_key"]))
-        if total and (not cur or total > cur["total"]):
-            out[(r["student_id"], r["subject_key"])] = {
-                "sid": r["student_id"], "name": r["full_name"], "group": r["group_name"], "hemis_id": r["hemis_id"],
-                "subject": (cur or {}).get("subject") or r["subject"], "key": r["subject_key"], "total": total,
-                "came": r["attended"] or 0, "kelmadi": max((r["absent"] or 0) - (r["excused"] or 0), 0),
-                "sababli": r["excused"] or 0, "source": "hemis", "as_of": r["as_of"]}
-    return out
+from subject_limits import per_student_subjects  # noqa: E402  (talaba × fan davomati — umumiy yordamchi)
 
 
 async def subject_attendance(sid: int) -> dict[str, dict]:
     """Semestr boshidan fanlar bo'yicha davomat: fan kaliti → {pct, kelmadi, sababli, total} (jadvaldagi darsda ko'rsatish
     uchun; fan nomi jadval va davomatda biroz farq qilsa ham — «Fransuz tili I» / «Fransuz tili» — mos tushadi)."""
+    import subject_limits
+    cred = await subject_limits.credits_map()
     out: dict[str, dict] = {}
     for (_, k), o in (await per_student_subjects("s.id = ?", (sid,))).items():
         if o["total"]:
-            out[k] = {"total": o["total"], "kelmadi": o["kelmadi"], "sababli": o["sababli"],
-                      "pct": round(100 * o["came"] / o["total"])}
+            out[k] = {"subject": loc.term(o["subject"]), "total": round(o["total"]), "kelmadi": round(o["kelmadi"]),
+                      "sababli": round(o["sababli"]), "pct": round(100 * o["came"] / o["total"]),
+                      **subject_limits.evaluate(o["kelmadi"], cred.get(k))}
     return out
 
 
@@ -345,6 +324,10 @@ async def api_attendance(request):
             subjects.pop(by_key.get(k, ""), None)
             subjects[o["subject"]] = {"subject": loc.term(o["subject"]), "total": round(o["total"]), "keldi": round(o["came"]),
                                       "kechikdi": 0, "kelmadi": round(o["kelmadi"]), "sababli": round(o["sababli"])}
+    import subject_limits
+    cred = await subject_limits.credits_map()
+    for x in subjects.values():
+        x.update(subject_limits.evaluate(x["kelmadi"], cred.get(subject_key(x["subject"]) or normalize_text(x["subject"]))))
     absences = [{"date": r["date"], "weekday": tr(WEEKDAYS[date.fromisoformat(r["date"]).weekday()]), "pair": r["pair"],
                  "subject": loc.term(r["subject"] or ""), "status": r["status"], "hours": r["hours"]}
                 for r in rows if r["status"] != "keldi"]
@@ -861,10 +844,16 @@ def _scope_sql(group: str) -> tuple[str, list] | None:
 
 async def _subject_rows(where: str, params: list | None = None) -> list[dict]:
     """Fanlar kesimidagi davomat (semestr boshidan): darslar, keldi %, sababsiz, sababli, qoldirgan talabalar."""
+    import subject_limits
+    cred = await subject_limits.credits_map()
     merged: dict[str, dict] = {}
     for (_, k), o in (await per_student_subjects(where, params or ())).items():
         m = merged.setdefault(k, {"subject": loc.term(o["subject"] or ""), "key": k, "total": 0, "came": 0, "kelmadi": 0,
-                                  "sababli": 0, "students": 0, "missed_students": 0})
+                                  "sababli": 0, "students": 0, "missed_students": 0, "over_students": 0, "warn_students": 0,
+                                  **subject_limits.evaluate(0, cred.get(k))})
+        ev = subject_limits.evaluate(o["kelmadi"], cred.get(k))
+        m["over_students"] += ev["state"] == "over"
+        m["warn_students"] += ev["state"] == "warn"
         for f in ("total", "came", "kelmadi", "sababli"):
             m[f] += o[f]
         m["students"] += 1
@@ -874,8 +863,10 @@ async def _subject_rows(where: str, params: list | None = None) -> list[dict]:
         for f in ("total", "came", "kelmadi", "sababli"):
             m[f] = round(m[f])
         m["pct"] = round(100 * m["came"] / m["total"]) if m["total"] else None
+        if m["students"] == 1:  # bitta talaba (talaba kartasi) — uning holati
+            m.update(subject_limits.evaluate(m["kelmadi"], m["credits"]))
         out.append(m)
-    return sorted(out, key=lambda x: (x["pct"] if x["pct"] is not None else 101, x["subject"]))
+    return sorted(out, key=lambda x: (-(x["over_students"]), x["pct"] if x["pct"] is not None else 101, x["subject"]))
 
 
 @staff_route
@@ -910,12 +901,31 @@ async def api_staff_subjects(request):
             for x in les:
                 le = _lesson(x)
                 a = by_subj.get(subject_key(x.get("subject") or ""))
-                le["att"] = {"pct": a["pct"], "kelmadi": a["kelmadi"], "total": a["total"]} if a and a["pct"] is not None else None
+                le["att"] = {"pct": a["pct"], "kelmadi": a["kelmadi"], "total": a["total"],
+                             "over_students": a.get("over_students", 0), "limit": a.get("limit")} if a and a["pct"] is not None else None
                 items.append(le)
             days.append({"date": d.isoformat(), "weekday": tr(WEEKDAYS[i]), "today": d == today(), "lessons": items})
         out["schedule"] = {"monday": monday.isoformat(), "week_type": wt, "days": days,
                            "prev": (monday - timedelta(days=7)).isoformat(), "next": (monday + timedelta(days=7)).isoformat()}
     return ok(out)
+
+
+@staff_route
+async def api_staff_subject_credits(request):
+    """Fan krediti (kurs koordinatori kiritadi): sababsiz qoldirish chegarasi shundan hisoblanadi; 0 — avtomatik."""
+    import subject_limits
+    if viewer_scope() is not None:  # guruh kuratorlari emas — faqat kurs koordinatori / superadmin
+        return bad("forbidden", 403)
+    body = await request.json()
+    key = str(body.get("key") or "").strip()
+    try:
+        credits = float(str(body.get("credits") or 0).replace(",", "."))
+    except ValueError:
+        return bad("bad_credits")
+    if not key or not 0 <= credits <= 30:
+        return bad("bad_credits")
+    await subject_limits.set_credits(key, credits)
+    return ok({"ok": True, "limit": subject_limits.limit_pairs(credits)})
 
 
 @staff_route
@@ -926,14 +936,16 @@ async def api_staff_subject_students(request):
     if cond is None or not key:
         return bad("forbidden", 403)
     where, params = cond
+    import subject_limits
+    credits = (await subject_limits.credits_map()).get(key)
     items = []
     for (_, k), o in (await per_student_subjects(where, params)).items():
         if k != key or not o["total"]:
             continue
         items.append({"id": o["sid"], "name": o["name"], "group": o["group"], "hemis_id": o["hemis_id"],
                       "total": round(o["total"]), "kelmadi": round(o["kelmadi"]), "sababli": round(o["sababli"]),
-                      "pct": round(100 * o["came"] / o["total"])})
-    items.sort(key=lambda x: (x["pct"], -x["kelmadi"], x["name"]))
+                      "pct": round(100 * o["came"] / o["total"]), **subject_limits.evaluate(o["kelmadi"], credits)})
+    items.sort(key=lambda x: (-x["kelmadi"], x["pct"], x["name"]))
     return ok({"items": items})
 
 
@@ -1795,6 +1807,7 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/staff/student/{sid:\\d+}/schedule", api_staff_student_schedule)
     r.add_get("/api/staff/subjects", api_staff_subjects)
     r.add_get("/api/staff/subjects/students", api_staff_subject_students)
+    r.add_post("/api/staff/subjects/credits", api_staff_subject_credits)
     r.add_get("/api/staff/inbox", api_staff_inbox)
     r.add_get("/api/staff/thread/{sid:\\d+}/{pid:\\d+}", api_staff_thread)
     r.add_post("/api/staff/thread/{sid:\\d+}/{pid:\\d+}", api_staff_reply)

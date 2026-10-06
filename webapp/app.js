@@ -16,7 +16,7 @@ const S = { me: null, lang: 'uz', child: null, cache: {}, timer: null, staffCour
 const T = {
   uz: {
     home: 'Asosiy', schedule: 'Jadval', attendance: 'Davomat', grades: 'Baholar', messages: 'Xabarlar',
-    menu: 'Menyu', subj_att: 'Davomat', subj_att_hint: 'Semestr boshidan shu fan bo‘yicha: {n} ta dars', unexc_n: '{n} ta sababsiz', notes_all: 'Barcha xabarlar', notes_unread: 'O‘qilmagan', notes_updated: 'Oxirgi yangilanish: {t}', note_new: 'Yangi', notes_read_all: 'Hammasi o‘qildi', notifications: 'Bildirishnomalar', finance: 'To‘lovlar', documents: 'Hujjatlar', trends: 'Dinamika',
+    menu: 'Menyu', pairs_short: 'para', unexc_lim: 'sababsiz {n} / {l}', lim_over: 'Sababsiz {u} para (chegara {l}): yakuniy nazoratga kiritilmaydi — akademik qarzdor', lim_warn: 'Chegaragacha {n} para qoldi (chegara {l} para — auditoriya soatining 25%)', subj_att: 'Davomat', subj_att_hint: 'Semestr boshidan shu fan bo‘yicha: {n} ta dars', unexc_n: '{n} ta sababsiz', notes_all: 'Barcha xabarlar', notes_unread: 'O‘qilmagan', notes_updated: 'Oxirgi yangilanish: {t}', note_new: 'Yangi', notes_read_all: 'Hammasi o‘qildi', notifications: 'Bildirishnomalar', finance: 'To‘lovlar', documents: 'Hujjatlar', trends: 'Dinamika',
     news: 'E’lonlar', settings: 'Sozlamalar', info: 'Foydali ma’lumot', group: 'Guruh', year: 'Kurs', faculty: 'Fakultet',
     yearN: '{n}-kurs', student: 'Talaba', ok_title: 'Hammasi joyida', ok_sub: 'Davomat, baholar va to‘lovlar bo‘yicha muammo yo‘q.',
     issues: '{n} ta masala e’tibor talab qiladi', gpa: 'GPA', of5: '5 dan', gpa_hint: 'o‘zlashtirish ko‘rsatkichi', acad: 'Akademik qarz', none: 'yo‘q',
@@ -59,7 +59,7 @@ const T = {
   },
   ru: {
     home: 'Главная', schedule: 'Расписание', attendance: 'Посещаемость', grades: 'Оценки', messages: 'Сообщения',
-    menu: 'Меню', subj_att: 'Посещаемость', subj_att_hint: 'С начала семестра по этому предмету: занятий {n}', unexc_n: 'без ув. причины: {n}', notes_all: 'Все уведомления', notes_unread: 'Непрочитанные', notes_updated: 'Последнее обновление: {t}', note_new: 'Новое', notes_read_all: 'Все прочитаны', notifications: 'Уведомления', finance: 'Оплата', documents: 'Документы', trends: 'Динамика',
+    menu: 'Меню', pairs_short: 'пар', unexc_lim: 'без ув. {n} / {l}', lim_over: 'Пропущено {u} пар (предел {l}): не допускается к итоговому контролю — академический долг', lim_warn: 'До предела осталось {n} (предел {l} пар — 25% аудиторных часов)', subj_att: 'Посещаемость', subj_att_hint: 'С начала семестра по этому предмету: занятий {n}', unexc_n: 'без ув. причины: {n}', notes_all: 'Все уведомления', notes_unread: 'Непрочитанные', notes_updated: 'Последнее обновление: {t}', note_new: 'Новое', notes_read_all: 'Все прочитаны', notifications: 'Уведомления', finance: 'Оплата', documents: 'Документы', trends: 'Динамика',
     news: 'Объявления', settings: 'Настройки', info: 'Полезная информация', group: 'Группа', year: 'Курс', faculty: 'Факультет',
     yearN: '{n} курс', student: 'Студент', ok_title: 'Всё в порядке', ok_sub: 'Проблем с посещаемостью, оценками и оплатой нет.',
     issues: 'Требуют внимания: {n}', gpa: 'GPA', of5: 'из 5', gpa_hint: 'средний балл', acad: 'Академ. задолженность', none: 'нет',
@@ -102,7 +102,7 @@ const T = {
   },
   en: {
     home: 'Home', schedule: 'Timetable', attendance: 'Attendance', grades: 'Grades', messages: 'Messages',
-    menu: 'Menu', subj_att: 'Attendance', subj_att_hint: 'Since the start of the semester in this subject: {n} classes', unexc_n: '{n} unexcused', notes_all: 'All notifications', notes_unread: 'Unread', notes_updated: 'Last update: {t}', note_new: 'New', notes_read_all: 'All read', notifications: 'Notifications', finance: 'Payments', documents: 'Documents', trends: 'Trends',
+    menu: 'Menu', pairs_short: 'classes', unexc_lim: 'unexcused {n} / {l}', lim_over: '{u} unexcused (limit {l}): not admitted to the final exam — academic debt', lim_warn: '{n} left before the limit ({l} classes — 25% of contact hours)', subj_att: 'Attendance', subj_att_hint: 'Since the start of the semester in this subject: {n} classes', unexc_n: '{n} unexcused', notes_all: 'All notifications', notes_unread: 'Unread', notes_updated: 'Last update: {t}', note_new: 'New', notes_read_all: 'All read', notifications: 'Notifications', finance: 'Payments', documents: 'Documents', trends: 'Trends',
     news: 'Announcements', settings: 'Settings', info: 'Useful information', group: 'Group', year: 'Year', faculty: 'Faculty',
     yearN: 'Year {n}', student: 'Student', ok_title: 'All good', ok_sub: 'No problems with attendance, grades or payments.',
     issues: '{n} issue(s) need attention', gpa: 'GPA', of5: 'of 5', gpa_hint: 'grade point average', acad: 'Academic debt', none: 'none',
@@ -423,11 +423,18 @@ function payTile(kind, p) {
     <span class="s">${p.days_left != null ? (late ? t('overdue') : t('days_left', { n: p.days_left })) : t('debt')}</span></a>`;
 }
 /* darsdagi fan bo'yicha davomat (semestr boshidan): foiz, chiziq va sababsiz qoldirilganlar */
+/* fan bo'yicha chegara (auditoriya soatining 25%): oshgan — qizil, 1 para qolgan — sariq */
+function limitBadge(a) {
+  if (!a || !a.limit) return '';
+  if (a.state === 'over') return `<div class="lim over">${ic('alert')}${t('lim_over', { u: a.kelmadi, l: a.limit })}</div>`;
+  if (a.state === 'warn') return `<div class="lim warn">${ic('alert')}${t('lim_warn', { n: a.left, l: a.limit })}</div>`;
+  return '';
+}
 function lessonAtt(a) {
   if (!a || !a.total) return '';
   const tone = a.pct >= 90 ? 'ok' : a.pct >= 75 ? 'warn' : 'bad';
   return `<div class="latt ${tone}" title="${esc(t('subj_att_hint', { n: a.total }))}"><span>${t('subj_att')}</span><b class="num">${a.pct}%</b>
-    <span class="lbar"><i style="width:${a.pct}%"></i></span>${a.kelmadi ? `<span class="lmiss">${t('unexc_n', { n: a.kelmadi })}</span>` : ''}</div>`;
+    <span class="lbar"><i style="width:${a.pct}%"></i></span>${a.kelmadi || a.limit ? `<span class="lmiss${a.state ? ' ' + a.state : ''}">${a.limit ? t('unexc_lim', { n: a.kelmadi, l: a.limit }) : t('unexc_n', { n: a.kelmadi })}</span>` : ''}</div>${a.state === 'over' ? limitBadge(a) : ''}`;
 }
 function lessonRow(l) {
   const st = l.status ? `<span class="pill ${l.status === 'keldi' ? 'ok' : l.status === 'kelmadi' ? 'bordo' : 'warn'}">${t(l.status)}</span>` : '';
@@ -539,7 +546,7 @@ async function viewAttendance() {
     const weeks = d.weeks && d.weeks.length > 1 ? `<div class="card"><h3 class="dk-h3">${hi('by_week')}${t('by_week')}</h3>${weekChart(d.weeks)}</div>` : '';
     const subj = d.subjects.length ? `<div class="card"><h3 class="dk-h3">${hi('by_subject')}${t('by_subject')}</h3><div class="list flat">${d.subjects.map(s => {
       const pct = s.total ? Math.round(100 * (s.keldi + s.kechikdi) / s.total) : 0;
-      return `<div class="subject"><div><div class="t" style="font-weight:600">${esc(s.subject)}</div><div class="small muted">${t('kelmadi')}: ${s.kelmadi} · ${t('sababli')}: ${s.sababli}</div></div>
+      return `<div class="subject"><div><div class="t" style="font-weight:600">${esc(s.subject)}</div><div class="small muted">${t('kelmadi')}: ${s.kelmadi}${s.limit ? ` / ${s.limit} ${t('pairs_short')}` : ''} · ${t('sababli')}: ${s.sababli}</div>${limitBadge(s)}</div>
         <b class="num">${pct}%</b><div class="meter"><i style="width:${pct}%"></i></div></div>`; }).join('')}</div></div>` : '';
     const missed = d.absences.length ? `<div class="card"><h3 class="dk-h3">${hi('missed_list')}${t('missed_list')}</h3><table class="dk-tbl"><thead><tr><th>${t('date_h')}</th><th>${t('pair_h')}</th><th>${t('subj_h')}</th><th class="r">${t('status_h')}</th></tr></thead>
         <tbody>${d.absences.slice(0, 60).map(x => `<tr><td>${esc(x.weekday)}, ${dateLabel(x.date)}</td><td class="num">${esc(t('pairN', { n: x.pair }))}</td><td>${esc(x.subject)}</td>
@@ -572,7 +579,7 @@ async function viewAttendance() {
         : `<div class="list">${empty('ok', t('nothing_missed'))}</div>`}</section>
     ${d.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}${t('by_subject')}</h2></div><div class="list">${d.subjects.map(s => {
       const pct = s.total ? Math.round(100 * (s.keldi + s.kechikdi) / s.total) : 0;
-      return `<div class="subject"><div><div class="t" style="font-weight:600">${esc(s.subject)}</div><div class="small muted">${t('kelmadi')}: ${s.kelmadi} · ${t('sababli')}: ${s.sababli}</div></div>
+      return `<div class="subject"><div><div class="t" style="font-weight:600">${esc(s.subject)}</div><div class="small muted">${t('kelmadi')}: ${s.kelmadi}${s.limit ? ` / ${s.limit} ${t('pairs_short')}` : ''} · ${t('sababli')}: ${s.sababli}</div>${limitBadge(s)}</div>
         <b class="num">${pct}%</b><div class="meter"><i style="width:${pct}%"></i></div></div>`;
     }).join('')}</div></section>` : ''}
     ${d.hemis.length ? `<section class="section"><div class="section-head"><h2>${hi('HEMIS')}HEMIS</h2></div><div class="list">${d.hemis.slice().reverse().map(h =>
@@ -1181,7 +1188,7 @@ async function viewStaffStudent(sid) {
       <div class="list">${o.academic.debts.map(debtRow).join('')}</div></section>` : ''}
     ${o.subjects && o.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}Fanlar bo‘yicha davomat</h2></div>
       <div class="list">${o.subjects.map(x => `<div class="row" style="cursor:default"><div class="body"><div class="t">${esc(x.subject)}</div>
-        ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi })}</div></div>`).join('')}</div></section>` : ''}
+        ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi, limit: x.limit, left: x.left, state: x.state })}</div></div>`).join('')}</div></section>` : ''}
     ${o.today && o.today.length ? `<section class="section"><div class="section-head"><h2>${hi('today_lessons')}Bugungi darslar</h2></div>
       <div class="list">${o.today.map(l => lessonRow(l)).join('')}</div></section>` : ''}
     <section class="section"><div class="section-head"><h2>${hi('Ota-onalar')}Ota-onalar</h2></div><div class="list">${o.parents.length ? o.parents.map(p =>
@@ -1205,7 +1212,7 @@ async function viewStaffSubjects(params) {
       <div class="list">${x.lessons.map(l => lessonRow(l)).join('')}</div></section>`).join('') : '';
   const subj = d.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}Fanlar kesimida davomat</h2></div>
       <div class="list">${d.subjects.map(x => `<div class="row" style="cursor:default"><div class="body"><div class="t">${esc(x.subject)}</div>
-        ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi })}<div class="d">${x.missed_students} / ${x.students} talaba qoldirgan</div></div></div>`).join('')}</div></section>`
+        ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi })}<div class="d">${x.missed_students} / ${x.students} talaba qoldirgan${x.limit ? ` · chegara ${x.limit} para (${x.credits} kredit)` : ''}${x.over_students ? ` · <b style="color:var(--bordo-fg)">⛔ ${x.over_students} talaba chegaraga yetgan</b>` : ''}</div></div></div>`).join('')}</div></section>`
     : `<div class="list">${empty('cal', 'Davomat ma’lumoti yo‘q')}</div>`;
   const body = `<select class="input" id="sgm" aria-label="Guruh" style="margin-bottom:12px"><option value="">Barcha guruhlar — faqat fanlar kesimi</option>
       ${d.groups.map(g => `<option value="${esc(g.name)}" ${g.name === group ? 'selected' : ''}>${esc(g.name)} (${g.students})</option>`).join('')}</select>
