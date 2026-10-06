@@ -7,7 +7,7 @@ import aiosqlite
 
 from tenancy import central, current_course
 
-from utils import group_key, normalize_text, now_iso
+from utils import group_key, normalize_text, now_iso, subject_key
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS students (
@@ -294,6 +294,21 @@ CREATE TABLE IF NOT EXISTS attendance_stats (
     PRIMARY KEY (student_id, as_of)
 );
 
+-- HEMIS davomat statistikasi BITTA FAN bo'yicha («O'quvchilarni … fanidan darslarga qatnashish statistikasi»).
+-- Umumiy davomatga (attendance_stats) qo'shilmaydi — faqat fanlar kesimida ko'rsatiladi. Birliklar — HEMIS'dagidek (para).
+CREATE TABLE IF NOT EXISTS subject_att_stats (
+    student_id  INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    subject     TEXT NOT NULL,
+    subject_key TEXT NOT NULL,
+    as_of       TEXT NOT NULL,
+    attended    REAL NOT NULL DEFAULT 0,
+    absent      REAL NOT NULL DEFAULT 0,
+    excused     REAL NOT NULL DEFAULT 0,
+    imported_at TEXT NOT NULL,
+    import_id   INTEGER,
+    PRIMARY KEY (student_id, subject_key, as_of)
+);
+
 -- To'lov-kontrakt: buxgalteriya hisobotidan har bir sana holatidagi ko'rsatkichlar (so'mda).
 -- JSHSHIR (shaxsiy raqam) saqlanmaydi — talaba F.I.Sh. bo'yicha topiladi.
 CREATE TABLE IF NOT EXISTS payments (
@@ -440,7 +455,7 @@ PARENT_FLAGS = {"notify_instant", "notify_daily", "notify_warn", "notify_pay"}
 
 
 # Yuklangan fayldan keladigan ma'lumotlar jadvallari (import_id ustuni bilan) — fayl o'chirilsa shu yozuvlar o'chadi
-IMPORT_TABLES = ("attendance", "attendance_stats", "payments", "payment_reports", "grades", "grade_history",
+IMPORT_TABLES = ("attendance", "attendance_stats", "subject_att_stats", "payments", "payment_reports", "grades", "grade_history",
                  "academic_debts", "schedule", "elective_schedule", "student_subjects", "notifications", "gpa_records")
 
 
@@ -1406,6 +1421,31 @@ class Database:
                            (admin_id, now_iso(), doc_id))
 
     # ------------------------------------------------------------ HEMIS davomat statistikasi
+    async def upsert_subject_stats(self, rows: list[dict], subject: str, as_of: str) -> list[tuple[int, dict | None, dict]]:
+        """Bitta fan bo'yicha HEMIS statistikasi. Qaytaradi: (talaba, shu fan bo'yicha oldingi holat yoki None, yangi)."""
+        key = subject_key(subject) or normalize_text(subject)
+        out, ts = [], now_iso()
+        for r in rows:
+            prev = await self.fetchone("SELECT * FROM subject_att_stats WHERE student_id = ? AND subject_key = ? AND as_of < ? "
+                                       "ORDER BY as_of DESC LIMIT 1", (r["student_id"], key, as_of))
+            await self.conn.execute(
+                """INSERT INTO subject_att_stats (student_id, subject, subject_key, as_of, attended, absent, excused, imported_at)
+                   VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(student_id, subject_key, as_of) DO UPDATE SET subject = excluded.subject,
+                   attended = excluded.attended, absent = excluded.absent, excused = excluded.excused, imported_at = excluded.imported_at""",
+                (r["student_id"], subject, key, as_of, r["attended"], r["absent"], r["excused"], ts))
+            out.append((r["student_id"], prev, r))
+        await self._tag("subject_att_stats", "student_id = ? AND subject_key = ? AND as_of = ?",
+                        [(r["student_id"], key, as_of) for r in rows])
+        await self.conn.commit()
+        return out
+
+    async def latest_subject_stats(self, where: str = "1 = 1", params=()) -> list[dict]:
+        """Har bir talaba va fan bo'yicha oxirgi HEMIS statistikasi (where — students s jadvali bo'yicha shart)."""
+        return await self.fetchall(
+            f"""SELECT x.*, s.full_name, s.group_name, s.hemis_id FROM subject_att_stats x JOIN students s ON s.id = x.student_id
+                WHERE {where} AND x.as_of = (SELECT MAX(as_of) FROM subject_att_stats y
+                                             WHERE y.student_id = x.student_id AND y.subject_key = x.subject_key)""", params)
+
     async def upsert_att_stats(self, rows: list[dict], as_of: str) -> list[tuple[int, dict | None, dict]]:
         """Qaytaradi: (talaba, shu sanadan oldingi oxirgi holat yoki None, yangi holat)."""
         out = []

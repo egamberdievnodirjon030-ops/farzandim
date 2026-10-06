@@ -5,6 +5,11 @@ Tarjimasi yo'q matn o'zbekcha ko'rsatiladi. {nomli} o'rinlar va HTML teglar tarj
 """
 
 TR: dict[str, dict[str, str]] = {
+    "📚 <b>Fan bo'yicha davomat</b>": {'ru': '📚 <b>Посещаемость по предмету</b>', 'en': '📚 <b>Attendance by subject</b>'},
+    "Fan: {s}": {'ru': 'Предмет: {s}', 'en': 'Subject: {s}'},
+    "Sababsiz qoldirilgan: {n}": {'ru': 'Пропущено без уважительной причины: {n}', 'en': 'Missed without a valid reason: {n}'},
+    "Fan bo'yicha davomat: {p}%": {'ru': 'Посещаемость по предмету: {p}%', 'en': 'Attendance in this subject: {p}%'},
+
     "✅ <b>Yo'qlama</b>": {'ru': '✅ <b>Отметка посещаемости</b>', 'en': '✅ <b>Attendance check</b>'},
     "Professor-o'qituvchi {t} «{s}» fanidan {p}-juftlikda farzandingizni darsga keldi deb belgiladi.": {
         'ru': 'Преподаватель {t} отметил(а) вашего ребёнка присутствующим на {p}-й паре по предмету «{s}».',

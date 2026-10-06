@@ -218,21 +218,46 @@ async def overview(st: dict, key: str) -> dict:
             "updated": await _last_update()}
 
 
+async def per_student_subjects(where: str, params=()) -> dict[tuple[int, str], dict]:
+    """Talaba × fan: semestr boshidan kunlik davomat va fan bo'yicha HEMIS statistikasi (qaysi biri ko'proq darsni
+    qamrasa — o'sha). Qaytaradi: (talaba, fan kaliti) → {subject, total, came, kelmadi, sababli, …} (darslar/para)."""
+    out: dict[tuple[int, str], dict] = {}
+    rows = await db.fetchall(
+        f"""SELECT a.student_id, s.full_name, s.group_name, s.hemis_id, a.subject, COUNT(*) AS total,
+                   SUM(a.status IN ('keldi', 'kechikdi')) AS came, SUM(a.status = 'kelmadi') AS kelmadi,
+                   SUM(a.status = 'sababli') AS sababli
+            FROM attendance a JOIN students s ON s.id = a.student_id
+            WHERE {where} AND a.date BETWEEN ? AND ? GROUP BY a.student_id, a.subject""",
+        (*params, semester_start().isoformat(), today().isoformat()))
+    for r in rows:
+        k = subject_key(r["subject"]) or normalize_text(r["subject"])
+        o = out.setdefault((r["student_id"], k), {"sid": r["student_id"], "name": r["full_name"], "group": r["group_name"],
+                                                  "hemis_id": r["hemis_id"], "subject": r["subject"], "key": k, "total": 0,
+                                                  "came": 0, "kelmadi": 0, "sababli": 0, "source": "daily"})
+        for f in ("total", "came", "kelmadi", "sababli"):
+            o[f] += r[f] or 0
+    for r in await db.latest_subject_stats(where, params):
+        if r["as_of"] < semester_start().isoformat():
+            continue
+        total = (r["attended"] or 0) + (r["absent"] or 0)
+        cur = out.get((r["student_id"], r["subject_key"]))
+        if total and (not cur or total > cur["total"]):
+            out[(r["student_id"], r["subject_key"])] = {
+                "sid": r["student_id"], "name": r["full_name"], "group": r["group_name"], "hemis_id": r["hemis_id"],
+                "subject": (cur or {}).get("subject") or r["subject"], "key": r["subject_key"], "total": total,
+                "came": r["attended"] or 0, "kelmadi": max((r["absent"] or 0) - (r["excused"] or 0), 0),
+                "sababli": r["excused"] or 0, "source": "hemis", "as_of": r["as_of"]}
+    return out
+
+
 async def subject_attendance(sid: int) -> dict[str, dict]:
     """Semestr boshidan fanlar bo'yicha davomat: fan kaliti → {pct, kelmadi, sababli, total} (jadvaldagi darsda ko'rsatish
     uchun; fan nomi jadval va davomatda biroz farq qilsa ham — «Fransuz tili I» / «Fransuz tili» — mos tushadi)."""
     out: dict[str, dict] = {}
-    for r in await db.subject_stats(sid, semester_start().isoformat(), today().isoformat()):
-        k = subject_key(r["subject"])
-        if not k or not r["total"]:
-            continue
-        o = out.setdefault(k, {"total": 0, "came": 0, "kelmadi": 0, "sababli": 0})
-        o["total"] += r["total"]
-        o["came"] += r["keldi"] + r["kechikdi"]
-        o["kelmadi"] += r["kelmadi"]
-        o["sababli"] += r["sababli"]
-    for o in out.values():
-        o["pct"] = round(100 * o.pop("came") / o["total"])
+    for (_, k), o in (await per_student_subjects("s.id = ?", (sid,))).items():
+        if o["total"]:
+            out[k] = {"total": o["total"], "kelmadi": o["kelmadi"], "sababli": o["sababli"],
+                      "pct": round(100 * o["came"] / o["total"])}
     return out
 
 
@@ -314,6 +339,12 @@ async def api_attendance(request):
                                                      "kechikdi": 0, "kelmadi": 0, "sababli": 0})
         s["total"] += 1
         s[r["status"]] = s.get(r["status"], 0) + 1
+    by_key = {subject_key(k) or normalize_text(k): k for k in subjects}
+    for (_, k), o in (await per_student_subjects("s.id = ?", (st["id"],))).items():
+        if o["source"] == "hemis":  # kunlik ro'yxatda yo'q yoki kamroq — fan bo'yicha HEMIS statistikasi
+            subjects.pop(by_key.get(k, ""), None)
+            subjects[o["subject"]] = {"subject": loc.term(o["subject"]), "total": round(o["total"]), "keldi": round(o["came"]),
+                                      "kechikdi": 0, "kelmadi": round(o["kelmadi"]), "sababli": round(o["sababli"])}
     absences = [{"date": r["date"], "weekday": tr(WEEKDAYS[date.fromisoformat(r["date"]).weekday()]), "pair": r["pair"],
                  "subject": loc.term(r["subject"] or ""), "status": r["status"], "hours": r["hours"]}
                 for r in rows if r["status"] != "keldi"]
@@ -803,7 +834,7 @@ async def api_staff_student(request):
     parents = await db.fetchall("SELECT p.tg_id, p.tg_name, p.phone, p.active FROM parent_students ps "
                                 "JOIN parents p ON p.tg_id = ps.parent_id WHERE ps.student_id = ?", (st["id"],))
     data["parents"] = [{**p, "lang": await central.get_lang(p["tg_id"]) or "uz"} for p in parents]
-    data["subjects"] = await _subject_rows(f"a.student_id = {int(st['id'])}")
+    data["subjects"] = await _subject_rows("s.id = ?", [st["id"]])
     return ok(data)
 
 
@@ -830,24 +861,18 @@ def _scope_sql(group: str) -> tuple[str, list] | None:
 
 async def _subject_rows(where: str, params: list | None = None) -> list[dict]:
     """Fanlar kesimidagi davomat (semestr boshidan): darslar, keldi %, sababsiz, sababli, qoldirgan talabalar."""
-    rows = await db.fetchall(
-        f"""SELECT a.subject, COUNT(*) AS total, SUM(a.status IN ('keldi', 'kechikdi')) AS came,
-                   SUM(a.status = 'kelmadi') AS kelmadi, SUM(a.status = 'sababli') AS sababli,
-                   SUM(CASE WHEN a.status = 'kelmadi' THEN a.hours ELSE 0 END) AS kelmadi_hours,
-                   COUNT(DISTINCT a.student_id) AS students,
-                   COUNT(DISTINCT CASE WHEN a.status = 'kelmadi' THEN a.student_id END) AS missed_students
-            FROM attendance a JOIN students s ON s.id = a.student_id
-            WHERE {where} AND a.date BETWEEN ? AND ? GROUP BY a.subject""",
-        (*(params or []), semester_start().isoformat(), today().isoformat()))
     merged: dict[str, dict] = {}
-    for r in rows:  # «Fransuz tili I» va «Fransuz tili» — bitta fan
-        k = subject_key(r["subject"]) or normalize_text(r["subject"])
-        m = merged.setdefault(k, {"subject": loc.term(r["subject"] or ""), "key": k, "total": 0, "came": 0, "kelmadi": 0,
-                                  "sababli": 0, "kelmadi_hours": 0, "students": 0, "missed_students": 0})
-        for f in ("total", "came", "kelmadi", "sababli", "kelmadi_hours", "students", "missed_students"):
-            m[f] += r[f] or 0
+    for (_, k), o in (await per_student_subjects(where, params or ())).items():
+        m = merged.setdefault(k, {"subject": loc.term(o["subject"] or ""), "key": k, "total": 0, "came": 0, "kelmadi": 0,
+                                  "sababli": 0, "students": 0, "missed_students": 0})
+        for f in ("total", "came", "kelmadi", "sababli"):
+            m[f] += o[f]
+        m["students"] += 1
+        m["missed_students"] += o["kelmadi"] > 0
     out = []
     for m in merged.values():
+        for f in ("total", "came", "kelmadi", "sababli"):
+            m[f] = round(m[f])
         m["pct"] = round(100 * m["came"] / m["total"]) if m["total"] else None
         out.append(m)
     return sorted(out, key=lambda x: (x["pct"] if x["pct"] is not None else 101, x["subject"]))
@@ -901,24 +926,13 @@ async def api_staff_subject_students(request):
     if cond is None or not key:
         return bad("forbidden", 403)
     where, params = cond
-    rows = await db.fetchall(
-        f"""SELECT s.id, s.full_name, s.group_name, s.hemis_id, a.subject, a.status FROM attendance a
-            JOIN students s ON s.id = a.student_id WHERE {where} AND a.date BETWEEN ? AND ?""",
-        (*params, semester_start().isoformat(), today().isoformat()))
-    per: dict[int, dict] = {}
-    for r in rows:
-        if (subject_key(r["subject"]) or normalize_text(r["subject"])) != key:
-            continue
-        p = per.setdefault(r["id"], {"id": r["id"], "name": r["full_name"], "group": r["group_name"], "hemis_id": r["hemis_id"],
-                                     "total": 0, "came": 0, "kelmadi": 0, "sababli": 0})
-        p["total"] += 1
-        p["came"] += r["status"] in ("keldi", "kechikdi")
-        if r["status"] in ("kelmadi", "sababli"):
-            p[r["status"]] += 1
     items = []
-    for p in per.values():
-        p["pct"] = round(100 * p["came"] / p["total"]) if p["total"] else None
-        items.append(p)
+    for (_, k), o in (await per_student_subjects(where, params)).items():
+        if k != key or not o["total"]:
+            continue
+        items.append({"id": o["sid"], "name": o["name"], "group": o["group"], "hemis_id": o["hemis_id"],
+                      "total": round(o["total"]), "kelmadi": round(o["kelmadi"]), "sababli": round(o["sababli"]),
+                      "pct": round(100 * o["came"] / o["total"])})
     items.sort(key=lambda x: (x["pct"], -x["kelmadi"], x["name"]))
     return ok({"items": items})
 

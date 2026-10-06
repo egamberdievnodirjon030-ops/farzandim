@@ -143,6 +143,29 @@ async def notify_new_absences(bot: Bot) -> int:
     return sent
 
 
+async def notify_subject_stats(bot: Bot, subject: str, changes: list, unit_hours: float) -> int:
+    """Fan bo'yicha HEMIS statistikasi: sababsiz qoldirishlar ko'paygan talabalar ota-onalariga xabar."""
+    sent = 0
+    for sid, prev, new in changes:
+        parents = await db.parents_of_student(sid, "notify_instant")
+        if not parents:
+            continue
+        st = await db.get_student(sid)
+        un = max(new["absent"] - new["excused"], 0)
+        was = max(prev["absent"] - prev["excused"], 0) if prev else 0
+
+        async def build(st=st, un=un, was=was, new=new) -> str:
+            total = (new["attended"] or 0) + (new["absent"] or 0)
+            pct = round(100 * (new["attended"] or 0) / total) if total else None
+            return (tr("📚 <b>Fan bo'yicha davomat</b>") + f"\n\n👨‍🎓 {esc(loc.student_name(st))} ({esc(st['group_name'] or '')})\n"
+                    + tr("Fan: {s}", s=esc(loc.term(subject))) + "\n"
+                    + tr("Sababsiz qoldirilgan: {n}", n=fmt_pairs(un * unit_hours))
+                    + (f" (+{fmt_pairs((un - was) * unit_hours)})" if was and un > was else "")
+                    + (("\n" + tr("Fan bo'yicha davomat: {p}%", p=pct)) if pct is not None else ""))
+        sent += await send_each(bot, parents, build, sid, "att", "att_new")
+    return sent
+
+
 async def notify_present_marks(bot: Bot) -> int:
     """Real vaqtdagi davomat (Manage integratsiyasi): o'qituvchi talabani «darsga keldi» deb belgiladi.
     Har bir dars — ota-ona ilovasidagi bildirishnomalar markazida alohida «Yo'qlama» kartochkasi (Manage talabaga

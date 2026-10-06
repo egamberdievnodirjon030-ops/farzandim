@@ -420,6 +420,22 @@ def parse_rows(all_rows: list[tuple], kind: str) -> ParseResult:
     return res
 
 
+_SUBJ_TITLE = re.compile(r"(?i)\bo\W?quvchilar(?:ni)?\s+(.+?)\s+fanidan\b")
+
+
+def stats_subject(all_rows: list[tuple], file_name: str = "") -> str | None:
+    """HEMIS statistikasi bitta fan bo'yicha bo'lsa — fan nomi: «O'quvchilarni <fan> fanidan darslarga qatnashish
+    statistikasi» sarlavhasidan yoki «Oquvchilar_<fan>_fanidan_davomati_statistikasi_….xlsx» fayl nomidan."""
+    for row in all_rows[:6]:
+        for c in row:
+            if isinstance(c, str):
+                m = _SUBJ_TITLE.search(" ".join(c.split()))
+                if m:
+                    return m.group(1).strip(" «»\"'")
+    m = _SUBJ_TITLE.search(re.sub(r"[_]+", " ", file_name or ""))
+    return m.group(1).strip() if m else None
+
+
 def _gpa(g) -> dict:
     """HEMIS «Performance GPA» qatori: «4.05», «25 / 120.0» (fanlar / kredit), «Qarz» (soni), o'zgartirilgan sana."""
     raw = cell_str(g("gpa")).replace(",", ".").strip()

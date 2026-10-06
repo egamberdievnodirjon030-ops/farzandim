@@ -29,7 +29,7 @@ from database import db
 from family import adopt_parents
 from tenancy import (central, coordinator_groups, course_title, current_course, current_user, group_scope, in_scope,
                      scope_label, scope_students, viewer_scope)
-from importer import (COMPATIBLE, KIND_TITLES, detect_kinds, load_rows, parse_rows, resolve_by_name,
+from importer import (COMPATIBLE, KIND_TITLES, detect_kinds, load_rows, parse_rows, resolve_by_name, stats_subject,
                       resolve_students)
 from guard import recheck_parents
 import redact
@@ -420,6 +420,7 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         return False
 
     lines = [f"✅ {tag}<b>{KIND_TITLES.get(result.kind, KIND_TITLES[kind])}</b> importi yakunlandi"]
+    stats_subj = (stats_subject(rows, file_name) if result.kind == "attendance_stats" else None)
     lines += [esc(n) for n in result.notes]
     errors = list(result.errors)
     pf = result.meta.get("payment_forms") if isinstance(result.meta, dict) else None
@@ -464,6 +465,24 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         lines.append(f"Talabalarning o'z raqamlari yangilandi: {n} ta talaba "
                      f"({sum(len(r['student_phones']) for r in rows)} ta raqam)")
         lines += await _after_phone_import(bot)
+
+    elif kind == "attendance" and result.kind == "attendance_stats" and stats_subj:
+        # HEMIS statistikasi BITTA FAN bo'yicha — fanlar kesimiga yoziladi, umumiy davomatga tegilmaydi
+        rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
+        errors += unknown
+        as_of = _stats_date(caption, file_name)
+        changes = await db.upsert_subject_stats(rows, stats_subj, as_of)
+        k = HEMIS_STATS_HOURS_PER_UNIT
+        unexc = lambda r: max((r["absent"] or 0) - (r["excused"] or 0), 0)  # noqa: E731
+        grew = [(sid, prev, new) for sid, prev, new in changes if prev and unexc(new) > unexc(prev) or not prev and unexc(new) > 0]
+        lines.append(f"📚 Fan: <b>{esc(stats_subject_title(stats_subj))}</b> — fan bo'yicha davomat (umumiy davomatga qo'shilmadi)")
+        lines.append(f"Talabalar: {len(rows)}, holat sanasi: {fmt_date(as_of, False)}; sababsiz qoldirganlar: "
+                     f"{sum(1 for r in rows if unexc(r) > 0)} ta talaba")
+        if silent:
+            lines.append("🔕 Jim rejim: ota-onalarga xabar yuborilmadi.")
+        elif grew:
+            from notifier import notify_subject_stats
+            lines.append(f"Ota-onalarga xabar (fan bo'yicha yangi sababsiz qoldirish): {await notify_subject_stats(bot, stats_subj, grew, k)}")
 
     elif kind == "attendance" and result.kind == "attendance_stats":
         rows, unknown = resolve_students(result.rows, await db.student_lookup(scope))
@@ -750,6 +769,10 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
     return True
 
 
+def stats_subject_title(name: str) -> str:
+    return " ".join(str(name).split())
+
+
 def _stats_date(caption: str | None, file_name: str | None) -> str:
     """HEMIS statistikasi qaysi sana holatiga: izohdagi sana → fayl nomidagi sana → bugun."""
     t = today()
@@ -757,6 +780,9 @@ def _stats_date(caption: str | None, file_name: str | None) -> str:
     if not dates:
         m = re.search(r"(\d{1,2})[._-](\d{1,2})[._-](20\d{2})", file_name or "")
         d = parse_date(f"{m.group(1)}.{m.group(2)}.{m.group(3)}") if m else None
+        if not d:  # HEMIS: «…_2026-10-06_15-33-30.xlsx»
+            m = re.search(r"(20\d{2})-(\d{2})-(\d{2})", file_name or "")
+            d = parse_date(f"{m.group(3)}.{m.group(2)}.{m.group(1)}") if m else None
         dates = [d] if d else []
     d = dates[0] if dates else t
     return min(d, t).isoformat()
