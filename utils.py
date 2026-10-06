@@ -217,8 +217,10 @@ def week_bounds(d: date) -> tuple[date, date]:
 
 
 def week_type_of(d: date) -> str:
-    """Semestr boshidan hisoblab toq yoki juft hafta."""
-    n = (d - semester_start()).days // 7 + 1
+    """Semestr boshidan hisoblab toq yoki juft hafta. Haftalar dushanbadan boshlanadi (semestr seshanba kuni
+    boshlansa ham, o'sha hafta — 1-hafta, keyingi dushanbadan — 2-hafta)."""
+    start = semester_start()
+    n = ((d - timedelta(days=d.weekday())) - (start - timedelta(days=start.weekday()))).days // 7 + 1
     return "toq" if n % 2 else "juft"
 
 

@@ -67,9 +67,9 @@ _REF = {
 }
 _LESSON = {
     "pair": ["lesson pair code", "lesson pair", "pair", "pair number", "pair code", "lesson pair name", "para",
-             "juftlik", "lesson number", "period", "lesson order", "para number"],
-    "subject": ["subject name", "subject", "lesson name", "discipline name", "discipline", "fan", "fan nomi", "predmet",
-                "course name", "subject title", "lesson title", "title"],
+             "juftlik", "lesson number", "period", "lesson order", "para number", "slot id", "slot", "slot number"],
+    "subject": ["subject name", "subject", "discipline name", "discipline", "fan", "fan nomi", "predmet", "course name",
+                "subject title", "title", "lesson name", "lesson title"],
     "lesson_type": ["training type name", "training type", "lesson type name", "lesson type", "type name",
                     "mashgulot turi", "dars turi"],
     "teacher": ["employee name", "teacher name", "employee full name", "teacher full name", "instructor name",
@@ -121,6 +121,11 @@ _W_EXCUSED = ("explicable", "excused", "sababli", "uzrli", "reason", "uvazh", "j
 _W_ABSENT = ("absent", "missed", "qoldir", "propusk", "skipped", "nb", "kelmadi", "qatnashmadi")
 _W_LATE = ("late", "kechik", "opozd", "delay")
 _W_PRESENT = ("present", "attended", "keldi", "qatnashdi", "prisut")
+
+# API dagi mashg'ulot turi kodlari → ota-onaga ko'rinadigan nom
+LESSON_TYPES = {"lecture": "Ma'ruza", "lection": "Ma'ruza", "seminar": "Seminar", "practice": "Amaliy", "practical": "Amaliy",
+                "practical lesson": "Amaliy", "lab": "Laboratoriya", "laboratory": "Laboratoriya", "lab work": "Laboratoriya",
+                "exam": "Imtihon", "consultation": "Konsultatsiya", "self study": "Mustaqil ta'lim"}
 
 STATE: dict[str, dict] = {k: {"fails": 0} for k in KINDS}
 _LOCKS = {k: asyncio.Lock() for k in KINDS}
@@ -400,8 +405,8 @@ def auto_map(keys: list[str], kind: str) -> dict[str, str]:
 
 
 # «11 lesson», «Lesson 3», «5-dars», «12-mavzu», «3» — bu fan nomi emas (darsning tartib raqami)
-_NOT_SUBJECT = re.compile(r"^\s*(\d+\s*[-.]?\s*(lesson|dars|mavzu|zanyatie|urok|lecture|seminar|topic)?|"
-                          r"(lesson|dars|mavzu|zanyatie|urok|topic)\s*[-№#]?\s*\d+)\s*$", re.I)
+_NOT_SUBJECT = re.compile(r"^\s*(\d+\s*(st|nd|rd|th|chi|-?chi)?\s*[-.]?\s*(lesson|lecture|seminar|dars|ders|mavzu|zanyatie|"
+                          r"urok|topic|week)\b|\d+\s*$|(lesson|lecture|dars|ders|mavzu|zanyatie|urok|topic)\s*[-№#]?\s*\d+)", re.I)
 _SUBJECT_KEYS = ("title", "subject", "discipline", "fan", "predmet", "course", "name")
 
 
@@ -590,6 +595,10 @@ def build_table(records: list[dict], kind: str) -> tuple[list[tuple], dict]:
                 v = to_time(v) or v
             elif f == "status":
                 v = to_status(v, m.get("status", ""))
+            elif f == "lesson_type" and isinstance(v, str):
+                v = LESSON_TYPES.get(normalize_text(v), " ".join(v.split()))
+            elif f in ("subject", "teacher", "room", "group_name") and isinstance(v, str):
+                v = " ".join(v.replace('"', " ").split()) if f == "group_name" else " ".join(v.split())
             elif f == "pair" and v not in (None, ""):
                 n = parse_int(re.sub(r"\D+", " ", cell_str(v)).split()[0]) if re.search(r"\d", cell_str(v)) else None
                 v = n or v
