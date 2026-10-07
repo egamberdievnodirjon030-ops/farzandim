@@ -1194,6 +1194,8 @@ async def targets(kind: str) -> list[dict]:
         for r in rows:
             if not real_hemis(r["hemis_id"]):  # namunaviy (DEMO0001) yoki qo'lda yozilgan ID — Manage'da yo'q
                 continue
+            if _MISSING.get(r["hemis_id"]) == today():  # bugun Manage'da topilmagan — ertaga qayta so'raladi
+                continue
             if kind == "schedule" and INTEGRATION_SCHEDULE_PER_GROUP:
                 if r["group_key"] in groups:
                     continue
@@ -1261,12 +1263,12 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
         raise IntegrationError("bazada haqiqiy (raqamli) HEMIS ID li talaba yo'q — DEMO0001 kabi namunaviy talabalar "
                                "so'ralmaydi. «Talabalar» (kontingent) faylini yuklang yoki --hemis=381231100123 bilan sinang")
     weeks = mondays(kind)
-    if probe:  # tekshirish: bitta hafta; javob bo'sh bo'lsa — keyingi talaba (5 tagacha)
+    if probe:  # tekshirish: bitta hafta; javob bo'sh yoki talaba Manage'da yo'q bo'lsa — keyingi talaba
         weeks = weeks[:1]
-        tg = [{"hemis_id": PROBE_HEMIS, "full_name": "", "group_name": ""}] if PROBE_HEMIS and per_student(kind) else tg[:5]
+        tg = [{"hemis_id": PROBE_HEMIS, "full_name": "", "group_name": ""}] if PROBE_HEMIS and per_student(kind) else tg[:40]
     url0, complete = await build_url(kind, tg[0]["hemis_id"] if tg[0] else None, weeks[0])
     info = {"pages": 0, "format": "", "complete": complete, "truncated": False, "url": _safe_url(url0),
-            "requests": 0, "failed": 0, "sample": b""}
+            "requests": 0, "failed": 0, "missing": 0, "sample": b""}
     records: list[dict] = []
     sem = asyncio.Semaphore(INTEGRATION_CONCURRENCY)
     timeout = aiohttp.ClientTimeout(total=INTEGRATION_TIMEOUT)
@@ -1282,6 +1284,10 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
             try:
                 recs, i, body = await _fetch_url(session, url, limit, probe)
             except IntegrationError as e:
+                if st and _not_in_manage(e):  # talaba Manage bazasida yo'q — xato emas, o'tkazib yuboriladi
+                    info["missing"] += 1
+                    _MISSING[st["hemis_id"]] = today()
+                    return
                 info["failed"] += 1
                 if e.status == 404 and "cannot get" in str(e).lower():  # manzil (yo'l) umuman yo'q — talabaga bog'liq emas
                     fatal.append(IntegrationError(f"bunday manzil Manage'da yo'q (HTTP 404: Cannot GET): {_safe_url(url)}. "
@@ -1314,21 +1320,33 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
 
     async with aiohttp.ClientSession(timeout=timeout) as session:  # timeout — har bir so'rov uchun
         if probe:
-            for st in tg:
+            for n, st in enumerate(tg):
                 await one(session, st, weeks[0])
-                if records or fatal:
+                if records or fatal or (info["requests"] + info["failed"] >= 5):
                     break
-            tg = tg[:max(1, info["requests"] + info["failed"])]
+            tg = tg[:max(1, info["requests"] + info["failed"] + info["missing"])]
         else:
             await asyncio.gather(*(one(session, st, m) for st in tg for m in weeks))
     if fatal:
         raise fatal[0]
-    total = len(tg) * len(weeks)
+    total = len(tg) * len(weeks) - info["missing"]
+    if per_student(kind) and info["missing"] and not info["requests"] and not info["failed"]:
+        raise IntegrationError(f"so'ralgan {info['missing']} ta talabaning birortasi Manage bazasida yo'q («User not found in DB») — "
+                               "Manage'da bor guruh talabasi bilan sinang: --hemis=… yoki --guruh=…")
     if info["failed"] and info["failed"] * 2 > total:
         raise IntegrationError(f"so'rovlarning ko'pi bajarilmadi: {info['failed']} / {total}")
     if info["failed"]:
         info["complete"] = False  # ba'zi talabalar olinmadi — «manbada yo'q» deb hisoblab bo'lmaydi
     return records, info
+
+
+_MISSING: dict[str, date] = {}  # Manage bazasida yo'q talabalar (HEMIS ID → tekshirilgan kun): kuniga bir marta so'raladi
+
+
+def _not_in_manage(e: "IntegrationError") -> bool:
+    """«User not found in DB» (Manage: 400, errorCode 401003) — talaba Manage'da yo'q."""
+    t = str(e).lower()
+    return e.status in (400, 404, 422) and "cannot get" not in t and ("not found" in t or "401003" in t or "topilmadi" in t)
 
 
 class IntegrationError(Exception):
@@ -1463,7 +1481,8 @@ async def pull(bot, kind: str) -> dict:
         if st.get("fails", 0) >= 3:
             log.warning("%s: %s yana olinmoqda (%s marta xatodan keyin)", INTEGRATION_NAME, TITLES[kind], st["fails"])
         st.update(fails=0, error=None, last_ok=now_iso(), pages=info["pages"], format=info["format"],
-                  truncated=info["truncated"], result=res)
+                  truncated=info["truncated"], result=res, missing=info.get("missing", 0),
+                  missing_total=sum(1 for d in _MISSING.values() if d == today()))
         if res["changed"]:
             st["last_change"] = st["last_ok"]
         await central.set_meta(f"integ_last_ok_{kind}", st["last_ok"])
@@ -1577,6 +1596,8 @@ async def status_text() -> str:
                 lines.append(f"  • {esc(key)}: {c['rows']} qator" + (" — yangilandi" if c["changed"] else
                                                                       " — o'zgarish yo'q")
                              + (f", to'g'rilangan: {c['corrected']}" if c.get("corrected") else ""))
+        if st.get("missing_total"):
+            lines.append(f"  Manage bazasida yo'q talabalar (bugun): {st['missing_total']} — ular o'tkazib yuboriladi")
         if st.get("last_change"):
             lines.append(f"  oxirgi o'zgarish: {_ago(st['last_change'])}")
     return "\n".join(lines)
@@ -1705,17 +1726,13 @@ async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dic
     out: dict = {"created": now_iso(), "base": _safe_url(INTEGRATION_URL), "subjects": {}, "timetable": {}, "tries": {},
                  "docs": None, "errors": []}
     lines = []
-    rows = await targets("subjects")
-    if group:
-        rows = [r for r in rows if group_key(r["group_name"]) == group_key(group)]
-    elif rows:
-        first = rows[0]["group_key"]
-        rows = [r for r in rows if r["group_key"] == first]
-    rows = rows[:limit]
-    if not rows:
-        return out, "Bazada haqiqiy HEMIS ID li talaba yo'q (yoki bunday guruh yo'q) — avval «Talabalar» faylini yuklang."
-    out["group"] = rows[0]["group_name"]
-    hid0 = rows[0]["hemis_id"]
+    _MISSING.clear()
+    allrows = await targets("subjects")
+    if not allrows:
+        return out, "Bazada haqiqiy HEMIS ID li talaba yo'q — avval «Talabalar» faylini yuklang."
+    by_group: dict[str, list[dict]] = {}
+    for r in allrows:
+        by_group.setdefault(r["group_key"], []).append(r)
     t = today()
     monday = t - timedelta(days=t.weekday())
     timeout = aiohttp.ClientTimeout(total=INTEGRATION_TIMEOUT)
@@ -1739,6 +1756,35 @@ async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dic
     async with aiohttp.ClientSession(timeout=timeout) as session:
         sub_path = endpoint("subjects") or KNOWN_PATHS["subjects"]
         sem = asyncio.Semaphore(INTEGRATION_CONCURRENCY)
+        # qaysi guruhlar Manage'da bor: har bir guruhdan 2 talaba
+        avail: dict[str, bool] = {}
+
+        async def check_group(gk, rs):
+            for r in rs[:2]:
+                async with sem:
+                    st, _, _ = await get(session, sub_path, r["hemis_id"])
+                if st == 200:
+                    avail[gk] = True
+                    return
+            avail[gk] = False
+        await asyncio.gather(*(check_group(gk, rs) for gk, rs in list(by_group.items())[:80]))
+        names = {gk: rs[0]["group_name"] for gk, rs in by_group.items()}
+        yes = sorted(names[g] for g, ok in avail.items() if ok)
+        no = sorted(names[g] for g, ok in avail.items() if not ok)
+        out["groups_in_manage"], out["groups_not_in_manage"] = yes, no
+        lines.append(f"Manage'da bor guruhlar ({len(yes)}): {', '.join(yes) or '—'}")
+        lines.append(f"Manage'da yo'q guruhlar ({len(no)}): {', '.join(no) or '—'}")
+        gk = group_key(group) if group else None
+        if gk and not avail.get(gk):
+            lines.append(f"⚠️ {group} guruhi talabalari Manage'da topilmadi — Manage'da bor guruhdan olinadi")
+            gk = None
+        gk = gk or next((g for g, ok in avail.items() if ok), None)
+        if not gk:
+            return out, "\n".join(lines + ["❌ Birorta guruh talabasi Manage'da topilmadi («User not found in DB»). "
+                                            "Bot bazasidagi HEMIS ID lar Manage'dagi bilan bir xilmi — tekshiring."])
+        rows = by_group[gk][:limit]
+        out["group"] = rows[0]["group_name"]
+        hid0 = next((r["hemis_id"] for r in rows), None)
 
         async def one(r):
             async with sem:
@@ -1746,6 +1792,7 @@ async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dic
             out["subjects"][r["hemis_id"]] = {"name": r["full_name"], "status": st, "data": data}
         await asyncio.gather(*(one(r) for r in rows))
         ok = sum(1 for v in out["subjects"].values() if v["status"] == 200)
+        hid0 = next((h for h, v in out["subjects"].items() if v["status"] == 200), hid0)
         lines.append(f"Fanlar (student-subjects): {ok} / {len(rows)} talaba — {out['group']}")
         if ok == 0:
             first = next(iter(out["subjects"].values()))
