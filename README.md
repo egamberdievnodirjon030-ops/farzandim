@@ -719,6 +719,8 @@ Tekshirish: `curl https://ilova.example.uz/healthz` — `ok` qaytishi kerak. Key
 
 **Qanday ishlaydi:** har bir yozuv talabaga (HEMIS ID, bo'lmasa F.I.Sh. + guruh) va o'z kursiga ajratiladi; boshqa kurslar va bazada yo'q talabalar e'tiborsiz qoladi. Ma'lumot o'zgarmagan bo'lsa hech narsa qilinmaydi. Yangi qoldirish — ota-onaga darhol xabar; o'qituvchi davomatni to'g'rilasa (manbada qoldirish o'chirilsa) — botda ham «keldi» bo'ladi (oxirgi `INTEGRATION_DAYS` kun). Birinchi olishda xabar yuborilmaydi (`INTEGRATION_FIRST_SILENT`). Manba javob bermasa — bot ishlashda davom etadi, xato holatda ko'rinadi, 3 marta ketma-ket bo'lsa super-adminga xabar boradi.
 
+**Kalitni bot orqali kiritish (eng oson).** Super-admin Telegram'da `/integratsiya` → «🔑 Kalitni kiritish (curl)» (yoki `/manage_kalit`) ni bosib, Manage'dagi so'rovni curl ko'rinishida (Swagger → «Try it out» → curl) **to'liq** yuboradi — `Authorization: Basic …` qatori bilan. Bot manzil (`INTEGRATION_URL`), yo'l (`hemisId` → har bir talaba, `academicYearId`, `monday`), kalit va sarlavhalarni o'zi ajratadi, xabarni darhol o'chiradi, ulanishni sinaydi va ma'lumot olishni boshlaydi — `.env` ni tahrirlash va botni qayta ishga tushirish shart emas. Fanlar, dars jadvali, davomat — har biri uchun o'z curl'i. Kalit `data/integration_conf.json` da saqlanadi (`.env` dan ustun; git'ga tushmaydi); o'chirish: `/manage_kalit tozalash`. Kompyuterda: `python integration.py kalit` (curl'ni qo'yib, bo'sh qatorda Enter).
+
 **Talabaning fanlari — fan bo'yicha davomat va kredit (Manage: `student-subjects`).** Har bir talaba uchun so'raladi:
 
 ```

@@ -175,8 +175,160 @@ LESSON_TYPES = {"lecture": "Ma'ruza", "lection": "Ma'ruza", "seminar": "Seminar"
                 "practical lesson": "Amaliy", "lab": "Laboratoriya", "laboratory": "Laboratoriya", "lab work": "Laboratoriya",
                 "exam": "Imtihon", "consultation": "Konsultatsiya", "self study": "Mustaqil ta'lim"}
 
+# ---------------------------------------------------------------- kalit: curl buyrug'idan (bot orqali kiritiladi)
+# Super-admin Manage'dagi curl buyrug'ini (Swagger «Try it out» → curl) botga yuboradi: manzil, Authorization va
+# sarlavhalar shundan olinib data/integration_conf.json ga yoziladi (.env dagidan ustun, botni qayta ishga tushirish shart
+# emas). Fayl data/ papkasida — git'ga tushmaydi.
+CONF_FILE = DATA_DIR / "integration_conf.json"
+_ENV_BASE = {k: globals()[k] for k in ("INTEGRATION_URL", "INTEGRATION_AUTH", "INTEGRATION_TOKEN", "INTEGRATION_HEADERS",
+                                       "INTEGRATION_ATTENDANCE", "INTEGRATION_SCHEDULE", "INTEGRATION_SUBJECTS",
+                                       "INTEGRATION_ACADEMIC_YEAR")}
+_CONF_KEYS = {"url": "INTEGRATION_URL", "auth": "INTEGRATION_AUTH", "token": "INTEGRATION_TOKEN",
+              "headers": "INTEGRATION_HEADERS", "attendance": "INTEGRATION_ATTENDANCE", "schedule": "INTEGRATION_SCHEDULE",
+              "subjects": "INTEGRATION_SUBJECTS", "academic_year": "INTEGRATION_ACADEMIC_YEAR"}
+
+
+def load_conf() -> dict:
+    try:
+        return json.loads(CONF_FILE.read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def apply_conf() -> None:
+    """data/integration_conf.json (bot orqali kiritilgan kalit) — .env dagi qiymatlar ustiga."""
+    conf = load_conf()
+    for key, name in _CONF_KEYS.items():
+        globals()[name] = conf[key] if conf.get(key) not in (None, "") else _ENV_BASE[name]
+    for st in STATE.values():
+        st["fails"], st["error"] = 0, None
+
+
+_QUOTES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u00ab": '"', "\u00bb": '"'})
+
+
+def parse_curl(text: str) -> dict:
+    """«curl -X 'GET' 'https://…/student-subjects?hemisId=…&academicYearId=8' -H 'Authorization: Basic …'» →
+    {url, base, path, kind, auth, token, headers, academic_year}. Bash (\\), cmd (^) va PowerShell (`) qator ko'chirishlari."""
+    import shlex
+    t = text.translate(_QUOTES).strip()
+    t = re.sub(r"[\\^`]\s*\r?\n", " ", t).replace("\r", " ").replace("\n", " ")
+    t = t.rstrip("\\^` ")
+    try:
+        parts = shlex.split(t)
+    except ValueError as e:
+        raise ValueError(f"curl buyrug'ini o'qib bo'lmadi (qo'shtirnoq yopilmagan?): {e}") from None
+    url, headers, user = None, {}, None
+    i = 0
+    while i < len(parts):
+        p = parts[i]
+        if p in ("-H", "--header") and i + 1 < len(parts):
+            k, _, v = parts[i + 1].partition(":")
+            headers[k.strip()] = v.strip()
+            i += 2
+            continue
+        if p in ("-u", "--user") and i + 1 < len(parts):
+            user = parts[i + 1]
+            i += 2
+            continue
+        if p in ("-X", "--request", "-d", "--data", "-o", "--output") and i + 1 < len(parts):
+            i += 2
+            continue
+        if re.match(r"(?i)^https?://", p) and not url:
+            url = p
+        i += 1
+    if not url:
+        raise ValueError("curl ichida https://… manzil topilmadi")
+    auth_h = next((v for k, v in headers.items() if k.lower() == "authorization"), "")
+    if user:
+        auth, token = "basic", user
+    elif auth_h.lower().startswith("basic "):
+        auth, token = "basic", auth_h[6:].strip()
+        try:
+            dec = base64.b64decode(token + "=" * (-len(token) % 4), validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            raise ValueError("Authorization: Basic dan keyingi kalit buzilgan (to'liq nusxalanmagan bo'lishi mumkin)") from None
+        if ":" not in dec:
+            raise ValueError("Basic kalit ichida login:parol yo'q — kalitni Manage'dan qaytadan nusxalang")
+    elif auth_h.lower().startswith("bearer "):
+        auth, token = "bearer", auth_h[7:].strip()
+    else:
+        raise ValueError("curl ichida kalit yo'q: «-H 'Authorization: Basic …'» qatori bilan to'liq nusxalang")
+    if not token:
+        raise ValueError("Authorization qatorida kalit bo'sh — «Basic» dan keyingi qismini ham nusxalang")
+    extra = "; ".join(f"{k}: {v}" for k, v in headers.items() if k.lower() not in ("authorization", "accept", "content-type"))
+    sp = urlsplit(url)
+    path = sp.path
+    m = re.search(r"/v\d+(?=/)", path)
+    cut = m.end() if m else path.rfind("/")
+    base = urlunsplit((sp.scheme, sp.netloc, path[:cut], "", ""))
+    route = path[cut:].lstrip("/")
+    low = route.lower()
+    kind = ("subjects" if "subject" in low else "schedule" if ("timetable" in low or "schedule" in low or "jadval" in low)
+            else "attendance" if ("attend" in low or "davomat" in low) else None)
+    q, year = [], None
+    for k, v in parse_qsl(sp.query, keep_blank_values=True):
+        kl = k.lower()
+        if re.search(r"hemis|student.?id|studentid", kl):
+            v = "{hemis_id}"
+        elif "academicyear" in kl.replace("_", ""):
+            year, v = v, "{academic_year}"
+        elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+            v = ("{monday}" if re.search(r"monday|week", kl) else "{from}" if re.search(r"from|start|begin", kl)
+                 else "{to}" if re.search(r"to$|end|till", kl) else v)
+        q.append(f"{k}={v}")
+    return {"url": base, "path": route + ("?" + "&".join(q) if q else ""), "kind": kind, "auth": auth, "token": token,
+            "headers": extra, "academic_year": year}
+
+
+def save_curl(text: str, kind: str | None = None, by: int | None = None) -> dict:
+    """curl'dan kalit va manzilni saqlaydi va darhol qo'llaydi. Qaytaradi: parse_curl natijasi (kalitsiz)."""
+    c = parse_curl(text)
+    kind = kind or c["kind"]
+    if kind not in KINDS:
+        raise ValueError("Bu qaysi ma'lumot ekanini manzildan aniqlab bo'lmadi — buyruqqa turini qo'shing: "
+                         "/manage_kalit fanlar | jadval | davomat, so'ng curl")
+    conf = load_conf()
+    conf.update(url=c["url"], auth=c["auth"], token=c["token"], headers=c["headers"], updated_at=now_iso(), by=by)
+    conf[kind] = c["path"]
+    if c["academic_year"]:
+        conf["academic_year"] = c["academic_year"]
+    CONF_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CONF_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(conf, ensure_ascii=False, indent=1), "utf-8")
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    tmp.replace(CONF_FILE)
+    apply_conf()
+    return {**{k: v for k, v in c.items() if k != "token"}, "kind": kind}
+
+
+def clear_conf() -> None:
+    try:
+        CONF_FILE.unlink()
+    except OSError:
+        pass
+    apply_conf()
+
+
+def key_owner() -> str:
+    """Kalit kimning nomidan (login yashirilgan holda): «n.e…@uwed.uz»."""
+    tok = INTEGRATION_TOKEN
+    if INTEGRATION_AUTH.lower() != "basic" or not tok:
+        return ""
+    try:
+        login = (tok if ":" in tok else base64.b64decode(tok + "=" * (-len(tok) % 4)).decode("utf-8")).split(":", 1)[0]
+    except (ValueError, UnicodeDecodeError):
+        return ""
+    name, _, dom = login.partition("@")
+    return (name[:3] + "…" + ("@" + dom if dom else "")) if name else ""
+
+
 STATE: dict[str, dict] = {k: {"fails": 0} for k in KINDS}
 _LOCKS = {k: asyncio.Lock() for k in KINDS}
+apply_conf()  # bot orqali kiritilgan kalit (data/integration_conf.json) — .env ustidan
 
 
 # Manage (my.uwed.uz/api/integration/v1) ning ma'lum manzillari: .env da yozilmagan yoki harfi xato yozilgan bo'lsa
@@ -985,8 +1137,8 @@ def _headers_and_url(url: str) -> tuple[dict, str]:
             headers["Authorization"] = f"Bearer {tok}"
         elif low == "token":
             headers["Authorization"] = f"Token {tok}"
-        elif low == "basic":
-            headers["Authorization"] = "Basic " + base64.b64encode(tok.encode()).decode()
+        elif low == "basic":  # login:parol — kodlanadi; curl'dan olingan tayyor kalit (base64) — o'zi
+            headers["Authorization"] = "Basic " + (base64.b64encode(tok.encode()).decode() if ":" in tok else tok)
         elif low.startswith("header:"):
             headers[mode.split(":", 1)[1].strip()] = tok
         elif low.startswith("query:"):
@@ -1355,16 +1507,19 @@ def interval(kind: str) -> int:
 
 
 async def loop(bot) -> None:
-    """Fon vazifasi: sozlangan turlarni o'z oralig'ida olib turadi (to'xtatilgan bo'lsa — kutadi)."""
-    if not configured():
-        return
-    log.info("%s integratsiyasi yoqildi: %s", INTEGRATION_NAME,
-             ", ".join(f"{TITLES[k]} — har {interval(k)} s" for k in KINDS if configured(k)))
+    """Fon vazifasi: sozlangan turlarni o'z oralig'ida olib turadi (to'xtatilgan bo'lsa — kutadi). Kalit keyinroq
+    (bot orqali) kiritilsa ham — qayta ishga tushirmasdan boshlanadi."""
     await asyncio.sleep(5)
     due = {k: 0.0 for k in KINDS}
+    announced = None
     while True:
         try:
-            if not await paused():
+            now_on = tuple(k for k in KINDS if configured(k))
+            if now_on and now_on != announced:
+                announced = now_on
+                log.info("%s integratsiyasi yoqildi: %s", INTEGRATION_NAME,
+                         ", ".join(f"{TITLES[k]} — har {interval(k)} s" for k in now_on))
+            if now_on and not await paused():
                 for kind in KINDS:
                     if configured(kind) and _time.monotonic() >= due[kind]:
                         due[kind] = _time.monotonic() + interval(kind)
@@ -1384,15 +1539,19 @@ def _ago(iso: str | None) -> str:
 async def status_text() -> str:
     lines = [f"🔌 <b>Integratsiya: {esc(INTEGRATION_NAME)}</b>"]
     if not configured() and not INTEGRATION_WEBHOOK_SECRET:
-        lines.append("\nHali sozlanmagan. Kalit berilgach .env faylida to'ldiring (README, «Integratsiya» bo'limi):\n"
+        lines.append("\nHali sozlanmagan. Eng osoni: «🔑 Kalitni kiritish» tugmasini bosib, Manage'dagi curl buyrug'ini "
+                     "(Authorization: Basic … bilan) shu yerga yuboring. Yoki .env faylida to'ldiring:\n"
                      "<code>INTEGRATION_URL=https://manage.example.uz/api\nINTEGRATION_TOKEN=…\n"
                      "INTEGRATION_ATTENDANCE=attendance?from={from}&amp;to={to}\nINTEGRATION_SCHEDULE=schedule</code>\n"
                      "so'ng botni qayta ishga tushiring va «🔍 Tekshirish» ni bosing.")
         return "\n".join(lines)
     if await paused():
         lines.append("⏸ <b>To'xtatilgan</b> — avtomatik olish o'chiq (webhook ham qabul qilinmaydi).")
+    conf = load_conf()
     lines.append(f"Manba: <code>{esc(_safe_url(INTEGRATION_URL) or '—')}</code>"
-                 + (f", kalit: {esc(INTEGRATION_AUTH)}" if INTEGRATION_TOKEN else ", kalitsiz"))
+                 + (f", kalit: {esc(INTEGRATION_AUTH)}" + (f" ({esc(key_owner())})" if key_owner() else "")
+                    + (f" — bot orqali kiritilgan {fmt_dt(conf['updated_at'])}" if conf.get("token") else " — .env dan")
+                    if INTEGRATION_TOKEN else ", kalitsiz"))
     if INTEGRATION_WEBHOOK_SECRET:
         lines.append("Webhook: <code>POST /api/integration/attendance</code> va <code>/schedule</code> — yoqilgan")
     for kind in KINDS:
@@ -1682,6 +1841,34 @@ if __name__ == "__main__":
         global PROBE_HEMIS
         args = [a for a in sys.argv[1:] if not a.startswith("--")]
         PROBE_HEMIS = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--hemis=")), None)
+        if args[:1] == ["kalit"]:
+            if any(a in ("tozalash", "ochirish") for a in args[1:]):
+                clear_conf()
+                print("Bot orqali kiritilgan kalit o'chirildi (endi .env dagisi ishlatiladi).")
+            else:
+                print("Manage'dagi curl buyrug'ini to'liq (Authorization: Basic … bilan) shu yerga qo'ying va "
+                      "oxirida bo'sh qatorda Enter bosing:")
+                buf = []
+                while True:
+                    try:
+                        line = input()
+                    except EOFError:
+                        break
+                    if not line.strip() and buf:
+                        break
+                    buf.append(line)
+                kind = KIND_WORDS.get(args[1].lower()) if len(args) > 1 else None
+                try:
+                    info = save_curl("\n".join(buf), kind)
+                except ValueError as e:
+                    print("❌", e)
+                else:
+                    print(f"✅ Kalit saqlandi ({key_owner() or info['auth']}): {TITLES[info['kind']]} — "
+                          f"{info['url']}/{info['path']}\nFayl: {CONF_FILE.resolve()}\n")
+                    print(await setup_check())
+            await db.close()
+            await central.close()
+            return
         if args[:1] == ["sozlash"]:
             print(await setup_check())
             await db.close()
