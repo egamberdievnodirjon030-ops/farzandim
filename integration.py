@@ -1686,6 +1686,92 @@ async def probe(kind: str) -> str:
     return "\n".join(lines)
 
 
+# Manage'dagi ehtimoliy manzillar: API hujjati (Swagger — barcha manzillar ro'yxati) va davomat
+_DOC_PATHS = ("docs-json", "swagger.json", "swagger-json", "openapi.json", "api-json", "docs/swagger.json",
+              "../docs-json", "../../docs-json", "../../../api-json", "../../../docs-json", "../../../swagger.json")
+_TRY_PATHS = ("student-attendance?hemisId={hemis_id}&academicYearId={academic_year}",
+              "student-attendance/weekly?hemisId={hemis_id}&monday={monday}",
+              "student-attendances?hemisId={hemis_id}&academicYearId={academic_year}",
+              "student-lessons?hemisId={hemis_id}&academicYearId={academic_year}",
+              "student-subjects/attendance?hemisId={hemis_id}&academicYearId={academic_year}",
+              "attendance?hemisId={hemis_id}&academicYearId={academic_year}",
+              "student-timetable/weekly?hemisId={hemis_id}&monday={monday}")
+
+
+async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dict, str]:
+    """python integration.py yigish — Manage'dan namuna yig'ish (kalitsiz faylga): bir guruh talabalarining fanlari,
+    bitta talabaning shu va o'tgan haftalardagi jadvali, ehtimoliy davomat manzillari va API hujjati (Swagger)."""
+    import aiohttp
+    out: dict = {"created": now_iso(), "base": _safe_url(INTEGRATION_URL), "subjects": {}, "timetable": {}, "tries": {},
+                 "docs": None, "errors": []}
+    lines = []
+    rows = await targets("subjects")
+    if group:
+        rows = [r for r in rows if group_key(r["group_name"]) == group_key(group)]
+    elif rows:
+        first = rows[0]["group_key"]
+        rows = [r for r in rows if r["group_key"] == first]
+    rows = rows[:limit]
+    if not rows:
+        return out, "Bazada haqiqiy HEMIS ID li talaba yo'q (yoki bunday guruh yo'q) — avval «Talabalar» faylini yuklang."
+    out["group"] = rows[0]["group_name"]
+    hid0 = rows[0]["hemis_id"]
+    t = today()
+    monday = t - timedelta(days=t.weekday())
+    timeout = aiohttp.ClientTimeout(total=INTEGRATION_TIMEOUT)
+
+    async def get(session, path: str, hid: str, mon: date | None = None):
+        url = path if path.startswith("http") else urljoin(INTEGRATION_URL.rstrip("/") + "/", path)
+        url = (url.replace("{hemis_id}", hid).replace("{academic_year}", INTEGRATION_ACADEMIC_YEAR or "8")
+               .replace("{monday}", (mon or monday).isoformat()))
+        headers, real = _headers_and_url(url)
+        try:
+            async with session.get(real, headers=headers) as r:
+                body = await r.read()
+                try:
+                    data = json.loads(_decode(body))
+                except ValueError:
+                    data = _decode(body[:2000])
+                return r.status, data, _safe_url(url)
+        except Exception as e:  # noqa: BLE001
+            return None, str(e), _safe_url(url)
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        sub_path = endpoint("subjects") or KNOWN_PATHS["subjects"]
+        sem = asyncio.Semaphore(INTEGRATION_CONCURRENCY)
+
+        async def one(r):
+            async with sem:
+                st, data, url = await get(session, sub_path, r["hemis_id"])
+            out["subjects"][r["hemis_id"]] = {"name": r["full_name"], "status": st, "data": data}
+        await asyncio.gather(*(one(r) for r in rows))
+        ok = sum(1 for v in out["subjects"].values() if v["status"] == 200)
+        lines.append(f"Fanlar (student-subjects): {ok} / {len(rows)} talaba — {out['group']}")
+        if ok == 0:
+            first = next(iter(out["subjects"].values()))
+            lines.append(f"   ❌ {first['status']}: {str(first['data'])[:200]}")
+        tt_path = endpoint("schedule") or KNOWN_PATHS["schedule"]
+        for w in range(0, 6):  # semestrdagi haftalar: o'tilgan darslarni sanash uchun
+            mon = monday - timedelta(days=7 * w)
+            st, data, url = await get(session, tt_path, hid0, mon)
+            out["timetable"][mon.isoformat()] = {"status": st, "data": data}
+        lines.append(f"Dars jadvali (6 hafta, 1 talaba): {sum(1 for v in out['timetable'].values() if v['status'] == 200)} / 6")
+        for p in _TRY_PATHS:
+            st, data, url = await get(session, p, hid0)
+            out["tries"][p.split("?")[0]] = {"status": st, "url": url, "data": data if st == 200 else str(data)[:300]}
+        found = [k for k, v in out["tries"].items() if v["status"] == 200]
+        lines.append("Boshqa manzillar: " + (", ".join(f"✅ {k}" for k in found) if found else "javob bergani yo'q"))
+        for p in _DOC_PATHS:
+            st, data, url = await get(session, p, hid0)
+            if st == 200 and isinstance(data, dict) and ("paths" in data or "openapi" in data or "swagger" in data):
+                out["docs"] = {"url": url, "data": data}
+                lines.append(f"✅ API hujjati (Swagger) topildi: {url} — {len(data.get('paths', {}))} ta manzil")
+                break
+        else:
+            lines.append("API hujjati (Swagger JSON) topilmadi")
+    return out, "\n".join(lines)
+
+
 async def setup_check() -> str:
     """python integration.py sozlash — .env, har bir manzil qanday chiqishi va bitta sinov so'rovi (bazaga yozilmaydi)."""
     lines = ["1) .env tekshiruvi", env_report(), "", "2) Manzillar va sinov so'rovi (bitta talaba bilan)"]
@@ -1866,6 +1952,21 @@ if __name__ == "__main__":
                     print(f"✅ Kalit saqlandi ({key_owner() or info['auth']}): {TITLES[info['kind']]} — "
                           f"{info['url']}/{info['path']}\nFayl: {CONF_FILE.resolve()}\n")
                     print(await setup_check())
+            await db.close()
+            await central.close()
+            return
+        if args[:1] == ["yigish"]:
+            grp = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--guruh=")), None)
+            print(f"Manage'dan namuna yig'ilmoqda ({_safe_url(INTEGRATION_URL)})…")
+            data, text = await collect_sample(grp)
+            print(text)
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            out = (DATA_DIR / "manage_namuna.json").resolve()
+            raw = json.dumps(data, ensure_ascii=False, indent=1, default=str)
+            if INTEGRATION_TOKEN and INTEGRATION_TOKEN in raw:  # ehtiyot: kalit faylga tushmasin
+                raw = raw.replace(INTEGRATION_TOKEN, "***")
+            out.write_text(raw, "utf-8")
+            print(f"\n✅ Tayyor. Shu faylni yuboring (ichida kalit/parol yo'q): {out}")
             await db.close()
             await central.close()
             return
