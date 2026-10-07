@@ -328,9 +328,11 @@ def _decode(body: bytes) -> str:
     return body.decode("utf-8", "replace")
 
 
-def explode(rec: dict, depth: int = 0) -> list[dict]:
+def explode(rec: dict, depth: int = 0, pk: str = "") -> list[dict]:
     """Ichma-ich yozuvlar: {"date": …, "lessons": [{…}, {…}]} → har bir dars alohida yozuv (kun maydonlari bilan).
-    Faqat «yozuvga o'xshash» ro'yxatlar ochiladi (elementida 3+ maydon); [{"name": "3-1a-24"}] kabilar — birlashtiriladi."""
+    Faqat «yozuvga o'xshash» ro'yxatlar ochiladi (elementida 3+ maydon); [{"name": "3-1a-24"}] kabilar — birlashtiriladi.
+    Ochilgan yozuvda _pk — ota yozuv raqami, _ck — ichki yozuvdan kelgan maydonlar: ota yozuvdagi jami son har bir
+    ichki yozuvda takrorlanadi, uni yig'ishda bir marta olish uchun (fan: lessonCount 30 = ma'ruza 15 + seminar 15)."""
     if depth > 3:
         return [rec]
     best, size = None, 0
@@ -343,8 +345,8 @@ def explode(rec: dict, depth: int = 0) -> list[dict]:
         return [rec]
     parent = {k: v for k, v in rec.items() if k != best}
     out = []
-    for child in rec[best]:
-        out += explode({**parent, **child}, depth + 1)
+    for i, child in enumerate(rec[best]):
+        out += explode({**parent, **child, "_pk": pk, "_ck": ",".join(str(k) for k in child)}, depth + 1, f"{pk}.{i}")
     return out
 
 
@@ -366,7 +368,7 @@ def parse_payload(body: bytes, ctype: str = "") -> tuple[list[dict], object, str
         recs, path = find_records(payload)
         if not recs and isinstance(payload, dict) and payload and not any(isinstance(v, list) for v in payload.values()):
             recs = [payload]  # bitta yozuv
-        out = [x for r in recs for x in explode(r)]
+        out = [x for i, r in enumerate(recs) for x in explode(r, 0, str(i))]
         # ichidagi ro'yxati bo'sh yozuvlar (masalan, darssiz kun: "lessons": []) — tashlab yuboriladi
         nested = {k for r in recs for k, v in r.items() if isinstance(v, list) and v and all(isinstance(i, dict) for i in v)
                   and sum(len(i) for i in v) / len(v) >= 3}
@@ -605,8 +607,8 @@ def build_table(records: list[dict], kind: str) -> tuple[list[tuple], dict]:
     records = [flatten(r) if any(isinstance(v, (dict, list)) for v in r.values()) else r for r in records]
     keys = list(dict.fromkeys(k for r in records for k in r))
     m = mapping_for(keys, kind, records)
-    info = {"mapping": m, "unmapped": [k for k in keys if k not in m.values()], "records": len(records),
-            "mode": kind}
+    info = {"mapping": m, "unmapped": [k for k in keys if k not in m.values() and k not in ("_pk", "_ck")],
+            "records": len(records), "mode": kind}
     if kind == "attendance":
         daily = "date" in m
         if not daily and "absent" in m:
@@ -714,6 +716,9 @@ def _in_hours(key: str) -> bool:
     return any(w in humanize(key).split() for w in _HOUR_WORDS)
 
 
+_SUM_FIELDS = ("planned", "held", "attended", "absent", "excused", "unexcused", "percent")
+
+
 def subject_rows(records: list[dict]) -> tuple[list[dict], dict]:
     """Yozuvlar → talaba × fan: {hemis_id, full_name, group_name, subject, code, credits, attended, absent, excused}
     (sonlar — para, HEMIS fan statistikasi kabi). Ikki ko'rinish tanilad:
@@ -725,7 +730,7 @@ def subject_rows(records: list[dict]) -> tuple[list[dict], dict]:
     m = mapping_for(keys, "subjects", records)
     totals = bool({"attended", "absent", "unexcused"} & set(m))
     lessons = not totals and bool({"status", "date"} & set(m))
-    info = {"mapping": m, "unmapped": [k for k in keys if k not in m.values() and not k.startswith("_ctx")],
+    info = {"mapping": m, "unmapped": [k for k in keys if k not in m.values() and not k.startswith("_")],
             "records": len(records), "mode": "totals" if totals else "lessons" if lessons else "credits", "notes": []}
     get = lambda r, f: r.get(m[f]) if f in m else None  # noqa: E731
 
@@ -756,35 +761,27 @@ def subject_rows(records: list[dict]) -> tuple[list[dict], dict]:
         if code and not o["code"]:
             o["code"] = code
         o["semester"] = o["semester"] or cell_str(get(r, "semester")).strip() or None
-        # ichma-ich turlari (ma'ruza 15 + seminar 15) alohida yozuv bo'lib keladi — yig'iladi
-        for f, dst in (("planned", "planned"), ("held", "held_n")):
-            v = num(r, f)
-            if v is not None and v >= 0:
-                o[dst] = (o[dst] or 0) + v
         c = parse_float(get(r, "credits"))
         if c and 0 < c <= 30:
             o["credits"], o["credits_src"] = c, "manage"
         elif not o["credits"] and credits_from_code(code):
             o["credits"], o["credits_src"] = float(credits_from_code(code)), "code"
-        if totals:
-            att, ab, ex, un = num(r, "attended"), num(r, "absent"), num(r, "excused"), num(r, "unexcused")
-            if ab is None and un is not None:
-                ab = un + (ex or 0)
-            if ex is None and un is not None and ab is not None:
-                ex = max(ab - un, 0)
-            if att is None and ab is not None:
-                held, pct = num(r, "held"), num(r, "percent")
-                if held is not None and held >= ab:
-                    att = held - ab
-                elif pct is not None and 0 <= pct < 100 and ab > 0:
-                    att = round(ab * pct / (100 - pct), 1)
-            if ab is None:
-                continue
-            if att is None:
-                no_attended += 1
-                continue
-            o.update(attended=att, absent=ab, excused=min(ex or 0, ab))
-        elif lessons:
+        if not lessons:
+            # sonlar yig'iladi: ichki yozuvlar (ma'ruza, seminar) — qo'shiladi; ota yozuvdagi jami (har bir ichki yozuvda
+            # takrorlanadi) — bir marta; alohida yozuvlar — qo'shiladi
+            acc = o.setdefault("_acc", {})
+            for f in _SUM_FIELDS:
+                v = num(r, f)
+                if v is None or v < 0:
+                    continue
+                a = acc.setdefault(f, {"sum": 0.0, "n": 0, "seen": set()})
+                if "_pk" in r and m[f].split(".")[0] not in str(r.get("_ck") or "").split(","):
+                    if r["_pk"] in a["seen"]:
+                        continue
+                    a["seen"].add(r["_pk"])
+                a["sum"] += v
+                a["n"] += 1
+        else:
             d = to_date(get(r, "date"))
             if d and d < sem0:
                 continue
@@ -800,6 +797,29 @@ def subject_rows(records: list[dict]) -> tuple[list[dict], dict]:
             else:
                 o["absent"] += 1
                 o["excused"] += st == "sababli"
+    for o in agg.values():
+        acc = o.pop("_acc", {})
+        val = lambda f: (acc[f]["sum"] / acc[f]["n"] if f == "percent" else acc[f]["sum"]) if f in acc and acc[f]["n"] else None  # noqa: E731,B023
+        o["planned"], o["held_n"] = val("planned"), val("held")
+        if not totals:
+            continue
+        att, ab, ex, un = val("attended"), val("absent"), val("excused"), val("unexcused")
+        if ab is None and un is not None:
+            ab = un + (ex or 0)
+        if ex is None and un is not None and ab is not None:
+            ex = max(ab - un, 0)
+        if att is None and ab is not None:
+            held, pct = val("held"), val("percent")
+            if held is not None and held >= ab:
+                att = held - ab  # o'tilgan (yo'qlama qilingan) darslar − qoldirilganlar
+            elif pct is not None and 0 <= pct < 100 and ab > 0:
+                att = round(ab * pct / (100 - pct), 1)
+        if ab is None:
+            continue
+        if att is None:
+            no_attended += 1
+            continue
+        o.update(attended=att, absent=ab, excused=min(ex or 0, ab))
     _current_semester(list(agg.values()), info)
     if no_attended:
         info["notes"].append(f"{no_attended} ta fanda faqat qoldirishlar soni bor (qatnashgan / o'tilgan darslar soni yoki "

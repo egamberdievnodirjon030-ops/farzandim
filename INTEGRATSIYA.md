@@ -40,6 +40,39 @@ Namuna javob (har qanday shunga o'xshash tuzilma ham bo'ladi):
 Bot davomatni har daqiqada, jadvalni har 15 daqiqada so'raydi (ikkalasi ham sozlanadi). Bir so'rov oxirgi
 7 kunni, jadval esa joriy va keyingi haftani oladi.
 
+## Eng oson yo'l: `student-subjects` javobiga yo'qlama natijasini qo'shish
+
+Hozir bot `GET /api/integration/v1/student-subjects?hemisId=…&academicYearId=8` ni ishlatadi. Javobda har bir fan va
+uning turlari (`subjectTypes`: ma'ruza, seminar) bo'yicha `lessonCount` (ajratilgan darslar) va `doneLessonCount`
+(o'tilgan, yo'qlama qilingan darslar) bor — lekin **shu talaba o'sha darslarda qatnashgan-qatnashmagani yo'q**.
+
+Har bir `subjectTypes` elementiga (yoki fan darajasiga) shu talaba bo'yicha yo'qlama natijasini qo'shish kifoya:
+
+| Maydon | Ma'nosi |
+|---|---|
+| `attendedCount` | o'tilgan darslardan talaba qatnashgani (keldi + kechikdi) |
+| `absentCount` | qatnashmagani (jami) |
+| `excusedCount` | shundan sababli |
+
+Namuna (qo'shilgan maydonlar — oxirgi uchta):
+
+```json
+{"subjectName": "Konfliktologiya", "lessonCount": "30", "doneLessonCount": "6",
+ "subjectTypes": [
+   {"lessonType": "LECTURE", "lessonCount": 15, "doneLessonCount": 3,
+    "attendedCount": 2, "absentCount": 1, "excusedCount": 0},
+   {"lessonType": "SEMINAR", "lessonCount": 15, "doneLessonCount": 3,
+    "attendedCount": 1, "absentCount": 2, "excusedCount": 1}]}
+```
+
+Bot ma'ruza va seminarni o'zi qo'shadi (yuqoridagi namunada: qatnashgan 3, qoldirgan 3, shundan sababli 1).
+Faqat `absentCount` (va `excusedCount`) berilsa ham bo'ladi — qatnashgan = `doneLessonCount` − `absentCount`.
+Bot tomonida hech narsa o'zgartirish shart emas: maydonlar paydo bo'lishi bilan davomat avtomatik olinadi.
+
+Muqobil: dars jadvali kabi haftalik so'rov, har bir darsda yo'qlama holati bilan
+(`student-attendance/weekly?hemisId=…&monday=…` → har bir yozuvda sana, juftlik, fan, holat: keldi / kelmadi /
+sababli). Bunda ota-onaga xabar har bir dars bo'yicha (qaysi kuni, qaysi juftlik) boradi.
+
 ## Ixtiyoriy: real vaqt (webhook)
 
 Davomat belgilanishi bilan Manage o'zi yuborishi mumkin. Shunda ota-onaga xabar bir necha soniyada boradi.
