@@ -47,7 +47,7 @@ import termsheet
 import status
 from reports import UPDATE_KEYS, last_update, schedule_report
 from subject_limits import limit_pairs
-from utils import (CONTRACT, credits_from_code, GRANT, normalize_phone, fmt_pairs, fmt_dt, now_iso, detect_doc_type, fmt_money, doc_keywords, doc_title, esc, fmt_date, fmt_num, fmt_phone, fmt_size,
+from utils import (CONTRACT, credits_from_code, subject_key, GRANT, normalize_phone, fmt_pairs, fmt_dt, now_iso, detect_doc_type, fmt_money, doc_keywords, doc_title, esc, fmt_date, fmt_num, fmt_phone, fmt_size,
                    group_key, name_score, normalize_text, parse_course, parse_date, parse_user_dates, split_message,
                    today, fmt_gpa, fmt_limit,
                    week_bounds)
@@ -800,6 +800,74 @@ def _code_credit_lines(rows: list[dict]) -> list[str]:
         return []
     return [f"Fan kreditlari fan kodidan aniqlandi ({len(found)} ta fan): " + ", ".join(
         f"{esc(s)} — {c} kr. (chegara {limit_pairs(c)} para)" for s, c in sorted(found.items()))]
+
+
+async def apply_subject_stats(bot, rows: list[dict], silent: bool = False, as_of: str | None = None,
+                              source: str = "") -> list[str]:
+    """Talaba × fan qatorlari (student_id, subject, credits, code, attended, absent, excused — para) — Manage'dan
+    (student-subjects): kreditlar yoziladi, davomat fanlar kesimiga va umumiy davomatga qo'shiladi, sababsiz qoldirish
+    ko'paygan bo'lsa ota-onaga xabar, so'ng 25% chegarasi va umumiy chegaralar tekshiriladi. Natija — hisobot qatorlari."""
+    as_of = as_of or today().isoformat()
+    k = HEMIS_STATS_HOURS_PER_UNIT
+    lines = [f"✅ <b>Fanlar</b> ({esc(source or 'integratsiya')}) — {fmt_date(as_of, False)} holatiga"]
+    creds: dict[str, dict[str, tuple]] = {"manage": {}, "code": {}}
+    for r in rows:
+        if r.get("credits"):
+            creds["manage" if r.get("credits_src") == "manage" else "code"].setdefault(
+                subject_key(r["subject"]) or normalize_text(r["subject"]), (r["subject"], r["credits"], r.get("code")))
+    for src, found in creds.items():
+        await db.upsert_subject_credits(found, source=src)
+    creds = {**creds["code"], **creds["manage"]}
+    if creds:
+        lines.append(f"Fan kreditlari: {len(creds)} ta fan — " + ", ".join(
+            f"{esc(s)} {fmt_num(c)} kr. ({limit_pairs(c)} para)" for s, c, _ in sorted(creds.values())[:20])
+            + (" …" if len(creds) > 20 else ""))
+    stats = [r for r in rows if r.get("absent") is not None]
+    if not stats:
+        return lines
+    by_subj: dict[str, list[dict]] = {}
+    for r in stats:
+        by_subj.setdefault(subject_key(r["subject"]) or normalize_text(r["subject"]), []).append(r)
+    sids = {r["student_id"] for r in stats}
+    before = {sid: await absence.summary(sid) for sid in sids}
+    unexc = lambda r: max((r["absent"] or 0) - (r["excused"] or 0), 0)  # noqa: E731
+    from notifier import notify_subject_stats
+    sent = grew_n = 0
+    for key, rs in by_subj.items():
+        subject = rs[0]["subject"]
+        # oldingi holat — shu fan bo'yicha oxirgi yozuv (shu kungisi ham): kun davomida qayta olinganda xabar takrorlanmaydi
+        prev = {x["student_id"]: x for x in await db.fetchall(
+            """SELECT student_id, attended, absent, excused FROM subject_att_stats x WHERE subject_key = ?
+               AND as_of = (SELECT MAX(as_of) FROM subject_att_stats y WHERE y.student_id = x.student_id
+                            AND y.subject_key = x.subject_key)""", (key,))}
+        await db.upsert_subject_stats(rs, subject, as_of)
+        grew = [(r["student_id"], prev.get(r["student_id"]), r) for r in rs
+                if unexc(r) > (unexc(prev[r["student_id"]]) if r["student_id"] in prev else 0)]
+        grew_n += len(grew)
+        if grew and not silent:
+            sent += await notify_subject_stats(bot, subject, grew, k)
+    after = {sid: await absence.summary(sid) for sid in sids}
+    lines.append(f"Fan bo'yicha davomat: {len(by_subj)} ta fan, {len(sids)} ta talaba — fanlar kesimiga yozildi va umumiy "
+                 f"davomatga qo'shildi; sababsiz qoldirishi ko'payganlar: {grew_n}")
+    if silent:
+        lines.append("🔕 Birinchi olish — ota-onalarga xabar yuborilmadi (eski qoldirishlar «yangi» bo'lib ketmasligi uchun).")
+    else:
+        if sent:
+            lines.append(f"Ota-onalarga xabar (fan bo'yicha yangi sababsiz qoldirish): {sent}")
+        sl_sent, overs = await check_subject_limits(bot, sids)
+        lines += _subject_limit_lines(overs, sl_sent)
+        warned, crossings = await check_thresholds(bot, sids)
+        if warned:
+            lines.append(f"Chegara bo'yicha ogohlantirishlar: {warned}")
+        lines += _crossings_lines(crossings)
+    dec_sent, drops = await notify_absence_decrease(bot, before, after, notify=not silent)
+    lines += _drops_lines(drops, dec_sent, silent)
+    import snapshots
+    try:
+        await snapshots.capture()
+    except Exception:
+        log.exception("Dinamika nuqtalari yozilmadi")
+    return lines
 
 
 def _subject_limit_lines(overs: list[dict], sent: int) -> list[str]:

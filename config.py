@@ -164,6 +164,13 @@ INTEGRATION_TOKEN = os.getenv("INTEGRATION_TOKEN", "").strip()
 INTEGRATION_AUTH = os.getenv("INTEGRATION_AUTH", "bearer").strip() or "bearer"
 INTEGRATION_ATTENDANCE = os.getenv("INTEGRATION_ATTENDANCE", "").strip()
 INTEGRATION_SCHEDULE = os.getenv("INTEGRATION_SCHEDULE", "").strip()
+# Talabaning fanlari (fan bo'yicha davomat va kredit), masalan Manage:
+# student-subjects?hemisId={hemis_id}&academicYearId={academic_year}
+INTEGRATION_SUBJECTS = os.getenv("INTEGRATION_SUBJECTS", "").strip()
+INTEGRATION_ACADEMIC_YEAR = os.getenv("INTEGRATION_ACADEMIC_YEAR", "").strip()   # {academic_year} o'rniga (Manage: 8)
+INTEGRATION_SUBJECTS_INTERVAL = max(60, int(os.getenv("INTEGRATION_SUBJECTS_INTERVAL", "900") or 900))
+# Fanlardagi qoldirishlar birligi: auto (maydon nomida hour/soat bo'lsa — soat), pair (para) yoki hour (soat)
+INTEGRATION_SUBJECTS_UNIT = os.getenv("INTEGRATION_SUBJECTS_UNIT", "auto").strip().lower() or "auto"
 INTEGRATION_INTERVAL = max(15, int(os.getenv("INTEGRATION_INTERVAL", "60") or 60))            # davomat, soniya
 INTEGRATION_SCHEDULE_INTERVAL = max(60, int(os.getenv("INTEGRATION_SCHEDULE_INTERVAL", "900") or 900))
 INTEGRATION_DAYS = max(1, int(os.getenv("INTEGRATION_DAYS", "7") or 7))  # davomat: oxirgi necha kun olinadi

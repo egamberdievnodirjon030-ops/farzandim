@@ -36,8 +36,8 @@ async def credits_info() -> dict[str, dict]:
         k = subject_key(r["subject"]) or normalize_text(r["subject"])
         if k:
             out[k] = {"credits": r["c"], "src": "debts"}
-    for r in await db.fetchall("SELECT subject_key, credits, code FROM subject_credits WHERE credits > 0"):
-        out[r["subject_key"]] = {"credits": r["credits"], "src": "code", "code": r["code"]}
+    for r in await db.fetchall("SELECT subject_key, credits, code, source FROM subject_credits WHERE credits > 0"):
+        out[r["subject_key"]] = {"credits": r["credits"], "src": r["source"] or "code", "code": r["code"]}
     for r in await db.fetchall("SELECT subject, MAX(credits) AS c FROM grades WHERE credits > 0 GROUP BY subject"):
         k = subject_key(r["subject"]) or normalize_text(r["subject"])
         if k:

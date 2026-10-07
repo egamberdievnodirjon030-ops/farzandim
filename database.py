@@ -303,6 +303,7 @@ CREATE TABLE IF NOT EXISTS subject_credits (
     subject     TEXT NOT NULL,
     credits     REAL NOT NULL,
     code        TEXT,
+    source      TEXT NOT NULL DEFAULT 'code',   -- code (fan kodidan) | manage (Manage «kredit» maydoni)
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -510,6 +511,9 @@ class Database:
         async with self.conn.execute("PRAGMA table_info(grades)") as cur:
             if "credits" not in {r[1] for r in await cur.fetchall()}:
                 await self.conn.execute("ALTER TABLE grades ADD COLUMN credits REAL")
+        async with self.conn.execute("PRAGMA table_info(subject_credits)") as cur:
+            if "source" not in {r[1] for r in await cur.fetchall()}:
+                await self.conn.execute("ALTER TABLE subject_credits ADD COLUMN source TEXT NOT NULL DEFAULT 'code'")
         async with self.conn.execute("SELECT (SELECT COUNT(*) FROM messages), (SELECT COUNT(*) FROM questions)") as cur:
             msgs, qs = await cur.fetchone()
         if not msgs and qs:  # oldingi versiya: savol-javoblar — yozishmaga
@@ -1036,15 +1040,26 @@ class Database:
             k = subject_key(r.get("subject")) or normalize_text(r.get("subject"))
             if c and k:
                 found.setdefault(k, (r["subject"], c, re.split(r"[-_ .]", str(r["code"]).strip())[0]))
-        if found:
-            await self.conn.executemany(
-                """INSERT INTO subject_credits (subject_key, subject, credits, code) VALUES (?, ?, ?, ?)
-                   ON CONFLICT(subject_key) DO UPDATE SET subject = excluded.subject, credits = excluded.credits,
-                   code = excluded.code, updated_at = datetime('now')""",
-                [(k, *v) for k, v in found.items()])
-            if commit:
-                await self.conn.commit()
+        await self.upsert_subject_credits(found, commit=commit)
         return found
+
+    async def upsert_subject_credits(self, found: dict[str, tuple[str, float, str | None]], commit: bool = True,
+                                     source: str = "code") -> int:
+        """Fan kaliti → (fan, kredit, kod): fan kodidan (source=code) yoki Manage «kredit» maydonidan (manage).
+        Manage bergan kredit fan kodidagidan ustun: jadvaldan qayta olinganda ustiga yozilmaydi."""
+        if not found:
+            return 0
+        await self.conn.executemany(
+            """INSERT INTO subject_credits (subject_key, subject, credits, code, source) VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(subject_key) DO UPDATE SET subject = excluded.subject,
+               credits = CASE WHEN subject_credits.source = 'manage' AND excluded.source != 'manage'
+                              THEN subject_credits.credits ELSE excluded.credits END,
+               source = CASE WHEN subject_credits.source = 'manage' THEN 'manage' ELSE excluded.source END,
+               code = COALESCE(excluded.code, subject_credits.code), updated_at = datetime('now')""",
+            [(k, *v, source) for k, v in found.items()])
+        if commit:
+            await self.conn.commit()
+        return len(found)
 
     async def schedule_for(self, gkey: str, weekday: int, week_type: str) -> list[dict]:
         return await self.fetchall(

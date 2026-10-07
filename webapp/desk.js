@@ -613,7 +613,7 @@ function limChip(x) {
     : x.state === 'warn' ? `<span class="chip warn">${x.left} para qoldi</span>` : '';
 }
 const credSrc = x => ({ manual: 'Kredit qo‘lda kiritilgan', grades: 'Kredit baholar faylidan', debts: 'Kredit qarzdorlar ro‘yxatidan',
-  code: `Kredit Manage fan kodidan (${x.code || ''})` })[x.credits_src] || '';
+  code: `Kredit Manage fan kodidan (${x.code || ''})`, manage: 'Kredit Manage’dan (talabaning fanlari)' })[x.credits_src] || '';
 function subjRow(x) {
   return `<div class="subj${x.state === 'over' ? ' over' : ''}"><div class="sn"><b>${esc(x.subject)}</b><span>${x.total} ta dars${x.kelmadi ? ` · <em>${x.kelmadi} sababsiz</em>` : ''}${x.limit != null ? ` / chegara ${x.limit} para (${x.credits} kredit)` : ''}${x.sababli ? ` · ${x.sababli} sababli` : ''}</span>${limChip(x)}</div>
     ${pctCell(x.pct)}</div>`;

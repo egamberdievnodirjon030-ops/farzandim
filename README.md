@@ -719,7 +719,17 @@ Tekshirish: `curl https://ilova.example.uz/healthz` — `ok` qaytishi kerak. Key
 
 **Qanday ishlaydi:** har bir yozuv talabaga (HEMIS ID, bo'lmasa F.I.Sh. + guruh) va o'z kursiga ajratiladi; boshqa kurslar va bazada yo'q talabalar e'tiborsiz qoladi. Ma'lumot o'zgarmagan bo'lsa hech narsa qilinmaydi. Yangi qoldirish — ota-onaga darhol xabar; o'qituvchi davomatni to'g'rilasa (manbada qoldirish o'chirilsa) — botda ham «keldi» bo'ladi (oxirgi `INTEGRATION_DAYS` kun). Birinchi olishda xabar yuborilmaydi (`INTEGRATION_FIRST_SILENT`). Manba javob bermasa — bot ishlashda davom etadi, xato holatda ko'rinadi, 3 marta ketma-ket bo'lsa super-adminga xabar boradi.
 
-**Super-admin:** `/integratsiya` — holat (oxirgi olish, yozuvlar, har bir kurs bo'yicha natija, xatolar) va tugmalar: «🔄 Hozir yangilash», «🔍 Tekshirish» (birinchi sahifa, tanilgan maydonlar, namunaviy qatorlar, bazadagi talabalarga mosligi — bazaga yozilmaydi), «⏸ To'xtatish / ▶️ Yoqish». Biror maydon noto'g'ri tanilsa: `/integratsiya_moslash davomat sana=lesson_date juftlik=lessonPair.code` (`tozalash` — hammasi avtomatik). Terminalda tekshirish: `python integration.py davomat jadval`.
+**Talabaning fanlari — fan bo'yicha davomat va kredit (Manage: `student-subjects`).** Har bir talaba uchun so'raladi:
+
+```
+INTEGRATION_SUBJECTS=student-subjects?hemisId={hemis_id}&academicYearId={academic_year}
+INTEGRATION_ACADEMIC_YEAR=8
+INTEGRATION_SUBJECTS_INTERVAL=900
+```
+
+Javobdagi har bir fan: nomi, kodi, krediti va shu fan bo'yicha davomat (qatnashgan / qoldirgan / sababli — jami son, foiz yoki darslar ro'yxati; maydon nomida `hours`/`soat` bo'lsa soat deb olinib paraga o'giriladi, aniq ko'rsatish: `INTEGRATION_SUBJECTS_UNIT=pair|hour`). Natija — fan bo'yicha HEMIS statistikasi fayli bilan bir xil: fanlar kesimi, umumiy davomat (fanlar yig'indisi), 25% chegarasi, ota-onaga «Fan bo'yicha davomat» va chegara xabarlari (bir kunda qayta olinganda takrorlanmaydi). **Kreditlar barcha fanlar (tillar ham) bo'yicha shu yerdan olinadi** (Manage «kredit» maydoni fan kodidagidan ustun). O'quv yili bo'yicha javobda ikki semestr fanlari bo'lsa — davomat faqat joriy semestrdan olinadi. Tekshirish va javobni ko'rish: `python integration.py fanlar --dump` (javob `data/integration_sample_subjects.json` ga saqlanadi); maydon noto'g'ri tanilsa: `/integratsiya_moslash fanlar qatnashgan=attendance.present`.
+
+**Super-admin:** `/integratsiya` — holat (oxirgi olish, yozuvlar, har bir kurs bo'yicha natija, xatolar) va tugmalar: «🔄 Hozir yangilash», «🔍 Tekshirish» (birinchi sahifa, tanilgan maydonlar, namunaviy qatorlar, bazadagi talabalarga mosligi — bazaga yozilmaydi), «⏸ To'xtatish / ▶️ Yoqish». Biror maydon noto'g'ri tanilsa: `/integratsiya_moslash davomat sana=lesson_date juftlik=lessonPair.code` (`tozalash` — hammasi avtomatik). Terminalda tekshirish: `python integration.py davomat jadval fanlar`.
 
 Kalit berilganda: `.env` ni to'ldiring → botni qayta ishga tushiring → `/integratsiya` → «🔍 Tekshirish». Manage dasturchilari uchun qisqa talablar: `INTEGRATSIYA.md`. Integratsiya yoqilgandan keyin ham davomat va jadvalni Excel bilan yuklash mumkin (zaxira yo'l) — keyingi avtomatik yangilanishda manbadagi ma'lumot ustun.
 

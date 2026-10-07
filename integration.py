@@ -38,19 +38,24 @@ from config import (DATA_DIR, INTEGRATION_ATTENDANCE, INTEGRATION_AUTH, INTEGRAT
                     INTEGRATION_HEADERS, INTEGRATION_INTERVAL, INTEGRATION_MAX_PAGES, INTEGRATION_NAME,
                     INTEGRATION_PAGE_PARAM, INTEGRATION_SCHEDULE, INTEGRATION_SCHEDULE_INTERVAL, INTEGRATION_TIMEOUT,
                     INTEGRATION_TOKEN, INTEGRATION_URL, INTEGRATION_WEBHOOK_SECRET, PAIR_TIMES, TZ,
-                    INTEGRATION_CONCURRENCY, INTEGRATION_SCHEDULE_PER_GROUP)
+                    INTEGRATION_CONCURRENCY, INTEGRATION_SCHEDULE_PER_GROUP, INTEGRATION_SUBJECTS,
+                    INTEGRATION_ACADEMIC_YEAR, INTEGRATION_SUBJECTS_INTERVAL, INTEGRATION_SUBJECTS_UNIT,
+                    HEMIS_STATS_HOURS_PER_UNIT)
 from database import db
 from importer import ALIASES, parse_rows, resolve_students
 from tenancy import central, use_course
-from utils import WEEKDAYS, cell_str, esc, fmt_dt, group_key, normalize_status, normalize_text, now_iso, parse_date, \
-    parse_float, parse_int, parse_time, parse_weekday, today, week_type_of
+from utils import WEEKDAYS, cell_str, credits_from_code, esc, fmt_dt, group_key, normalize_status, normalize_text, \
+    now_iso, parse_date, parse_float, parse_int, parse_time, parse_weekday, semester_start, subject_key, today, week_type_of
 
 log = logging.getLogger("integration")
 
-KINDS = ("attendance", "schedule")
-TITLES = {"attendance": "Davomat", "schedule": "Dars jadvali"}
+KINDS = ("attendance", "schedule", "subjects")
+TITLES = {"attendance": "Davomat", "schedule": "Dars jadvali", "subjects": "Fanlar (davomat va kredit)"}
 KIND_WORDS = {"attendance": "attendance", "davomat": "attendance", "schedule": "schedule", "jadval": "schedule",
-              "dars_jadvali": "schedule", "timetable": "schedule"}
+              "dars_jadvali": "schedule", "timetable": "schedule", "subjects": "subjects", "fanlar": "subjects",
+              "fan": "subjects", "student-subjects": "subjects"}
+ENV_NAMES = {"attendance": "INTEGRATION_ATTENDANCE", "schedule": "INTEGRATION_SCHEDULE", "subjects": "INTEGRATION_SUBJECTS"}
+CLI_WORDS = {"attendance": "davomat", "schedule": "jadval", "subjects": "fanlar"}
 MAP_FILE = DATA_DIR / "integration_map.json"
 SOURCE = "integ"  # attendance.source — integratsiyadan kelgan yozuv
 
@@ -102,6 +107,31 @@ HINTS: dict[str, dict[str, list[str]]] = {
         # fan kodi: «CTIR25C4-21» — undan fan krediti (C4 → 4 kredit) va sababsiz qoldirish chegarasi aniqlanadi
         "code": ["subject code", "course code", "discipline code", "code", "fan kodi", "kod"],
     },
+    # Talabaning fanlari (Manage: student-subjects): har bir fan — kredit va shu fan bo'yicha davomat
+    "subjects": {
+        **_REF,
+        "subject": ["subject name", "subject title", "curriculum subject name", "subject", "discipline name",
+                    "discipline", "course name", "title", "fan", "fan nomi", "predmet", "name"],
+        "code": ["subject code", "course code", "discipline code", "code", "fan kodi", "kod"],
+        "credits": ["credit", "credits", "credit count", "credits count", "subject credit", "subject credits",
+                    "total credit", "total credits", "credit amount", "kredit", "kreditlar", "ects"],
+        "attended": ["attended", "attended count", "attended lessons", "attended hours", "present", "present count",
+                     "presence count", "visited", "visited count", "qatnashgan", "qatnashganlar soni"],
+        "absent": ["absent count", "absent total", "total absent", "absent", "absent lessons", "absent hours",
+                   "absences", "absence count", "missed", "missed count", "missed hours", "missed lessons", "nb",
+                   "qatnashmagan", "qatnashmaganlar soni", "qoldirgan"],
+        "excused": ["excused", "excused count", "excused hours", "explicable", "explicable count", "absent on",
+                    "absent on count", "reasonable", "sababli", "sabablilar soni"],
+        "unexcused": ["unexcused", "unexcused count", "unexcused hours", "inexplicable", "absent off",
+                      "absent off count", "not explicable", "sababsiz", "sababsizlar soni"],
+        "held": ["held lessons", "held", "conducted", "conducted lessons", "passed lessons", "lessons held",
+                 "total lessons", "lessons count", "lesson count", "otilgan darslar", "otilgan"],
+        "percent": ["attendance percent", "attendance percentage", "attendance rate", "percent", "percentage",
+                    "davomat foizi", "foiz"],
+        "date": ["lesson date", "date", "attendance date", "sana"],
+        "status": ["attendance status", "status", "holat"],
+        "semester": ["semester name", "semester", "semester code", "term", "semestr"],
+    },
 }
 # jadvalga yoziladigan sarlavha (importer shu nomni aniq taniydi)
 CANON = {
@@ -109,7 +139,8 @@ CANON = {
     "subject": "Fan", "lesson_type": "Mashg'ulot turi", "teacher": "O'qituvchi", "status": "Holat", "hours": "Soat",
     "weekday": "Hafta kuni", "start_time": "Boshlanish", "end_time": "Tugash", "time_range": "Vaqt", "room": "Xona",
     "week_type": "Hafta turi", "subgroup": "Seminar raqami", "attended": "Qatnashganlar soni",
-    "absent": "Qatnashmaganlar soni", "excused": "Sabablilar soni", "code": "Fan kodi",
+    "absent": "Qatnashmaganlar soni", "excused": "Sabablilar soni", "code": "Fan kodi", "credits": "Kredit",
+    "unexcused": "Sababsiz", "held": "O'tilgan darslar", "percent": "Davomat foizi", "semester": "Semestr",
 }
 FIELD_NAMES = {
     "hemis_id": "talaba ID (HEMIS)", "full_name": "F.I.Sh.", "group_name": "guruh", "date": "sana", "pair": "juftlik",
@@ -117,7 +148,8 @@ FIELD_NAMES = {
     "hours": "soat", "weekday": "hafta kuni", "start_time": "boshlanish vaqti", "end_time": "tugash vaqti",
     "time_range": "vaqt", "room": "xona", "week_type": "hafta turi", "subgroup": "kichik guruh",
     "attended": "qatnashgan", "absent": "qatnashmagan (jami)", "excused": "sababli (jami)",
-    "code": "fan kodi (kredit)",
+    "code": "fan kodi (kredit)", "credits": "kredit", "unexcused": "sababsiz (jami)", "held": "o'tilgan darslar",
+    "percent": "davomat foizi", "semester": "semestr",
 }
 # holat maydoni bo'lmasa — shu so'zli maydonlardan aniqlanadi (HEMIS: explicable, absent_on, absent_off …)
 _W_EXCUSED = ("explicable", "excused", "sababli", "uzrli", "reason", "uvazh", "justified")
@@ -135,7 +167,7 @@ _LOCKS = {k: asyncio.Lock() for k in KINDS}
 
 
 def endpoint(kind: str) -> str:
-    return {"attendance": INTEGRATION_ATTENDANCE, "schedule": INTEGRATION_SCHEDULE}[kind]
+    return {"attendance": INTEGRATION_ATTENDANCE, "schedule": INTEGRATION_SCHEDULE, "subjects": INTEGRATION_SUBJECTS}[kind]
 
 
 def configured(kind: str | None = None) -> bool:
@@ -663,6 +695,163 @@ def _weekly(rows: list[dict], explicit_week: bool) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- talabaning fanlari (fan bo'yicha davomat va kredit)
+_HOUR_WORDS = ("hour", "hours", "soat", "soatlar", "chas", "chasov")
+
+
+def _in_hours(key: str) -> bool:
+    """Qoldirishlar soatdami (para emas): .env dagi INTEGRATION_SUBJECTS_UNIT yoki maydon nomi («absent_hours»)."""
+    if INTEGRATION_SUBJECTS_UNIT in ("hour", "hours", "soat"):
+        return True
+    if INTEGRATION_SUBJECTS_UNIT in ("pair", "pairs", "para"):
+        return False
+    return any(w in humanize(key).split() for w in _HOUR_WORDS)
+
+
+def subject_rows(records: list[dict]) -> tuple[list[dict], dict]:
+    """Yozuvlar → talaba × fan: {hemis_id, full_name, group_name, subject, code, credits, attended, absent, excused}
+    (sonlar — para, HEMIS fan statistikasi kabi). Ikki ko'rinish tanilad:
+    • jami ko'rsatkichlar (har bir fan — qatnashgan / qoldirgan / sababli soni yoki foizi);
+    • darslar ro'yxati (har bir dars — sana va holat): holatlar sanaladi.
+    Davomat sonlari bo'lmasa ham fan krediti (kredit maydoni yoki fan kodi «CTIR25C4» → 4) olinadi."""
+    records = [flatten(r) if any(isinstance(v, (dict, list)) for v in r.values()) else r for r in records]
+    keys = list(dict.fromkeys(k for r in records for k in r))
+    m = mapping_for(keys, "subjects", records)
+    totals = bool({"attended", "absent", "unexcused"} & set(m))
+    lessons = not totals and bool({"status", "date"} & set(m))
+    info = {"mapping": m, "unmapped": [k for k in keys if k not in m.values() and not k.startswith("_ctx")],
+            "records": len(records), "mode": "totals" if totals else "lessons" if lessons else "credits", "notes": []}
+    get = lambda r, f: r.get(m[f]) if f in m else None  # noqa: E731
+
+    def num(r, f):
+        v = parse_float(get(r, f))
+        if v is None:
+            return None
+        return v / HEMIS_STATS_HOURS_PER_UNIT if f != "percent" and _in_hours(m[f]) else v
+
+    sem0 = semester_start()
+    agg: dict[tuple, dict] = {}
+    no_attended = 0
+    for r in records:
+        subj = " ".join(cell_str(get(r, "subject")).split())
+        if not subj or _NOT_SUBJECT.match(normalize_text(subj)):
+            continue
+        hid = cell_str(get(r, "hemis_id") or r.get("_ctx.hemis_id")).strip()
+        name = " ".join(cell_str(get(r, "full_name") or r.get("_ctx.full_name")).split())
+        grp = " ".join(cell_str(get(r, "group_name") or r.get("_ctx.group")).replace('"', " ").split())
+        key = (hid or normalize_text(name), subject_key(subj) or normalize_text(subj))
+        o = agg.get(key)
+        if o is None:
+            o = agg[key] = {"hemis_id": hid or None, "full_name": name or None, "group_name": grp or None,
+                            "subject": subj, "code": None, "credits": None, "credits_src": None,
+                            "attended": None, "absent": None, "excused": None, "semester": None, "_row": len(agg) + 1}
+        code = cell_str(get(r, "code")).strip()
+        if code and not o["code"]:
+            o["code"] = code
+        o["semester"] = o["semester"] or cell_str(get(r, "semester")).strip() or None
+        c = parse_float(get(r, "credits"))
+        if c and 0 < c <= 30:
+            o["credits"], o["credits_src"] = c, "manage"
+        elif not o["credits"] and credits_from_code(code):
+            o["credits"], o["credits_src"] = float(credits_from_code(code)), "code"
+        if totals:
+            att, ab, ex, un = num(r, "attended"), num(r, "absent"), num(r, "excused"), num(r, "unexcused")
+            if ab is None and un is not None:
+                ab = un + (ex or 0)
+            if ex is None and un is not None and ab is not None:
+                ex = max(ab - un, 0)
+            if att is None and ab is not None:
+                held, pct = num(r, "held"), num(r, "percent")
+                if held is not None and held >= ab:
+                    att = held - ab
+                elif pct is not None and 0 <= pct < 100 and ab > 0:
+                    att = round(ab * pct / (100 - pct), 1)
+            if ab is None:
+                continue
+            if att is None:
+                no_attended += 1
+                continue
+            o.update(attended=att, absent=ab, excused=min(ex or 0, ab))
+        elif lessons:
+            d = to_date(get(r, "date"))
+            if d and d < sem0:
+                continue
+            st = to_status(get(r, "status"), m.get("status", "")) if "status" in m else None
+            if not st:
+                st, _ = derive_status(r)
+            if not st:
+                continue
+            for f in ("attended", "absent", "excused"):
+                o[f] = o[f] or 0
+            if st in ("keldi", "kechikdi"):
+                o["attended"] += 1
+            else:
+                o["absent"] += 1
+                o["excused"] += st == "sababli"
+    _current_semester(list(agg.values()), info)
+    if no_attended:
+        info["notes"].append(f"{no_attended} ta fanda faqat qoldirishlar soni bor (qatnashgan / o'tilgan darslar soni yoki "
+                             "foiz yo'q) — davomat foizini hisoblab bo'lmaydi, shuning uchun bu fanlar davomati yozilmadi. "
+                             "/integratsiya_moslash fanlar qatnashgan=… bilan maydonni ko'rsating")
+    return list(agg.values()), info
+
+
+def _current_semester(rows: list[dict], info: dict) -> None:
+    """O'quv yili bo'yicha javobda ikki semestr fanlari bo'lsa — davomat faqat joriy semestrdan olinadi (aks holda kuzgi
+    fanlarning qoldirishlari bahorgi umumiy davomatga qo'shilib ketadi): talabaning davomati bor eng oxirgi semestri.
+    Kreditlar barcha fanlardan olinadi."""
+    def order(s: str) -> tuple:
+        n = re.findall(r"\d+", s or "")
+        return (int(n[-1]) if n else -1, s or "")
+
+    by_st: dict[str, list[dict]] = {}
+    for r in rows:
+        by_st.setdefault(r["hemis_id"] or normalize_text(r["full_name"]), []).append(r)
+    dropped = 0
+    for rs in by_st.values():
+        sems = {r["semester"] for r in rs if r["semester"] and r["absent"] is not None
+                and (r["attended"] or 0) + (r["absent"] or 0) > 0}
+        if len({r["semester"] for r in rs if r["semester"]}) < 2 or not sems:
+            continue
+        cur = max(sems, key=order)
+        for r in rs:
+            if r["semester"] and r["semester"] != cur and r["absent"] is not None:
+                r["attended"] = r["absent"] = r["excused"] = None
+                dropped += 1
+    if dropped:
+        info["notes"].append(f"Javobda bir necha semestr fanlari bor — davomat faqat joriy semestrdan olindi "
+                             f"(boshqa semestrning {dropped} ta fan yozuvi davomatga qo'shilmadi, kreditlari olindi)")
+
+
+async def ingest_subjects(bot, records: list[dict], origin: str = "polling") -> dict:
+    """Talabaning fanlari: kreditlar va fan bo'yicha davomat — har bir kurs bazasiga (fanlar kesimi, umumiy davomat,
+    25% chegarasi va ota-onaga xabarlar — fan bo'yicha HEMIS statistikasi fayli bilan bir xil)."""
+    from handlers.admin import apply_subject_stats
+    rows, info = subject_rows(records)
+    result = {"kind": "subjects", "records": len(records), "mapping": info["mapping"], "unmapped": info["unmapped"],
+              "mode": info["mode"], "courses": {}, "changed": False, "errors": 0, "origin": origin, "notes": info["notes"]}
+    if not rows:
+        return result
+    for key in db.keys():
+        with use_course(key):
+            mine, missing = resolve_students([dict(r) for r in rows], await db.student_lookup())
+            if not mine:
+                continue
+            sig = sorted((r["student_id"], subject_key(r["subject"]), r["credits"], r["attended"], r["absent"], r["excused"])
+                         for r in mine)
+            digest = hashlib.sha256(json.dumps(sig, default=str).encode()).hexdigest()
+            prev = await db.get_setting("integ_hash_subjects")
+            if prev == digest:
+                result["courses"][key] = {"rows": len(mine), "changed": False}
+                continue
+            silent = prev is None and INTEGRATION_FIRST_SILENT
+            lines = await apply_subject_stats(bot, mine, silent=silent, source=f"{INTEGRATION_NAME} (avtomatik)")
+            await db.set_setting("integ_hash_subjects", digest)
+            result["changed"] = True
+            result["courses"][key] = {"rows": len(mine), "changed": True, "silent": silent, "report": "\n".join(lines)}
+    return result
+
+
 # ---------------------------------------------------------------- HTTP
 def _headers_and_url(url: str) -> tuple[dict, str]:
     headers = {"Accept": "application/json, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*",
@@ -754,7 +943,8 @@ async def build_url(kind: str, hemis: str | None = None, monday: date | None = N
     since = await _since(kind) if "{since}" in url else ""
     vals = {"from": d1.isoformat(), "to": d2.isoformat(), "from_ts": ts(d1), "to_ts": ts(d2, True),
             "since": since or f"{d1.isoformat()}T00:00:00", "from_dmy": d1.strftime("%d.%m.%Y"),
-            "to_dmy": d2.strftime("%d.%m.%Y"), "hemis_id": hemis or "", "monday": monday.isoformat() if monday else ""}
+            "to_dmy": d2.strftime("%d.%m.%Y"), "hemis_id": hemis or "", "monday": monday.isoformat() if monday else "",
+            "academic_year": INTEGRATION_ACADEMIC_YEAR}
     for k, v in vals.items():
         url = url.replace("{" + k + "}", str(v))
     return url, "{since}" not in path
@@ -826,8 +1016,7 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
                 info["failed"] += 1
                 if e.status == 404 and "cannot get" in str(e).lower():  # manzil (yo'l) umuman yo'q — talabaga bog'liq emas
                     fatal.append(IntegrationError(f"bunday manzil Manage'da yo'q (HTTP 404: Cannot GET): {_safe_url(url)}. "
-                                                  f".env dagi INTEGRATION_{'ATTENDANCE' if kind == 'attendance' else 'SCHEDULE'} "
-                                                  "qatorini tekshiring", status=404))
+                                                  f".env dagi {ENV_NAMES[kind]} qatorini tekshiring", status=404))
                 elif e.status in (401, 403) or not per_student(kind):  # kalit noto'g'ri — davom etishdan foyda yo'q
                     fatal.append(e)
                 elif info["failed"] <= 3:
@@ -908,6 +1097,8 @@ class _Report:
 async def ingest(bot, kind: str, records: list[dict], complete_window: tuple[date, date] | None = None,
                  origin: str = "polling") -> dict:
     """Yozuvlarni har bir kurs bazasiga ajratib, Excel importi yo'lidan o'tkazadi."""
+    if kind == "subjects":
+        return await ingest_subjects(bot, records, origin)
     from handlers.admin import _process_import_body
     table, info = build_table(records, kind)
     result = {"kind": kind, "records": len(records), "mapping": info["mapping"], "unmapped": info["unmapped"],
@@ -1043,7 +1234,7 @@ async def set_paused(value: bool) -> None:
 
 
 def interval(kind: str) -> int:
-    return INTEGRATION_INTERVAL if kind == "attendance" else INTEGRATION_SCHEDULE_INTERVAL
+    return {"attendance": INTEGRATION_INTERVAL, "subjects": INTEGRATION_SUBJECTS_INTERVAL}.get(kind, INTEGRATION_SCHEDULE_INTERVAL)
 
 
 async def loop(bot) -> None:
@@ -1133,7 +1324,8 @@ def env_report() -> str:
                     found.setdefault(k, []).append(raw.split("=", 1)[1].strip() if "=" in raw else "")
         except OSError:
             pass
-    for k in ("INTEGRATION_URL", "INTEGRATION_AUTH", "INTEGRATION_TOKEN", "INTEGRATION_SCHEDULE", "INTEGRATION_ATTENDANCE"):
+    for k in ("INTEGRATION_URL", "INTEGRATION_AUTH", "INTEGRATION_TOKEN", "INTEGRATION_SCHEDULE", "INTEGRATION_ATTENDANCE",
+              "INTEGRATION_SUBJECTS", "INTEGRATION_ACADEMIC_YEAR"):
         vals = found.get(k)
         if not vals:
             lines.append(f"  {k}: .env da yo'q")
@@ -1142,14 +1334,17 @@ def env_report() -> str:
         shown = "(kiritilgan)" if k == "INTEGRATION_TOKEN" and last else (last or "bo'sh")
         lines.append(f"  {k}: {shown}" + (f"  — ⚠️ {len(vals)} marta yozilgan, oxirgisi olinadi" if len(vals) > 1 else ""))
     lines.append(f"Bot o'qigani: URL={'bor' if INTEGRATION_URL else 'yoq'}, SCHEDULE={'bor' if INTEGRATION_SCHEDULE else 'yoq'}, "
-                 f"ATTENDANCE={'bor' if INTEGRATION_ATTENDANCE else 'yoq'}, AUTH={INTEGRATION_AUTH}")
+                 f"ATTENDANCE={'bor' if INTEGRATION_ATTENDANCE else 'yoq'}, SUBJECTS={'bor' if INTEGRATION_SUBJECTS else 'yoq'}, "
+                 f"AUTH={INTEGRATION_AUTH}")
+    if "{academic_year}" in INTEGRATION_SUBJECTS and not INTEGRATION_ACADEMIC_YEAR:
+        lines.append("⚠️ INTEGRATION_SUBJECTS da {academic_year} bor, lekin INTEGRATION_ACADEMIC_YEAR to'ldirilmagan (masalan 8)")
     return "\n".join(lines)
 
 
 async def probe(kind: str) -> str:
     """Ulanishni tekshirish: birinchi sahifa, tanilgan maydonlar va namunaviy qatorlar (bazaga yozilmaydi)."""
     if not configured(kind):
-        return f"<b>{TITLES[kind]}</b>: manzil sozlanmagan (INTEGRATION_{'ATTENDANCE' if kind == 'attendance' else 'SCHEDULE'}).\n" + esc(env_report())
+        return f"<b>{TITLES[kind]}</b>: manzil sozlanmagan ({ENV_NAMES[kind]}).\n" + esc(env_report())
     try:
         records, info = await fetch(kind, max_pages=1)
     except Exception as e:
@@ -1162,6 +1357,8 @@ async def probe(kind: str) -> str:
                         "python integration.py jadval --hemis=381231100123 --dump (javob data papkasidagi faylga saqlanadi)."
                         if per_student(kind) else ""))
         return "\n".join(lines)
+    if kind == "subjects":
+        return "\n".join(lines + await _probe_subjects(records))
     table, binfo = build_table(records, kind)
     m = binfo["mapping"]
     ov = overrides().get(kind, {})
@@ -1205,16 +1402,56 @@ async def probe(kind: str) -> str:
                     found += sum(1 for r in parsed.rows if r.get("group_key") in mine)
         lines.append(f"Bot bazasidagi talabalar/guruhlarga tegishli: {found} ta qator"
                      + ("" if found else " — ⚠️ hech biri mos kelmadi (ID yoki guruh nomlarini tekshiring)"))
-    lines.append("\nMaydon noto'g'ri tanilgan bo'lsa: <code>/integratsiya_moslash "
-                 + ("davomat" if kind == "attendance" else "jadval") + " maydon=API_nomi</code>")
+    lines.append(f"\nMaydon noto'g'ri tanilgan bo'lsa: <code>/integratsiya_moslash {CLI_WORDS[kind]} maydon=API_nomi</code>")
     return "\n".join(lines)
+
+
+async def _probe_subjects(records: list[dict]) -> list[str]:
+    rows, info = subject_rows(records)
+    m = info["mapping"]
+    ov = overrides().get("subjects", {})
+    mode = {"totals": "har bir fan bo'yicha jami sonlar", "lessons": "darslar ro'yxati (holatlar sanaladi)",
+            "credits": "davomat sonlari topilmadi — faqat kreditlar olinadi"}[info["mode"]]
+    lines = ["\n<b>Tanilgan maydonlar</b> (maydon ← API dagi nomi):"]
+    for f, k in m.items():
+        lines.append(f"  • {FIELD_NAMES.get(f, f)} ← <code>{esc(k)}</code>"
+                     + (" (soat → para)" if f in ("attended", "absent", "excused", "unexcused", "held") and _in_hours(k) else "")
+                     + (" ✋" if ov.get(f) == k else ""))
+    miss = [f for f in ("subject",) if f not in m]
+    if not ({"credits", "code"} & set(m)):
+        miss.append("credits")
+    if miss:
+        lines.append("⚠️ Topilmadi: " + ", ".join(FIELD_NAMES.get(f, f) for f in miss))
+    lines.append(f"Ko'rinishi: {mode}")
+    for n in info["notes"]:
+        lines.append(f"⚠️ {esc(n)}")
+    if info["unmapped"]:
+        lines.append("Ishlatilmagan maydonlar: " + esc(", ".join(info["unmapped"][:30])) + (" …" if len(info["unmapped"]) > 30 else ""))
+    with_cred = [r for r in rows if r["credits"]]
+    with_att = [r for r in rows if r["absent"] is not None]
+    lines.append(f"\nFanlar: {len(rows)}, krediti bor: {len(with_cred)}, davomati bor: {len(with_att)}")
+    for r in rows[:12]:
+        att = (f"qatnashgan {r['attended']:g}, qoldirgan {r['absent']:g} (sababli {r['excused']:g})"
+               if r["absent"] is not None else "davomat yo'q")
+        lines.append(f"  • {esc(r['subject'])}" + (f" [{esc(r['code'])}]" if r["code"] else "")
+                     + f" — {(str(int(r['credits'])) + ' kredit') if r['credits'] else 'kredit yo‘q'}; {att}")
+    found = 0
+    for key in db.keys():
+        with use_course(key):
+            ok, _ = resolve_students([dict(r) for r in rows], await db.student_lookup())
+            found += len(ok)
+    lines.append(f"Bot bazasidagi talabalarga tegishli: {found} ta qator"
+                 + ("" if found or not rows else " — ⚠️ hech biri mos kelmadi (HEMIS ID ni tekshiring)"))
+    lines.append("\nMaydon noto'g'ri tanilgan bo'lsa: <code>/integratsiya_moslash fanlar maydon=API_nomi</code>")
+    return lines
 
 
 FIELD_WORDS = {normalize_text(v): k for k, v in FIELD_NAMES.items()} | {k: k for k in FIELD_NAMES} | {
     "id": "hemis_id", "hemis": "hemis_id", "fish": "full_name", "fio": "full_name", "guruh": "group_name",
     "sana": "date", "juftlik": "pair", "para": "pair", "fan": "subject", "holat": "status", "turi": "lesson_type",
     "oqituvchi": "teacher", "soat": "hours", "kun": "weekday", "boshlanish": "start_time", "tugash": "end_time",
-    "xona": "room", "hafta": "week_type"}
+    "xona": "room", "hafta": "week_type", "kredit": "credits", "kod": "code", "qatnashgan": "attended",
+    "qoldirgan": "absent", "sababli": "excused", "sababsiz": "unexcused", "otilgan": "held", "foiz": "percent"}
 
 
 def parse_field(word: str) -> str | None:
