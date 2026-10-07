@@ -850,7 +850,7 @@ async def apply_subject_stats(bot, rows: list[dict], silent: bool = False, as_of
             """SELECT student_id, attended, absent, excused FROM subject_att_stats x WHERE subject_key = ?
                AND as_of = (SELECT MAX(as_of) FROM subject_att_stats y WHERE y.student_id = x.student_id
                             AND y.subject_key = x.subject_key)""", (key,))}
-        await db.upsert_subject_stats(rs, subject, as_of)
+        await db.upsert_subject_stats(rs, subject, as_of, source="manage" if source else None)
         grew = [(r["student_id"], prev.get(r["student_id"]), r) for r in rs
                 if unexc(r) > (unexc(prev[r["student_id"]]) if r["student_id"] in prev else 0)]
         grew_n += len(grew)

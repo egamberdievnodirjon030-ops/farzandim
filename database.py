@@ -319,6 +319,7 @@ CREATE TABLE IF NOT EXISTS subject_att_stats (
     excused     REAL NOT NULL DEFAULT 0,
     imported_at TEXT NOT NULL,
     import_id   INTEGER,
+    source      TEXT,   -- manage (integratsiya: talabaning barcha fanlari) | NULL (HEMIS fan statistikasi fayli)
     PRIMARY KEY (student_id, subject_key, as_of)
 );
 
@@ -520,6 +521,9 @@ class Database:
         for col in ("pairs", "held"):
             if col not in sc:
                 await self.conn.execute(f"ALTER TABLE subject_credits ADD COLUMN {col} REAL")
+        async with self.conn.execute("PRAGMA table_info(subject_att_stats)") as cur:
+            if "source" not in {r[1] for r in await cur.fetchall()}:
+                await self.conn.execute("ALTER TABLE subject_att_stats ADD COLUMN source TEXT")
         async with self.conn.execute("SELECT (SELECT COUNT(*) FROM messages), (SELECT COUNT(*) FROM questions)") as cur:
             msgs, qs = await cur.fetchone()
         if not msgs and qs:  # oldingi versiya: savol-javoblar — yozishmaga
@@ -924,7 +928,8 @@ class Database:
         outer = " AND x.student_id = ?" if sid is not None else ""
         rows = await self.fetchall(
             f"""SELECT x.student_id, SUM(x.attended) AS attended, SUM(x.absent) AS absent, SUM(x.excused) AS excused,
-                       MAX(x.as_of) AS as_of, MAX(x.imported_at) AS imported_at, COUNT(*) AS subjects
+                       MAX(x.as_of) AS as_of, MAX(x.imported_at) AS imported_at, COUNT(*) AS subjects,
+                       MAX(x.source = 'manage') AS manage
                 FROM subject_att_stats x
                 WHERE x.as_of = (SELECT MAX(y.as_of) FROM subject_att_stats y WHERE y.student_id = x.student_id
                                  AND y.subject_key = x.subject_key AND y.as_of >= ?{cond}){outer}
@@ -938,7 +943,9 @@ class Database:
         if not subj:
             return overall
         size = lambda r: (r["attended"] or 0) + (r["absent"] or 0)  # noqa: E731
-        if overall and size(overall) >= size(subj):
+        # Manage'dan (talabaning barcha fanlari, real vaqt) kelgan yangiroq ma'lumot — eski umumiy fayldan ustun
+        fresh = subj.get("manage") and (not overall or subj["as_of"] >= overall["as_of"])
+        if overall and not fresh and size(overall) >= size(subj):
             return overall
         return {"student_id": subj["student_id"], "as_of": subj["as_of"], "attended": subj["attended"] or 0,
                 "absent": subj["absent"] or 0, "excused": subj["excused"] or 0, "self_marked": None, "teacher_marked": None,
@@ -1517,7 +1524,8 @@ class Database:
                            (admin_id, now_iso(), doc_id))
 
     # ------------------------------------------------------------ HEMIS davomat statistikasi
-    async def upsert_subject_stats(self, rows: list[dict], subject: str, as_of: str) -> list[tuple[int, dict | None, dict]]:
+    async def upsert_subject_stats(self, rows: list[dict], subject: str, as_of: str,
+                                   source: str | None = None) -> list[tuple[int, dict | None, dict]]:
         """Bitta fan bo'yicha HEMIS statistikasi. Qaytaradi: (talaba, shu fan bo'yicha oldingi holat yoki None, yangi)."""
         key = subject_key(subject) or normalize_text(subject)
         out, ts = [], now_iso()
@@ -1525,10 +1533,11 @@ class Database:
             prev = await self.fetchone("SELECT * FROM subject_att_stats WHERE student_id = ? AND subject_key = ? AND as_of < ? "
                                        "ORDER BY as_of DESC LIMIT 1", (r["student_id"], key, as_of))
             await self.conn.execute(
-                """INSERT INTO subject_att_stats (student_id, subject, subject_key, as_of, attended, absent, excused, imported_at)
-                   VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(student_id, subject_key, as_of) DO UPDATE SET subject = excluded.subject,
-                   attended = excluded.attended, absent = excluded.absent, excused = excluded.excused, imported_at = excluded.imported_at""",
-                (r["student_id"], subject, key, as_of, r["attended"], r["absent"], r["excused"], ts))
+                """INSERT INTO subject_att_stats (student_id, subject, subject_key, as_of, attended, absent, excused, imported_at, source)
+                   VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(student_id, subject_key, as_of) DO UPDATE SET subject = excluded.subject,
+                   attended = excluded.attended, absent = excluded.absent, excused = excluded.excused,
+                   imported_at = excluded.imported_at, source = excluded.source""",
+                (r["student_id"], subject, key, as_of, r["attended"], r["absent"], r["excused"], ts, source))
             out.append((r["student_id"], prev, r))
         await self._tag("subject_att_stats", "student_id = ? AND subject_key = ? AND as_of = ?",
                         [(r["student_id"], key, as_of) for r in rows])

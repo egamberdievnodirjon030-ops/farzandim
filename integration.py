@@ -1823,6 +1823,55 @@ async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dic
     return out, "\n".join(lines)
 
 
+async def compare_student(hemis: str) -> str:
+    """python integration.py solishtir --hemis=… — bitta talaba: Manage'dagi sonlar va botdagi hisob yonma-yon."""
+    import absence
+    import subject_limits
+    global PROBE_HEMIS
+    PROBE_HEMIS = hemis
+    try:
+        records, _ = await fetch("subjects", max_pages=1)
+    finally:
+        PROBE_HEMIS = None
+    rows, _ = subject_rows(records)
+    man = {subject_key(r["subject"]): r for r in rows}
+    lines = [f"Talaba HEMIS ID: {hemis}", "", "FAN | Manage: o'tilgan / kelgan / qoldirgan | Bot: darslar / kelgan / sababsiz / sababli "
+             "(manba, sana) | chegara"]
+    for key in db.keys():
+        with use_course(key):
+            st = await db.fetchone("SELECT * FROM students WHERE hemis_id = ?", (hemis,))
+            if not st:
+                continue
+            subs = {k: o for (_, k), o in (await subject_limits.per_student_subjects("s.id = ?", (st["id"],))).items()}
+            raw = await db.fetchall("SELECT subject, as_of, attended, absent, excused FROM subject_att_stats WHERE student_id = ? "
+                                    "ORDER BY subject, as_of", (st["id"],))
+            daily = await db.fetchone("SELECT COUNT(*) n, SUM(status = 'kelmadi') k FROM attendance WHERE student_id = ?",
+                                      (st["id"],))
+            overall = await db.fetchall("SELECT as_of, attended, absent, excused FROM attendance_stats WHERE student_id = ? "
+                                        "ORDER BY as_of", (st["id"],))
+            rules = await subject_limits.rules_map()
+            sm = await absence.summary(st["id"])
+            lines[0] += f" — {st['full_name']} ({st['group_name']}), kurs: {key}"
+            for k in sorted(set(man) | set(subs)):
+                m, o = man.get(k), subs.get(k)
+                ms = (f"{(m['attended'] or 0) + (m['absent'] or 0):g} / {m['attended'] or 0:g} / {m['absent'] or 0:g}"
+                      if m and m["absent"] is not None else "—")
+                bs = (f"{o['total']:g} / {o['came']:g} / {o['kelmadi']:g} / {o['sababli']:g} ({o['source']}, {o.get('as_of', '')})"
+                      if o else "—")
+                ev = subject_limits.evaluate(o["kelmadi"] if o else 0, rules.get(k))
+                lines.append(f"• {(m or o)['subject'][:40]} | {ms} | {bs} | {ev['limit'] or '—'}")
+            lines.append("")
+            lines.append(f"Bot umumiy: {sm and round(sm.get('percent') or 0)}%, sababsiz {sm and sm['unexcused'] / 2:g} para "
+                         f"({sm and sm['unexcused']:g} soat), manba: {sm and absence.source_note(sm)}")
+            lines.append(f"Bazada: fan statistikasi yozuvlari {len(raw)} ta, kunlik davomat {daily['n']} ta "
+                         f"(kelmadi {daily['k'] or 0}), umumiy HEMIS statistikasi {len(overall)} ta")
+            for r in overall[-3:]:
+                lines.append(f"   umumiy HEMIS {r['as_of']}: qatnashgan {r['attended']}, qatnashmagan {r['absent']}, sababli {r['excused']}")
+            for r in raw:
+                lines.append(f"   fan {r['as_of']}: {r['subject'][:40]} — {r['attended']:g} / {r['absent']:g} / {r['excused']:g}")
+    return "\n".join(lines)
+
+
 async def setup_check() -> str:
     """python integration.py sozlash — .env, har bir manzil qanday chiqishi va bitta sinov so'rovi (bazaga yozilmaydi)."""
     lines = ["1) .env tekshiruvi", env_report(), "", "2) Manzillar va sinov so'rovi (bitta talaba bilan)"]
@@ -2018,6 +2067,18 @@ if __name__ == "__main__":
                 raw = raw.replace(INTEGRATION_TOKEN, "***")
             out.write_text(raw, "utf-8")
             print(f"\n✅ Tayyor. Shu faylni yuboring (ichida kalit/parol yo'q): {out}")
+            await db.close()
+            await central.close()
+            return
+        if args[:1] == ["solishtir"]:
+            if not PROBE_HEMIS:
+                print("Talabaning HEMIS ID sini bering: python integration.py solishtir --hemis=350231100388")
+            else:
+                text = await compare_student(PROBE_HEMIS)
+                print(text)
+                out = DATA_DIR / "solishtir.txt"
+                out.write_text(text, "utf-8")
+                print(f"\nSaqlandi: {out.resolve()}")
             await db.close()
             await central.close()
             return
