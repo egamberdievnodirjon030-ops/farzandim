@@ -171,6 +171,10 @@ INTEGRATION_ACADEMIC_YEAR = os.getenv("INTEGRATION_ACADEMIC_YEAR", "").strip()  
 INTEGRATION_SUBJECTS_INTERVAL = max(60, int(os.getenv("INTEGRATION_SUBJECTS_INTERVAL", "900") or 900))
 # Fanlardagi qoldirishlar birligi: auto (maydon nomida hour/soat bo'lsa — soat), pair (para) yoki hour (soat)
 INTEGRATION_SUBJECTS_UNIT = os.getenv("INTEGRATION_SUBJECTS_UNIT", "auto").strip().lower() or "auto"
+# Manage «doneLessonCount» nimani bildiradi: auto — bir oqimdagi (academicGroupId) talabalarda har xil bo'lsa, talabaning
+# yo'qlamada «keldi» deb belgilangan darslari (qoldirgan = oqimdagi eng ko'p − talabaniki); held — o'tilgan darslar
+# (guruh bo'yicha bir xil, davomat emas); attended — doim talabaning qatnashgan darslari
+INTEGRATION_DONE_MEANS = os.getenv("INTEGRATION_DONE_MEANS", "auto").strip().lower() or "auto"
 INTEGRATION_INTERVAL = max(15, int(os.getenv("INTEGRATION_INTERVAL", "60") or 60))            # davomat, soniya
 INTEGRATION_SCHEDULE_INTERVAL = max(60, int(os.getenv("INTEGRATION_SCHEDULE_INTERVAL", "900") or 900))
 INTEGRATION_DAYS = max(1, int(os.getenv("INTEGRATION_DAYS", "7") or 7))  # davomat: oxirgi necha kun olinadi

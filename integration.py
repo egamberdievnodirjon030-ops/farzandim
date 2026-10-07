@@ -40,6 +40,7 @@ from config import (DATA_DIR, INTEGRATION_ATTENDANCE, INTEGRATION_AUTH, INTEGRAT
                     INTEGRATION_TOKEN, INTEGRATION_URL, INTEGRATION_WEBHOOK_SECRET, PAIR_TIMES, TZ,
                     INTEGRATION_CONCURRENCY, INTEGRATION_SCHEDULE_PER_GROUP, INTEGRATION_SUBJECTS,
                     INTEGRATION_ACADEMIC_YEAR, INTEGRATION_SUBJECTS_INTERVAL, INTEGRATION_SUBJECTS_UNIT,
+                    INTEGRATION_DONE_MEANS,
                     HEMIS_STATS_HOURS_PER_UNIT)
 from database import db
 from importer import ALIASES, parse_rows, resolve_students
@@ -136,6 +137,9 @@ HINTS: dict[str, dict[str, list[str]]] = {
         "date": ["lesson date", "date", "attendance date", "sana"],
         "status": ["attendance status", "status", "holat"],
         "semester": ["semester name", "semester", "semester code", "term", "semestr"],
+        # oqim: bir xil darslarni birga o'tadigan talabalar (Manage: subjectTypes[].academicGroupId) va dars turi
+        "stream": ["academic group id", "stream id", "subgroup id", "academic group", "stream", "potok"],
+        "lesson_type": ["lesson type", "training type", "lesson type name", "mashgulot turi"],
     },
 }
 # jadvalga yoziladigan sarlavha (importer shu nomni aniq taniydi)
@@ -146,6 +150,7 @@ CANON = {
     "week_type": "Hafta turi", "subgroup": "Seminar raqami", "attended": "Qatnashganlar soni",
     "absent": "Qatnashmaganlar soni", "excused": "Sabablilar soni", "code": "Fan kodi", "credits": "Kredit",
     "unexcused": "Sababsiz", "held": "O'tilgan darslar", "planned": "Ajratilgan darslar", "percent": "Davomat foizi", "semester": "Semestr",
+    "stream": "Oqim",
 }
 FIELD_NAMES = {
     "hemis_id": "talaba ID (HEMIS)", "full_name": "F.I.Sh.", "group_name": "guruh", "date": "sana", "pair": "juftlik",
@@ -154,7 +159,7 @@ FIELD_NAMES = {
     "time_range": "vaqt", "room": "xona", "week_type": "hafta turi", "subgroup": "kichik guruh",
     "attended": "qatnashgan", "absent": "qatnashmagan (jami)", "excused": "sababli (jami)",
     "code": "fan kodi (kredit)", "credits": "kredit", "unexcused": "sababsiz (jami)", "held": "o'tilgan darslar",
-    "planned": "ajratilgan darslar (para)",
+    "planned": "ajratilgan darslar (para)", "stream": "oqim (akademik guruh)",
     "percent": "davomat foizi", "semester": "semestr",
 }
 # holat maydoni bo'lmasa — shu so'zli maydonlardan aniqlanadi (HEMIS: explicable, absent_on, absent_off …)
@@ -820,12 +825,68 @@ def subject_rows(records: list[dict]) -> tuple[list[dict], dict]:
             no_attended += 1
             continue
         o.update(attended=att, absent=ab, excused=min(ex or 0, ab))
+    if not totals and not lessons and "held" in m:
+        _done_as_attendance(records, m, agg, info)
     _current_semester(list(agg.values()), info)
     if no_attended:
         info["notes"].append(f"{no_attended} ta fanda faqat qoldirishlar soni bor (qatnashgan / o'tilgan darslar soni yoki "
                              "foiz yo'q) — davomat foizini hisoblab bo'lmaydi, shuning uchun bu fanlar davomati yozilmadi. "
                              "/integratsiya_moslash fanlar qatnashgan=… bilan maydonni ko'rsating")
     return list(agg.values()), info
+
+
+def done_streams(records: list[dict], m: dict) -> dict[tuple, dict[str, float]]:
+    """Oqim (fan × dars turi × academicGroupId) → {talaba: doneLessonCount}. Bir oqimdagi talabalar bir xil darslarni
+    o'tadi: «o'tilgan darslar» bo'lsa — hammasida bir xil, talabaning «keldi» belgilari bo'lsa — har xil."""
+    out: dict[tuple, dict[str, float]] = {}
+    for r in records:
+        subj = " ".join(cell_str(r.get(m["subject"]) if "subject" in m else "").split())
+        v = parse_float(r.get(m["held"]))
+        if not subj or v is None:
+            continue
+        if "_pk" in r and m["held"].split(".")[0] not in str(r.get("_ck") or "").split(","):
+            continue  # ota yozuvdagi jami — oqim emas
+        who = cell_str(r.get(m["hemis_id"]) if "hemis_id" in m else r.get("_ctx.hemis_id")).strip() \
+            or normalize_text(r.get("_ctx.full_name"))
+        stream = cell_str(r.get(m["stream"])) if "stream" in m else ""
+        ltype = normalize_text(r.get(m["lesson_type"])) if "lesson_type" in m else ""
+        key = (subject_key(subj) or normalize_text(subj), ltype, stream)
+        out.setdefault(key, {})[who] = out.get(key, {}).get(who, 0) + v
+    return out
+
+
+def _done_as_attendance(records: list[dict], m: dict, agg: dict, info: dict) -> None:
+    """doneLessonCount — talabaning «keldi» deb belgilangan darslari bo'lsa: qoldirgan = oqimdagi eng ko'p − talabaniki
+    (oqimdagi eng ko'p — o'tilgan darslar). Sababli/sababsiz ajratilmaydi (Manage bermaydi) — hammasi sababsiz."""
+    streams = done_streams(records, m)
+    multi = {k: v for k, v in streams.items() if len(v) >= 2}
+    varied = [k for k, v in multi.items() if len(set(v.values())) > 1]
+    info["done"] = {"streams": len(streams), "compared": len(multi), "varied": len(varied)}
+    if INTEGRATION_DONE_MEANS == "held":
+        return
+    if INTEGRATION_DONE_MEANS != "attended":  # auto
+        if not multi:
+            info["notes"].append("doneLessonCount talabaning davomatimi yoki o'tilgan darslar sonimi — aniqlash uchun bir "
+                                 "oqimdan kamida 2 talaba kerak: python integration.py tahlil")
+            return
+        if not varied:
+            info["notes"].append(f"doneLessonCount — o'tilgan darslar soni: {len(multi)} ta oqimning hammasida talabalarda bir xil "
+                                 "(talabaning kelgan-kelmagani emas). Davomat bu manzildan olinmaydi.")
+            return
+    for key, vals in streams.items():
+        held = max(vals.values())
+        for who, v in vals.items():
+            o = agg.get((who, key[0]))
+            if o is None:
+                continue
+            o["attended"] = (o["attended"] or 0) + v
+            o["absent"] = (o["absent"] or 0) + max(held - v, 0)
+            o["excused"] = 0
+    info["mode"] = "done"
+    info["notes"].append(
+        (f"doneLessonCount — talabaning «keldi» belgilari: {len(varied)} / {len(multi)} oqimda talabalarda har xil. "
+         if INTEGRATION_DONE_MEANS != "attended" else "doneLessonCount — talabaning «keldi» belgilari (INTEGRATION_DONE_MEANS). ")
+        + "Qoldirgan = oqimdagi eng ko'p − talabaniki; sababli/sababsiz ajratilmaydi.")
 
 
 def _current_semester(rows: list[dict], info: dict) -> None:
@@ -1439,11 +1500,72 @@ async def probe(kind: str) -> str:
     return "\n".join(lines)
 
 
+TAHLIL_GROUP: str | None = None  # python integration.py tahlil --guruh=3-10c-24
+
+
+async def analyse_done() -> str:
+    """doneLessonCount nimani bildirishini ma'lumotdan aniqlash: guruh(lar)dagi barcha talabalar uchun fanlarni olib,
+    bir oqimdagi (academicGroupId) talabalarning qiymatlarini solishtiradi. Bazaga yozilmaydi."""
+    if not configured("subjects"):
+        return f"Manzil sozlanmagan ({ENV_NAMES['subjects']})."
+    global targets
+    orig = targets
+
+    async def only_group(kind: str) -> list[dict]:
+        rows = await orig(kind)
+        if TAHLIL_GROUP:
+            return [r for r in rows if group_key(r["group_name"]) == group_key(TAHLIL_GROUP)]
+        first = rows[0]["group_key"] if rows else None  # standart: birinchi guruh
+        return [r for r in rows if r["group_key"] == first]
+
+    targets = only_group
+    try:
+        records, info = await fetch("subjects")
+    finally:
+        targets = orig
+    recs = [flatten(r) if any(isinstance(v, (dict, list)) for v in r.values()) else r for r in records]
+    keys = list(dict.fromkeys(k for r in recs for k in r))
+    m = mapping_for(keys, "subjects", recs)
+    students = {r.get("_ctx.hemis_id") for r in recs}
+    lines = [f"So'rovlar: {info['requests']} ta talaba, xato: {info['failed']}; yozuvlar: {len(recs)}"]
+    if "held" not in m:
+        return "\n".join(lines + ["doneLessonCount (o'tilgan darslar) maydoni topilmadi."])
+    streams = done_streams(recs, m)
+    lines.append(f"Talabalar: {len(students)}, oqimlar (fan × dars turi × academicGroupId): {len(streams)}\n")
+    varied = 0
+    names = {}
+    for r in recs:
+        names[r.get("_ctx.hemis_id")] = r.get("_ctx.full_name") or r.get("_ctx.hemis_id")
+    for (subj, lt, stream), vals in sorted(streams.items()):
+        uniq = sorted(set(vals.values()))
+        if len(vals) >= 2 and len(uniq) > 1:
+            varied += 1
+        dist = ", ".join(f"{v:g} — {sum(1 for x in vals.values() if x == v)} ta" for v in uniq)
+        lines.append(f"• {subj} [{lt or '—'}] {stream[:8]}: {len(vals)} talaba; doneLessonCount: {dist}")
+        if 1 < len(uniq) and len(vals) >= 2:
+            mx = uniq[-1]
+            low = sorted(((v, names.get(w, w)) for w, v in vals.items() if v < mx))[:5]
+            lines.append("    kamroq: " + "; ".join(f"{n} — {v:g} (eng ko'pi {mx:g})" for v, n in low))
+    multi = sum(1 for v in streams.values() if len(v) >= 2)
+    lines.append("")
+    if not multi:
+        lines.append("Xulosa: solishtirish uchun bir oqimda kamida 2 talaba kerak (bazaga shu guruh talabalarini yuklang).")
+    elif varied:
+        lines.append(f"Xulosa: {varied} / {multi} oqimda bir guruhdagi talabalarda doneLessonCount HAR XIL — demak u talabaning "
+                     "yo'qlamada «keldi» deb belgilangan darslari. Bot qoldirgan darslarni shundan hisoblaydi "
+                     "(INTEGRATION_DONE_MEANS=auto). Kamroq chiqqan talabalarni haqiqiy davomat bilan solishtirib ko'ring.")
+    else:
+        lines.append(f"Xulosa: {multi} ta oqimning hammasida doneLessonCount talabalarda BIR XIL — demak u o'tilgan darslar soni, "
+                     "talabaning kelgan-kelmagani emas.")
+    return "\n".join(lines)
+
+
 async def _probe_subjects(records: list[dict]) -> list[str]:
     rows, info = subject_rows(records)
     m = info["mapping"]
     ov = overrides().get("subjects", {})
     mode = {"totals": "har bir fan bo'yicha jami sonlar", "lessons": "darslar ro'yxati (holatlar sanaladi)",
+            "done": "doneLessonCount — talabaning «keldi» belgilari (oqimdagi talabalar bilan solishtirildi)",
             "credits": "davomat sonlari YO'Q — faqat fan ma'lumotlari (kredit, ajratilgan darslar) olinadi"}[info["mode"]]
     lines = ["\n<b>Tanilgan maydonlar</b> (maydon ← API dagi nomi):"]
     for f, k in m.items():
@@ -1512,6 +1634,18 @@ if __name__ == "__main__":
         global PROBE_HEMIS
         args = [a for a in sys.argv[1:] if not a.startswith("--")]
         PROBE_HEMIS = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--hemis=")), None)
+        if args[:1] == ["tahlil"]:
+            global TAHLIL_GROUP
+            TAHLIL_GROUP = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--guruh=")), None)
+            text = await analyse_done()
+            print(text)
+            out = DATA_DIR / "integration_tahlil.txt"
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            out.write_text(text, "utf-8")
+            print(f"\nNatija saqlandi: {out.resolve()}")
+            await db.close()
+            await central.close()
+            return
         bad = [a for a in args if KIND_WORDS.get(a.lower()) is None]
         if bad:
             print(f"Noma'lum tur: {', '.join(bad)}. Mumkin: davomat, jadval, fanlar")
