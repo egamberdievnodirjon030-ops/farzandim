@@ -167,7 +167,7 @@ INTEGRATION_SCHEDULE = os.getenv("INTEGRATION_SCHEDULE", "").strip()
 # Talabaning fanlari (fan bo'yicha davomat va kredit), masalan Manage:
 # student-subjects?hemisId={hemis_id}&academicYearId={academic_year}
 INTEGRATION_SUBJECTS = os.getenv("INTEGRATION_SUBJECTS", "").strip()
-INTEGRATION_ACADEMIC_YEAR = os.getenv("INTEGRATION_ACADEMIC_YEAR", "").strip()   # {academic_year} o'rniga (Manage: 8)
+INTEGRATION_ACADEMIC_YEAR = os.getenv("INTEGRATION_ACADEMIC_YEAR", "8").strip() or "8"  # {academic_year} (Manage: 2026–2027 = 8)
 INTEGRATION_SUBJECTS_INTERVAL = max(60, int(os.getenv("INTEGRATION_SUBJECTS_INTERVAL", "900") or 900))
 # Fanlardagi qoldirishlar birligi: auto (maydon nomida hour/soat bo'lsa — soat), pair (para) yoki hour (soat)
 INTEGRATION_SUBJECTS_UNIT = os.getenv("INTEGRATION_SUBJECTS_UNIT", "auto").strip().lower() or "auto"

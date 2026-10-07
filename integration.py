@@ -24,11 +24,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import csv
+import difflib
 import hashlib
 import hmac
 import io
 import json
 import logging
+import os
 import re
 import time as _time
 from datetime import date, datetime, timedelta
@@ -177,8 +179,29 @@ STATE: dict[str, dict] = {k: {"fails": 0} for k in KINDS}
 _LOCKS = {k: asyncio.Lock() for k in KINDS}
 
 
+# Manage (my.uwed.uz/api/integration/v1) ning ma'lum manzillari: .env da yozilmagan yoki harfi xato yozilgan bo'lsa
+# («tudent-subjects») — shulardan olinadi
+KNOWN_PATHS = {"schedule": "student-timetable/weekly?hemisId={hemis_id}&monday={monday}",
+               "subjects": "student-subjects?hemisId={hemis_id}&academicYearId={academic_year}"}
+_FIXED: set[str] = set()
+
+
 def endpoint(kind: str) -> str:
-    return {"attendance": INTEGRATION_ATTENDANCE, "schedule": INTEGRATION_SCHEDULE, "subjects": INTEGRATION_SUBJECTS}[kind]
+    path = {"attendance": INTEGRATION_ATTENDANCE, "schedule": INTEGRATION_SCHEDULE, "subjects": INTEGRATION_SUBJECTS}[kind]
+    known = KNOWN_PATHS.get(kind)
+    if not known or "uwed.uz" not in INTEGRATION_URL.lower() or path.startswith("http"):
+        return path
+    if not path:  # Manage (UWED): yozilmagan bo'lsa ham ma'lum manzil
+        return known if kind == "subjects" else path
+    want = known.split("?", 1)[0]
+    have = path.split("?", 1)[0].strip("/")
+    if have != want and difflib.SequenceMatcher(None, have.lower(), want).ratio() >= 0.85:
+        if kind not in _FIXED:
+            _FIXED.add(kind)
+            log.warning("%s: .env dagi %s manzili xato yozilgan («%s») — to'g'risi ishlatiladi: «%s»",
+                        INTEGRATION_NAME, ENV_NAMES[kind], have, want)
+        return want + ("?" + path.split("?", 1)[1] if "?" in path else "?" + known.split("?", 1)[1])
+    return path
 
 
 def configured(kind: str | None = None) -> bool:
@@ -1426,6 +1449,10 @@ def env_report() -> str:
             continue
         last = vals[-1]
         shown = "(kiritilgan)" if k == "INTEGRATION_TOKEN" and last else (last or "bo'sh")
+        real = os.environ.get(k, "").strip()
+        if k != "INTEGRATION_TOKEN" and real and real != last.strip().strip("'\""):
+            lines.append(f"  ⚠️ {k}: Windows/tizim muhitida boshqa qiymat o'rnatilgan («{real}») — .env dagisi e'tiborga "
+                         "olinmaydi. Uni o'chiring (Tizim → Muhit o'zgaruvchilari) yoki yangi terminal oching")
         lines.append(f"  {k}: {shown}" + (f"  — ⚠️ {len(vals)} marta yozilgan, oxirgisi olinadi" if len(vals) > 1 else ""))
     lines.append(f"Bot o'qigani: URL={'bor' if INTEGRATION_URL else 'yoq'}, SCHEDULE={'bor' if INTEGRATION_SCHEDULE else 'yoq'}, "
                  f"ATTENDANCE={'bor' if INTEGRATION_ATTENDANCE else 'yoq'}, SUBJECTS={'bor' if INTEGRATION_SUBJECTS else 'yoq'}, "
@@ -1497,6 +1524,27 @@ async def probe(kind: str) -> str:
         lines.append(f"Bot bazasidagi talabalar/guruhlarga tegishli: {found} ta qator"
                      + ("" if found else " — ⚠️ hech biri mos kelmadi (ID yoki guruh nomlarini tekshiring)"))
     lines.append(f"\nMaydon noto'g'ri tanilgan bo'lsa: <code>/integratsiya_moslash {CLI_WORDS[kind]} maydon=API_nomi</code>")
+    return "\n".join(lines)
+
+
+async def setup_check() -> str:
+    """python integration.py sozlash — .env, har bir manzil qanday chiqishi va bitta sinov so'rovi (bazaga yozilmaydi)."""
+    lines = ["1) .env tekshiruvi", env_report(), "", "2) Manzillar va sinov so'rovi (bitta talaba bilan)"]
+    for kind in KINDS:
+        if not configured(kind):
+            lines.append(f"• {TITLES[kind]}: sozlanmagan ({ENV_NAMES[kind]} bo'sh)")
+            continue
+        url, _ = await build_url(kind, "<HEMIS ID>", window(kind)[0] - timedelta(days=window(kind)[0].weekday()))
+        lines.append(f"• {TITLES[kind]}: {_safe_url(url)}")
+        try:
+            records, info = await fetch(kind, max_pages=1)
+        except Exception as e:  # noqa: BLE001
+            lines.append(f"    ❌ {_err_text(e)}")
+            continue
+        lines.append(f"    ✅ javob keldi: {len(records)} ta yozuv (so'rovlar: {info['requests']}, xato: {info['failed']})")
+    talabalar = sum(1 for _ in await targets("subjects"))
+    lines.append(f"\n3) Bazadagi haqiqiy HEMIS ID li talabalar: {talabalar}"
+                 + ("" if talabalar else " — «Talabalar» (kontingent) faylini yuklang"))
     return "\n".join(lines)
 
 
@@ -1634,6 +1682,11 @@ if __name__ == "__main__":
         global PROBE_HEMIS
         args = [a for a in sys.argv[1:] if not a.startswith("--")]
         PROBE_HEMIS = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--hemis=")), None)
+        if args[:1] == ["sozlash"]:
+            print(await setup_check())
+            await db.close()
+            await central.close()
+            return
         if args[:1] == ["tahlil"]:
             global TAHLIL_GROUP
             TAHLIL_GROUP = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--guruh=")), None)
