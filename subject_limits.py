@@ -28,6 +28,14 @@ def limit_pairs(credits: float | None) -> int | None:
     return max(1, math.floor(c * AUDITORIUM_PAIRS_PER_CREDIT * SUBJECT_LIMIT_PERCENT / 100 + 1e-9))
 
 
+def limit_from_pairs(pairs: float | None) -> int | None:
+    """Fanga ajratilgan auditoriya mashg'ulotlari (para, Manage: lessonCount) → chegara: 25%, pastga yaxlitlanadi
+    (30 para → 7, 20 → 5, 10 → 2)."""
+    if not pairs or pairs <= 0:
+        return None
+    return max(1, math.floor(pairs * SUBJECT_LIMIT_PERCENT / 100 + 1e-9))
+
+
 async def credits_info() -> dict[str, dict]:
     """Joriy kurs bo'yicha fan kaliti → {credits, src, code}. Ustunlik: koordinator kiritgani → baholar fayli →
     fan kodi (Manage jadvali: «CTIR25C4» → 4) → akademik qarzdorlar ro'yxati."""
@@ -36,8 +44,13 @@ async def credits_info() -> dict[str, dict]:
         k = subject_key(r["subject"]) or normalize_text(r["subject"])
         if k:
             out[k] = {"credits": r["c"], "src": "debts"}
-    for r in await db.fetchall("SELECT subject_key, credits, code, source FROM subject_credits WHERE credits > 0"):
-        out[r["subject_key"]] = {"credits": r["credits"], "src": r["source"] or "code", "code": r["code"]}
+    pairs = {}
+    for r in await db.fetchall("SELECT subject_key, credits, code, source, pairs, held FROM subject_credits "
+                               "WHERE credits > 0 OR pairs > 0"):
+        if r["credits"] and r["credits"] > 0:
+            out[r["subject_key"]] = {"credits": r["credits"], "src": r["source"] or "code", "code": r["code"]}
+        if r["pairs"] and r["pairs"] > 0:
+            pairs[r["subject_key"]] = (r["pairs"], r["held"])
     for r in await db.fetchall("SELECT subject, MAX(credits) AS c FROM grades WHERE credits > 0 GROUP BY subject"):
         k = subject_key(r["subject"]) or normalize_text(r["subject"])
         if k:
@@ -49,26 +62,39 @@ async def credits_info() -> dict[str, dict]:
             continue
         if v > 0:  # 0 — avtomatik (fayllar va fan kodidagi kredit)
             out[r["key"].split(":", 1)[1]] = {"credits": v, "src": "manual"}
+    # Manage'dagi fanga ajratilgan darslar soni (lessonCount) — qoida aynan shundan (auditoriya soatining 25%):
+    # kreditdan aniqroq, faqat koordinator qo'lda kiritgan kredit undan ustun
+    for k, (p, held) in pairs.items():
+        cur = out.setdefault(k, {"credits": None, "src": None})
+        cur["pairs"], cur["held"] = p, held
     return out
+
+
+async def rules_map() -> dict[str, dict]:
+    """Fan kaliti → {credits, pairs} (evaluate uchun)."""
+    return {k: {"credits": v.get("credits"), "pairs": None if v.get("src") == "manual" else v.get("pairs")}
+            for k, v in (await credits_info()).items()}
 
 
 async def credits_map() -> dict[str, float]:
     """Fan kaliti → kredit (credits_info ustunligi bo'yicha)."""
-    return {k: v["credits"] for k, v in (await credits_info()).items()}
+    return {k: v["credits"] for k, v in (await credits_info()).items() if v.get("credits")}
 
 
 async def set_credits(key: str, credits: float | None) -> None:
     await db.set_setting(f"credits:{key}", str(credits or 0))
 
 
-def evaluate(unexcused: float, credits: float | None) -> dict:
-    """Fan bo'yicha holat: chegara, qolgan, holat (ok | warn — 1 para qoldi | over — chegaraga yetdi/oshdi)."""
-    lim = limit_pairs(credits)
+def evaluate(unexcused: float, rule: float | dict | None) -> dict:
+    """Fan bo'yicha holat: chegara, qolgan, holat (ok | warn — 1 para qoldi | over — chegaraga yetdi/oshdi).
+    rule — kredit yoki {credits, pairs} (pairs — fanga ajratilgan auditoriya darslari, bo'lsa — undan)."""
+    credits, pairs = (rule.get("credits"), rule.get("pairs")) if isinstance(rule, dict) else (rule, None)
+    lim = limit_from_pairs(pairs) or limit_pairs(credits)
     if lim is None:
-        return {"credits": credits, "limit": None, "left": None, "state": None}
+        return {"credits": credits, "pairs": pairs, "limit": None, "left": None, "state": None}
     u = round(unexcused or 0)
     state = "over" if u >= lim else "warn" if u >= lim - 1 and u > 0 else "ok"
-    return {"credits": credits, "limit": lim, "left": max(lim - u, 0), "state": state}
+    return {"credits": credits, "pairs": pairs, "limit": lim, "left": max(lim - u, 0), "state": state}
 
 
 async def per_student_subjects(where: str, params=()) -> dict[tuple[int, str], dict]:

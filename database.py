@@ -304,6 +304,8 @@ CREATE TABLE IF NOT EXISTS subject_credits (
     credits     REAL NOT NULL,
     code        TEXT,
     source      TEXT NOT NULL DEFAULT 'code',   -- code (fan kodidan) | manage (Manage «kredit» maydoni)
+    pairs       REAL,   -- fanga ajratilgan auditoriya darslari, para (Manage: lessonCount) — 25% chegarasi shundan
+    held        REAL,   -- shu paytgacha o'tilgan darslar (Manage: doneLessonCount)
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -512,8 +514,12 @@ class Database:
             if "credits" not in {r[1] for r in await cur.fetchall()}:
                 await self.conn.execute("ALTER TABLE grades ADD COLUMN credits REAL")
         async with self.conn.execute("PRAGMA table_info(subject_credits)") as cur:
-            if "source" not in {r[1] for r in await cur.fetchall()}:
-                await self.conn.execute("ALTER TABLE subject_credits ADD COLUMN source TEXT NOT NULL DEFAULT 'code'")
+            sc = {r[1] for r in await cur.fetchall()}
+        if "source" not in sc:
+            await self.conn.execute("ALTER TABLE subject_credits ADD COLUMN source TEXT NOT NULL DEFAULT 'code'")
+        for col in ("pairs", "held"):
+            if col not in sc:
+                await self.conn.execute(f"ALTER TABLE subject_credits ADD COLUMN {col} REAL")
         async with self.conn.execute("SELECT (SELECT COUNT(*) FROM messages), (SELECT COUNT(*) FROM questions)") as cur:
             msgs, qs = await cur.fetchone()
         if not msgs and qs:  # oldingi versiya: savol-javoblar — yozishmaga
@@ -1043,6 +1049,18 @@ class Database:
         await self.upsert_subject_credits(found, commit=commit)
         return found
 
+    async def set_subject_pairs(self, found: dict[str, tuple[str, float, float | None]]) -> int:
+        """Fan kaliti → (fan, ajratilgan darslar, o'tilgan darslar) — Manage'dagi talabaning fanlaridan (kredit o'zgarmaydi)."""
+        if not found:
+            return 0
+        await self.conn.executemany(
+            """INSERT INTO subject_credits (subject_key, subject, credits, pairs, held, source) VALUES (?, ?, 0, ?, ?, 'code')
+               ON CONFLICT(subject_key) DO UPDATE SET pairs = excluded.pairs, held = excluded.held,
+               updated_at = datetime('now')""",
+            [(k, s, p, h) for k, (s, p, h) in found.items()])
+        await self.conn.commit()
+        return len(found)
+
     async def upsert_subject_credits(self, found: dict[str, tuple[str, float, str | None]], commit: bool = True,
                                      source: str = "code") -> int:
         """Fan kaliti → (fan, kredit, kod): fan kodidan (source=code) yoki Manage «kredit» maydonidan (manage).
@@ -1052,9 +1070,10 @@ class Database:
         await self.conn.executemany(
             """INSERT INTO subject_credits (subject_key, subject, credits, code, source) VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(subject_key) DO UPDATE SET subject = excluded.subject,
-               credits = CASE WHEN subject_credits.source = 'manage' AND excluded.source != 'manage'
-                              THEN subject_credits.credits ELSE excluded.credits END,
-               source = CASE WHEN subject_credits.source = 'manage' THEN 'manage' ELSE excluded.source END,
+               credits = CASE WHEN subject_credits.source = 'manage' AND subject_credits.credits > 0
+                                   AND excluded.source != 'manage' THEN subject_credits.credits ELSE excluded.credits END,
+               source = CASE WHEN subject_credits.source = 'manage' AND subject_credits.credits > 0
+                             THEN 'manage' ELSE excluded.source END,
                code = COALESCE(excluded.code, subject_credits.code), updated_at = datetime('now')""",
             [(k, *v, source) for k, v in found.items()])
         if commit:

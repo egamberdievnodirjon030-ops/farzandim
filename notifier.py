@@ -148,7 +148,7 @@ async def check_subject_limits(bot: Bot, student_ids, notify: bool = True) -> tu
     chegaraga yetganda — yakuniy nazoratga kiritilmasligi haqida. Har bir holat bir marta (semestr ichida).
     Qaytaradi: (yuborilgan xabarlar, chegaraga yetganlar ro'yxati — kurs koordinatori hisobotiga)."""
     import subject_limits
-    cred = await subject_limits.credits_map()
+    cred = await subject_limits.rules_map()
     sent, overs = 0, []
     for sid in student_ids:
         subs = await subject_limits.per_student_subjects("s.id = ?", (sid,))

@@ -1212,7 +1212,7 @@ async function viewStaffSubjects(params) {
       <div class="list">${x.lessons.map(l => lessonRow(l)).join('')}</div></section>`).join('') : '';
   const subj = d.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}Fanlar kesimida davomat</h2></div>
       <div class="list">${d.subjects.map(x => `<div class="row" style="cursor:default"><div class="body"><div class="t">${esc(x.subject)}</div>
-        ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi })}<div class="d">${x.missed_students} / ${x.students} talaba qoldirgan${x.limit ? ` · chegara ${x.limit} para (${x.credits} kredit)` : ''}${x.over_students ? ` · <b style="color:var(--bordo-fg)">⛔ ${x.over_students} talaba chegaraga yetgan</b>` : ''}</div></div></div>`).join('')}</div></section>`
+        ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi })}<div class="d">${x.missed_students} / ${x.students} talaba qoldirgan${x.limit ? ` · chegara ${x.limit} para (${x.pairs ? x.pairs + ' para ajratilgan' : x.credits + ' kredit'})` : ''}${x.over_students ? ` · <b style="color:var(--bordo-fg)">⛔ ${x.over_students} talaba chegaraga yetgan</b>` : ''}</div></div></div>`).join('')}</div></section>`
     : `<div class="list">${empty('cal', 'Davomat ma’lumoti yo‘q')}</div>`;
   const body = `<select class="input" id="sgm" aria-label="Guruh" style="margin-bottom:12px"><option value="">Barcha guruhlar — faqat fanlar kesimi</option>
       ${d.groups.map(g => `<option value="${esc(g.name)}" ${g.name === group ? 'selected' : ''}>${esc(g.name)} (${g.students})</option>`).join('')}</select>

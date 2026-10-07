@@ -124,8 +124,13 @@ HINTS: dict[str, dict[str, list[str]]] = {
                     "absent on count", "reasonable", "sababli", "sabablilar soni"],
         "unexcused": ["unexcused", "unexcused count", "unexcused hours", "inexplicable", "absent off",
                       "absent off count", "not explicable", "sababsiz", "sababsizlar soni"],
-        "held": ["held lessons", "held", "conducted", "conducted lessons", "passed lessons", "lessons held",
-                 "total lessons", "lessons count", "lesson count", "otilgan darslar", "otilgan"],
+        "held": ["done lesson count", "done lessons count", "done lessons", "held lessons", "held lesson count",
+                 "conducted lessons", "conducted lesson count", "passed lessons", "lessons held", "held", "conducted",
+                 "otilgan darslar", "otilgan"],
+        # fanga ajratilgan auditoriya darslari (Manage: lessonCount) — 25% chegarasi aynan shundan
+        "planned": ["lesson count", "lessons count", "total lessons", "total lesson count", "planned lessons",
+                    "planned lesson count", "auditorium lessons", "auditorium hours", "auditory hours",
+                    "classroom hours", "ajratilgan darslar", "auditoriya soati", "auditoriya soatlari"],
         "percent": ["attendance percent", "attendance percentage", "attendance rate", "percent", "percentage",
                     "davomat foizi", "foiz"],
         "date": ["lesson date", "date", "attendance date", "sana"],
@@ -140,7 +145,7 @@ CANON = {
     "weekday": "Hafta kuni", "start_time": "Boshlanish", "end_time": "Tugash", "time_range": "Vaqt", "room": "Xona",
     "week_type": "Hafta turi", "subgroup": "Seminar raqami", "attended": "Qatnashganlar soni",
     "absent": "Qatnashmaganlar soni", "excused": "Sabablilar soni", "code": "Fan kodi", "credits": "Kredit",
-    "unexcused": "Sababsiz", "held": "O'tilgan darslar", "percent": "Davomat foizi", "semester": "Semestr",
+    "unexcused": "Sababsiz", "held": "O'tilgan darslar", "planned": "Ajratilgan darslar", "percent": "Davomat foizi", "semester": "Semestr",
 }
 FIELD_NAMES = {
     "hemis_id": "talaba ID (HEMIS)", "full_name": "F.I.Sh.", "group_name": "guruh", "date": "sana", "pair": "juftlik",
@@ -149,6 +154,7 @@ FIELD_NAMES = {
     "time_range": "vaqt", "room": "xona", "week_type": "hafta turi", "subgroup": "kichik guruh",
     "attended": "qatnashgan", "absent": "qatnashmagan (jami)", "excused": "sababli (jami)",
     "code": "fan kodi (kredit)", "credits": "kredit", "unexcused": "sababsiz (jami)", "held": "o'tilgan darslar",
+    "planned": "ajratilgan darslar (para)",
     "percent": "davomat foizi", "semester": "semestr",
 }
 # holat maydoni bo'lmasa — shu so'zli maydonlardan aniqlanadi (HEMIS: explicable, absent_on, absent_off …)
@@ -744,11 +750,17 @@ def subject_rows(records: list[dict]) -> tuple[list[dict], dict]:
         if o is None:
             o = agg[key] = {"hemis_id": hid or None, "full_name": name or None, "group_name": grp or None,
                             "subject": subj, "code": None, "credits": None, "credits_src": None,
-                            "attended": None, "absent": None, "excused": None, "semester": None, "_row": len(agg) + 1}
+                            "attended": None, "absent": None, "excused": None, "semester": None,
+                            "planned": None, "held_n": None, "_row": len(agg) + 1}
         code = cell_str(get(r, "code")).strip()
         if code and not o["code"]:
             o["code"] = code
         o["semester"] = o["semester"] or cell_str(get(r, "semester")).strip() or None
+        # ichma-ich turlari (ma'ruza 15 + seminar 15) alohida yozuv bo'lib keladi — yig'iladi
+        for f, dst in (("planned", "planned"), ("held", "held_n")):
+            v = num(r, f)
+            if v is not None and v >= 0:
+                o[dst] = (o[dst] or 0) + v
         c = parse_float(get(r, "credits"))
         if c and 0 < c <= 30:
             o["credits"], o["credits_src"] = c, "manage"
@@ -837,7 +849,8 @@ async def ingest_subjects(bot, records: list[dict], origin: str = "polling") -> 
             mine, missing = resolve_students([dict(r) for r in rows], await db.student_lookup())
             if not mine:
                 continue
-            sig = sorted((r["student_id"], subject_key(r["subject"]), r["credits"], r["attended"], r["absent"], r["excused"])
+            sig = sorted((r["student_id"], subject_key(r["subject"]), r["credits"], r["planned"], r["held_n"], r["attended"],
+                          r["absent"], r["excused"])
                          for r in mine)
             digest = hashlib.sha256(json.dumps(sig, default=str).encode()).hexdigest()
             prev = await db.get_setting("integ_hash_subjects")
@@ -1411,14 +1424,14 @@ async def _probe_subjects(records: list[dict]) -> list[str]:
     m = info["mapping"]
     ov = overrides().get("subjects", {})
     mode = {"totals": "har bir fan bo'yicha jami sonlar", "lessons": "darslar ro'yxati (holatlar sanaladi)",
-            "credits": "davomat sonlari topilmadi — faqat kreditlar olinadi"}[info["mode"]]
+            "credits": "davomat sonlari YO'Q — faqat fan ma'lumotlari (kredit, ajratilgan darslar) olinadi"}[info["mode"]]
     lines = ["\n<b>Tanilgan maydonlar</b> (maydon ← API dagi nomi):"]
     for f, k in m.items():
         lines.append(f"  • {FIELD_NAMES.get(f, f)} ← <code>{esc(k)}</code>"
                      + (" (soat → para)" if f in ("attended", "absent", "excused", "unexcused", "held") and _in_hours(k) else "")
                      + (" ✋" if ov.get(f) == k else ""))
     miss = [f for f in ("subject",) if f not in m]
-    if not ({"credits", "code"} & set(m)):
+    if not ({"credits", "code", "planned"} & set(m)):
         miss.append("credits")
     if miss:
         lines.append("⚠️ Topilmadi: " + ", ".join(FIELD_NAMES.get(f, f) for f in miss))
@@ -1427,14 +1440,24 @@ async def _probe_subjects(records: list[dict]) -> list[str]:
         lines.append(f"⚠️ {esc(n)}")
     if info["unmapped"]:
         lines.append("Ishlatilmagan maydonlar: " + esc(", ".join(info["unmapped"][:30])) + (" …" if len(info["unmapped"]) > 30 else ""))
+    from subject_limits import limit_from_pairs, limit_pairs
     with_cred = [r for r in rows if r["credits"]]
     with_att = [r for r in rows if r["absent"] is not None]
-    lines.append(f"\nFanlar: {len(rows)}, krediti bor: {len(with_cred)}, davomati bor: {len(with_att)}")
+    with_pl = [r for r in rows if r["planned"]]
+    lines.append(f"\nFanlar: {len(rows)}, krediti bor: {len(with_cred)}, ajratilgan darslar soni bor: {len(with_pl)}, "
+                 f"davomati bor: {len(with_att)}")
     for r in rows[:12]:
         att = (f"qatnashgan {r['attended']:g}, qoldirgan {r['absent']:g} (sababli {r['excused']:g})"
                if r["absent"] is not None else "davomat yo'q")
+        lim = limit_from_pairs(r["planned"]) or limit_pairs(r["credits"])
         lines.append(f"  • {esc(r['subject'])}" + (f" [{esc(r['code'])}]" if r["code"] else "")
-                     + f" — {(str(int(r['credits'])) + ' kredit') if r['credits'] else 'kredit yo‘q'}; {att}")
+                     + (f" — {int(r['credits'])} kredit" if r["credits"] else "")
+                     + (f" — {r['planned']:g} para ajratilgan" + (f", {r['held_n']:g} tasi o'tildi" if r["held_n"] is not None else "")
+                        if r["planned"] else "")
+                     + (f" → chegara {lim} para" if lim else " — chegara noma'lum") + f"; {att}")
+    if rows and not with_att:
+        lines.append("ℹ️ Bu manzilda davomat (qatnashgan / qoldirgan) yo'q. Chegaralar shu yerdan olinadi, davomatning o'zi esa "
+                     "HEMIS fan statistikasi fayllaridan yoki Manage'ning davomat manzilidan (INTEGRATION_ATTENDANCE) keladi.")
     found = 0
     for key in db.keys():
         with use_course(key):
@@ -1469,22 +1492,36 @@ if __name__ == "__main__":
         global PROBE_HEMIS
         args = [a for a in sys.argv[1:] if not a.startswith("--")]
         PROBE_HEMIS = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--hemis=")), None)
-        for kind in [KIND_WORDS.get(a, a) for a in args] or [k for k in KINDS if configured(k)] or list(KINDS):
+        bad = [a for a in args if KIND_WORDS.get(a.lower()) is None]
+        if bad:
+            print(f"Noma'lum tur: {', '.join(bad)}. Mumkin: davomat, jadval, fanlar")
+        kinds = [] if bad else [KIND_WORDS[a.lower()] for a in args] or [k for k in KINDS if configured(k)] or list(KINDS)
+        for kind in kinds:
             print(re.sub(r"<[^>]+>", "", (await probe(kind)).replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")))
-            if "--dump" in sys.argv and configured(kind):
+            if "--dump" in sys.argv:
+                if not configured(kind):
+                    print(f"Javob saqlanmadi: .env da {ENV_NAMES[kind]} to'ldirilmagan (yoki bot uni o'qimadi — yuqoridagi "
+                          ".env tekshiruviga qarang)")
+                    print()
+                    continue
                 try:
                     _, info = await fetch(kind, max_pages=1)
                 except Exception as e:  # noqa: BLE001
-                    print("Saqlanmadi:", _err_text(e))
+                    print("Javob saqlanmadi:", _err_text(e))
                 else:
-                    out = DATA_DIR / f"integration_sample_{kind}.json"
                     raw = info["sample"]
-                    try:
-                        raw = json.dumps(json.loads(_decode(raw)), ensure_ascii=False, indent=2).encode()
-                    except ValueError:
-                        pass
-                    out.write_bytes(raw)
-                    print(f"Javob saqlandi: {out}")
+                    if not raw:
+                        print("Javob saqlanmadi: Manage hech bir talaba uchun javob qaytarmadi (so'rovlar xato bilan tugadi)")
+                    else:
+                        try:
+                            raw = json.dumps(json.loads(_decode(raw)), ensure_ascii=False, indent=2).encode()
+                        except ValueError:
+                            pass
+                        DATA_DIR.mkdir(parents=True, exist_ok=True)
+                        out = (DATA_DIR / f"integration_sample_{kind}.json").resolve()
+                        out.write_bytes(raw)
+                        print(f"Javob saqlandi: {out}")
+                        print("Javob boshi:\n" + _decode(raw)[:2500])
             print()
         await db.close()
         await central.close()

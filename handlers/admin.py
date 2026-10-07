@@ -818,6 +818,16 @@ async def apply_subject_stats(bot, rows: list[dict], silent: bool = False, as_of
     for src, found in creds.items():
         await db.upsert_subject_credits(found, source=src)
     creds = {**creds["code"], **creds["manage"]}
+    pairs: dict[str, tuple] = {}
+    for r in rows:
+        if r.get("planned"):
+            pairs.setdefault(subject_key(r["subject"]) or normalize_text(r["subject"]), (r["subject"], r["planned"], r.get("held_n")))
+    if pairs:
+        await db.set_subject_pairs(pairs)
+        from subject_limits import limit_from_pairs
+        lines.append(f"Fanlarga ajratilgan darslar ({len(pairs)} ta fan) va sababsiz qoldirish chegarasi (25%): " + ", ".join(
+            f"{esc(s)} — {fmt_num(p)} para → {limit_from_pairs(p)} para" + (f" (o'tildi: {fmt_num(h)})" if h is not None else "")
+            for s, p, h in sorted(pairs.values())[:20]) + (" …" if len(pairs) > 20 else ""))
     if creds:
         lines.append(f"Fan kreditlari: {len(creds)} ta fan — " + ", ".join(
             f"{esc(s)} {fmt_num(c)} kr. ({limit_pairs(c)} para)" for s, c, _ in sorted(creds.values())[:20])

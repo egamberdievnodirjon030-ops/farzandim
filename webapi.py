@@ -230,7 +230,7 @@ async def subject_attendance(sid: int) -> dict[str, dict]:
     """Semestr boshidan fanlar bo'yicha davomat: fan kaliti → {pct, kelmadi, sababli, total} (jadvaldagi darsda ko'rsatish
     uchun; fan nomi jadval va davomatda biroz farq qilsa ham — «Fransuz tili I» / «Fransuz tili» — mos tushadi)."""
     import subject_limits
-    cred = await subject_limits.credits_map()
+    cred = await subject_limits.rules_map()
     out: dict[str, dict] = {}
     for (_, k), o in (await per_student_subjects("s.id = ?", (sid,))).items():
         if o["total"]:
@@ -325,7 +325,7 @@ async def api_attendance(request):
             subjects[o["subject"]] = {"subject": loc.term(o["subject"]), "total": round(o["total"]), "keldi": round(o["came"]),
                                       "kechikdi": 0, "kelmadi": round(o["kelmadi"]), "sababli": round(o["sababli"])}
     import subject_limits
-    cred = await subject_limits.credits_map()
+    cred = await subject_limits.rules_map()
     for x in subjects.values():
         x.update(subject_limits.evaluate(x["kelmadi"], cred.get(subject_key(x["subject"]) or normalize_text(x["subject"]))))
     absences = [{"date": r["date"], "weekday": tr(WEEKDAYS[date.fromisoformat(r["date"]).weekday()]), "pair": r["pair"],
@@ -846,13 +846,14 @@ async def _subject_rows(where: str, params: list | None = None) -> list[dict]:
     """Fanlar kesimidagi davomat (semestr boshidan): darslar, keldi %, sababsiz, sababli, qoldirgan talabalar."""
     import subject_limits
     info = await subject_limits.credits_info()
-    cred = {k: v["credits"] for k, v in info.items()}
+    cred = await subject_limits.rules_map()
     merged: dict[str, dict] = {}
     for (_, k), o in (await per_student_subjects(where, params or ())).items():
         m = merged.setdefault(k, {"subject": loc.term(o["subject"] or ""), "key": k, "total": 0, "came": 0, "kelmadi": 0,
                                   "sababli": 0, "students": 0, "missed_students": 0, "over_students": 0, "warn_students": 0,
                                   **subject_limits.evaluate(0, cred.get(k)),
-                                  "credits_src": (info.get(k) or {}).get("src"), "code": (info.get(k) or {}).get("code")})
+                                  "credits_src": (info.get(k) or {}).get("src"), "code": (info.get(k) or {}).get("code"),
+                                  "held": (info.get(k) or {}).get("held")})
         ev = subject_limits.evaluate(o["kelmadi"], cred.get(k))
         m["over_students"] += ev["state"] == "over"
         m["warn_students"] += ev["state"] == "warn"
@@ -866,7 +867,7 @@ async def _subject_rows(where: str, params: list | None = None) -> list[dict]:
             m[f] = round(m[f])
         m["pct"] = round(100 * m["came"] / m["total"]) if m["total"] else None
         if m["students"] == 1:  # bitta talaba (talaba kartasi) — uning holati
-            m.update(subject_limits.evaluate(m["kelmadi"], m["credits"]))
+            m.update(subject_limits.evaluate(m["kelmadi"], cred.get(m["key"])))
         out.append(m)
     return sorted(out, key=lambda x: (-(x["over_students"]), x["pct"] if x["pct"] is not None else 101, x["subject"]))
 
@@ -939,7 +940,7 @@ async def api_staff_subject_students(request):
         return bad("forbidden", 403)
     where, params = cond
     import subject_limits
-    credits = (await subject_limits.credits_map()).get(key)
+    credits = (await subject_limits.rules_map()).get(key)
     items = []
     for (_, k), o in (await per_student_subjects(where, params)).items():
         if k != key or not o["total"]:
