@@ -76,7 +76,7 @@ def hemis_periods(hist: list[dict]) -> list[dict]:
 
 def source_note(sm: dict) -> str:
     if sm["source"] == "hemis" and sm.get("subjects"):
-        return tr("HEMIS: {n} ta fan bo'yicha yig'indi, {d} holatiga", n=sm["subjects"], d=fmt_date(sm['as_of'], False))
+        return tr("{n} ta fan bo'yicha yig'indi, {d} holatiga", n=sm["subjects"], d=fmt_date(sm['as_of'], False))
     return (tr("HEMIS ma'lumoti, {d} holatiga", d=fmt_date(sm['as_of'], False)) if sm["source"] == "hemis"
             else tr("kunlik davomat bo'yicha"))
 

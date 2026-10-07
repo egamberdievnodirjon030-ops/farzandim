@@ -118,7 +118,9 @@ HINTS: dict[str, dict[str, list[str]]] = {
         "code": ["subject code", "course code", "discipline code", "code", "fan kodi", "kod"],
         "credits": ["credit", "credits", "credit count", "credits count", "subject credit", "subject credits",
                     "total credit", "total credits", "credit amount", "kredit", "kreditlar", "ects"],
-        "attended": ["attended", "attended count", "attended lessons", "attended hours", "present", "present count",
+        # Manage: attendedAmount — talaba kelgan darslar, totalAttendedLessonAmount — o'tilgan (yo'qlama qilingan)
+        # darslar, totalLessonAmount — fanga ajratilgan darslar, percentAttendedAmount — kelgan / o'tilgan
+        "attended": ["attended amount", "attended", "attended count", "attended lessons", "attended hours", "present", "present count",
                      "presence count", "visited", "visited count", "qatnashgan", "qatnashganlar soni"],
         "absent": ["absent count", "absent total", "total absent", "absent", "absent lessons", "absent hours",
                    "absences", "absence count", "missed", "missed count", "missed hours", "missed lessons", "nb",
@@ -127,14 +129,14 @@ HINTS: dict[str, dict[str, list[str]]] = {
                     "absent on count", "reasonable", "sababli", "sabablilar soni"],
         "unexcused": ["unexcused", "unexcused count", "unexcused hours", "inexplicable", "absent off",
                       "absent off count", "not explicable", "sababsiz", "sababsizlar soni"],
-        "held": ["done lesson count", "done lessons count", "done lessons", "held lessons", "held lesson count",
+        "held": ["total attended lesson amount", "attended lesson amount", "done lesson count", "done lessons count", "done lessons", "held lessons", "held lesson count",
                  "conducted lessons", "conducted lesson count", "passed lessons", "lessons held", "held", "conducted",
                  "otilgan darslar", "otilgan"],
         # fanga ajratilgan auditoriya darslari (Manage: lessonCount) — 25% chegarasi aynan shundan
-        "planned": ["lesson count", "lessons count", "total lessons", "total lesson count", "planned lessons",
+        "planned": ["total lesson amount", "lesson amount", "lesson count", "lessons count", "total lessons", "total lesson count", "planned lessons",
                     "planned lesson count", "auditorium lessons", "auditorium hours", "auditory hours",
                     "classroom hours", "ajratilgan darslar", "auditoriya soati", "auditoriya soatlari"],
-        "percent": ["attendance percent", "attendance percentage", "attendance rate", "percent", "percentage",
+        "percent": ["percent attended amount", "attendance percent", "attendance percentage", "attendance rate", "percent", "percentage",
                     "davomat foizi", "foiz"],
         "date": ["lesson date", "date", "attendance date", "sana"],
         "status": ["attendance status", "status", "holat"],
@@ -984,6 +986,8 @@ def subject_rows(records: list[dict]) -> tuple[list[dict], dict]:
         if not totals:
             continue
         att, ab, ex, un = val("attended"), val("absent"), val("excused"), val("unexcused")
+        if ab is None and un is None and att is not None and val("held") is not None:
+            ab = max(val("held") - att, 0)  # Manage: o'tilgan (yo'qlama qilingan) − kelgan; sababli ajratilmaydi
         if ab is None and un is not None:
             ab = un + (ex or 0)
         if ex is None and un is not None and ab is not None:
