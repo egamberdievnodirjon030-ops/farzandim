@@ -8,8 +8,9 @@
 (function (root) {
   'use strict';
 
-  // Eski matnlarda apostrof örnida uçraydigan belgilar: ' ` ‘ ’ ʻ ʼ ´
-  var APOS = "'`‘’ʻʼ´";
+  // Eski matnlarda o', g' va tutuq örnida uçraydigan barça apostrof şakllari:
+  // ' ` ´ ‘ ’ ‛ ′ ʹ ʻ ʼ ʽ ＇
+  var APOS = "'`\u00B4\u2018\u2019\u201B\u2032\u02B9\u02BB\u02BC\u02BD\uFF07";
   var TUTUQ = 'ʼ';
   var NEW = { s: 'ş', S: 'Ş', c: 'ç', C: 'Ç', o: 'ö', O: 'Ö', g: 'ğ', G: 'Ğ' };
 
@@ -65,13 +66,23 @@
     var to = Math.min(value.length, endNew + 1);
     var seg = value.slice(from, to);
     var conv = convert(seg);
-    if (conv === seg) return null;
 
     var next = value.slice(0, from) + conv + value.slice(to);
     var pos = caret >= to
       ? caret + conv.length - seg.length
       : from + convert(value.slice(from, Math.max(from, caret))).length;
-    return { value: next, caret: Math.min(pos, next.length) };
+    pos = Math.min(pos, next.length);
+
+    // o' yozilişi bilan darhol ö bölsin (keyingi harfni kutmasdan), xuddi klaviaturadagidek
+    if (endNew - start === 1 && pos >= 2 && APOS.indexOf(next.charAt(pos - 1)) >= 0) {
+      var o = next.charAt(pos - 2);
+      if (o === 'o' || o === 'O') {
+        next = next.slice(0, pos - 2) + NEW[o] + next.slice(pos);
+        pos -= 1;
+      }
+    }
+    if (next === value) return null;
+    return { value: next, caret: pos };
   }
 
   var api = { convert: convert, convertPlain: convertPlain, liveUpdate: liveUpdate };

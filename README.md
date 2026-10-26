@@ -6,11 +6,11 @@ Eski lotin yozuvida qanday yozgan bölsangiz, şunday yozavering. Matn yangi (20
 |---|---|---|
 | `sh` | **ş** | Sherzod → Şerzod |
 | `ch` | **ç** | choy → çoy |
-| `o'` (yoki `o‘`, `` o` ``) | **ö** | O'zbekiston → Özbekiston |
-| `g'` (yoki `g‘`, `` g` ``) | **ğ** | tog' → toğ |
+| `o'` `o‘` `o’` `oʻ` `` o` `` | **ö** | O'zbekiston → Özbekiston |
+| `g'` `g‘` `g’` `gʻ` `` g` `` | **ğ** | tog' → toğ |
 | harf + `'` | **ʼ** (tutuq belgisi) | ma'no → maʼno |
 
-Katta harflar ham işlaydi: `SH` / `Sh` → Ş, `O'` → Ö. `ng` özgarmaydi.
+Apostrofning qaysi şaklini işlatsangiz ham (`'` `‘` `’` `ʻ` `` ` `` va boşqalar) ögiriladi. Katta harflar ham işlaydi: `SH` / `Sh` → Ş, `O'` → Ö. `ng` özgarmaydi.
 
 ## Nimalar bor
 

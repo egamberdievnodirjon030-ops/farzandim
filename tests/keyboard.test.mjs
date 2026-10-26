@@ -90,6 +90,8 @@ const cases = [
   ["O'zbekiston", 'Özbekiston'],
   ["o'zbek", 'özbek'],
   ['o`zbek', 'özbek'],
+  ['O`ZBEK G`ULOM', 'ÖZBEK ĞULOM'],
+  ["tog`da bog'da", 'toğda boğda'],
   ["G'afur G'ulom", 'Ğafur Ğulom'],
   ["tog'", 'toğ'],
   ["bog'cha", 'boğça'],

@@ -81,6 +81,26 @@ test('qöyiş (paste): butun bölak ögiriladi', () => {
   assert.deepEqual(r, { value: 'Matn: Özbekiston, Toşkent şahri', caret: 31 });
 });
 
-test('öçiriş hech narsani özgartirmaydi', () => {
+test('öçiriş heç narsani özgartirmaydi', () => {
   assert.equal(liveUpdate('sah', 'sh', 1), null);
+});
+
+// o', g' va tutuq uçun barça apostrof şakllari
+const APOS_FORMS = ["'", '`', '´', '‘', '’', '‛', '′', 'ʹ', 'ʻ', 'ʼ', 'ʽ', '＇'];
+
+for (const a of APOS_FORMS) {
+  const cp = 'U+' + a.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+  test(`apostrof şakli ${a} (${cp})`, () => {
+    assert.equal(convert(`O${a}zbekiston, tog${a}, ko${a}cha, ma${a}no`), 'Özbekiston, toğ, köça, maʼno');
+    assert.equal(typeLive(`O${a}zbekiston, tog${a}, ko${a}cha, ma${a}no`).value, 'Özbekiston, toğ, köça, maʼno');
+    // yozayotganda keyingi harfni kutmasdan darhol ögiriladi
+    assert.deepEqual(typeLive(`o${a}`), { value: 'ö', caret: 1 });
+    assert.deepEqual(typeLive(`O${a}`), { value: 'Ö', caret: 1 });
+    assert.deepEqual(typeLive(`g${a}`), { value: 'ğ', caret: 1 });
+  });
+}
+
+test("joylangan matnda qöştirnoq ('kino') ö ga aylanmaydi", () => {
+  const value = "'kino' ko'rdik";
+  assert.equal(liveUpdate('', value, value.length).value, "'kino' kördik");
 });
