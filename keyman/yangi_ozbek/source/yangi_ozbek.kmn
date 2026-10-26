@@ -10,11 +10,14 @@ c
 c Ögirmasdan yoziş kerak bölsa (masalan, email manzil):
 c   kompyuterda — AltGr (öng Alt) + H / ' / `
 c   telefonda   — "s" yoki "c" tugmasini bosib turing → "sh" / "ch"
+c
+c Yangi harflarni 2 ta tugma bilan yoziş: AltGr + S / C / O / G → ş ç ö ğ
+c (Caps Lock yoniq bölsa → Ş Ç Ö Ğ)
 
 store(&NAME) 'Yangi Özbek Lotin'
 store(&COPYRIGHT) '© 2026 egamberdievnodirjon030-ops'
 store(&VERSION) '10.0'
-store(&KEYBOARDVERSION) '1.0'
+store(&KEYBOARDVERSION) '1.1'
 store(&TARGETS) 'any'
 store(&BITMAP) 'yangi_ozbek.ico'
 store(&VISUALKEYBOARD) 'yangi_ozbek.kvks'
@@ -38,15 +41,14 @@ store(tutuqAfter) 'abcdefhijklmnpqrstuvwxyz' 'ABCDEFHIJKLMNPQRSTUVWXYZ' 'şŞç�
 
 group(main) using keys
 
-c AltGr + harf: yangi harflarni bitta tugma bilan yoziş
-+ [RALT K_S] > 'ş'
-+ [SHIFT RALT K_S] > 'Ş'
-+ [RALT K_C] > 'ç'
-+ [SHIFT RALT K_C] > 'Ç'
-+ [RALT K_O] > 'ö'
-+ [SHIFT RALT K_O] > 'Ö'
-+ [RALT K_G] > 'ğ'
-+ [SHIFT RALT K_G] > 'Ğ'
+c AltGr + harf: yangi harflarni 2 ta tugma bilan yoziş.
+c Caps Lock yoniq bölsa, xuddi şu 2 ta tugma boş harf beradi (Shift ham işlaydi).
+store(altKey)   [NCAPS RALT K_S] [NCAPS RALT K_C] [NCAPS RALT K_O] [NCAPS RALT K_G] \
+                [CAPS RALT K_S]  [CAPS RALT K_C]  [CAPS RALT K_O]  [CAPS RALT K_G] \
+                [NCAPS SHIFT RALT K_S] [NCAPS SHIFT RALT K_C] [NCAPS SHIFT RALT K_O] [NCAPS SHIFT RALT K_G] \
+                [CAPS SHIFT RALT K_S]  [CAPS SHIFT RALT K_C]  [CAPS SHIFT RALT K_O]  [CAPS SHIFT RALT K_G]
+store(altOut)   'şçöğ' 'ŞÇÖĞ' 'ŞÇÖĞ' 'şçöğ'
++ any(altKey) > index(altOut, 1)
 
 c AltGr + h / ' / `: ögirmasdan oddiy belgi (sherzod@mail.uz kabi)
 + [RALT K_H] > 'h'

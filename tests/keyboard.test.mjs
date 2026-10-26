@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const SHIFT = 0x10, RALT = 0x08;
+const SHIFT = 0x10, RALT = 0x08, CAPS = 0x100, NCAPS = 0x200;
 const source = readFileSync(new URL('../keyman/yangi_ozbek/build/yangi_ozbek.js', import.meta.url), 'utf8');
 
 // KeymanWeb'ning kompilyatsiya qilingan qoidalar çaqiradigan qismi
@@ -14,7 +14,12 @@ function loadKeyboard() {
   let anyIndices = [];
   const KeymanWeb = {
     KR: (kbd) => { keyboard = kbd; },
-    KKM: (e, ruleShift, ruleKey) => e.Lcode === ruleKey && (ruleShift & 0xff) === e.Lmodifiers,
+    KKM: (e, ruleShift, ruleKey) => {
+      if (e.Lcode !== ruleKey || (ruleShift & 0x7f) !== (e.Lmodifiers & 0x7f)) return false;
+      if (ruleShift & CAPS) return Boolean(e.Lmodifiers & CAPS);
+      if (ruleShift & NCAPS) return !(e.Lmodifiers & CAPS);
+      return true;
+    },
     KFCM: (n, t, spec) => {
       const ctx = [...t.text].slice(-n);
       if (ctx.length < n) return false;
@@ -57,14 +62,18 @@ function press(t, code, mods, fallback) {
 }
 
 // Matnni xuddi klaviaturada terganday kiritadi.
-// {AltGr+x} — öng Alt bilan, {T_SH} — telefon tugmasi, {U+015F} — telefondagi tayyor harf.
+// {AltGr+x} — öng Alt bilan, {Caps} — Caps Lock'ni yoqiş/öçiriş,
+// {T_SH} — telefon tugmasi, {U+015F} — telefondagi tayyor harf.
 function type(input) {
   const t = { text: '' };
+  let caps = 0;
   for (const [, special, ch] of input.matchAll(/\{([^}]+)\}|(.)/gsu)) {
-    if (special?.startsWith('AltGr+')) {
+    if (special === 'Caps') {
+      caps ^= CAPS;
+    } else if (special?.startsWith('AltGr+')) {
       const c = special.slice(6);
       const [code, shift] = US[c];
-      press(t, code, RALT | shift);
+      press(t, code, RALT | shift | caps);
     } else if (special?.startsWith('T_')) {
       const i = touchKeys.indexOf(special);
       assert.ok(i >= 0, `${special} touch tugmasi yöq`);
@@ -73,7 +82,9 @@ function type(input) {
       t.text += String.fromCodePoint(parseInt(special.slice(2), 16));
     } else {
       const [code, shift] = US[ch];
-      press(t, code, shift, ch);
+      const isLetter = code >= 65 && code <= 90;
+      const out = isLetter && caps ? (shift ? ch.toLowerCase() : ch.toUpperCase()) : ch;
+      press(t, code, shift | caps, out);
     }
   }
   return t.text;
@@ -105,6 +116,13 @@ const cases = [
   // AltGr bilan
   ['{AltGr+s}{AltGr+c}{AltGr+o}{AltGr+g}', 'şçöğ'],
   ['{AltGr+S}{AltGr+C}{AltGr+O}{AltGr+G}', 'ŞÇÖĞ'],
+  // Caps Lock yoniq: AltGr + harf (2 ta tugma) → boş harf
+  ['{Caps}{AltGr+s}{AltGr+c}{AltGr+o}{AltGr+g}', 'ŞÇÖĞ'],
+  ['{Caps}{AltGr+S}{AltGr+C}{AltGr+O}{AltGr+G}', 'şçöğ'],
+  ['{AltGr+S}erzod {AltGr+O}zbekistonda', 'Şerzod Özbekistonda'],
+  ['{Caps}{AltGr+s}{Caps}erzod', 'Şerzod'],
+  // Caps Lock yoniq: eski usul ham işlaydi
+  ["{Caps}sherzod o'zbekiston", 'ŞERZOD ÖZBEKISTON'],
   ['s{AltGr+h}erzod@mail.uz', 'sherzod@mail.uz'],
   ["o{AltGr+'}", "o'"],
   ['o{AltGr+`}', 'o`'],

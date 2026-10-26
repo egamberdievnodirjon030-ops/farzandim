@@ -242,6 +242,7 @@
         </table>
       </div>
       <p class="note">Apostrofning qaysi şaklini işlatsangiz ham (' ‘ ’ ʻ ` va boşqalar), o' darhol ö ga, g' esa ğ ga ögiriladi.</p>
+      <p class="note"><b>2 ta tugma bilan:</b> <kbd>AltGr</kbd> + <kbd>S</kbd> → ş, <kbd>AltGr</kbd> + <kbd>C</kbd> → ç, <kbd>AltGr</kbd> + <kbd>O</kbd> → ö, <kbd>AltGr</kbd> + <kbd>G</kbd> → ğ. Caps Lock yoniq bölsa, xuddi şu tugmalar Ş Ç Ö Ğ beradi. AltGr — öng Alt tugmasi, Mac'da Option.</p>
       <p class="note">Yangi alifboda 28 ta harf va 1 ta tutuq belgisi (ʼ) bor. «ng» alohida harf hisoblanmaydi, lekin yozuvda özgarmaydi: dengiz → dengiz.</p>
     </section>
 
@@ -280,7 +281,7 @@
         </div>
       </div>
       <div class="tips">
-        <p><b>Kompyuterda:</b> <kbd>AltGr</kbd> + <kbd>S</kbd> <kbd>C</kbd> <kbd>O</kbd> <kbd>G</kbd> bilan ş ç ö ğ darhol çiqadi. Ögirmasdan «sh» kerak bölsa (email, havola): <kbd>s</kbd>, keyin <kbd>AltGr</kbd> + <kbd>H</kbd>.</p>
+        <p><b>Kompyuterda:</b> <kbd>AltGr</kbd> + <kbd>S</kbd> <kbd>C</kbd> <kbd>O</kbd> <kbd>G</kbd> bilan ş ç ö ğ darhol çiqadi, Caps Lock yoniq bölsa Ş Ç Ö Ğ. Ögirmasdan «sh» kerak bölsa (email, havola): <kbd>s</kbd>, keyin <kbd>AltGr</kbd> + <kbd>H</kbd>.</p>
         <p><b>Telefonda:</b> yuqori qatorda Ö Ğ Ş Ç tugmalari bor. Ögirmasdan «sh» kerak bölsa, <kbd>s</kbd> tugmasini bosib turing va «sh»ni tanlang.</p>
       </div>
     </section>
@@ -384,18 +385,30 @@
     }
   });
 
+  // Tayyor harfni ögirmasdan qöyadi
+  function insertText(ch) {
+    ta.setRangeText(ch, ta.selectionStart, ta.selectionEnd, 'end');
+    prev = ta.value;
+    save(STORE_TEXT, ta.value);
+    count();
+  }
+
   // Harf tugmalari: klaviatura yopilib qolmasligi uçun fokus maydonda qoladi
   Array.prototype.forEach.call(document.querySelectorAll('.ins'), function (btn) {
     btn.addEventListener('pointerdown', function (e) { e.preventDefault(); });
     btn.addEventListener('click', function () {
-      var ch = btn.getAttribute('data-ch');
-      var s = ta.selectionStart, e = ta.selectionEnd;
-      ta.setRangeText(ch, s, e, 'end');
+      insertText(btn.getAttribute('data-ch'));
       ta.focus();
-      prev = ta.value;
-      save(STORE_TEXT, ta.value);
-      count();
     });
+  });
+
+  // AltGr (Mac'da Option) + S / C / O / G → ş ç ö ğ; Caps Lock yoki Shift bilan → Ş Ç Ö Ğ
+  var ALT_LETTERS = { KeyS: 'ş', KeyC: 'ç', KeyO: 'ö', KeyG: 'ğ' };
+  ta.addEventListener('keydown', function (e) {
+    var ch = ALT_LETTERS[e.code];
+    if (!ch || e.metaKey || !(e.altKey || e.getModifierState('AltGraph'))) return;
+    e.preventDefault();
+    insertText(e.shiftKey !== e.getModifierState('CapsLock') ? ch.toUpperCase() : ch);
   });
 
   // "Sinab köring": söz harfma-harf yoziladi, ögiriş közga körinadi

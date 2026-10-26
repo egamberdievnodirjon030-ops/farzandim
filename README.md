@@ -42,7 +42,7 @@ Apostrofning qaysi şaklini işlatsangiz ham (`'` `‘` `’` `ʻ` `` ` `` va bo
 
 | | Kompyuter | Telefon |
 |---|---|---|
-| Yangi harfni bitta tugma bilan | `AltGr` + `S` `C` `O` `G` (Shift bilan: Ş Ç Ö Ğ) | yuqori qatordagi Ö Ğ Ş Ç tugmalari |
+| Yangi harfni 2 ta tugma bilan | `AltGr` + `S` `C` `O` `G` → ş ç ö ğ; `Caps Lock` yoniq bölsa → Ş Ç Ö Ğ | yuqori qatordagi Ö Ğ Ş Ç tugmalari |
 | Ögirmasdan «sh» / «ch» (email, havola) | `s`, keyin `AltGr` + `H` | `s` yoki `c`ni bosib turing → «sh» / «ch» |
 | Oddiy apostrof `'` | `AltGr` + `'` | `ʼ` tugmasini bosib turing → `'` |
 
