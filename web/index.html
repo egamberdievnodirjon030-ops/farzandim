@@ -1,0 +1,425 @@
+<title>Yangi Alifbo Klaviaturasi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Eski lotin yozuvida yozing, matn yangi (2026) özbek alifbosida çiqadi: sh → ş, ch → ç, o' → ö, g' → ğ.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Layout: bitta ustun; tepada eski → yangi tugmalar, örtada yozuv maydoni, pastda qoidalar va örnatiş */
+  :root {
+    --bg: #f3f6fa;
+    --surface: #ffffff;
+    --ink: #142036;
+    --muted: #56657c;
+    --line: #d6dee9;
+    --accent: #1d4fb8;
+    --accent-soft: #e5edfb;
+    --new: #0b7f6c;
+    --new-soft: #e1f4ef;
+    --key: #fbfcfe;
+    --key-edge: #c3cedd;
+    --font-display: "Unbounded", "Trebuchet MS", system-ui, sans-serif;
+    --font-body: "Onest", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-key: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d131e; --surface: #151d2b; --ink: #e5ebf4; --muted: #95a4ba; --line: #263247;
+      --accent: #85a9ff; --accent-soft: #1b2741; --new: #4fd0b4; --new-soft: #12302b;
+      --key: #1b2536; --key-edge: #34435c; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d131e; --surface: #151d2b; --ink: #e5ebf4; --muted: #95a4ba; --line: #263247;
+    --accent: #85a9ff; --accent-soft: #1b2741; --new: #4fd0b4; --new-soft: #12302b;
+    --key: #1b2536; --key-edge: #34435c; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 16px/1.55 var(--font-body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 48px;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 44px; }
+  h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(1.6rem, 5vw, 2.4rem); font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
+  h2 { font-size: 1.2rem; font-weight: 500; }
+  p { margin: 0; }
+  a { color: var(--accent); }
+  table { font: inherit; }
+  .lead { color: var(--muted); max-width: 60ch; margin-top: 10px; font-size: 1.05rem; }
+  .eyebrow { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  /* Tugma qopqoqlari */
+  kbd, .cap {
+    font-family: var(--font-key);
+    font-weight: 700;
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.1em;
+    height: 2.1em;
+    padding: 0 0.45em;
+    border: 1px solid var(--key-edge);
+    border-bottom-width: 3px;
+    border-radius: 7px;
+    background: var(--key);
+    color: var(--ink);
+    line-height: 1;
+  }
+  kbd { font-size: 0.85em; min-width: 1.9em; height: 1.9em; }
+  .cap.new { background: var(--new-soft); border-color: var(--new); color: var(--new); }
+
+  .map { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 22px; }
+  .pair { display: flex; align-items: center; gap: 6px; font-size: 1.2rem; }
+  .pair .arrow { color: var(--muted); margin: 0 4px; font-family: var(--font-key); }
+
+  /* Yozuv maydoni */
+  .editor { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .toolbar .spacer { flex: 1; }
+  .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; user-select: none; }
+  .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .switch .track { width: 42px; height: 24px; border-radius: 12px; background: var(--line); position: relative; transition: background .15s; flex: none; }
+  .switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+  .switch input:checked + .track { background: var(--new); }
+  .switch input:checked + .track::after { transform: translateX(18px); }
+  .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn {
+    font: 500 0.92rem var(--font-body);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:focus-visible, .chip:focus-visible, .ins:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+  .btn.primary:hover { color: var(--surface); filter: brightness(1.08); }
+  textarea {
+    display: block;
+    width: 100%;
+    min-height: 220px;
+    resize: vertical;
+    border: 0;
+    padding: 16px;
+    font: 400 1.15rem/1.6 var(--font-body);
+    color: var(--ink);
+    background: var(--surface);
+  }
+  textarea:focus { outline: none; }
+  .editor:focus-within { border-color: var(--accent); }
+  .under { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid var(--line); }
+  .ins { font-size: 1.05rem; cursor: pointer; }
+  .ins:hover { border-color: var(--new); color: var(--new); }
+  .count { margin-left: auto; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  .status { color: var(--new); font-size: 0.88rem; font-weight: 600; min-height: 1.2em; }
+  .try { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+  .try .label { color: var(--muted); font-size: 0.9rem; margin-right: 2px; }
+  .chip {
+    font: 500 0.92rem var(--font-key);
+    border: 1px dashed var(--key-edge);
+    background: transparent;
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .chip:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
+  .hint { color: var(--muted); font-size: 0.9rem; margin-top: 10px; }
+
+  /* Qoidalar jadvali */
+  .table-wrap { overflow-x: auto; margin-top: 14px; }
+  .rules { width: 100%; border-collapse: collapse; min-width: 420px; }
+  .rules th, .rules td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .rules th { font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .rules .ex { color: var(--muted); }
+  .rules .ex b { color: var(--ink); font-weight: 600; }
+  .note { color: var(--muted); margin-top: 12px; max-width: 65ch; }
+
+  /* Örnatiş */
+  .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 16px; }
+  .platform { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+  .platform h3 { margin: 0 0 8px; font: 600 1rem var(--font-body); }
+  .platform ol { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 0.95rem; }
+  .download { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; align-items: center; }
+  .download a.btn { text-decoration: none; display: inline-block; }
+  .download code { font-family: var(--font-key); font-size: 0.85rem; color: var(--muted); }
+  .tips { margin-top: 16px; display: grid; gap: 8px; color: var(--ink); }
+  .tips p { color: var(--muted); }
+
+  footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); padding-top: 16px; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media (max-width: 480px) {
+    .wrap, .stack { gap: 32px; }
+    textarea { min-height: 180px; font-size: 1.08rem; }
+    .toolbar .spacer { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .switch .track, .switch .track::after { transition: none; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Özbek lotin alifbosi · 2026</p>
+    <h1>Yangi alifbo klaviaturasi</h1>
+    <p class="lead">Odatdagidek eski usulda yozing, harflar yozayotganingizda yangi alifboga özi ögiriladi. Masalan, Sherzod deb yozsangiz, Şerzod çiqadi.</p>
+    <div class="map" aria-label="Eski yozuv va yangi harflar">
+      <span class="pair"><span class="cap">s</span><span class="cap">h</span><span class="arrow">→</span><span class="cap new">ş</span></span>
+      <span class="pair"><span class="cap">c</span><span class="cap">h</span><span class="arrow">→</span><span class="cap new">ç</span></span>
+      <span class="pair"><span class="cap">o</span><span class="cap">'</span><span class="arrow">→</span><span class="cap new">ö</span></span>
+      <span class="pair"><span class="cap">g</span><span class="cap">'</span><span class="arrow">→</span><span class="cap new">ğ</span></span>
+    </div>
+  </header>
+
+  <main class="stack">
+    <section aria-labelledby="yozish-h">
+      <h2 id="yozish-h" class="sr-only">Yoziş</h2>
+      <div class="editor">
+        <div class="toolbar">
+          <label class="switch" for="auto">
+            <input type="checkbox" id="auto" checked>
+            <span class="track" aria-hidden="true"></span>
+            <span>Avtomatik ögiriş</span>
+          </label>
+          <span class="spacer"></span>
+          <button type="button" class="btn primary" id="copy">Nusxa oliş</button>
+          <button type="button" class="btn" id="convert-all">Hammasini ögiriş</button>
+          <button type="button" class="btn" id="clear">Tozalaş</button>
+        </div>
+        <label for="matn" class="sr-only">Matn</label>
+        <textarea id="matn" spellcheck="false" autocapitalize="sentences" autocomplete="off" placeholder="Şu yerga yozing: Sherzod, O'zbekiston, choy…"></textarea>
+        <div class="under">
+          <span class="sr-only">Harf qöşiş:</span>
+          <button type="button" class="cap ins" data-ch="ö">ö</button>
+          <button type="button" class="cap ins" data-ch="ğ">ğ</button>
+          <button type="button" class="cap ins" data-ch="ş">ş</button>
+          <button type="button" class="cap ins" data-ch="ç">ç</button>
+          <button type="button" class="cap ins" data-ch="Ö">Ö</button>
+          <button type="button" class="cap ins" data-ch="Ğ">Ğ</button>
+          <button type="button" class="cap ins" data-ch="Ş">Ş</button>
+          <button type="button" class="cap ins" data-ch="Ç">Ç</button>
+          <button type="button" class="cap ins" data-ch="ʼ" title="Tutuq belgisi">ʼ</button>
+          <span class="count" id="count">0 belgi</span>
+        </div>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <div class="try">
+        <span class="label">Sinab köring:</span>
+        <button type="button" class="chip" data-type="Sherzod">Sherzod</button>
+        <button type="button" class="chip" data-type="O'zbekiston">O'zbekiston</button>
+        <button type="button" class="chip" data-type="choy ichdik">choy ichdik</button>
+        <button type="button" class="chip" data-type="tog'ga chiqdik">tog'ga chiqdik</button>
+        <button type="button" class="chip" data-type="ma'no">ma'no</button>
+      </div>
+      <p class="hint">Eski yozuvdagi matnni joylasangiz (Ctrl+V), u ham darhol ögiriladi, undagi email va havolalar esa özgarmaydi. Email yoki havolani qöldan yozayotganda «Avtomatik ögiriş»ni öçirib turing.</p>
+    </section>
+
+    <section aria-labelledby="qoida-h">
+      <h2 id="qoida-h">Qaysi harf nimaga ögiriladi</h2>
+      <div class="table-wrap">
+        <table class="rules">
+          <thead>
+            <tr><th>Eski yozuv</th><th>Yangi alifbo</th><th>Misol</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>sh</kbd> <kbd>Sh</kbd></td><td><span class="cap new">ş</span> <span class="cap new">Ş</span></td><td class="ex">Shahar → <b>Şahar</b></td></tr>
+            <tr><td><kbd>ch</kbd> <kbd>Ch</kbd></td><td><span class="cap new">ç</span> <span class="cap new">Ç</span></td><td class="ex">choy → <b>çoy</b></td></tr>
+            <tr><td><kbd>oʻ</kbd> <kbd>o'</kbd> <kbd>o`</kbd></td><td><span class="cap new">ö</span> <span class="cap new">Ö</span></td><td class="ex">Oʻzbekiston → <b>Özbekiston</b></td></tr>
+            <tr><td><kbd>gʻ</kbd> <kbd>g'</kbd> <kbd>g`</kbd></td><td><span class="cap new">ğ</span> <span class="cap new">Ğ</span></td><td class="ex">togʻ → <b>toğ</b></td></tr>
+            <tr><td>harf + <kbd>'</kbd></td><td><span class="cap new">ʼ</span></td><td class="ex">ma'no → <b>maʼno</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Yangi alifboda 28 ta harf va 1 ta tutuq belgisi (ʼ) bor. «ng» alohida harf hisoblanmaydi, lekin yozuvda özgarmaydi: dengiz → dengiz.</p>
+    </section>
+
+    <section aria-labelledby="ornat-h">
+      <h2 id="ornat-h">Kompyuter va telefonga örnatiş</h2>
+      <p class="note">Bu sahifa brauzerda işlaydi. Har qanday dasturda (Word, Telegram, brauzer) şunday yoziş uçun bepul Keyman dasturi orqali «Yangi Özbek Lotin» klaviaturasini örnating.</p>
+      <div class="download">
+        <a class="btn primary" href="https://github.com/egamberdievnodirjon030-ops/farzandim/raw/ccr-b8bea070-9rcpnz/dist/yangi_ozbek.kmp" target="_blank" rel="noopener">Klaviaturani yuklab oliş</a>
+        <a class="btn" href="https://keyman.com/downloads/" target="_blank" rel="noopener">Keyman dasturi</a>
+        <code>yangi_ozbek.kmp · 10 KB</code>
+      </div>
+      <div class="platforms">
+        <div class="platform">
+          <h3>Windows, macOS, Linux</h3>
+          <ol>
+            <li>keyman.com saytidan Keyman'ni örnating.</li>
+            <li><b>yangi_ozbek.kmp</b> faylini ikki marta bosing va «Install»ni tanlang.</li>
+            <li>Windows'da klaviaturani <kbd>Win</kbd> + <kbd>Space</kbd> bilan almaştiring.</li>
+          </ol>
+        </div>
+        <div class="platform">
+          <h3>Android</h3>
+          <ol>
+            <li>Play Market'dan «Keyman» ilovasini örnating va uni tizim klaviaturasi sifatida yoqing (ilova özi körsatadi).</li>
+            <li>Keyman'da: Settings → Install Keyboard or Dictionary → Install from local file → <b>yangi_ozbek.kmp</b>.</li>
+            <li>Yozayotganda globus tugmasi bilan «Yangi Özbek Lotin»ni tanlang.</li>
+          </ol>
+        </div>
+        <div class="platform">
+          <h3>iPhone, iPad</h3>
+          <ol>
+            <li>App Store'dan «Keyman» ilovasini örnating.</li>
+            <li><b>yangi_ozbek.kmp</b> faylini Fayllar ilovasida oçing → Ulaşiş → Keyman.</li>
+            <li>Sozlamalar → Umumiy → Klaviatura → Klaviaturalar → Keyman'ni qöşing.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="tips">
+        <p><b>Kompyuterda:</b> <kbd>AltGr</kbd> + <kbd>S</kbd> <kbd>C</kbd> <kbd>O</kbd> <kbd>G</kbd> bilan ş ç ö ğ darhol çiqadi. Ögirmasdan «sh» kerak bölsa (email, havola): <kbd>s</kbd>, keyin <kbd>AltGr</kbd> + <kbd>H</kbd>.</p>
+        <p><b>Telefonda:</b> yuqori qatorda Ö Ğ Ş Ç tugmalari bor. Ögirmasdan «sh» kerak bölsa, <kbd>s</kbd> tugmasini bosib turing va «sh»ni tanlang.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    Alifbo qoidalari 2026-yil 21-oktabrda imzolangan qonun asosida.
+    Manba kodi: <a href="https://github.com/egamberdievnodirjon030-ops/farzandim" target="_blank" rel="noopener">github.com/egamberdievnodirjon030-ops/farzandim</a>
+  </footer>
+</div>
+
+<script src="converter.js"></script>
+<script>
+(function () {
+  'use strict';
+  var STORE_TEXT = 'yangi-alifbo:matn';
+  var STORE_AUTO = 'yangi-alifbo:auto';
+  var SAMPLE = 'Şerzod Özbekistonda tuğilgan. U har kuni ertalab çoy içadi, keyin kitob öqiydi.';
+
+  var ta = document.getElementById('matn');
+  var auto = document.getElementById('auto');
+  var countEl = document.getElementById('count');
+  var statusEl = document.getElementById('status');
+  var composing = false;
+  var statusTimer = 0;
+
+  function load(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function save(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* saqlanmasa ham işlayveradi */ } }
+
+  var saved = load(STORE_TEXT);
+  ta.value = saved !== null ? saved : SAMPLE;
+  auto.checked = load(STORE_AUTO) !== '0';
+  var prev = ta.value;
+
+  function say(text) {
+    statusEl.textContent = text;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function () { statusEl.textContent = ''; }, 2500);
+  }
+
+  function count() {
+    var n = Array.from(ta.value).length;
+    countEl.textContent = n + ' belgi';
+  }
+
+  function sync() {
+    if (auto.checked) {
+      var r = YangiAlifbo.liveUpdate(prev, ta.value, ta.selectionEnd);
+      if (r) {
+        ta.value = r.value;
+        ta.setSelectionRange(r.caret, r.caret);
+      }
+    }
+    prev = ta.value;
+    save(STORE_TEXT, ta.value);
+    count();
+  }
+
+  ta.addEventListener('compositionstart', function () { composing = true; });
+  ta.addEventListener('compositionend', function () {
+    composing = false;
+    setTimeout(sync, 0);
+  });
+  ta.addEventListener('input', function (e) {
+    if (composing || e.isComposing) return;
+    sync();
+  });
+
+  auto.addEventListener('change', function () {
+    save(STORE_AUTO, auto.checked ? '1' : '0');
+    prev = ta.value;
+    say(auto.checked ? 'Avtomatik ögiriş yoqildi' : 'Avtomatik ögiriş öçirildi');
+  });
+
+  document.getElementById('convert-all').addEventListener('click', function () {
+    var next = YangiAlifbo.convert(ta.value);
+    if (next === ta.value) { say('Ögiriladigan harf topilmadi'); return; }
+    ta.value = next;
+    sync();
+    say('Butun matn yangi alifboga ögirildi');
+  });
+
+  document.getElementById('clear').addEventListener('click', function () {
+    ta.value = '';
+    sync();
+    ta.focus();
+  });
+
+  document.getElementById('copy').addEventListener('click', function () {
+    var text = ta.value;
+    function fallback() {
+      ta.focus();
+      ta.select();
+      say('Matn belgilandi, Ctrl+C bilan nusxa oling');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { say('Nusxa olindi'); }, fallback);
+    } else {
+      fallback();
+    }
+  });
+
+  // Harf tugmalari: klaviatura yopilib qolmasligi uçun fokus maydonda qoladi
+  Array.prototype.forEach.call(document.querySelectorAll('.ins'), function (btn) {
+    btn.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+    btn.addEventListener('click', function () {
+      var ch = btn.getAttribute('data-ch');
+      var s = ta.selectionStart, e = ta.selectionEnd;
+      ta.setRangeText(ch, s, e, 'end');
+      ta.focus();
+      prev = ta.value;
+      save(STORE_TEXT, ta.value);
+      count();
+    });
+  });
+
+  // "Sinab köring": söz harfma-harf yoziladi, ögiriş közga körinadi
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var typing = 0;
+  Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (chip) {
+    chip.addEventListener('click', function () {
+      clearInterval(typing);
+      if (!auto.checked) { auto.checked = true; save(STORE_AUTO, '1'); }
+      var chars = Array.from(chip.getAttribute('data-type'));
+      var lead = ta.value && !/\s$/.test(ta.value) ? ' ' : '';
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+      if (lead) chars.unshift(lead);
+      function step() {
+        var ch = chars.shift();
+        if (ch === undefined) { clearInterval(typing); return; }
+        var pos = ta.value.length;
+        ta.setRangeText(ch, pos, pos, 'end');
+        sync();
+      }
+      if (reduce) { while (chars.length) step(); } else { typing = setInterval(step, 90); }
+    });
+  });
+
+  count();
+})();
+</script>

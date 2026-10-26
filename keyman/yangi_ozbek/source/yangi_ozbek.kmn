@@ -1,0 +1,72 @@
+c Yangi Özbek Lotin klaviaturasi
+c
+c Eski lotin yozuvida qanday yozsangiz, şunday yozavering — klaviatura
+c yangi (2026) alifboga özi ögirib boradi:
+c
+c   sh → ş    ch → ç    o' → ö    g' → ğ    harf + ' → ʼ (tutuq belgisi)
+c
+c   Sherzod → Şerzod,  O'zbekiston → Özbekiston,  choy → çoy,  tog' → toğ
+c
+c Ögirmasdan yoziş kerak bölsa (masalan, email manzil):
+c   kompyuterda — AltGr (öng Alt) + H / ' / `
+c   telefonda   — "s" yoki "c" tugmasini bosib turing → "sh" / "ch"
+
+store(&NAME) 'Yangi Özbek Lotin'
+store(&COPYRIGHT) '© 2026 egamberdievnodirjon030-ops'
+store(&VERSION) '10.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+store(&BITMAP) 'yangi_ozbek.ico'
+store(&VISUALKEYBOARD) 'yangi_ozbek.kvks'
+store(&LAYOUTFILE) 'yangi_ozbek.keyman-touch-layout'
+
+begin Unicode > use(main)
+
+c s, c + h → ş, ç
+store(scOld) 'sScC'
+store(scNew) 'şŞçÇ'
+
+c o, g + ' → ö, ğ
+store(ogOld) 'oOgG'
+store(ogNew) 'öÖğĞ'
+
+c Apostrof sifatida işlatiladigan tugmalar: ' va `
+store(aposKey) "'" '`'
+
+c Bu harflardan keyin kelgan apostrof — tutuq belgisi (ʼ): maʼno, sanʼat, şeʼr
+store(tutuqAfter) 'abcdefhijklmnpqrstuvwxyz' 'ABCDEFHIJKLMNPQRSTUVWXYZ' 'şŞçÇöÖğĞ'
+
+group(main) using keys
+
+c AltGr + harf: yangi harflarni bitta tugma bilan yoziş
++ [RALT K_S] > 'ş'
++ [SHIFT RALT K_S] > 'Ş'
++ [RALT K_C] > 'ç'
++ [SHIFT RALT K_C] > 'Ç'
++ [RALT K_O] > 'ö'
++ [SHIFT RALT K_O] > 'Ö'
++ [RALT K_G] > 'ğ'
++ [SHIFT RALT K_G] > 'Ğ'
+
+c AltGr + h / ' / `: ögirmasdan oddiy belgi (sherzod@mail.uz kabi)
++ [RALT K_H] > 'h'
++ [SHIFT RALT K_H] > 'H'
++ [RALT K_QUOTE] > "'"
++ [RALT K_BKQUOTE] > '`'
+
+c Telefon tugmalari (uzoq bosiş): ögirmasdan "sh", "ch", "'"
++ [T_SH] > 'sh'
++ [T_SH_U] > 'Sh'
++ [T_CH] > 'ch'
++ [T_CH_U] > 'Ch'
++ [T_APOS] > "'"
+
+c sh → ş, ch → ç (Sh, SH → Ş; Ch, CH → Ç)
+any(scOld) + 'h' > index(scNew, 1)
+any(scOld) + 'H' > index(scNew, 1)
+
+c o' → ö, g' → ğ (o` va g` ham)
+any(ogOld) + any(aposKey) > index(ogNew, 1)
+
+c boşqa harfdan keyin ' → ʼ
+any(tutuqAfter) + any(aposKey) > index(tutuqAfter, 1) U+02BC
