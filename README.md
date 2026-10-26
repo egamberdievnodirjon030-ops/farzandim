@@ -15,12 +15,20 @@ Apostrofning qaysi şaklini işlatsangiz ham (`'` `‘` `’` `ʻ` `` ` `` va bo
 ## Nimalar bor
 
 - **[`dist/yangi_ozbek.kmp`](https://github.com/egamberdievnodirjon030-ops/farzandim/raw/ccr-b8bea070-9rcpnz/dist/yangi_ozbek.kmp)**: klaviatura. Bepul [Keyman](https://keyman.com/downloads/) dasturi orqali Windows, macOS, Linux, Android va iPhone/iPad'da işlaydi. Word, Telegram, brauzer va boşqa har qanday dasturda yozasiz.
+- **[`dist/YangiAlifbo-Windows.zip`](https://github.com/egamberdievnodirjon030-ops/farzandim/raw/ccr-b8bea070-9rcpnz/dist/YangiAlifbo-Windows.zip)**: Windows uçun, Keyman'siz. Klaviaturangiz va uning körinişi özgarmaydi, fonda işlaydigan kiçik dastur yozganingizni ögirib boradi. [AutoHotkey v2](https://www.autohotkey.com) (bepul) kerak. Manba: `windows/YangiAlifbo/`.
 - **`web/`**: brauzerda işlaydigan sahifa, heç narsa örnatiş şart emas. Yozganingiz darhol ögiriladi, eski yozuvdagi matnni joylab (Ctrl+V) ham ögiriş mumkin.
 - **`keyman/yangi_ozbek/`**: klaviatura manba kodi. Qoidalar `source/yangi_ozbek.kmn` faylida, telefon tugmalari `source/yangi_ozbek.keyman-touch-layout` faylida.
 
 ## Örnatiş
 
-**Windows, macOS, Linux**
+**Windows, Keyman'siz (klaviatura körinişi özgarmaydi)**
+
+1. [autohotkey.com](https://www.autohotkey.com) saytidan AutoHotkey v2'ni örnating.
+2. `YangiAlifbo-Windows.zip`ni yuklab oling, öng tugma → «Extract All», çiqqan `YangiAlifbo` papkasini Documents'ga köçiring.
+3. `YangiAlifbo.ahk`ni ikki marta bosing. Soat yonida kök Ş belgisi çiqadi; birinçi marta avtomatik işga tuşişni söraydi.
+4. `Ctrl` + `Alt` + `Space` — yoqiş / öçiriş. Parolingizda sh, ch yoki o' bölsa, parol yozişdan oldin öçirib turing.
+
+**Windows, macOS, Linux (Keyman bilan)**
 
 1. [keyman.com/downloads](https://keyman.com/downloads/) saytidan Keyman'ni örnating.
 2. `yangi_ozbek.kmp` faylini ikki marta bosing va «Install»ni tanlang.

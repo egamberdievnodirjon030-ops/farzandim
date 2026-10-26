@@ -1,0 +1,6 @@
+* text=auto
+*.ahk text eol=crlf
+windows/**/*.txt text eol=crlf
+*.ico binary
+*.kmp binary
+*.zip binary

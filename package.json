@@ -5,7 +5,9 @@
   "description": "Yangi (2026) özbek lotin alifbosi klaviaturasi va ögirgiçi: sh → ş, ch → ç, o' → ö, g' → ğ",
   "license": "MIT",
   "scripts": {
-    "build": "kmc --no-error-reporting build keyman/yangi_ozbek/yangi_ozbek.kpj && node -e \"const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.copyFileSync('keyman/yangi_ozbek/build/yangi_ozbek.kmp','dist/yangi_ozbek.kmp')\"",
+    "build": "npm run build:keyman && npm run build:windows",
+    "build:keyman": "kmc --no-error-reporting build keyman/yangi_ozbek/yangi_ozbek.kpj && node -e \"const fs=require('fs');fs.mkdirSync('dist',{recursive:true});fs.copyFileSync('keyman/yangi_ozbek/build/yangi_ozbek.kmp','dist/yangi_ozbek.kmp')\"",
+    "build:windows": "cd windows && rm -f ../dist/YangiAlifbo-Windows.zip && zip -X -q -r ../dist/YangiAlifbo-Windows.zip YangiAlifbo",
     "pretest": "npm run build",
     "test": "node --test tests/*.test.mjs"
   },
