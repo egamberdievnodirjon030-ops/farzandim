@@ -193,6 +193,7 @@ CREATE TABLE IF NOT EXISTS disc_orders (
     deadline    TEXT,                       -- xat: qarzni to'lash muddati
     basis_kind  TEXT,                       -- 1-bosqich: 'bildirishnoma' — kurs koordinatori bildirishnomasi dekanga topshirilgan
     basis_date  TEXT, basis_number TEXT,    -- bildirishnoma sanasi va (kiruvchi) raqami
+    archived_at TEXT,                       -- yakunlangach «Hujjatlar» dan tozalangan (tarixda qoladi)
     created_at  TEXT NOT NULL, created_by INTEGER,
     issued_at   TEXT, issued_by INTEGER
 );
@@ -224,7 +225,8 @@ CREATE TABLE IF NOT EXISTS disc_files (
     path        TEXT NOT NULL,              -- kurs papkasidagi nisbiy yo'l (chora/...)
     size        INTEGER, mime TEXT,
     uploaded_at TEXT NOT NULL, by_user INTEGER,
-    sent_doc_id INTEGER, sent_at TEXT       -- ota-onaga yuborilgan bo'lsa: documents.id va vaqti
+    sent_doc_id INTEGER, sent_at TEXT,      -- ota-onaga yuborilgan bo'lsa: documents.id va vaqti
+    send_note   TEXT                        -- avtomatik yuborish natijasi (kimga ketdi, kim o'tkazib yuborildi va nega)
 );
 
 CREATE TABLE IF NOT EXISTS warnings_sent (
@@ -603,10 +605,11 @@ class Database:
             await self.conn.execute("ALTER TABLE students ADD COLUMN full_name_cyr TEXT")
         if "address" not in cols:
             await self.conn.execute("ALTER TABLE students ADD COLUMN address TEXT")
-        for t, add in (("disc_orders", (("deadline", "TEXT"), ("basis_kind", "TEXT"), ("basis_date", "TEXT"), ("basis_number", "TEXT"))),
+        for t, add in (("disc_orders", (("deadline", "TEXT"), ("basis_kind", "TEXT"), ("basis_date", "TEXT"), ("basis_number", "TEXT"),
+                                        ("archived_at", "TEXT"))),
                        ("disc_cases", (("amount", "REAL"), ("as_of", "TEXT"), ("basis", "TEXT"), ("basis_at", "TEXT"),
                                        ("letter_no", "TEXT"), ("letter_date", "TEXT"), ("letter_at", "TEXT"))),
-                       ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT")))):
+                       ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT"), ("send_note", "TEXT")))):
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 have = {r[1] for r in await cur.fetchall()}
             for col, ddl in add:

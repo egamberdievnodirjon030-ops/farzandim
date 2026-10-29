@@ -499,6 +499,7 @@ a.kpi:hover::before { opacity: 1; }
 .kpi-v small { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 5px; letter-spacing: 0; }
 .kpi-s { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .kpi-s b { color: var(--ink); font-weight: 600; }
+.kpi-s .ln { flex-basis: 100%; }
 .kpi-s svg.i { width: 14px; height: 14px; color: var(--faint); }
 .kpi .meter { margin: 8px 0 4px; height: 6px; background: var(--cb); }
 .kpi .meter i { background: var(--c); }
@@ -666,25 +667,6 @@ button.chip { border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font
 .ord-st li > span.nowrap { flex-wrap: nowrap; flex: none; }
 .ord-st b.click { cursor: pointer; }
 .ord-st b.click:hover { text-decoration: underline; }
-.ch-panel { margin-bottom: 18px; }
-.ch-panel > header .grow { flex: 1; margin: 0; }
-.ch-pgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); gap: 18px; align-items: start; padding-top: 4px; }
-.ch-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
-.ch-tiles.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.ch-t { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
-  color: var(--ink); text-decoration: none; transition: border-color .15s, box-shadow .15s; min-width: 0; }
-.ch-t:hover { border-color: var(--navy-500); box-shadow: var(--shadow); }
-.ch-t .k { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
-.ch-t .k svg.i { width: 15px; height: 15px; flex: none; }
-.ch-t > b { font-size: 26px; line-height: 1.15; }
-.ch-t .s { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
-.ch-t .s b { color: var(--ink); }
-.ch-t.bad { border-color: var(--bordo-500); background: var(--bordo-50); }
-.ch-t.bad > b, .ch-t.bad .k { color: var(--bordo-600); }
-.ch-t.warn { border-color: var(--warn); background: var(--warn-50); }
-.ch-t.warn > b, .ch-t.warn .k { color: var(--warn); }
-.ch-pchart { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
-.ch-pchart > .k { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
 .chs-case h4 { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .chs-sub { margin: 14px 0 6px; font-size: 12.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
 .chs-files { margin: 0; padding: 0; }
@@ -695,12 +677,6 @@ button.chip { border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font
 .chs-files .t .sub-l { white-space: normal; }
 .chs-files .sub-l svg.i { width: 13px; height: 13px; vertical-align: -2px; color: var(--ok); }
 .chs-up { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
-@media (max-width: 1280px) { .ch-pgrid { grid-template-columns: 1fr; } }
-@media (max-width: 900px) { .ch-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 560px) {
-  .ch-tiles { grid-template-columns: 1fr 1fr; gap: 8px; } .ch-t { padding: 9px 10px; } .ch-t .k { font-size: 12px; } .ch-t > b { font-size: 22px; }
-  .ch-panel > header .grow { display: none; } .ch-pgrid { padding-left: 12px; padding-right: 12px; }
-}
 
 /* chora jarayoni: bosqichlar (A dan B gacha) */
 .steps { list-style: none; margin: 4px 0 14px; padding: 0; display: grid; gap: 0; counter-reset: st; }
@@ -726,24 +702,27 @@ button.chip { border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font
 .opt-or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .opt-or::before, .opt-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .warn-t { color: var(--warn); }
-/* kurs holati: jarayon zanjiri */
-.ch-flow { display: flex; align-items: stretch; gap: 6px; margin-bottom: 16px; }
-.ch-flow .fl { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 11px 13px; border: 1px solid var(--line);
-  border-radius: 12px; background: var(--surface); color: var(--ink); text-decoration: none; transition: border-color .15s, box-shadow .15s; }
-.ch-flow .fl:hover { border-color: var(--navy-500); box-shadow: var(--shadow); }
-.ch-flow .fl .k { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--muted); }
-.ch-flow .fl .k i { font-style: normal; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px;
-  background: var(--navy-700); color: #fff; flex: none; }
-.ch-flow .fl > b { font-size: 26px; line-height: 1.15; }
-.ch-flow .fl .s { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
-.ch-flow .fl .s b { color: var(--ink); }
-.ch-flow .fl.bad { border-color: var(--bordo-500); background: var(--bordo-50); } .ch-flow .fl.bad > b { color: var(--bordo-600); }
-.ch-flow .fl.warn { border-color: var(--warn); background: var(--warn-50); } .ch-flow .fl.warn > b { color: var(--warn); }
-.ch-flow .fl.ok > b { color: var(--ok); }
-.fl-arr { display: grid; place-items: center; color: var(--muted); flex: none; }
-.fl-arr svg.i { width: 16px; height: 16px; }
 @media (max-width: 900px) {
-  .ch-flow { flex-direction: column; } .fl-arr { transform: rotate(90deg); height: 14px; }
-  .ch-tiles.three { grid-template-columns: 1fr 1fr; }
   .step { padding-left: 38px; } .st-n { width: 28px; height: 28px; } .step::before { left: 13px; top: 30px; }
 }
+/* «Hujjatlar»: yakunlanganlar va tozalanganlar — ixcham ro'yxat */
+.ord-done { margin-top: 18px; }
+.ord-done > header { flex-wrap: wrap; }
+.ord-list { list-style: none; margin: 0; padding: 4px 20px 12px; }
+.ord-list > li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.ord-list > li:first-child { border-top: 0; }
+.ord-list > li > span:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.ord-list .who { flex-basis: 100%; white-space: normal; }
+.ord-list > li.ord-open { display: block; border-top: 0; padding-top: 0; }
+.ord-list > li.ord-open .ord { margin: 0; }
+.ord-arch { margin-top: 18px; }
+.ord-arch > summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.danger-t { color: var(--bordo-600); }
+/* chora turlari jadvali */
+.tbl.mx td .sub-l { display: block; }
+.tbl.mx tr.tot td { border-top: 2px solid var(--line); background: var(--surface-2); }
+@media (max-width: 760px) { .ord-list > li { flex-direction: column; align-items: stretch; } .ord-list .nowrap { white-space: normal; display: flex; flex-wrap: wrap; gap: 6px; } }
+.mx-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 18px; padding: 0 0 8px; }
+.mx-grid > div { min-width: 0; }
+.mx-h { padding: 4px 20px 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+@media (max-width: 1100px) { .mx-grid { grid-template-columns: 1fr; } }

@@ -547,8 +547,9 @@ def plan(an: Analysis, target_sid: int, target_hemis: str = "") -> tuple[list[li
             found |= "target" in kinds
             ambiguous |= "ambiguous" in kinds
             others = [h for h in hits if h.kind != "target"]
-            if block and not numbered and not prev_punct and close and "target" not in kinds:
-                boxes.append(wide(ln))                         # yopilgan bandning davomi
+            if (block and not numbered and not prev_punct and close and "target" not in kinds
+                    and not (official and not others) and not _section_start(pg, ln)):
+                boxes.append(wide(ln))                         # yopilgan bandning davomi (rahbar imzosi, «Asos:» — emas)
             else:
                 block = False
                 if others and "target" not in kinds and _is_record(pg, ln):

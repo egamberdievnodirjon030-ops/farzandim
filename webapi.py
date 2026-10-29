@@ -792,7 +792,16 @@ async def _student_rows(q: str = "", limit: int = 3000) -> list[dict]:
     if q:
         students = [s for s in students if q in (s.get("name_norm") or "") or q == normalize_text(s.get("hemis_id") or "")
                     or name_score(q, s.get("name_norm") or "") >= 0.8]
-    return [_row(x) for x in await status.all_statuses(students[:max(400, limit)])]
+    return await _with_measures([_row(x) for x in await status.all_statuses(students[:max(400, limit)])])
+
+
+async def _with_measures(rows: list[dict]) -> list[dict]:
+    """«Chora» ustuni: talabaga rasman ko'rilgan choralar (chegaraga yetgani emas)."""
+    import discipline
+    measures = await discipline.bulk_measures()
+    for r in rows:
+        r["measures"] = measures.get(r["id"], [])
+    return rows
 
 
 @staff_route
@@ -808,7 +817,7 @@ async def api_staff_students(request):
     except ValueError:
         limit = 200
     sts = await status.all_statuses(students[:max(400, limit)])
-    rows = [_row(x) for x in sts]
+    rows = await _with_measures([_row(x) for x in sts])
     if flt in ("att", "acad", "gpa", "kontrakt", "trimestr"):
         rows = [r for r in rows if r["flags"][flt]]
     elif flt == "prob":
@@ -1502,8 +1511,26 @@ async def api_disc_order_delete(request):
     oid = int(request.match_info["oid"])
     if not await _disc_order_visible(oid):
         return bad("not_found", 404)
-    res = await D.delete_order(oid)
+    res = await D.delete_order(oid, force=request.query.get("force") == "1")
     return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_order_archive(request):
+    """Tozalash: yakunlangan chora «Hujjatlar» dan olinadi ({"archived": false} — qaytarish)."""
+    import discipline as D
+    oid = int(request.match_info["oid"])
+    if not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    body = await request.json() if request.can_read_body else {}
+    res = await D.archive_order(oid, bool(body.get("archived", True)))
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_archive_done(request):
+    import discipline as D
+    return ok(await D.archive_done())
 
 
 @staff_route
@@ -1610,7 +1637,11 @@ async def api_disc_upload(request):
             if not res["ok"]:
                 return bad(res["error"])
             saved.append(res["id"])
-    return ok({"ok": True, "files": saved}) if saved else bad("empty")
+    if not saved:
+        return bad("empty")
+    # asl nusxa (imzolangan) — chora chiqarilgan bo'lsa, ota-onalarga darhol (boshqa talabalar yopilgan)
+    auto = await D.send_originals(request.app["bot"], oid, saved, request["user"]["id"])
+    return ok({"ok": True, "files": saved, "auto": auto})
 
 
 async def _disc_file_visible(fid: int) -> bool:
@@ -1674,7 +1705,11 @@ async def api_disc_case_upload(request):
             if not res["ok"]:
                 return bad(res["error"])
             saved.append(res["id"])
-    return ok({"ok": True, "files": saved}) if saved else bad("empty")
+    if not saved:
+        return bad("empty")
+    oid = (await db.fetchone("SELECT order_id FROM disc_cases WHERE id = ?", (cid,)) or {}).get("order_id")
+    auto = await D.send_originals(request.app["bot"], oid, saved, request["user"]["id"]) if oid else None
+    return ok({"ok": True, "files": saved, "auto": auto})
 
 
 @staff_route
@@ -2197,6 +2232,8 @@ def setup_routes(app: web.Application) -> None:
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/issue", api_disc_order_issue)
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/cancel", api_disc_order_cancel)
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/basis", api_disc_order_basis)
+    r.add_post("/api/staff/discipline/orders/{oid:\\d+}/archive", api_disc_order_archive)
+    r.add_post("/api/staff/discipline/archive-done", api_disc_archive_done)
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/letters", api_disc_order_letters)
     r.add_post("/api/staff/discipline/cases/{cid:\\d+}/basis", api_disc_case_basis)
     r.add_delete("/api/staff/discipline/orders/{oid:\\d+}/cases/{cid:\\d+}", api_disc_order_case_delete)
