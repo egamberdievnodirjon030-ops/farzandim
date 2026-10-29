@@ -22,6 +22,8 @@ Telegram bot ota-onalarga farzandining qaysi kunlarda, qaysi fanlardan darsga qa
 
 **Kompyuter versiyasi:** kurs koordinatori va super-admin uchun brauzerdagi boshqaruv paneli — butun kurs bitta jadvalda (saralash, filtrlar), xabarlar va suhbat yonma-yon, so'rovlar, e'lon (uch tildagi ko'rinishi bilan), fayllarni sudrab yuklash, hisobotni yuklab olish; super-admin — barcha kurslar, kurslar va koordinatorlar, zaxira nusxa va xatolar jurnali. Kirish — botdagi «💻 Kompyuter versiyasi» tugmasi (parolsiz). Batafsil — «Kompyuter versiyasi» bo'limi.
 
+**Tashriflar:** ijara xonadonlariga tashrif, madaniy tashrif, tadbir va koordinatorlik soati rejalari — talaba botda tasdiqlaydi yoki boshqa vaqt taklif qiladi, koordinatorga manzilga qanday borilishi (bekat, avtobus, metro), talabalar yashash joylari xaritasi, dalolatnoma (telefonda imzo, bir betli Word) va hisobot (batafsil — «Tashriflar» bo'limida).
+
 **Universitet tizimi bilan integratsiya:** davomat va dars jadvali «Manage» tizimidan avtomatik, real vaqtga yaqin olinadi (API kaliti yoki webhook; javob ko'rinishi va shabloni qat'iy emas). Batafsil — «Integratsiya» bo'limi.
 
 **Kurs koordinatori (admin) uchun:** Excel import, e'lon yuborish (hammaga yoki guruhlar bo'yicha, oldindan ko'rish bilan), bog'lash so'rovlarini tasdiqlash, savollarga javob, statistika, talaba qidirish, talaba bo'lib kirishga uringanlar haqida darhol xabar va ularni bloklash yoki xato bo'lsa ruxsat berish.
@@ -591,6 +593,61 @@ Sozlama (shu yorliqda, kurs bo'yicha): hujjatlardagi koordinatorlar ismi (bo'sh 
 
 Hujjatlar va fayllar `data/<kurs>/chora/` da saqlanadi (zaxira nusxaga kiradi). Rasmiy hujjat imzolanib, raqam olgandan keyingina «chiqarildi» deb belgilang — ota-onalarga xabar shu paytda boradi.
 
+## Tashriflar: ijara xonadonlari, madaniy tashriflar, tadbirlar, koordinatorlik soati
+
+Alohida «tashrif-py» loyihasining asosiy qismlari shu botga modul sifatida joylashtirilgan — alohida bot, alohida sayt
+va alohida baza kerak emas: talabalar, manzillar, kurs koordinatorlari va kirish huquqlari — hozirgi tizimniki.
+Boshqaruv paneli → **«Tashriflar»** (yorliqlar: Rejalar, Yashash joylari, Hisobot).
+
+**Ish oqimi** (dekan o'rinbosari tasdig'i yo'q):
+
+```
+qoralama ─┬─ ijara tashrifi ─► talabalar tasdig'i (botda) ─┬─► tasdiqlangan (aktual) ─► o'tkazildi
+          └─ madaniy tashrif / tadbir / koordinatorlik soati ┘
+(o'tkazilgandan tashqari istalgan holatdan → bekor qilingan)
+```
+
+- **Ijara tashrifi** — talabalar tanlanadi (ijara manzili talaba kartasidan), «Saqlash va yuborish» bosilsa har bir
+  talabaga botda xabar boradi: ✅ tasdiqlayman, 🕒 boshqa vaqt taklif qilaman (yoziladi: «22.10 14:00», «ertaga 16:30»,
+  «16:30»), ❌ bu manzilda yashamayman (sababi bilan). **Hammasi tasdiqlagach reja o'zi aktual bo'ladi**; talabaga
+  yakuniy xabar, koordinatorga bildirish keladi.
+- Javob bermaganlar: `STUDENT_REPLY_HOURS` (24 soat) o'tgach talabaga eslatma, koordinatorga «✅ Shundayligicha
+  tasdiqlash» tugmasi (javobsizlar «javob bermadi» deb belgilanadi). Talaba telefonda aytgan bo'lsa — javobini panelda
+  belgilash mumkin (jurnalga «koordinator belgiladi» deb yoziladi).
+- Talaba boshqa vaqt taklif qilsa — koordinatorga «Taklifni qabul qilish» tugmasi (botda va panelda).
+- **Vaqt o'zgarsa, barcha tasdiqlar bekor bo'ladi** va so'rov qaytadan yuboriladi (talaba 14:00 ga rozi edi, 19:00 ga emas).
+- Tadbir, madaniy tashrif, koordinatorlik soati — yuborilishi bilan aktual.
+- Tashrifdan `REMINDER_HOURS_BEFORE` (3) soat oldin talabalar va koordinatorga eslatma (har biri bir marta).
+- Har bir harakat jurnalga yoziladi (kim, qachon, nima); hisobotga faqat tasdiqlangan va o'tkazilgan rejalar kiradi.
+
+**Talabani botga ulash.** Talaba ota-ona menyusiga kirmaydi — faqat tashrif xabarlarini oladi. Ikki yo'l: talabaning
+**shaxsiy havolasi** (talaba kartasi yoki reja oynasidagi «Havola» — `t.me/<bot>?start=v_...`; ochsa, javob kutayotgan
+tashriflar darhol keladi) yoki ota-onasini **o'z raqami bilan tasdiqlagan** talaba avtomatik taniladi. Botga ulanmagan
+talabalar bo'lsa, rejani yuborganda koordinatorga ularning havolalari ro'yxati keladi.
+
+**«Qanday boriladi»** — faqat kurs koordinatoriga (talabaga hech qachon): talaba tasdiqlashi bilan botda shu manzil
+yaqinidagi bekatlar, avtobus raqamlari, metro, Yandex Xaritalar va Yandex Go tugmalari; `/yol` — turgan joyni (GPS)
+yuboradi va bot qaysi avtobusga qayerdan chiqib, qayerda tushishni aytadi (joylashuv saqlanmaydi). Panelda — xarita
+bilan («Qanday boriladi» tugmasi; turgan joy brauzer orqali yoki xaritadan). Manzil OpenStreetMap orqali (kalitsiz)
+yoki `YANDEX_GEOCODER_KEY` bo'lsa Yandex orqali topiladi; noto'g'ri joy ko'rsatilmaydi — shubhali natija «taxminiy»
+deb beriladi yoki umuman berilmaydi. Mavze, kvartal, daha va mahallalar ro'yxati, tuman chegaralari va shahar bekatlari
+dastur bilan keladi (`tashrif/malumot/`) — internetsiz ishlaydi. Manzil topilmasa — talaba kartasida «Xaritadagi joyi»
+(koordinata, Yandex/Google/2GIS havolasi yoki xaritadan tanlash). `YOL_MALUMOTI=yoq` — manzil hech qaysi tashqi
+xizmatga yuborilmaydi.
+
+**Yashash joylari** — talabalar qayerda yashaydi: ijara xonadonida / talabalar turar joyida / o'z uyida /
+qarindoshinikida (talaba kartasida belgilanadi; manzili bor, turi ko'rsatilmagan talaba — ijarada), ijara xonadoni
+toifasi (yashil / sariq / qizil — dalolatnomaning 14-bandidan, bo'lmasa qo'lda), xarita (belgi rangi — toifa, raqam —
+shu joyda nechta talaba), tumanlar kesimi va xonadonlar ro'yxati (bir xonadonda 2+ talaba).
+
+**Dalolatnoma** — o'tkazilgan (yoki tasdiqlangan) ijara tashrifida har bir talaba uchun: 16 band (qog'oz namunadagidek),
+**imzolar telefon ekranida barmoq bilan chiziladi** (faylda oddiy imzo kattaligida chiqadi). Word fayl har doim
+**bitta betda** (matn ko'p bo'lsa shrift o'zi kichrayadi), belgilangan javob — ☑, qolganlari — ☐; tashrif suratlari
+ilova sifatida qo'shiladi. Fayl talabaning hujjati sifatida saqlanadi (talaba kartasida yuklab olinadi).
+
+Ma'lumot kurs bazasida (`visit_*` jadvallari), fayllar — `data/<kurs>/tashrif/` (zaxira nusxaga kiradi), manzillar
+joyi keshi — `data/tashrif/geo.db`. Sozlamalar: `.env.example` dagi «Tashriflar» bo'limi.
+
 ## Kurs koordinatori paneli va ma'lumotlarni tekshirish
 
 `/panel` (yoki /admin → «📊 Kurs holati») — kurs holati bir qarashda: jami talabalar, ulangan ota-onalar (va ota-onasi ulangan talabalar ulushi), akademik qarzdorlar, kontrakt va trimestr qarzdorlari (jami summa bilan), davomat muammosi borlar (18+ soat), **3 va undan ortiq muammosi bor talabalar**. Tugmalar: «🔴 Muammoli talabalar» (muammolar soni bo'yicha saralangan), akademik, kontrakt, trimestr va davomat bo'yicha ro'yxatlar. Kurs yoki guruh bo'yicha: `/panel 3-kurs`, `/panel 3-1a-24`.
@@ -842,6 +899,11 @@ guard.py          — talabalarni aniqlash (raqam va Telegram guruhlar bo'yicha)
 redact.py         — rasmiy hujjatlarda boshqa talabalar ma'lumotlarini qora rang bilan yopish
 discipline.py     — chora ko'rish: chegaraga yetganlar, farmoyish/buyruqlar, hujjatlar, tarix, signal
 docxfill.py       — Word (.docx) shablonlarini to'ldirish ({{KALIT}} belgilar, jadval satrlari)
+visits.py         — tashriflar: rejalar, holatlar, talaba javoblari, eslatmalar, dalolatnoma, yashash joylari, hisobot
+visitsapi.py      — «Tashriflar» bo'limi API si (boshqaruv paneli)
+handlers/visits.py — tashrif bot oqimlari: talaba havolasi va javoblari, /yol (turgan joydan yo'l)
+tashrif/          — «Qanday boriladi»: manzilni xaritadan topish, bekatlar, metro, yo'nalish (tashrif-py dan), tuman
+                    chegaralari; malumot/ — shahar bekatlari, mavze/mahallalar, tumanlar (OpenStreetMap)
 middlewares.py    — bloklangan foydalanuvchi so'rovlarini to'xtatish
 keyboards.py      — tugmalar
 utils.py          — ism/telefon/sana bilan ishlash, kirill→lotin
@@ -855,7 +917,8 @@ appmode.py        — ilova rejimi: bot faqat ilovaga o'tish vositasi, qisqa bil
 live.py           — real vaqt voqealari (Server-Sent Events): bildirishnoma, xabar, so'rov — ilova ochiq bo'lsa darhol
 docstore.py       — rasmiy hujjatlar ombori va ilovada ko'rish (PDF sahifalari — rasm)
 handlers/appgate.py — ilova rejimida ota-onaning botdagi matnlari va eski tugmalari — ilovaga yo'naltiriladi
-webapp/           — ilovaning o'zi: index.html, app.js, app.css; kompyuter versiyasi: desk.html, desk.js, desk.css;
+webapp/           — ilovaning o'zi: index.html, app.js, app.css; kompyuter versiyasi: desk.html, desk.js, desk.css,
+                    tashrif.js («Tashriflar»: kalendar, xarita, dalolatnoma va imzo, Word); vendor/leaflet — xarita;
                     shriftlar (Golos Text, PT Serif)
 ilova_sinov.bat   — Windows: ilovani vaqtincha HTTPS orqali sinash (ilova_sinov.ps1 ni ishga tushiradi)
 ilova_sinov.sh    — Linux/macOS: xuddi shu (Cloudflare Quick Tunnel + bot)

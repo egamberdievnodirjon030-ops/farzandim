@@ -132,12 +132,14 @@ async def _blocked_anywhere(user_id: int) -> bool:
 
 
 def _student_confirm(event, data: dict) -> bool:
-    """Talaba ota-onasini tasdiqlash jarayoni (havola, o'z raqami, «Ha/Yo'q») — talaba deb bloklangan bo'lsa ham ochiq."""
+    """Talaba ota-onasini tasdiqlash jarayoni (havola, o'z raqami, «Ha/Yo'q») va tashrif xabarlari (shaxsiy havola,
+    tasdiqlash tugmalari) — talaba deb bloklangan bo'lsa ham ochiq."""
     if isinstance(event, Message):
-        return bool(event.text and event.text.startswith("/start t_")) or \
-            (bool(event.contact) and (data.get("raw_state") or "").startswith("SC:"))
+        return bool(event.text and event.text.startswith(("/start t_", "/start v_"))) or \
+            (bool(event.contact) and (data.get("raw_state") or "").startswith("SC:")) or \
+            (data.get("raw_state") or "").startswith("TV:")  # tashrif: talaba vaqt yoki sabab yozmoqda
     if isinstance(event, CallbackQuery):
-        return (event.data or "").startswith("sc:")
+        return (event.data or "").startswith(("sc:", "tv:"))
     return False
 
 

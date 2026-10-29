@@ -93,6 +93,8 @@ async def on_student_contact(message: Message, state: FSMContext) -> None:
         u = message.from_user
         await db.execute("UPDATE link_requests SET student_tg = ?, student_phone = ?, student_tg_name = ? WHERE id = ?",
                          (u.id, phone, " ".join(x for x in (u.full_name, f"@{u.username}" if u.username else "") if x), rid))
+        import visits  # o'z raqami bilan tasdiqlangan talaba — tashrif xabarlari ham unga boradi
+        await visits.remember_confirmed_student(r["student_id"], u.id, u.full_name)
         parent = await db.get_parent(r["parent_id"]) or {}
     await state.clear()
     kb = InlineKeyboardBuilder()

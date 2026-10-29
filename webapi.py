@@ -2335,4 +2335,5 @@ def setup_routes(app: web.Application) -> None:
     r.add_post("/api/super/regulations", api_super_regulations)
     r.add_delete("/api/super/regulations/{rid:\\d+}", api_super_regulation_delete)
     r.add_post("/api/super/backup", api_super_backup)
-
+    import visitsapi  # «Tashriflar» bo'limi (tashrif moduli)
+    visitsapi.setup(r)

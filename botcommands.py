@@ -27,6 +27,7 @@ ADMIN_COMMANDS = PUBLIC_COMMANDS + [
     BotCommand(command="jadval", description="Talabaning shaxsiy dars jadvali"),
     BotCommand(command="tayyor", description="Import sessiyasini yakunlash"),
     BotCommand(command="panel", description="📊 Kurs holati"),
+    BotCommand(command="yol", description="🧭 Tashrif manziliga qanday boriladi (turgan joydan)"),
     BotCommand(command="kompyuter", description="💻 Kompyuter versiyasi (brauzerda)"),
     BotCommand(command="koordinator", description="Ota-onalarga ko'rinadigan ismingiz"),
     BotCommand(command="tarjimalar", description="🌐 Fan va fakultet nomlari tarjimasi"),

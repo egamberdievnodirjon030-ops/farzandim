@@ -14,7 +14,7 @@ const DEV = new URLSearchParams(location.search).has('dev');
 const appToken = { get() { try { return localStorage.getItem('appToken'); } catch (_) { return null; } },
   set(v) { try { v ? localStorage.setItem('appToken', v) : localStorage.removeItem('appToken'); } catch (_) { /* */ } } };
 function authHeaders(h) { const tk = appToken.get(); if (tk) h.Authorization = 'Bearer ' + tk; return h; }
-const S = { me: null, course: null, stu: null, stuCourse: null, timers: [], badges: { unread: 0, requests: 0, chora: 0 } };
+const S = { me: null, course: null, stu: null, stuCourse: null, timers: [], badges: { unread: 0, requests: 0, chora: 0, tashrif: 0 } };
 
 /* ---------------------------------------------------------------- belgilar */
 const P = {
@@ -295,7 +295,7 @@ document.addEventListener('click', async e => {
 }, true);
 
 /* ---------------------------------------------------------------- karkas: yon menyu */
-const NAV_COURSE = [['#/panel', 'panel', 'Kurs holati'], ['#/students', 'users', 'Talabalar'], ['#/subjects', 'cal', 'Jadval va fanlar'], ['#/chora', 'shield', 'Chora ko‘rish', 'chora'], ['#/inbox', 'chat', 'Xabarlar', 'unread'],
+const NAV_COURSE = [['#/panel', 'panel', 'Kurs holati'], ['#/students', 'users', 'Talabalar'], ['#/subjects', 'cal', 'Jadval va fanlar'], ['#/chora', 'shield', 'Chora ko‘rish', 'chora'], ['#/tashrif', 'home', 'Tashriflar', 'tashrif'], ['#/inbox', 'chat', 'Xabarlar', 'unread'],
   ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar'], ['#/files', 'upload', 'Ma’lumot va hisobot']];
 const NAV_SUPER = [['#/super', 'chart', 'Barcha kurslar'], ['#/super/courses', 'building', 'Kurslar va koordinatorlar'], ['#/super/regs', 'book', 'Ichki nizomlar'], ['#/super/system', 'shield', 'Tizim']];
 
@@ -344,11 +344,12 @@ function paintBadges() {
 }
 async function refreshBadges() {
   try {
-    const [ib, rq, ch] = await Promise.all([api('/api/staff/inbox'), api('/api/staff/requests'),
-      api('/api/staff/discipline/badge').catch(() => ({ new: 0 }))]);
+    const [ib, rq, ch, vt] = await Promise.all([api('/api/staff/inbox'), api('/api/staff/requests'),
+      api('/api/staff/discipline/badge').catch(() => ({ new: 0 })), api('/api/staff/visits/badge').catch(() => null)]);
     S.badges.unread = ib.items.reduce((s, i) => s + (i.unread || 0), 0);
     S.badges.requests = rq.items.length;
     S.badges.chora = ch.new || 0;
+    S.badges.tashrif = vt ? tashrifBadge(vt) : 0;
     paintBadges();
   } catch (e) { /* jim */ }
 }
@@ -362,7 +363,8 @@ async function route() {
   const sup = S.me.role === 'super';
   if (!parts.length) { location.replace(sup ? '#/super' : '#/panel'); return; }
   markNav();
-  const pages = { panel: pPanel, students: pStudents, subjects: pSubjects, chora: pChora, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles, surveys: pSurveys };
+  const pages = { panel: pPanel, students: pStudents, subjects: pSubjects, chora: pChora, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles, surveys: pSurveys,
+    tashrif: typeof pTashrif === 'function' ? pTashrif : pPanel };
   try {
     if (parts[0] === 'super') {
       if (!sup) { location.replace('#/panel'); return; }
@@ -385,8 +387,8 @@ function tone(v, bad = 'bordo') { return v ? bad : 'ok'; }
 async function pPanel() {
   document.title = 'Kurs holati — Boshqaruv paneli';
   view(head('Kurs holati', courseSub()) + skel(110) + skel(360));
-  const [d, ib, rq, ch] = await Promise.all([api('/api/staff/panel'), api('/api/staff/inbox'), api('/api/staff/requests'),
-    api('/api/staff/discipline/badge').catch(() => null)]);
+  const [d, ib, rq, ch, vt] = await Promise.all([api('/api/staff/panel'), api('/api/staff/inbox'), api('/api/staff/requests'),
+    api('/api/staff/discipline/badge').catch(() => null), api('/api/staff/visits/badge').catch(() => null)]);
   const cover = pct(d.linked, d.total);
   const unread = ib.items.reduce((a, i) => a + (i.unread || 0), 0);
   const share = n => (d.total ? `${pct(n, d.total)}% talabalar` : '');
@@ -400,6 +402,7 @@ async function pPanel() {
       state: ch.new ? 'bad' : 'ok', title: `O‘quv yilida jami ${ch.kpi.total} ta chora`,
       sub: `<span class="ln">ogohlantirish: <b>${ch.kpi.ogohlantirish}</b> · hayfsan: <b>${ch.kpi.hayfsan}</b></span>${ch.new ? `<span class="ln">chora kutilmoqda: <b>${ch.new}</b> ta</span>` : ''}` }) : ''}
     ${ch && ch.kpi.letters ? lettersKpi(ch.kpi.letters) : ''}
+    ${vt && typeof tashrifKpi === 'function' ? tashrifKpi(vt) : ''}
     ${kpi({ href: '#/students?f=acad', icon: 'bookx', c: 'acad', label: 'Akademik qarz', value: d.acad, unit: 'ta', state: probState(d.acad),
       sub: 'qarzdorlar ro‘yxati bo‘yicha' })}
     ${kpi({ href: '#/students?f=gpa', icon: 'cap', c: 'gpa', label: 'GPA past', value: d.gpa, unit: 'ta', state: probState(d.gpa),
@@ -612,6 +615,7 @@ async function openStudent(id, course = null) {
       ${m.ground === 'davomat' ? `davomat, sababsiz ${pairs(m.hours)}` : m.ground === 'trimestr' ? `trimestr qarzi ${money(m.amount)}` : `ichki tartib: ${esc(m.rule || '')}`}
       ${m.files ? `<span class="chip ok">${ic('file')} ${m.files} ta hujjat</span>` : '<span class="chip warn">asl hujjat yo‘q</span>'}</span><b>${m.number ? '№ ' + esc(m.number) + ', ' : ''}${dmy(m.date)}</b></div>`).join('')}
       <div style="margin-top:10px"><button class="btn sm" data-chs="${id}">${ic('folder')} Hujjatlarni ochish</button></div></div>` : ''}
+    <div class="box" id="stu-home">${skel(60)}</div>
     ${d.subjects && d.subjects.length ? `<div class="box"><h4>Fanlar bo‘yicha davomat</h4><div class="subj-list">${d.subjects.map(subjRow).join('')}</div></div>` : ''}
     <div class="box"><h4>Haftalik jadval</h4><div id="stu-week">${skel(80)}</div></div>
     <div class="box"><h4>To‘lovlar</h4><div class="kv">${payLine('Kontrakt', k)}${payLine('Trimestr', t)}</div></div>
@@ -622,6 +626,7 @@ async function openStudent(id, course = null) {
       : `<div class="hint">Ota-onasi hali botga ulanmagan.</div>`}</div>`;
   $('#drawer header b').textContent = c.name;
   loadStudentWeek(id, course, '');
+  if (typeof loadStudentHome === 'function') loadStudentHome(id, course); else $('#stu-home')?.remove();
 }
 /* fan qatori: nomi, davomat chizig'i va foizi, sababsiz/sababli */
 function attTone(p) { return p == null ? '' : p >= 90 ? 'ok' : p >= 75 ? 'warn' : 'bad'; }

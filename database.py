@@ -230,6 +230,82 @@ CREATE TABLE IF NOT EXISTS disc_files (
     doc_number  TEXT, doc_date TEXT         -- asl nusxaning raqami va sanasi (arxivda qidirish uchun; bo'lmasa — choradan)
 );
 
+-- Tashriflar (tashrif moduli): kurs koordinatorining ijara xonadoniga tashrifi, madaniy tashrif, tadbir,
+-- koordinatorlik soati. Holatlar: qoralama → talaba_tasdigida (ijara) → tasdiqlangan → bajarildi (bekor_qilingan);
+-- har bir harakat jurnalga yoziladi (visit_events).
+CREATE TABLE IF NOT EXISTS visit_plans (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    coordinator_id   INTEGER NOT NULL,          -- rejani tuzgan kurs koordinatorining Telegram ID si
+    coordinator_name TEXT,
+    type             TEXT NOT NULL,             -- ijara_tashrifi | madaniy_tashrif | tadbir | koordinatorlik_soati
+    title            TEXT NOT NULL,
+    visit_date       TEXT NOT NULL,             -- YYYY-MM-DD (mahalliy)
+    start_time       TEXT NOT NULL,             -- HH:MM
+    end_time         TEXT NOT NULL,
+    place            TEXT, note TEXT,
+    status           TEXT NOT NULL,
+    student_deadline TEXT,                      -- talaba javobi muddati (ISO)
+    sent_at          TEXT, completed_at TEXT, result TEXT, problem TEXT, cancel_reason TEXT, reminded_at TEXT,
+    created_at       TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visit_plans_date ON visit_plans(visit_date, status);
+CREATE TABLE IF NOT EXISTS visit_students (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id          INTEGER NOT NULL REFERENCES visit_plans(id) ON DELETE CASCADE,
+    student_id       INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    address          TEXT,
+    response         TEXT NOT NULL DEFAULT 'kutilmoqda',  -- kutilmoqda | tasdiqladi | vaqt_taklif_qildi | rad_etdi | javob_bermadi
+    proposed_date    TEXT, proposed_time TEXT, comment TEXT,
+    notified_at      TEXT, responded_at TEXT, reminder_sent_at TEXT,
+    UNIQUE (plan_id, student_id)
+);
+CREATE INDEX IF NOT EXISTS idx_visit_students_student ON visit_students(student_id);
+CREATE TABLE IF NOT EXISTS visit_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id     INTEGER NOT NULL REFERENCES visit_plans(id) ON DELETE CASCADE,
+    at          TEXT NOT NULL,
+    actor_kind  TEXT NOT NULL,                  -- koordinator | talaba | tizim
+    actor_id    INTEGER, actor_name TEXT,
+    action      TEXT NOT NULL, from_status TEXT, to_status TEXT, detail TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_visit_events_plan ON visit_events(plan_id, at);
+-- Tashrif dalolatnomasi (ijara xonadoni): 16 band, imzolar — JSON; Word fayli boshqaruv panelida yasaladi
+CREATE TABLE IF NOT EXISTS visit_acts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id     INTEGER NOT NULL REFERENCES visit_plans(id) ON DELETE CASCADE,
+    student_id  INTEGER REFERENCES students(id) ON DELETE SET NULL,
+    data        TEXT NOT NULL DEFAULT '{}',
+    category    TEXT,                           -- 14-band: yashil | sariq | qizil (dashboard shundan)
+    docx_path   TEXT, docx_at TEXT,
+    created_by  INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visit_acts_student ON visit_acts(student_id);
+CREATE TABLE IF NOT EXISTS visit_photos (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id     INTEGER NOT NULL REFERENCES visit_plans(id) ON DELETE CASCADE,
+    act_id      INTEGER REFERENCES visit_acts(id) ON DELETE SET NULL,
+    name        TEXT, path TEXT NOT NULL, size INTEGER, mime TEXT,
+    uploaded_by INTEGER, created_at TEXT NOT NULL
+);
+-- Botdagi tashrif xabarlari (javob berilgach tugmalari olinadi — ikki marta bosib bo'lmasin)
+CREATE TABLE IF NOT EXISTS visit_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id    INTEGER NOT NULL, student_id INTEGER,
+    chat_id    INTEGER NOT NULL, message_id INTEGER NOT NULL,
+    kind       TEXT NOT NULL,                   -- talaba | taklif | uzatish
+    sent_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visit_messages_plan ON visit_messages(plan_id, kind);
+-- Talabaning Telegram hisobi (tashrif xabarlari uchun): shaxsiy havola yoki ota-onani tasdiqlash orqali
+CREATE TABLE IF NOT EXISTS student_accounts (
+    student_id INTEGER PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
+    tg_id      INTEGER NOT NULL,
+    tg_name    TEXT,
+    via        TEXT,                            -- havola | tasdiq
+    linked_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_student_accounts_tg ON student_accounts(tg_id);
+
 CREATE TABLE IF NOT EXISTS warnings_sent (
     student_id INTEGER NOT NULL,
     kind       TEXT NOT NULL,
@@ -606,6 +682,11 @@ class Database:
             await self.conn.execute("ALTER TABLE students ADD COLUMN full_name_cyr TEXT")
         if "address" not in cols:
             await self.conn.execute("ALTER TABLE students ADD COLUMN address TEXT")
+        # tashrif moduli: xaritadagi aniq nuqta, yashash joyi turi (ijara | ttj | uy | qarindosh), ijara xonadoni
+        # toifasi (yashil | sariq | qizil — dalolatnoma bo'lmasa, qo'lda) va botga ulash uchun shaxsiy kod
+        for col, ddl in (("lat", "REAL"), ("lon", "REAL"), ("living", "TEXT"), ("zone", "TEXT"), ("visit_code", "TEXT")):
+            if col not in cols:
+                await self.conn.execute(f"ALTER TABLE students ADD COLUMN {col} {ddl}")
         for t, add in (("disc_orders", (("deadline", "TEXT"), ("basis_kind", "TEXT"), ("basis_date", "TEXT"), ("basis_number", "TEXT"),
                                         ("archived_at", "TEXT"))),
                        ("disc_cases", (("amount", "REAL"), ("as_of", "TEXT"), ("basis", "TEXT"), ("basis_at", "TEXT"),

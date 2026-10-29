@@ -27,7 +27,8 @@ async def security_headers(request: web.Request, handler):
     # Ilova faqat Telegram ichida ochiladi — begona saytlarga joylashtirilmaydi
     resp.headers.setdefault("Content-Security-Policy",
                             "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; "
-                            "img-src 'self' data: blob:; connect-src 'self'; frame-ancestors https://web.telegram.org "
+                            "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org "
+                            "https://tile.openstreetmap.de; connect-src 'self'; frame-ancestors https://web.telegram.org "
                             "https://*.telegram.org; object-src 'none'; base-uri 'self'")
     if request.path.startswith("/api/"):
         resp.headers["Cache-Control"] = "no-store"
@@ -37,7 +38,7 @@ async def security_headers(request: web.Request, handler):
 def _version() -> str:
     """Ilova fayllari versiyasi (o'zgartirilgan vaqtlari bo'yicha): yangi kod o'rnatilganda o'zgaradi."""
     import hashlib
-    stamp = "|".join(f"{f}:{(STATIC / f).stat().st_mtime_ns}" for f in ("app.js", "app.css", "desk.js", "desk.css", "tg.js")
+    stamp = "|".join(f"{f}:{(STATIC / f).stat().st_mtime_ns}" for f in ("app.js", "app.css", "desk.js", "desk.css", "tashrif.js", "tg.js")
                      if (STATIC / f).exists())
     return hashlib.sha1(stamp.encode()).hexdigest()[:10]
 
@@ -49,7 +50,7 @@ def _html(name: str) -> web.Response:
     """HTML sahifa — skript va uslublar versiya bilan (?v=…): Telegram eski nusxani keshdan olmaydi, ilovani
     qo'lda yangilash shart emas."""
     html = (STATIC / name).read_text(encoding="utf-8")
-    for f in ("app.css", "app.js", "desk.css", "desk.js", "fonts.css", "tg.js"):
+    for f in ("app.css", "app.js", "desk.css", "desk.js", "tashrif.js", "fonts.css", "tg.js"):
         html = html.replace(f"static/{f}\"", f"static/{f}?v={APP_VERSION}\"")
     return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
 
