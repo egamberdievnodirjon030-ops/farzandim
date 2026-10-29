@@ -820,16 +820,17 @@ async def apply_subject_stats(bot, rows: list[dict], silent: bool = False, as_of
     for src, found in creds.items():
         await db.upsert_subject_credits(found, source=src)
     creds = {**creds["code"], **creds["manage"]}
-    pairs: dict[str, tuple] = {}
-    for r in rows:
-        if r.get("planned"):
-            pairs.setdefault(subject_key(r["subject"]) or normalize_text(r["subject"]), (r["subject"], r["planned"], r.get("held_n")))
+    pairs, odd = _subject_pairs(rows)
     if pairs:
         await db.set_subject_pairs(pairs)
         from subject_limits import limit_from_pairs
         lines.append(f"Fanlarga ajratilgan darslar ({len(pairs)} ta fan) va sababsiz qoldirish chegarasi (25%): " + ", ".join(
             f"{esc(s)} — {fmt_num(p)} para → {limit_from_pairs(p)} para" + (f" (o'tildi: {fmt_num(h)})" if h is not None else "")
             for s, p, h in sorted(pairs.values())[:20]) + (" …" if len(pairs) > 20 else ""))
+        if odd:
+            lines.append(f"Darslar soni fanning umumiy sonidan farq qiladigan talabalar (kech qo'shilgan yoki alohida reja): "
+                         f"{len(odd)} ta — {esc(', '.join(sorted(odd)[:8]))}" + (" …" if len(odd) > 8 else "")
+                         + "; chegara fanning umumiy darslari bo'yicha olindi.")
     if creds:
         lines.append(f"Fan kreditlari: {len(creds)} ta fan — " + ", ".join(
             f"{esc(s)} {fmt_num(c)} kr. ({limit_pairs(c)} para)" for s, c, _ in sorted(creds.values())[:20])
@@ -881,6 +882,27 @@ async def apply_subject_stats(bot, rows: list[dict], silent: bool = False, as_of
     except Exception:
         log.exception("Dinamika nuqtalari yozilmadi")
     return lines
+
+
+def _subject_pairs(rows: list[dict]) -> tuple[dict[str, tuple], set[str]]:
+    """Fan kaliti → (fan, ajratilgan darslar, o'tilgan darslar): talabalar orasida eng ko'p uchragan qiymat (o'quv reja) —
+    kech qo'shilgan yoki alohida rejadagi talabaning kamroq darsi fanning chegarasini o'zgartirmaydi.
+    Qaytaradi: (fanlar, darslari farq qiladigan talabalar)."""
+    by: dict[str, list[dict]] = {}
+    for r in rows:
+        if r.get("planned"):
+            by.setdefault(subject_key(r["subject"]) or normalize_text(r["subject"]), []).append(r)
+
+    def top(vals: list) -> float:  # eng ko'p uchragani (teng bo'lsa — kattasi)
+        return max(set(vals), key=lambda v: (vals.count(v), v))
+
+    out, odd = {}, set()
+    for key, rs in by.items():
+        p = top([r["planned"] for r in rs])
+        held = [r["held_n"] for r in rs if r["planned"] == p and r.get("held_n") is not None]
+        out[key] = (rs[0]["subject"], p, top(held) if held else None)
+        odd |= {r.get("full_name") or r.get("hemis_id") or str(r.get("student_id")) for r in rs if r["planned"] != p}
+    return out, odd
 
 
 async def _disc_signal(bot, sids: set[int] | None = None) -> list[str]:
