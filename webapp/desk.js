@@ -399,6 +399,7 @@ async function pPanel() {
     ${ch ? kpi({ href: '#/chora?tab=hist', icon: 'shield', c: 'risk', label: 'Chora ko‘rilganlar', value: ch.kpi.students, unit: 'ta',
       state: ch.new ? 'bad' : 'ok', title: `O‘quv yilida jami ${ch.kpi.total} ta chora`,
       sub: `<span class="ln">ogohlantirish: <b>${ch.kpi.ogohlantirish}</b> · hayfsan: <b>${ch.kpi.hayfsan}</b></span>${ch.new ? `<span class="ln">chora kutilmoqda: <b>${ch.new}</b> ta</span>` : ''}` }) : ''}
+    ${ch && ch.kpi.letters ? lettersKpi(ch.kpi.letters) : ''}
     ${kpi({ href: '#/students?f=acad', icon: 'bookx', c: 'acad', label: 'Akademik qarz', value: d.acad, unit: 'ta', state: probState(d.acad),
       sub: 'qarzdorlar ro‘yxati bo‘yicha' })}
     ${kpi({ href: '#/students?f=gpa', icon: 'cap', c: 'gpa', label: 'GPA past', value: d.gpa, unit: 'ta', state: probState(d.gpa),
@@ -780,9 +781,10 @@ function formDlg(title, inner, okText = 'Saqlash', danger = false) {
 async function pChora(parts, q) {
   document.title = 'Chora ko‘rish — Boshqaruv paneli';
   const st = S.chora = S.chora || { tab: 'list', m: 'ogohlantirish', sel: new Set(), hm: '', hg: '' };
-  if (q && (q.get('tab') || q.get('m') || q.has('aq'))) {  // havoladan (masalan, «Kurs holati»dan) — bir marta; keyin yorliqlar o'zi almashadi
+  if (q && (q.get('tab') || q.get('m') || q.has('aq') || q.has('hm'))) {  // havoladan (masalan, «Kurs holati»dan) — bir marta; keyin yorliqlar o'zi almashadi
     if (q.get('tab')) st.tab = q.get('tab');
     if (q.get('m')) st.m = q.get('m');
+    if (q.has('hm')) { st.hm = q.get('hm'); st.hg = ''; }
     if (q.has('aq')) { st.aq = q.get('aq'); st.at = ''; }
     history.replaceState(null, '', '#/chora');
   }
@@ -1192,6 +1194,19 @@ function choraBars(dyn) {
       <span>${x.label.slice(0, 3)}</span></div>`; }).join('')}</div>
     <div class="ch-leg"><span><i class="og"></i>Dekan ogohlantirishi</span><span><i class="hy"></i>Hayfsan</span><span><i class="xa"></i>Ota-onaga xat</span><span><i class="bo"></i>Boshqa</span></div>`;
 }
+/* ota-onaga yuborilgan xatlar: nima bo'yicha (davomat / ichki tartib / trimestr) va qaysi chora bilan */
+const LT_GROUNDS = [['davomat', 'davomat'], ['tartib', 'ichki tartib'], ['trimestr', 'trimestr qarzi']];
+const LT_MEAS = [['ogohlantirish', 'dekan ogohlantirishi'], ['hayfsan', 'hayfsan'], ['boshqa', 'boshqa chora'], ['xat', 'alohida xat']];
+function lettersKpi(L) {
+  const g = LT_GROUNDS.filter(([k]) => L[k]).map(([k, l]) => `${l}: <b>${L[k]}</b>`).join(' · ');
+  const m = LT_MEAS.filter(([k]) => (L.by_measure || {})[k]).map(([k, l]) => `${l} ${L.by_measure[k]}`).join(' · ');
+  return kpi({ href: '#/chora?tab=hist&hm=xat', icon: 'mail', c: 'msg', label: 'Ota-onaga xatlar', value: L.sent, unit: 'ta',
+    state: L.pending ? 'bad' : null,
+    title: `O‘quv yilida ota-onaga yuborilgan xatlar: ${L.sent} ta (${L.students} talaba)${m ? `\nChora bo‘yicha: ${m}` : ''}`
+      + `\nBotda imzolangan xat yetkazilgan: ${L.in_bot}${L.last ? `\nOxirgisi: ${dmy(L.last)}` : ''}`,
+    sub: `<span class="ln">${g || 'hali xat yuborilmagan'}</span>${m ? `<span class="ln sub-m">${m}</span>` : ''}`
+      + (L.pending ? `<span class="ln warn-t">yuborilmagan: <b>${L.pending}</b> ta</span>` : '') });
+}
 /* chora turlari × asos: dekan ogohlantirishi va hayfsan — nechtasi davomat, nechtasi ichki tartib bo'yicha */
 const MX_ROWS = [['ogohlantirish', 'Dekan ogohlantirishi'], ['hayfsan', 'Hayfsan'], ['boshqa', 'Boshqa chora'], ['xat', 'Ota-onaga xat']];
 function choraMatrix(mx) {
@@ -1221,13 +1236,13 @@ function choraMonths(dyn) {
 }
 async function loadChoraHist(st) {
   const box = $('#ch-hist');
-  const qs = new URLSearchParams(); if (st.hm) qs.set('measure', st.hm); if (st.hg) qs.set('ground', st.hg);
+  const qs = new URLSearchParams(); if (st.hm === 'xat') qs.set('letters', '1'); else if (st.hm) qs.set('measure', st.hm); if (st.hg) qs.set('ground', st.hg);
   const h = await api('/api/staff/discipline/history' + (qs.toString() ? '?' + qs : ''));
   const k = h.kpi;
   box.innerHTML = `<section class="kpis">
       ${kpi({ icon: 'alert', c: 'acad', label: 'Dekan ogohlantirishi', value: k.ogohlantirish, unit: 'ta', sub: 'o‘quv yili boshidan' })}
       ${kpi({ icon: 'shield', c: 'risk', label: 'Hayfsan', value: k.hayfsan, unit: 'ta', sub: 'o‘quv yili boshidan' })}
-      ${kpi({ icon: 'mail', c: 'msg', label: 'Ota-onaga xat', value: k.xat, unit: 'ta', sub: `trimestr qarzi bo‘yicha: ${k.trimestr}` })}
+      ${lettersKpi(k.letters)}
       ${kpi({ icon: 'calx', c: 'att', label: 'Davomat bo‘yicha', value: k.davomat, unit: 'ta', sub: 'sababsiz dars qoldirish' })}
       ${kpi({ icon: 'book', c: 'gpa', label: 'Ichki tartib bo‘yicha', value: k.tartib, unit: 'ta', sub: 'qoidalarni buzish' })}
       ${kpi({ icon: 'users', c: 'people', label: 'Talabalar', value: k.students, unit: 'ta', sub: `${k.repeat} tasiga takroriy chora` })}

@@ -1772,7 +1772,8 @@ async def api_disc_address(request):
 @staff_route
 async def api_disc_history(request):
     import discipline as D
-    return ok(await D.history(measure=request.query.get("measure", ""), ground=request.query.get("ground", "")))
+    return ok(await D.history(measure=request.query.get("measure", ""), ground=request.query.get("ground", ""),
+                              letters=request.query.get("letters", "")))
 
 
 @staff_route

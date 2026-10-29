@@ -1176,8 +1176,9 @@ def _why(r: dict) -> str:
     return r.get("rule") or ""
 
 
-async def history(scope: set[str] | None = ..., measure: str = "", ground: str = "") -> dict:
-    """O'quv yili boshidan rasman ko'rilgan choralar: ro'yxat (hujjatlari bilan), ko'rsatkichlar, oylar bo'yicha dinamika."""
+async def history(scope: set[str] | None = ..., measure: str = "", ground: str = "", letters: str = "") -> dict:
+    """O'quv yili boshidan rasman ko'rilgan choralar: ro'yxat (hujjatlari bilan), ko'rsatkichlar, oylar bo'yicha dinamika.
+    letters: «1» — ota-onaga xat yuborilganlar (chora turidan qat'i nazar), «0» — xati hali yuborilmaganlar."""
     if scope is ...:
         from tenancy import viewer_scope
         scope = viewer_scope()
@@ -1203,6 +1204,8 @@ async def history(scope: set[str] | None = ..., measure: str = "", ground: str =
         rows = [r for r in rows if r["measure"] == measure]
     if ground:
         rows = [r for r in rows if r["ground"] == ground]
+    if letters in ("0", "1"):
+        rows = [r for r in rows if bool(r["letter_date"]) == (letters == "1")]
     # oylar bo'yicha dinamika (o'quv yili boshidan joriy oygacha)
     start, t = academic_year_start(), today()
     months, y, m = [], start.year, start.month
@@ -1229,13 +1232,24 @@ async def history(scope: set[str] | None = ..., measure: str = "", ground: str =
     kpi.update({"students": len({r["student_id"] for r in all_rows}),
                 "repeat": sum(1 for v in _count_by(all_rows).values() if v > 1),
                 "no_original": sum(1 for r in all_rows if not r["has_original"]), "total": len(all_rows),
-                "letters_sent": sum(1 for r in all_rows if r["measure"] != "xat" and r["letter_date"]),
-                "letters_pending": sum(1 for r in all_rows if r["measure"] != "xat" and not r["letter_date"])})
+                "letters": _letters_kpi(all_rows)})
     by_group: dict[str, int] = {}
     for r in all_rows:
         by_group[r["group_name"] or "—"] = by_group.get(r["group_name"] or "—", 0) + 1
     return {"items": rows, "kpi": kpi, "dynamics": dyn, "matrix": matrix, "by_group": sorted(by_group.items(), key=lambda x: -x[1]),
             "since": ay_start()}
+
+
+def _letters_kpi(rows: list[dict]) -> dict:
+    """Ota-onaga yuborilgan xatlar: jami, asosi (davomat / ichki tartib / trimestr), qaysi chora bo'yicha, botda yetkazilgani
+    (imzolangan xat ota-onaga yuborilgan) va hali yuborilmaganlar (farmoyish/buyruq chiqqan, xat yo'q)."""
+    sent = [r for r in rows if r["letter_date"]]
+    out = {"sent": len(sent), "pending": sum(1 for r in rows if not r["letter_date"]),
+           "students": len({r["student_id"] for r in sent}), "last": max((r["letter_date"] for r in sent), default=None),
+           "in_bot": sum(1 for r in sent if any(f["sent_at"] and (f["kind"] == "xat" or r["measure"] == "xat") for f in r["files"]))}
+    out.update({g: sum(1 for r in sent if r["ground"] == g) for g in GROUNDS})
+    out["by_measure"] = {m: sum(1 for r in sent if r["measure"] == m) for m in MEASURES}
+    return out
 
 
 def _count_by(rows: list[dict]) -> dict[int, int]:

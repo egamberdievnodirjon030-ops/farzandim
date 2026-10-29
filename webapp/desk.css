@@ -500,6 +500,7 @@ a.kpi:hover::before { opacity: 1; }
 .kpi-s { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .kpi-s b { color: var(--ink); font-weight: 600; }
 .kpi-s .ln { flex-basis: 100%; }
+.kpi-s .sub-m { font-size: 12px; }
 .kpi-s svg.i { width: 14px; height: 14px; color: var(--faint); }
 .kpi .meter { margin: 8px 0 4px; height: 6px; background: var(--cb); }
 .kpi .meter i { background: var(--c); }
