@@ -1528,6 +1528,33 @@ async def api_disc_order_archive(request):
 
 
 @staff_route
+async def api_disc_doc_archive(request):
+    """Asl nusxalar arxivi: ?q= — hujjat raqami yoki talaba F.I.Sh., ?type= — hujjat turi."""
+    import discipline as D
+    return ok(await D.doc_archive(request.query.get("q", "").strip()[:80], request.query.get("type", "")))
+
+
+@staff_route
+async def api_disc_files_meta(request):
+    """Asl nusxa(lar)ning raqami va sanasi: {"ids": [...], "number", "date"}."""
+    import discipline as D
+    body = await request.json()
+    ids = []
+    for v in (body.get("ids") or [])[:50]:
+        try:
+            fid = int(v)
+        except (TypeError, ValueError):
+            continue
+        if not await _disc_file_visible(fid):
+            return bad("not_found", 404)
+        ids.append(fid)
+    if not ids:
+        return bad("no_files")
+    res = await D.set_file_meta(ids, str(body.get("number") or ""), str(body.get("date") or "") or None)
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
 async def api_disc_archive_done(request):
     import discipline as D
     return ok(await D.archive_done())
@@ -1624,16 +1651,19 @@ async def api_disc_upload(request):
     o = await _disc_order_visible(oid)
     if not o:
         return bad("not_found", 404)
-    kind, case_id, saved = "boshqa", None, []
+    kind, case_id, saved, meta = "boshqa", None, [], {}
     async for part in await request.multipart():
         if part.name == "kind":
             kind = (await part.text()).strip()
+        elif part.name in ("number", "date"):
+            meta[part.name] = (await part.text()).strip()
         elif part.name == "case_id":
             v = (await part.text()).strip()
             case_id = int(v) if v.isdigit() and any(c["id"] == int(v) for c in o["cases"]) else None
         elif part.name == "file" and part.filename:
             data = bytes(await part.read(decode=False))
-            res = await D.add_file(None if case_id else oid, case_id, kind, part.filename, data, request["user"]["id"])
+            res = await D.add_file(None if case_id else oid, case_id, kind, part.filename, data, request["user"]["id"],
+                                   meta.get("number"), meta.get("date"))
             if not res["ok"]:
                 return bad(res["error"])
             saved.append(res["id"])
@@ -1696,12 +1726,15 @@ async def api_disc_case_upload(request):
     c = await db.fetchone("SELECT student_id FROM disc_cases WHERE id = ?", (cid,))
     if not c or not _visible(await db.get_student(c["student_id"])):
         return bad("not_found", 404)
-    kind, saved = "boshqa", []
+    kind, saved, meta = "boshqa", [], {}
     async for part in await request.multipart():
         if part.name == "kind":
             kind = (await part.text()).strip()
+        elif part.name in ("number", "date"):
+            meta[part.name] = (await part.text()).strip()
         elif part.name == "file" and part.filename:
-            res = await D.add_file(None, cid, kind, part.filename, bytes(await part.read(decode=False)), request["user"]["id"])
+            res = await D.add_file(None, cid, kind, part.filename, bytes(await part.read(decode=False)), request["user"]["id"],
+                                   meta.get("number"), meta.get("date"))
             if not res["ok"]:
                 return bad(res["error"])
             saved.append(res["id"])
@@ -2234,6 +2267,8 @@ def setup_routes(app: web.Application) -> None:
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/basis", api_disc_order_basis)
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/archive", api_disc_order_archive)
     r.add_post("/api/staff/discipline/archive-done", api_disc_archive_done)
+    r.add_get("/api/staff/discipline/archive", api_disc_doc_archive)
+    r.add_post("/api/staff/discipline/files/meta", api_disc_files_meta)
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/letters", api_disc_order_letters)
     r.add_post("/api/staff/discipline/cases/{cid:\\d+}/basis", api_disc_case_basis)
     r.add_delete("/api/staff/discipline/orders/{oid:\\d+}/cases/{cid:\\d+}", api_disc_order_case_delete)

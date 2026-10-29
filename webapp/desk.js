@@ -739,6 +739,14 @@ function autoMsg(a, kind, o) {
   return '';
 }
 const fileTone = f => (f.sent_at ? 'ok' : f.send_note ? 'warn' : 'muted');
+/* dalolatnomaning o'z raqami (arxivda qidirish uchun); bekor qilinsa — null (yuklanmaydi) */
+async function askDocNo(kind) {
+  if (kind !== 'dalolatnoma') return {};
+  const v = await formDlg('Dalolatnoma — raqam va sana', `<p>Asl nusxa arxivda shu raqam bo‘yicha topiladi (raqami bo‘lmasa — bo‘sh qoldiring).</p><div class="cols2">
+    <label class="field"><span>Raqami</span><input class="input" name="number" placeholder="Masalan: 3"></label>
+    <label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${todayIso()}"></label></div>`, 'Yuklash');
+  return v ? { number: v.get('number') || '', date: v.get('date') || '' } : null;
+}
 /* hujjatni brauzerda ochish (PDF, rasm) — oyna darhol ochiladi, keyin fayl yuklanadi (qalqib chiquvchi oyna to'sig'i uchun) */
 async function viewFile(fid) {
   const w = window.open('', '_blank');
@@ -772,9 +780,10 @@ function formDlg(title, inner, okText = 'Saqlash', danger = false) {
 async function pChora(parts, q) {
   document.title = 'Chora ko‘rish — Boshqaruv paneli';
   const st = S.chora = S.chora || { tab: 'list', m: 'ogohlantirish', sel: new Set(), hm: '', hg: '' };
-  if (q && (q.get('tab') || q.get('m'))) {  // havoladan (masalan, «Kurs holati»dan) — bir marta; keyin yorliqlar o'zi almashadi
+  if (q && (q.get('tab') || q.get('m') || q.has('aq'))) {  // havoladan (masalan, «Kurs holati»dan) — bir marta; keyin yorliqlar o'zi almashadi
     if (q.get('tab')) st.tab = q.get('tab');
     if (q.get('m')) st.m = q.get('m');
+    if (q.has('aq')) { st.aq = q.get('aq'); st.at = ''; }
     history.replaceState(null, '', '#/chora');
   }
   view(head('Chora ko‘rish', courseSub()) + skel(70) + skel(320));
@@ -784,12 +793,13 @@ async function pChora(parts, q) {
   const drafts = d.orders.filter(o => !o.archived_at && !o.done).length;
   const tab = (k, icn, label, n) => `<button data-tab="${k}" class="${st.tab === k ? 'on' : ''}" role="tab" aria-selected="${st.tab === k}">${ic(icn)} ${label}${n ? ` <span class="n">${n}</span>` : ''}</button>`;
   const tabs = `<div class="toolbar"><div class="seg" role="tablist">${tab('list', 'alert', 'Chegaraga yetganlar', S.badges.chora)}${tab('docs', 'file', 'Hujjatlar', drafts)}
-    ${tab('hist', 'chart', 'Chora ko‘rilganlar')}${tab('tpl', 'book', 'Shablonlar va sozlama')}</div><span class="grow"></span>
+    ${tab('hist', 'chart', 'Chora ko‘rilganlar')}${tab('arch', 'folder', 'Arxiv')}${tab('tpl', 'book', 'Shablonlar va sozlama')}</div><span class="grow"></span>
     <button class="btn" data-ch="tartib">${ic('plus')} Ichki tartib bo‘yicha chora</button></div>`;
   let body = '';
   if (st.tab === 'list') body = choraList(d, st);
   else if (st.tab === 'docs') body = choraDocs(d);
   else if (st.tab === 'hist') body = `<div id="ch-hist">${skel(90)}${skel(260)}</div>`;
+  else if (st.tab === 'arch') body = choraArch(st);
   else body = choraTpl(d);
   view(head('Chora ko‘rish', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + tabs + body);
   $$('[data-tab]').forEach(b => b.addEventListener('click', () => { st.tab = b.dataset.tab; route(); }));
@@ -797,6 +807,7 @@ async function pChora(parts, q) {
   if (st.tab === 'list') (st.m === 'trimestr' ? bindChoraTri : bindChoraList)(d, st);
   if (st.tab === 'docs') bindChoraDocs(d);
   if (st.tab === 'hist') loadChoraHist(st);
+  if (st.tab === 'arch') bindChoraArch(st);
   if (st.tab === 'tpl') bindChoraTpl(d);
 }
 function choraSeg(d, m) {
@@ -953,7 +964,8 @@ function stagedCard(o) {
               <button class="btn sm ghost" data-cb="${c.id}" data-v="dalolatnoma" title="Yozishdan bosh tortdi — dalolatnoma tuziladi">Yozmadi</button>`}
             <button class="btn sm ghost" data-chs="${c.student_id}" title="Talabaning hujjatlari">${ic('folder')}${c.files_n ? ` ${c.files_n}` : ''}</button>
             ${draft ? `<button class="btn sm ghost" data-dcase="${c.id}" title="Hujjatdan chiqarish">${ic('x')}</button>` : ''}</span></li>`).join('')}</ul>
-        ${B.dalolatnoma && has('dalolatnoma') ? `<div class="wrapc"><button class="btn sm" data-doc="dalolatnoma">${ic('download')} Dalolatnoma (Word) — yozmaganlar</button></div>` : ''}</div></div></li>`;
+        ${B.dalolatnoma && has('dalolatnoma') ? `<div class="wrapc"><button class="btn sm" data-doc="dalolatnoma">${ic('download')} Dalolatnoma (Word) — yozmaganlar</button>
+          ${fchips(common(['dalolatnoma']))}${upl('dalolatnoma', 'Imzolangan dalolatnoma')}</div>` : ''}</div></div></li>`;
   const s2 = `<li class="step ${st(2)}">${head(2, docT, issued ? `<span class="chip ok">${o.number ? '№ ' + esc(o.number) + ' · ' : ''}${dmy(o.date)}</span>`
       : cur < 2 ? '<span class="chip muted">1-bosqichdan keyin</span>' : '<span class="chip warn">imzolanishi kutilmoqda</span>')}
     <div class="st-b">${cur < 2 && !issued ? `<p class="hint">Avval 1-bosqich: bildirishnoma dekanga topshirilsin yoki har bir talabaning tushuntirish xati (yozmasa — dalolatnoma) bo‘lsin. Shundan keyin ${main ? main.title.toLowerCase() : 'hujjat'} shu asosda tayyorlanadi.</p>`
@@ -970,7 +982,7 @@ function stagedCard(o) {
             <button class="btn sm ghost" data-chs="${c.student_id}" title="Imzolangan xatni yuklash, PDF ni ota-onaga yuborish">${ic('folder')}${c.files_n ? ` ${c.files_n}` : ''}</button></span></li>`).join('')}</ul>
         <div class="wrapc">${o.cases.length > 1 ? `<button class="btn sm" data-doc="xat">${ic('mail')} Barcha xatlar (ZIP)</button>` : ''}
           <button class="btn sm primary" data-letters>${ic('send')} Xatlar yuborildi deb belgilash</button></div>`}</div></li>`;
-  const other = o.files.filter(f => !f.case_id && !['bildirishnoma', 'imzolangan', 'farmoyish', 'buyruq'].includes(f.kind));
+  const other = o.files.filter(f => !f.case_id && !['bildirishnoma', 'imzolangan', 'farmoyish', 'buyruq', ...(B.dalolatnoma ? ['dalolatnoma'] : [])].includes(f.kind));
   return `<article class="sec ord" data-oid="${o.id}"><header><h2><span class="h-ic c-${o.measure === 'hayfsan' ? 'risk' : 'acad'}" aria-hidden="true">${ic(o.measure === 'hayfsan' ? 'shield' : 'alert')}</span>
       ${M.t} <small>${GRND[o.ground] || ''} · ${o.cases.length} ta talaba</small></h2>${stChip}</header>
     <div class="pad">${o.rule ? `<p class="hint">Qoida: ${esc(o.rule)}</p>` : ''}
@@ -1055,14 +1067,18 @@ function bindChoraDocs(d) {
       await api(`/api/staff/discipline/files/${b.dataset.fdel}`, { method: 'DELETE' }); route(); }));
     card.querySelector('[data-up]')?.addEventListener('change', async e => {
       const files = [...e.target.files]; if (!files.length) return;
-      const fd = new FormData(); fd.append('kind', card.querySelector('[data-upkind]').value);
+      const kind = card.querySelector('[data-upkind]').value, meta = await askDocNo(kind); if (!meta) return;
+      const fd = new FormData(); fd.append('kind', kind);
+      Object.entries(meta).forEach(([k, v]) => fd.append(k, v));
       files.forEach(f => fd.append('file', f, f.name));
       try { const r = await api(`${base}/files`, { method: 'POST', body: fd }); toast('Yuklandi' + autoMsg(r.auto, fd.get('kind'), o)); route(); }
       catch (err) { toast(err.message === 'too_big' ? 'Fayl juda katta (20 MB gacha)' : 'Yuklanmadi', true); }
     });
     const upload = async (url, kind, files) => {
       if (!files.length) return;
+      const meta = await askDocNo(kind); if (!meta) return;
       const fd = new FormData(); fd.append('kind', kind); files.forEach(f => fd.append('file', f, f.name));
+      Object.entries(meta).forEach(([k, v]) => fd.append(k, v));
       try { const r = await api(url, { method: 'POST', body: fd }); toast('Yuklandi' + autoMsg(r.auto, kind, o)); route(); }
       catch (err) { toast(err.message === 'too_big' ? 'Fayl juda katta (20 MB gacha)' : 'Yuklanmadi', true); }
     };
@@ -1227,7 +1243,7 @@ async function loadChoraHist(st) {
       <div class="seg">${[['', 'Barcha asoslar'], ['davomat', 'Davomat'], ['tartib', 'Ichki tartib'], ['trimestr', 'Trimestr']].map(([v, l]) => `<button data-hg="${v}" class="${st.hg === v ? 'on' : ''}">${l}</button>`).join('')}</div></header>
       <p class="hint pad" style="margin:0;padding-bottom:0">${ic('folder')} Talabani bossangiz — barcha choralari asl hujjatlari bilan ochiladi: ko‘rish, yuklash, ota-onaga yuborish.</p>
       ${h.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Sana</th><th>Talaba</th><th>Chora</th><th>Asos</th><th>Asl hujjatlar</th></tr></thead><tbody>
-        ${h.items.map(x => `<tr class="click" data-chs="${x.student_id}"><td class="nowrap">${dmy(x.date)}${x.number ? `<div class="sub-l">№ ${esc(x.number)}</div>` : ''}</td>
+        ${h.items.map(x => `<tr class="click" data-chs="${x.student_id}"><td class="nowrap">${dmy(x.date)}${x.number ? `<div class="sub-l"><a href="#/chora?tab=arch&aq=${encodeURIComponent(x.number)}" title="Arxivda — asl nusxa">№ ${esc(x.number)}</a></div>` : ''}</td>
           <td class="name"><b>${esc(x.full_name)}</b><span>${esc(x.group_name || '')}</span></td>
           <td><span class="chip ${(MEAS[x.measure] || MEAS.boshqa).c}">${esc((MEAS[x.measure] || {}).s || x.title)}</span>
             ${x.measure !== 'xat' ? (x.letter_date ? `<div class="sub-l">${ic('mail')} xat: ${x.letter_no ? '№ ' + esc(x.letter_no) + ', ' : ''}${dmy(x.letter_date)}</div>` : '<div class="sub-l warn-t">ota-onaga xat yuborilmagan</div>') : ''}</td>
@@ -1240,6 +1256,55 @@ async function loadChoraHist(st) {
   box.querySelectorAll('[data-hg]').forEach(b => b.addEventListener('click', () => { st.hg = b.dataset.hg; loadChoraHist(st); }));
   box.querySelectorAll('[data-hdoc]').forEach(b => b.addEventListener('click', async e => { e.stopPropagation(); b.disabled = true; try { await download(`/api/staff/discipline/orders/${b.dataset.hdoc}/doc/zip`); } catch (_) { toast('Yuklab bo‘lmadi', true); } b.disabled = false; }));
   box.querySelectorAll('[data-fview]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); viewFile(a.dataset.fview); }));
+}
+/* asl nusxalar arxivi: raqam (17, 215-T, 01-12/101) yoki talaba F.I.Sh. bo'yicha qidiruv */
+const ARCH_C = { farmoyish: 'warn', buyruq: 'bordo', bildirishnoma: 'info', dalolatnoma: 'muted', xat: 'info', tushuntirish: 'muted', qaror: 'muted', asos: 'muted', boshqa: 'muted' };
+function choraArch(st) {
+  return `<p class="hint scope">${ic('info')}<span>Faqat yuklangan <b>asl nusxalar</b> (imzolangan farmoyish, buyruq, bildirishnoma, dalolatnoma, ota-onaga xat, tushuntirish xati) — tozalangan choralarniki ham. Bitta hujjat bir necha talabaga chiqqan bo‘lsa — bitta yozuv. Raqami bo‘yicha (masalan <b>17</b>, <b>215-T</b>, <b>01-12/101</b>) yoki talaba F.I.Sh. bo‘yicha qidiring.</span></p>
+    <div class="toolbar"><div class="search wide">${ic('search')}<input class="input" id="arq" type="search" placeholder="Hujjat raqami yoki talaba F.I.Sh." value="${esc(st.aq || '')}" aria-label="Arxivda qidirish"></div></div>
+    <div id="ch-arch">${skel(60)}${skel(260)}</div>`;
+}
+function bindChoraArch(st) {
+  let tm = null;
+  $('#arq').addEventListener('input', e => { clearTimeout(tm); tm = setTimeout(() => { st.aq = e.target.value.trim(); loadChoraArch(st); }, 300); });
+  if (!st.aq) $('#arq').focus();
+  loadChoraArch(st);
+}
+async function loadChoraArch(st) {
+  const qs = new URLSearchParams(); if (st.aq) qs.set('q', st.aq); if (st.at) qs.set('type', st.at);
+  const d = await api('/api/staff/discipline/archive' + (qs.toString() ? '?' + qs : ''));
+  const box = $('#ch-arch'); if (!box) return;
+  const types = Object.entries(d.types).filter(([k]) => d.counts[k] || k === st.at);
+  const studs = e => `${e.students.slice(0, 5).map(x => `<a href="#" class="stl" data-achs="${x.id}">${esc(x.name)}</a>`).join(', ')}${e.students.length > 5 ? ` <span class="sub-l">va yana ${e.students.length - 5} ta</span>` : ''}
+    <div class="sub-l">${e.students.length} ta talaba${e.students.length && e.students[0].group ? ' · ' + esc([...new Set(e.students.map(x => x.group))].join(', ')) : ''}</div>`;
+  const head = e => `<span class="chip ${ARCH_C[e.type] || 'muted'}">${esc(e.title)}</span>${e.number ? `<div class="docno">№ ${esc(e.number)}${e.exact ? ` <span class="chip ok">${ic('check')} aniq</span>` : ''}</div>` : '<div class="sub-l">raqamsiz</div>'}`;
+  box.innerHTML = `<div class="toolbar"><div class="seg">${[['', `Hammasi`], ...types].map(([k, l]) => `<button data-at="${k}" class="${(st.at || '') === k ? 'on' : ''}">${esc(k ? l.replace(/ \(.*\)$/, '') : l)}${k && d.counts[k] ? ` <span class="n">${d.counts[k]}</span>` : ''}</button>`).join('')}</div></div>
+    <section class="sec">${d.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl arch"><thead><tr><th>Hujjat</th><th>Sana</th><th>Talabalar</th><th>Asl nusxa</th><th></th></tr></thead><tbody>
+      ${d.items.map(e => `<tr class="${e.exact ? 'hit' : ''}"><td>${head(e)}</td><td class="nowrap">${dmy(e.date)}</td><td>${studs(e)}</td>
+        <td><div class="wrapc">${e.files.map(f => `<a href="#" class="chip ${f.sent_at ? 'ok' : 'muted'}" data-fview="${f.id}" title="${esc(f.name)}${f.send_note ? ' — ' + esc(f.send_note) : ''}">${ic(isPdf(f) ? 'eye' : 'file')} ${esc(f.name.length > 28 ? f.name.slice(0, 26) + '…' : f.name)}</a>
+          <button class="btn sm ghost" data-fdl="${f.id}" title="Yuklab olish">${ic('download')}</button>`).join('')}</div></td>
+        <td class="r nowrap"><button class="btn sm ghost" data-ameta="${e.files.map(f => f.id).join(',')}" data-no="${esc(e.number || '')}" data-dt="${esc(e.date || '')}" title="Raqam va sana">${ic('edit')}</button></td></tr>`).join('')}</tbody></table></div>`
+      : emptyBox('folder', st.aq ? 'Asl nusxa topilmadi' : 'Arxiv hali bo‘sh', st.aq ? 'Raqam yoki F.I.Sh. ni tekshiring; quyida — raqami bor, lekin asl nusxasi yuklanmagan hujjatlar.' : 'Imzolangan asl nusxalar «Hujjatlar» yorlig‘ida yoki talaba oynasida yuklanadi.')}</section>
+    ${d.missing.length ? `<section class="sec" style="margin-top:18px"><header>${H('alert', `Asl nusxasi yuklanmagan — ${d.missing.length} ta`, 'money2')}</header>
+      <div class="tbl-wrap" style="max-height:none"><table class="tbl arch"><tbody>${d.missing.map(e => `<tr><td>${head(e)}</td><td class="nowrap">${dmy(e.date)}</td><td>${studs(e)}</td>
+        <td class="r nowrap"><label class="btn sm">${ic('upload')} Asl nusxani yuklash<input type="file" data-aup="${e.order_id}" data-k="${e.upload}" accept=".pdf,image/*" hidden multiple></label></td></tr>`).join('')}</tbody></table></div></section>` : ''}`;
+  box.querySelectorAll('[data-at]').forEach(b => b.addEventListener('click', () => { st.at = b.dataset.at; loadChoraArch(st); }));
+  box.querySelectorAll('[data-achs]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openChora(Number(a.dataset.achs)); }));
+  box.querySelectorAll('[data-fview]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); viewFile(a.dataset.fview); }));
+  box.querySelectorAll('[data-fdl]').forEach(b => b.addEventListener('click', async () => { try { await download(`/api/staff/discipline/files/${b.dataset.fdl}`); } catch (_) { toast('Yuklab bo‘lmadi', true); } }));
+  box.querySelectorAll('[data-ameta]').forEach(b => b.addEventListener('click', async () => {
+    const v = await formDlg('Asl nusxa — raqam va sana', `<p>Arxivda shu raqam bo‘yicha topiladi. Bo‘sh qoldirilsa — choradagi raqam olinadi.</p><div class="cols2">
+      <label class="field"><span>Raqami</span><input class="input" name="number" value="${esc(b.dataset.no)}"></label>
+      <label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${esc(b.dataset.dt)}"></label></div>`);
+    if (!v) return;
+    try { await api('/api/staff/discipline/files/meta', { method: 'POST', json: { ids: b.dataset.ameta.split(','), number: v.get('number'), date: v.get('date') } }); toast('Saqlandi'); loadChoraArch(st); }
+    catch (e) { toast('Saqlanmadi', true); } }));
+  box.querySelectorAll('[data-aup]').forEach(i => i.addEventListener('change', async e => {
+    const files = [...e.target.files]; if (!files.length) return;
+    const fd = new FormData(); fd.append('kind', i.dataset.k); files.forEach(f => fd.append('file', f, f.name));
+    try { const r = await api(`/api/staff/discipline/orders/${i.dataset.aup}/files`, { method: 'POST', body: fd });
+      toast('Yuklandi' + autoMsg(r.auto, i.dataset.k, { status: 'issued' })); loadChoraArch(st); }
+    catch (err) { toast(err.message === 'too_big' ? 'Fayl juda katta (20 MB gacha)' : 'Yuklanmadi', true); } }));
 }
 function choraTpl(d) {
   const s = d.settings;
@@ -1328,7 +1393,9 @@ async function openChora(sid) {
     catch (e) { toast(e.message === 'shared_file' ? 'Umumiy hujjat chora chiqarilganda avtomatik yuboriladi' : e.message === 'not_sent' ? 'Yuborilmadi: hujjatda talaba topilmadi yoki ismdosh bor' : 'Yuborilmadi', true); b.disabled = false; } }));
   $$('#dbody [data-ufile]').forEach(i => i.addEventListener('change', async e => {
     const files = [...e.target.files]; if (!files.length) return;
+    const meta = await askDocNo($(`[data-ukind="${i.dataset.ufile}"]`).value); if (!meta) return;
     const fd = new FormData(); fd.append('kind', $(`[data-ukind="${i.dataset.ufile}"]`).value);
+    Object.entries(meta).forEach(([k, v]) => fd.append(k, v));
     files.forEach(f => fd.append('file', f, f.name));
     const kind = fd.get('kind'), cs = d.cases.find(c => c.id === Number(i.dataset.ufile));
     try { const r = await api(`/api/staff/discipline/cases/${i.dataset.ufile}/files`, { method: 'POST', body: fd });

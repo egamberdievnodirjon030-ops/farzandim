@@ -976,7 +976,20 @@ def _unlink(rel: str) -> None:
         pass
 
 
-async def add_file(oid: int | None, case_id: int | None, kind: str, name: str, data: bytes, user: int | None = None) -> dict:
+def _clean_no(v) -> str | None:
+    return re.sub(r"^\s*№\s*", "", str(v or "")).strip()[:40] or None
+
+
+def _clean_date(v) -> str | None:
+    try:
+        return date.fromisoformat(str(v)).isoformat() if v else None
+    except ValueError:
+        return None
+
+
+async def add_file(oid: int | None, case_id: int | None, kind: str, name: str, data: bytes, user: int | None = None,
+                   number: str | None = None, doc_date: str | None = None) -> dict:
+    """number/doc_date — asl nusxaning o'z raqami va sanasi (masalan, dalolatnoma); bo'lmasa arxivda choradan olinadi."""
     if kind not in DOC_KINDS:
         kind = "boshqa"
     if not data:
@@ -993,13 +1006,139 @@ async def add_file(oid: int | None, case_id: int | None, kind: str, name: str, d
     (d / fname).write_bytes(data)
     rel = str((d / fname).relative_to(_course_dir().parent))
     mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
-    fid = await db.execute("INSERT INTO disc_files (order_id, case_id, kind, name, path, size, mime, uploaded_at, by_user) "
-                           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (oid, case_id, kind, _safe_name(name), rel, len(data), mime,
-                                                                  now_iso(), user))
+    fid = await db.execute("INSERT INTO disc_files (order_id, case_id, kind, name, path, size, mime, uploaded_at, by_user, "
+                           "doc_number, doc_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           (oid, case_id, kind, _safe_name(name), rel, len(data), mime, now_iso(), user, _clean_no(number),
+                            _clean_date(doc_date)))
     if case_id and kind in ("tushuntirish", "dalolatnoma"):  # 1-bosqich: talabaning asosi
         await db.execute("UPDATE disc_cases SET basis = COALESCE(basis, ?), basis_at = COALESCE(basis_at, ?) WHERE id = ?",
                          (kind, now_iso(), case_id))
     return {"ok": True, "id": fid}
+
+
+async def set_file_meta(fids: list[int], number: str | None, doc_date: str | None) -> dict:
+    """Arxiv: asl nusxa(lar)ning raqami va sanasi (bo'sh — choradan olinadi)."""
+    if doc_date and not _clean_date(doc_date):
+        return {"ok": False, "error": "bad_date"}
+    for fid in fids:
+        await db.execute("UPDATE disc_files SET doc_number = ?, doc_date = ? WHERE id = ?", (_clean_no(number), _clean_date(doc_date), fid))
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- asl nusxalar arxivi (raqam va F.I.Sh. bo'yicha qidiruv)
+ARCHIVE_TYPES = {"farmoyish": "Dekan farmoyishi (ogohlantirish)", "buyruq": "Buyruq (hayfsan)", "bildirishnoma": "Bildirishnoma",
+                 "dalolatnoma": "Dalolatnoma", "xat": "Ota-onaga xat", "tushuntirish": "Tushuntirish xati",
+                 "qaror": "Qaror (boshqa chora)", "asos": "Asoslovchi hujjat", "boshqa": "Boshqa hujjat"}
+
+
+def _arch_type(kind: str, o: dict | None) -> str:
+    if kind in ("imzolangan", "farmoyish", "buyruq"):
+        m = (o or {}).get("measure")
+        return "buyruq" if m == "hayfsan" else "farmoyish" if m == "ogohlantirish" else "xat" if m == "xat" else \
+            kind if kind in ("farmoyish", "buyruq") else "qaror"
+    return kind if kind in ARCHIVE_TYPES else "boshqa"
+
+
+def _no_key(v: str | None) -> str:
+    """Raqamni solishtirish uchun: «№ 215-T» → «215t», «01-12/101» → «0112101»."""
+    return re.sub(r"[^0-9a-zа-я]", "", (v or "").lower().replace("№", ""))
+
+
+async def doc_archive(q: str = "", kind: str = "", scope: set[str] | None = ...) -> dict:
+    """Yuklangan asl nusxalar — hujjat bo'yicha (bitta farmoyish/buyruq/bildirishnoma bir necha talabaga): turi, raqami,
+    sanasi, talabalar, fayllar. q — raqam (17, 215-T, 01-12/101) yoki talaba F.I.Sh.; kind — hujjat turi.
+    «missing» — raqami bor, lekin asl nusxasi yuklanmagan farmoyish/buyruq va bildirishnomalar."""
+    from utils import normalize_text
+    if scope is ...:
+        from tenancy import viewer_scope
+        scope = viewer_scope()
+    orders_ = {o["id"]: o for o in [dict(r) for r in await db.fetchall("SELECT * FROM disc_orders")]}
+    cases = {c["id"]: dict(c) for c in await db.fetchall(
+        """SELECT c.*, s.full_name, s.group_name, s.group_key FROM disc_cases c JOIN students s ON s.id = c.student_id""")}
+    by_order: dict[int, list[dict]] = {}
+    for c in cases.values():
+        if c["order_id"]:
+            by_order.setdefault(c["order_id"], []).append(c)
+    entries: dict[tuple, dict] = {}
+    files = await db.fetchall("SELECT id, order_id, case_id, kind, name, size, uploaded_at, sent_at, send_note, doc_number, doc_date "
+                              "FROM disc_files ORDER BY id")
+    for f in files:
+        c = cases.get(f["case_id"]) if f["case_id"] else None
+        oid = f["order_id"] or (c or {}).get("order_id")
+        o = orders_.get(oid)
+        t = _arch_type(f["kind"], o)
+        if c:
+            studs = [c]
+        elif t == "dalolatnoma":
+            oc = by_order.get(oid, [])
+            studs = [x for x in oc if x.get("basis") == "dalolatnoma"] or oc
+        else:
+            studs = by_order.get(oid, [])
+        if t in ("farmoyish", "buyruq", "qaror"):
+            no, d = o and o.get("number"), o and o.get("date")
+        elif t == "bildirishnoma":
+            no, d = o and o.get("basis_number"), o and o.get("basis_date")
+        elif t == "xat":  # xatning o'z chiquvchi raqami; farmoyish raqami emas (faqat-xat choralarida — choraniki)
+            own = (o or {}).get("measure") == "xat"
+            no = (c or {}).get("letter_no") or ((o or {}).get("number") if own else None)
+            d = (c or {}).get("letter_date") or ((o or {}).get("date") if own else None)
+        else:
+            no, d = None, None
+        no, d = f["doc_number"] or no, f["doc_date"] or d or (f["uploaded_at"] or "")[:10]
+        key = (t, oid, c["id"] if c else None, _no_key(no))
+        e = entries.setdefault(key, {"type": t, "title": ARCHIVE_TYPES[t], "number": no, "date": d, "order_id": oid,
+                                     "measure": (o or {}).get("measure"), "ground": (o or {}).get("ground"),
+                                     "rule": (o or {}).get("rule"), "students": [], "files": []})
+        e["files"].append({k: f[k] for k in ("id", "kind", "name", "size", "uploaded_at", "sent_at", "send_note")})
+        for x in studs:
+            if all(y["id"] != x["student_id"] for y in e["students"]):
+                e["students"].append({"id": x["student_id"], "name": x["full_name"], "group": x["group_name"] or "",
+                                      "group_key": x["group_key"]})
+    # raqami bor, lekin asl nusxasi yo'q (o'quv yilida)
+    missing = []
+    have = {(e["type"], e["order_id"]) for e in entries.values()}
+    for o in orders_.values():
+        if o["created_at"] < ay_start() or o["status"] == "cancelled":
+            continue
+        studs = [{"id": c["student_id"], "name": c["full_name"], "group": c["group_name"] or "", "group_key": c["group_key"]}
+                 for c in by_order.get(o["id"], [])]
+        t = _arch_type("imzolangan", o)
+        if o["status"] == "issued" and t != "xat" and (t, o["id"]) not in have:
+            missing.append({"type": t, "title": ARCHIVE_TYPES[t], "number": o.get("number"), "date": o.get("date"),
+                            "order_id": o["id"], "measure": o["measure"], "ground": o["ground"], "students": studs, "upload": "imzolangan"})
+        if o.get("basis_kind") == "bildirishnoma" and ("bildirishnoma", o["id"]) not in have:
+            missing.append({"type": "bildirishnoma", "title": ARCHIVE_TYPES["bildirishnoma"], "number": o.get("basis_number"),
+                            "date": o.get("basis_date"), "order_id": o["id"], "measure": o["measure"], "ground": o["ground"],
+                            "students": studs, "upload": "bildirishnoma"})
+    items = list(entries.values())
+
+    def visible(e):
+        return scope is None or any(s["group_key"] in scope for s in e["students"])
+
+    qn, qk = normalize_text(q or ""), _no_key(q)
+
+    def rank(e):  # 0 — raqam aniq mos, 1 — raqam ichida, 2 — F.I.Sh./tur, None — mos emas
+        if not q:
+            return 2
+        nk = _no_key(e.get("number"))
+        if qk and nk and nk == qk:
+            return 0
+        if qk and nk and (qk in nk):
+            return 1
+        if qn and (any(qn in normalize_text(s["name"]) for s in e["students"]) or qn in normalize_text(e["title"])):
+            return 2
+        return None
+    out = []
+    for lst in (items, missing):
+        sel = [e for e in lst if visible(e) and (not kind or e["type"] == kind) and rank(e) is not None]
+        sel.sort(key=lambda e: (rank(e), -(int((e.get("date") or "0000-00-00").replace("-", "")))))
+        for e in sel:
+            e["exact"] = bool(q) and rank(e) == 0
+            for s_ in e["students"]:
+                s_.pop("group_key", None)
+        out.append(sel)
+    counts = {t: sum(1 for e in items if visible(e) and e["type"] == t) for t in ARCHIVE_TYPES}
+    return {"items": out[0], "missing": out[1], "counts": {k: v for k, v in counts.items() if v}, "types": ARCHIVE_TYPES}
 
 
 async def get_file(fid: int) -> tuple[dict, bytes] | None:

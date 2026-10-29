@@ -226,7 +226,8 @@ CREATE TABLE IF NOT EXISTS disc_files (
     size        INTEGER, mime TEXT,
     uploaded_at TEXT NOT NULL, by_user INTEGER,
     sent_doc_id INTEGER, sent_at TEXT,      -- ota-onaga yuborilgan bo'lsa: documents.id va vaqti
-    send_note   TEXT                        -- avtomatik yuborish natijasi (kimga ketdi, kim o'tkazib yuborildi va nega)
+    send_note   TEXT,                       -- avtomatik yuborish natijasi (kimga ketdi, kim o'tkazib yuborildi va nega)
+    doc_number  TEXT, doc_date TEXT         -- asl nusxaning raqami va sanasi (arxivda qidirish uchun; bo'lmasa — choradan)
 );
 
 CREATE TABLE IF NOT EXISTS warnings_sent (
@@ -609,7 +610,8 @@ class Database:
                                         ("archived_at", "TEXT"))),
                        ("disc_cases", (("amount", "REAL"), ("as_of", "TEXT"), ("basis", "TEXT"), ("basis_at", "TEXT"),
                                        ("letter_no", "TEXT"), ("letter_date", "TEXT"), ("letter_at", "TEXT"))),
-                       ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT"), ("send_note", "TEXT")))):
+                       ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT"), ("send_note", "TEXT"),
+                                       ("doc_number", "TEXT"), ("doc_date", "TEXT")))):
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 have = {r[1] for r in await cur.fetchall()}
             for col, ddl in add:
