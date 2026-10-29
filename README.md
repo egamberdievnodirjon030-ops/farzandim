@@ -128,7 +128,7 @@ Har kuni `BACKUP_TIME` da (standart — 03:00) barcha kurs bazalari va `central.
 - SQLite'ning o'z zaxira usuli: bot ishlab turgan paytda ham buzilmagan nusxa; har bir baza yaxlitlikka tekshiriladi (`PRAGMA integrity_check`), muammo bo'lsa — xabarda ❌ va super-adminga ogohlantirish.
 - `BACKUP_PASSWORD` berilsa — arxiv **AES-256** bilan shifrlanadi (tavsiya etiladi: arxivda talabalarning shaxsiy ma'lumotlari va qarzdorlik bor, u Telegram orqali yuboriladi). 7-Zip yoki WinRAR bilan shu parol orqali ochiladi.
 - Serverda `backups/` papkasida oxirgi `BACKUP_KEEP_DAYS` (standart — 14) kunlik arxivlar saqlanadi. Telegram botlar 50 MB dan katta fayl yubora olmaydi — bunday holda super-adminga hisobot va arxivning serverdagi manzili boradi.
-- Ilova va kompyuter versiyasidan yuborilgan rasmiy hujjatlar (`data/<kurs>/documents/`) ham arxivga kiradi.
+- Ilova va kompyuter versiyasidan yuborilgan rasmiy hujjatlar (`data/<kurs>/documents/`) va «Chora ko'rish» hujjatlari (`data/<kurs>/chora/`) ham arxivga kiradi.
 - Xabarda har bir kurs bo'yicha qisqa hisobot: talabalar, ota-onalar, oxirgi import vaqti, so'nggi 24 soatdagi tizim xatolari soni — kunlik «sog'liq tekshiruvi».
 
 **Tiklash:** botni to'xtating → arxivni oching → kerakli `<kurs>/bot.db` faylini `data/<kurs>/` papkasiga (umumiy ro'yxat kerak bo'lsa — `central.db` ni `data/` ga) qo'ying → botni ishga tushiring. Har bir kurs mustaqil — bitta kursni tiklash boshqalariga ta'sir qilmaydi.
@@ -526,6 +526,47 @@ Tushuntirish xati, dekan ogohlantirishi, hayfsan yoki boshqa rasmiy hujjat PDF k
 
 Fayllar Telegram serverida saqlanadi, bot bazasida faqat ularning identifikatori, nechta joy yopilgani, kim va qachon yuborgani yoziladi. Hujjatlarning asl nusxasi dekanatda saqlanishi kerak. Intizomiy hujjatlarni ota-onaga yuborish tartibi (masalan, avval talabaning o'zi tanishtirilishi) universitet ichki tartibi bilan kelishilgan bo'lishi lozim.
 
+## Chora ko'rish: dekan ogohlantirishi, hayfsan, ichki tartib
+
+Kompyuter versiyasida (boshqaruv paneli) **«Chora ko'rish»** bo'limi: davomat chegarasidan oshgan talabalar uchun hujjatlarni tayyorlash, sababini aniqlashtirish va o'quv yili davomida ko'rilgan barcha choralarni asoslovchi hujjatlari bilan saqlash.
+
+| Sababsiz qoldirilgan (semestr boshidan) | Chora | Hujjatlar |
+|---|---|---|
+| 36 soat va undan ko'p | Dekan ogohlantirishi | Bildirishnoma + dekan farmoyishi |
+| 54 soat va undan ko'p | Hayfsan | Bildirishnoma (avvalgi dekan ogohlantirishi raqami va sanasi bilan) + buyruq |
+| Ichki tartib qoidalarini buzish | Ogohlantirish, hayfsan yoki boshqa | Bildirishnoma + farmoyish/buyruq, dalolatnoma |
+
+Chegaralar `ABSENCE_WARN_LEVELS` dagi 2- va 3-qiymat (36, 54). Soatlar Manage'dan (yoki HEMIS statistikasi / kunlik davomatdan) olinadi.
+
+**Darhol signal.** Har bir davomat yangilanishidan keyin (Manage'dan avtomatik yoki fayl yuklanganda) chegaradan yangi oshgan talabalar haqida kurs koordinatoriga Telegram xabari boradi: «🔔 Chora ko'rish kerak» — talabalar ro'yxati va soatlari bilan. Har bir talaba va chora uchun bir marta; «sababli» deb belgilangan talabaning soatlari keyin yana oshsa — qayta. Guruh biriktirilgan koordinatorga faqat o'z guruhlari haqida xabar boradi. Bo'lim belgisida (chap menyu) va «Kurs holati» sahifasidagi «Chora ko'rish» kartasida ham yangi talabalar soni ko'rinadi.
+
+**Ish tartibi.**
+1. **«Chegaraga yetganlar»** — dekan ogohlantirishi va hayfsan bo'yicha ro'yxat (soat, guruh, holat). Har bir talaba uchun:
+   - **«So'rash»** — ota-onadan bot orqali qoldirish sababini so'raydi (javob «Xabarlar»da keladi);
+   - **«Sababli»** — sababli deb topilsa (izoh bilan) ro'yxatdan chiqariladi; sababsiz soatlari keyin yana oshsa, ro'yxatga qaytadi;
+   - **✕** — ro'yxatdan o'chirish (izoh bilan). Chiqarilganlar pastdagi bo'limda turadi, **«Qaytarish»** bilan qaytariladi.
+
+   Kerakli talabalarni belgilab **«Tanlanganlar uchun hujjatlarni tayyorlash»** bosiladi.
+2. **«Hujjatlar»** — har bir to'plam — bitta farmoyish yoki buyruq. Tayyor Word fayllar: bildirishnoma, farmoyish/buyruq (ichki tartib bo'yicha — dalolatnoma ham) yoki hammasi ZIP'da. Hujjat imzolangach **«Imzolandi — chiqarildi deb belgilash»**: raqami va sanasi kiritiladi (Word fayllarga ham yoziladi), talabalar «Chora ko'rilganlar»ga o'tadi, ota-onalarga xabar boradi (o'chirib qo'yish mumkin). Imzolangan nusxa, tushuntirish xati, dalolatnoma va boshqa asoslovchi hujjatlar (PDF, rasm, Word — 20 MB gacha) shu yerga biriktiriladi.
+3. **«Chora ko'rilganlar»** — o'quv yili boshidan (1-sentabr) hozirgacha: jami ogohlantirish, hayfsan, ichki tartib bo'yicha choralar, takroriy chora ko'rilgan talabalar; oylar bo'yicha dinamika, guruhlar kesimi, har bir talaba — hujjat raqami, sanasi va biriktirilgan fayllari bilan. Chora turi va asos bo'yicha filtr.
+4. **«Ichki tartib bo'yicha chora»** tugmasi — davomatdan tashqari choralar: talaba(lar)ni qidirib tanlash, chora turi, buzilgan qoida (tayyor variantlardan yoki o'zingiz yozasiz), izoh. Darhol «chiqarilgan» deb saqlash (raqami va sanasi bilan) yoki avval hujjatlarni tayyorlash mumkin.
+
+Talaba kartasida «Ko'rilgan choralar» bloki, ota-onaning farzand sahifasida — e'lon qilingan chora (hujjat raqami va sanasi bilan) ko'rinadi.
+
+**Shablonlar.** `shablonlar/chora/` dagi Word fayllar (dekan farmoyishi, hayfsan buyrug'i, dalolatnoma — universitet namunalari asosida; bildirishnomalar — dekan nomiga). «Shablonlar va sozlama» yorlig'ida har birini yuklab olish, Word'da tahrirlab qayta yuklash (super-admin) va asl holiga qaytarish mumkin. Yuklangan shablonlar `data/templates/chora/` da saqlanadi va barcha kurslarga amal qiladi. Shablondagi belgilar:
+
+| Belgi | Qiymat |
+|---|---|
+| `{{RAQAM}}`, `{{SANA}}`, `{{SANA_UZUN}}`, `{{SANA_QISQA}}` | hujjat raqami va sanasi: «2026-yil “24” oktabr», «2026-yil 24-oktabr», «24.10.2026» |
+| `{{BOSQICH}}`, `{{DAN}}`, `{{GACHA}}`, `{{SOAT}}`, `{{SONI}}` | kurs (bosqich), davr, chegara (soat), talabalar soni |
+| `{{KOORDINATORLAR}}`, `{{KOORDINATORLAR_NING}}` | kurs koordinatorlari: «N.Egamberdiyev», «N.Egamberdiyevning» |
+| `{{OQUV_YILI}}`, `{{SEMESTR}}`, `{{QOIDA}}`, `{{CHORA}}` | o'quv yili, semestr, buzilgan qoida, chora nomi |
+| `{{T_N}}`, `{{T_FISH}}`, `{{T_BOSQICH}}`, `{{T_FAKULTET}}`, `{{T_FAKULTET_QISQA}}`, `{{T_GURUH}}`, `{{T_SOAT}}`, `{{T_PARA}}`, `{{T_AVVAL}}`, `{{T_IZOH}}` | jadval satri — har bir talaba uchun takrorlanadi (`{{T_FISH}}` bo'lishi shart) |
+
+Sozlama (shu yorliqda, kurs bo'yicha): hujjatlardagi koordinatorlar ismi (bo'sh bo'lsa — kurs koordinatorlari ro'yxatidan) va fakultet nomi.
+
+Hujjatlar va fayllar `data/<kurs>/chora/` da saqlanadi (zaxira nusxaga kiradi). Rasmiy hujjat imzolanib, raqam olgandan keyingina «chiqarildi» deb belgilang — ota-onalarga xabar shu paytda boradi.
+
 ## Kurs koordinatori paneli va ma'lumotlarni tekshirish
 
 `/panel` (yoki /admin → «📊 Kurs holati») — kurs holati bir qarashda: jami talabalar, ulangan ota-onalar (va ota-onasi ulangan talabalar ulushi), akademik qarzdorlar, kontrakt va trimestr qarzdorlari (jami summa bilan), davomat muammosi borlar (18+ soat), **3 va undan ortiq muammosi bor talabalar**. Tugmalar: «🔴 Muammoli talabalar» (muammolar soni bo'yicha saralangan), akademik, kontrakt, trimestr va davomat bo'yicha ro'yxatlar. Kurs yoki guruh bo'yicha: `/panel 3-kurs`, `/panel 3-1a-24`.
@@ -773,6 +814,8 @@ academic.py       — akademik qarzdorlik: 100 ballik → 5 baholik tizim
 individual.py     — har bir talabaning shaxsiy dars jadvali (asosiy fanlar + tanlov fani va 2-til oqimi)
 guard.py          — talabalarni aniqlash (raqam va Telegram guruhlar bo'yicha), bloklash
 redact.py         — rasmiy hujjatlarda boshqa talabalar ma'lumotlarini qora rang bilan yopish
+discipline.py     — chora ko'rish: chegaraga yetganlar, farmoyish/buyruqlar, hujjatlar, tarix, signal
+docxfill.py       — Word (.docx) shablonlarini to'ldirish ({{KALIT}} belgilar, jadval satrlari)
 middlewares.py    — bloklangan foydalanuvchi so'rovlarini to'xtatish
 keyboards.py      — tugmalar
 utils.py          — ism/telefon/sana bilan ishlash, kirill→lotin
@@ -790,6 +833,6 @@ webapp/           — ilovaning o'zi: index.html, app.js, app.css; kompyuter ver
                     shriftlar (Golos Text, PT Serif)
 ilova_sinov.bat   — Windows: ilovani vaqtincha HTTPS orqali sinash (ilova_sinov.ps1 ni ishga tushiradi)
 ilova_sinov.sh    — Linux/macOS: xuddi shu (Cloudflare Quick Tunnel + bot)
-shablonlar/       — Excel namunalari
+shablonlar/       — Excel namunalari; shablonlar/chora/ — chora hujjatlari (Word)
 demo_seed.py      — sinov uchun to'qima ma'lumotlar
 ```

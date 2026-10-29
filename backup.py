@@ -53,6 +53,9 @@ async def make_backup() -> dict:
             docs = Path(DATA_DIR) / key / "documents"  # ilova va kompyuter versiyasidan yuborilgan hujjatlar
             if docs.is_dir() and any(docs.iterdir()):
                 shutil.copytree(docs, tmp / key / "documents")
+            chora = Path(DATA_DIR) / key / "chora"  # chora ko'rish: imzolangan nusxalar va asoslovchi hujjatlar
+            if chora.is_dir() and any(chora.iterdir()):
+                shutil.copytree(chora, tmp / key / "chora")
             s = await d.stats()
             items.append({"key": key, "title": course_title(key), "ok": ok, "students": s["students"],
                           "parents": s["parents_active"], "updated": await _last_update(d)})
@@ -68,7 +71,8 @@ async def make_backup() -> dict:
                      f"yaxlitlik: {i['ok']}" for i in items]
         manifest += [f"central.db — yaxlitlik: {central_ok}", "",
                      "Tiklash: botni to'xtating, kerakli <kurs>/bot.db (va central.db) faylini data/ papkasiga "
-                     "qo'ying, botni qayta ishga tushiring. Shablonlar: templates/ papkasini data/templates/ ga."]
+                     "qo'ying, botni qayta ishga tushiring. Shablonlar: templates/ papkasini data/templates/ ga; "
+                     "chora hujjatlari: <kurs>/chora/ ni data/<kurs>/chora/ ga."]
         (tmp / "manifest.txt").write_text("\n".join(manifest), encoding="utf-8")
         path = BACKUP_DIR / f"zaxira_{stamp}.zip"
         encrypted = False

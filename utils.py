@@ -211,6 +211,12 @@ def semester_start() -> date:
     return parse_date(SEMESTER_START) or date(today().year, 9, 1)
 
 
+def academic_year_start(d: date | None = None) -> date:
+    """O'quv yili boshi (1-sentabr): avgustgacha — o'tgan yilning sentabri."""
+    d = d or today()
+    return date(d.year if d.month >= 8 else d.year - 1, 9, 1)
+
+
 def week_bounds(d: date) -> tuple[date, date]:
     monday = d - timedelta(days=d.weekday())
     return monday, monday + timedelta(days=6)

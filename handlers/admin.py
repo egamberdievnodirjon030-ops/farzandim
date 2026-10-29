@@ -770,6 +770,8 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         lines.extend(esc(e) for e in errors[:15])
         if len(errors) > 15:
             lines.append(f"… va yana {len(errors) - 15} ta")
+    if kind == "attendance" and result.rows:
+        lines += await _disc_signal(bot)
     if result.rows and kind not in ("translations", "schedule", "elsched"):
         # har bir yuklash — dinamika uchun yangi nuqta (faqat o'zgargan ko'rsatkichlar yoziladi)
         import snapshots
@@ -872,12 +874,23 @@ async def apply_subject_stats(bot, rows: list[dict], silent: bool = False, as_of
         lines += _crossings_lines(crossings)
     dec_sent, drops = await notify_absence_decrease(bot, before, after, notify=not silent)
     lines += _drops_lines(drops, dec_sent, silent)
+    lines += await _disc_signal(bot, sids)
     import snapshots
     try:
         await snapshots.capture()
     except Exception:
         log.exception("Dinamika nuqtalari yozilmadi")
     return lines
+
+
+async def _disc_signal(bot, sids: set[int] | None = None) -> list[str]:
+    """Chora ko'rish: davomat chegarasidan (36/54 soat) yangi oshganlar — kurs koordinatoriga darhol signal."""
+    import discipline
+    try:
+        return discipline.signal_lines(await discipline.signal_new(bot, sids))
+    except Exception:
+        log.exception("Chora signali")
+        return []
 
 
 def _subject_limit_lines(overs: list[dict], sent: int) -> list[str]:

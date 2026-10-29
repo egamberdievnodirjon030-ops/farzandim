@@ -21,7 +21,7 @@ import tempfile
 import time
 from datetime import date, timedelta
 from pathlib import Path
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, quote
 
 from aiohttp import web
 
@@ -42,7 +42,7 @@ from i18n import tr, use_lang
 from tenancy import (central, coordinator_groups, course_keys, course_title, current_course, current_user, group_scope,
                      in_scope, reload_registry, scope_label,
                      scope_students, use_course, viewer_scope)
-from utils import (WEEKDAYS, truncate2, doc_title, group_key, lesson_kind, name_score, normalize_text, parse_user_dates,
+from utils import (WEEKDAYS, truncate2, doc_title, fmt_date, group_key, lesson_kind, name_score, normalize_text, parse_user_dates,
                    semester_start, subject_key, today, week_bounds, week_type_of)
 
 log = logging.getLogger("webapp")
@@ -211,6 +211,12 @@ async def overview(st: dict, key: str) -> dict:
     marks = {(r["pair"], normalize_text(r["subject"] or "")): r["status"] for r in await db.fetchall(
         "SELECT pair, subject, status FROM attendance WHERE student_id = ? AND date = ?", (st["id"], today().isoformat()))}
     issues = list(s["issues"])
+    import discipline
+    for m in await discipline.student_measures(st["id"]):
+        issues.append(tr("📄 {t} e'lon qilingan", t=tr(m["title"]))
+                      + (f" (№ {m['number']}, {fmt_date(m['date'], False)})" if m.get("number") and m.get("date")
+                         else f" ({fmt_date(m['date'], False)})" if m.get("date") else "")
+                      + (" — " + tr("davomat") if m["ground"] == "davomat" else " — " + tr("ichki tartib qoidalari")))
     for a in sorted(subj.values(), key=lambda x: x["subject"]):
         if a.get("state") == "over":
             issues.append(tr("⛔ «{s}» fanidan sababsiz {u} para (chegara — {l} para): yakuniy nazoratga kiritilmaydi, "
@@ -818,6 +824,8 @@ async def api_staff_student(request):
                                 "JOIN parents p ON p.tg_id = ps.parent_id WHERE ps.student_id = ?", (st["id"],))
     data["parents"] = [{**p, "lang": await central.get_lang(p["tg_id"]) or "uz"} for p in parents]
     data["subjects"] = await _subject_rows("s.id = ?", [st["id"]])
+    import discipline
+    data["measures"] = await discipline.student_measures(st["id"])
     return ok(data)
 
 
@@ -1381,6 +1389,260 @@ async def _pending_requests() -> list[dict]:
     return rows if scope is None else [r for r in rows if in_scope(r["group_name"], scope)]
 
 
+# ---------------------------------------------------------------- chora ko'rish (intizomiy choralar)
+def _file_resp(name: str, data: bytes, mime: str | None = None, inline: bool = False) -> web.Response:
+    ctype = mime or ("application/vnd.openxmlformats-officedocument.wordprocessingml.document" if name.endswith(".docx")
+                     else "application/zip" if name.endswith(".zip") else "application/octet-stream")
+    return web.Response(body=data, content_type=ctype, headers={
+        "Content-Disposition": f'{"inline" if inline else "attachment"}; filename="{quote(name)}"; filename*=UTF-8\'\'{quote(name)}'})
+
+
+async def _disc_order_visible(oid: int) -> dict | None:
+    import discipline
+    o = await discipline.order(oid)
+    scope = viewer_scope()
+    if not o or (scope is not None and not any(group_key(c["group_name"]) in scope for c in o["cases"])):
+        return None
+    return o
+
+
+@staff_route
+async def api_disc(request):
+    """«Chora ko'rish»: chegaradan oshganlar (36 — ogohlantirish, 54 — hayfsan), hujjatlar, sozlamalar."""
+    import discipline as D
+    cand = await D.candidates()
+    return ok({**cand, "orders": await D.orders(),
+               "settings": {"coordinators": await db.get_setting("disc:coordinators") or "",
+                            "auto_coordinators": ", ".join(await D.coordinator_names()) if not await db.get_setting(
+                                "disc:coordinators") else "",
+                            "faculty": await db.get_setting("disc:faculty") or ""},
+               "rules": D.RULE_PRESETS, "measures": {k: v["title"] for k, v in D.MEASURES.items()},
+               "grounds": D.GROUNDS, "doc_kinds": D.DOC_KINDS, "levels": absence.LEVELS,
+               "can_templates": request["user"]["id"] in SUPERADMIN_IDS})
+
+
+@staff_route
+async def api_disc_badge(request):
+    import discipline as D
+    cand = await D.candidates()
+    drafts = len([o for o in await D.orders("draft")])
+    h = await D.history()
+    return ok({"new": sum(cand["counts"].values()), "counts": cand["counts"], "drafts": drafts, "kpi": h["kpi"],
+               "dynamics": [{k: x[k] for k in ("label", "ogohlantirish", "hayfsan", "boshqa")} for x in h["dynamics"]]})
+
+
+@staff_route
+async def api_disc_case(request):
+    import discipline as D
+    body = await request.json()
+    try:
+        sid = int(body.get("sid"))
+    except (TypeError, ValueError):
+        return bad("bad_student")
+    if not _visible(await db.get_student(sid)):
+        return bad("not_found", 404)
+    res = await D.set_case(sid, str(body.get("measure", "")), str(body.get("action", "")), str(body.get("note") or ""),
+                           request["user"]["id"])
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_ask(request):
+    import discipline as D
+    body = await request.json()
+    try:
+        sid = int(body.get("sid"))
+    except (TypeError, ValueError):
+        return bad("bad_student")
+    if not _visible(await db.get_student(sid)):
+        return bad("not_found", 404)
+    res = await D.ask_parents(request.app["bot"], sid, str(body.get("measure", "")), request["user"]["id"],
+                                 await _staff_name(request["user"]["id"]))
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_order_new(request):
+    import discipline as D
+    body = await request.json()
+    items = [it for it in (body.get("items") or []) if isinstance(it, dict)]
+    for it in items:
+        try:
+            if not _visible(await db.get_student(int(it.get("sid")))):
+                return bad("not_found", 404)
+        except (TypeError, ValueError):
+            return bad("bad_student")
+    res = await D.create_order(str(body.get("measure", "")), str(body.get("ground", "davomat")), items,
+                               str(body.get("rule") or ""), str(body.get("note") or ""), request["user"]["id"])
+    if not res["ok"]:
+        return bad(res["error"])
+    if body.get("issue"):  # allaqachon imzolangan (ichki tartib bo'yicha qo'lda qo'shish)
+        iss = body["issue"]
+        await D.issue_order(request.app["bot"], res["id"], str(iss.get("number") or ""), str(iss.get("date") or today().isoformat()),
+                            bool(iss.get("notify")), request["user"]["id"])
+    return ok({**res, "order": await D.order(res["id"])})
+
+
+@staff_route
+async def api_disc_order(request):
+    o = await _disc_order_visible(int(request.match_info["oid"]))
+    return ok(o) if o else bad("not_found", 404)
+
+
+@staff_route
+async def api_disc_order_delete(request):
+    import discipline as D
+    oid = int(request.match_info["oid"])
+    if not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    res = await D.delete_order(oid)
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_order_issue(request):
+    import discipline as D
+    oid = int(request.match_info["oid"])
+    if not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    body = await request.json()
+    res = await D.issue_order(request.app["bot"], oid, str(body.get("number") or ""), str(body.get("date") or ""),
+                              bool(body.get("notify", True)), request["user"]["id"])
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_order_cancel(request):
+    import discipline as D
+    oid = int(request.match_info["oid"])
+    if not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    return ok(await D.cancel_order(oid))
+
+
+@staff_route
+async def api_disc_order_case_delete(request):
+    import discipline as D
+    oid = int(request.match_info["oid"])
+    if not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    res = await D.remove_case(oid, int(request.match_info["cid"]))
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_doc(request):
+    import discipline as D
+    oid, kind = int(request.match_info["oid"]), request.match_info["kind"]
+    if not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    res = await (D.build_zip(oid) if kind == "zip" else D.build_doc(oid, kind))
+    if not res:
+        return bad("not_found", 404)
+    return _file_resp(*res)
+
+
+@staff_route
+async def api_disc_upload(request):
+    import discipline as D
+    oid = int(request.match_info["oid"])
+    o = await _disc_order_visible(oid)
+    if not o:
+        return bad("not_found", 404)
+    kind, case_id, saved = "boshqa", None, []
+    async for part in await request.multipart():
+        if part.name == "kind":
+            kind = (await part.text()).strip()
+        elif part.name == "case_id":
+            v = (await part.text()).strip()
+            case_id = int(v) if v.isdigit() and any(c["id"] == int(v) for c in o["cases"]) else None
+        elif part.name == "file" and part.filename:
+            data = bytes(await part.read(decode=False))
+            res = await D.add_file(None if case_id else oid, case_id, kind, part.filename, data, request["user"]["id"])
+            if not res["ok"]:
+                return bad(res["error"])
+            saved.append(res["id"])
+    return ok({"ok": True, "files": saved}) if saved else bad("empty")
+
+
+@staff_route
+async def api_disc_file(request):
+    import discipline as D
+    fid = int(request.match_info["fid"])
+    oid = await D.file_order(fid)
+    if not oid or not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    res = await D.get_file(fid)
+    if not res:
+        return bad("not_found", 404)
+    f, data = res
+    return _file_resp(f["name"], data, f.get("mime"), inline=request.query.get("view") == "1")
+
+
+@staff_route
+async def api_disc_file_delete(request):
+    import discipline as D
+    fid = int(request.match_info["fid"])
+    oid = await D.file_order(fid)
+    if not oid or not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    return ok(await D.delete_file(fid))
+
+
+@staff_route
+async def api_disc_history(request):
+    import discipline as D
+    return ok(await D.history(measure=request.query.get("measure", ""), ground=request.query.get("ground", "")))
+
+
+@staff_route
+async def api_disc_settings(request):
+    if viewer_scope() is not None:
+        return bad("forbidden", 403)
+    body = await request.json()
+    for k in ("coordinators", "faculty"):
+        if k in body:
+            await db.set_setting(f"disc:{k}", str(body.get(k) or "").strip()[:300])
+    return ok({"ok": True})
+
+
+@staff_route
+async def api_disc_templates(request):
+    import discipline as D
+    return ok({"items": D.templates_list(), "can_upload": request["user"]["id"] in SUPERADMIN_IDS})
+
+
+@staff_route
+async def api_disc_template_get(request):
+    import discipline as D
+    name = request.match_info["name"]
+    if name not in D.TEMPLATE_TITLES:
+        return bad("not_found", 404)
+    return _file_resp(name, D.template_path(name).read_bytes())
+
+
+@staff_route
+async def api_disc_template_put(request):
+    import discipline as D
+    if request["user"]["id"] not in SUPERADMIN_IDS:
+        return bad("forbidden", 403)
+    name = request.match_info["name"]
+    data = b""
+    async for part in await request.multipart():
+        if part.name == "file":
+            data = bytes(await part.read(decode=False))
+    res = D.save_template(name, data)
+    return ok(res) if res["ok"] else web.json_response(res, status=400)
+
+
+@staff_route
+async def api_disc_template_reset(request):
+    import discipline as D
+    if request["user"]["id"] not in SUPERADMIN_IDS:
+        return bad("forbidden", 403)
+    return ok(D.reset_template(request.match_info["name"]))
+
+
 def _visible(st: dict | None) -> bool:
     """Talaba bor va joriy kurs koordinatorining guruhlarida (guruhsiz koordinator va super-admin — butun kurs)."""
     return bool(st) and in_scope(st.get("group_name"), viewer_scope())
@@ -1811,6 +2073,26 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/staff/subjects", api_staff_subjects)
     r.add_get("/api/staff/subjects/students", api_staff_subject_students)
     r.add_post("/api/staff/subjects/credits", api_staff_subject_credits)
+    r.add_get("/api/staff/discipline", api_disc)
+    r.add_get("/api/staff/discipline/badge", api_disc_badge)
+    r.add_get("/api/staff/discipline/history", api_disc_history)
+    r.add_post("/api/staff/discipline/case", api_disc_case)
+    r.add_post("/api/staff/discipline/ask", api_disc_ask)
+    r.add_post("/api/staff/discipline/settings", api_disc_settings)
+    r.add_post("/api/staff/discipline/orders", api_disc_order_new)
+    r.add_get("/api/staff/discipline/orders/{oid:\\d+}", api_disc_order)
+    r.add_delete("/api/staff/discipline/orders/{oid:\\d+}", api_disc_order_delete)
+    r.add_post("/api/staff/discipline/orders/{oid:\\d+}/issue", api_disc_order_issue)
+    r.add_post("/api/staff/discipline/orders/{oid:\\d+}/cancel", api_disc_order_cancel)
+    r.add_delete("/api/staff/discipline/orders/{oid:\\d+}/cases/{cid:\\d+}", api_disc_order_case_delete)
+    r.add_get("/api/staff/discipline/orders/{oid:\\d+}/doc/{kind}", api_disc_doc)
+    r.add_post("/api/staff/discipline/orders/{oid:\\d+}/files", api_disc_upload)
+    r.add_get("/api/staff/discipline/files/{fid:\\d+}", api_disc_file)
+    r.add_delete("/api/staff/discipline/files/{fid:\\d+}", api_disc_file_delete)
+    r.add_get("/api/staff/discipline/templates", api_disc_templates)
+    r.add_get("/api/staff/discipline/templates/{name}", api_disc_template_get)
+    r.add_post("/api/staff/discipline/templates/{name}", api_disc_template_put)
+    r.add_delete("/api/staff/discipline/templates/{name}", api_disc_template_reset)
     r.add_get("/api/staff/inbox", api_staff_inbox)
     r.add_get("/api/staff/thread/{sid:\\d+}/{pid:\\d+}", api_staff_thread)
     r.add_post("/api/staff/thread/{sid:\\d+}/{pid:\\d+}", api_staff_reply)

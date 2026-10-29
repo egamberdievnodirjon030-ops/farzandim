@@ -176,6 +176,46 @@ CREATE TABLE IF NOT EXISTS academic_debts (
 );
 CREATE INDEX IF NOT EXISTS idx_acad_debts_student ON academic_debts(student_id);
 
+-- Chora ko'rish (intizomiy choralar): dekan ogohlantirishi (farmoyish), hayfsan (buyruq) — davomat yoki ichki tartib
+-- qoidalari bo'yicha. Bitta farmoyish/buyruq — bir nechta talaba (disc_orders → disc_cases).
+CREATE TABLE IF NOT EXISTS disc_orders (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    measure     TEXT NOT NULL,              -- ogohlantirish | hayfsan | boshqa
+    ground      TEXT NOT NULL,              -- davomat | tartib
+    rule        TEXT,                       -- ichki tartib: buzilgan qoida (hujjatga shu matn yoziladi)
+    number      TEXT,                       -- farmoyish/buyruq raqami (chiqarilganda)
+    date        TEXT,                       -- farmoyish/buyruq sanasi
+    period_from TEXT, period_to TEXT,       -- davomat: qaysi davr bo'yicha
+    hours       REAL,                       -- davomat: chegara (36 / 54 soat)
+    status      TEXT NOT NULL DEFAULT 'draft',  -- draft | issued | cancelled
+    note        TEXT,
+    created_at  TEXT NOT NULL, created_by INTEGER,
+    issued_at   TEXT, issued_by INTEGER
+);
+CREATE TABLE IF NOT EXISTS disc_cases (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id  INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    measure     TEXT NOT NULL,
+    ground      TEXT NOT NULL,
+    status      TEXT NOT NULL,              -- asked | excused | removed | draft | issued | cancelled
+    hours       REAL,                       -- davomat: sababsiz soat (holat belgilangan paytda)
+    note        TEXT,                       -- sabab / izoh (sababli deb topilgani, qoidabuzarlik tafsiloti)
+    order_id    INTEGER REFERENCES disc_orders(id) ON DELETE SET NULL,
+    asked_at    TEXT,                       -- ota-onadan sababi so'ralgan vaqt
+    created_at  TEXT NOT NULL, updated_at TEXT, by_user INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_disc_cases_student ON disc_cases(student_id, measure, ground);
+CREATE TABLE IF NOT EXISTS disc_files (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id    INTEGER REFERENCES disc_orders(id) ON DELETE CASCADE,
+    case_id     INTEGER REFERENCES disc_cases(id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL,              -- farmoyish | buyruq | bildirishnoma | dalolatnoma | tushuntirish | asos | boshqa
+    name        TEXT NOT NULL,
+    path        TEXT NOT NULL,              -- kurs papkasidagi nisbiy yo'l (chora/...)
+    size        INTEGER, mime TEXT,
+    uploaded_at TEXT NOT NULL, by_user INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS warnings_sent (
     student_id INTEGER NOT NULL,
     kind       TEXT NOT NULL,
