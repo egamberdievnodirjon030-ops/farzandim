@@ -36,7 +36,7 @@ import time as _time
 from datetime import date, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
-from config import (DATA_DIR, INTEGRATION_ATTENDANCE, INTEGRATION_AUTH, INTEGRATION_DAYS, INTEGRATION_FIRST_SILENT,
+from config import (BASE_DIR, DATA_DIR, INTEGRATION_ATTENDANCE, INTEGRATION_AUTH, INTEGRATION_DAYS, INTEGRATION_FIRST_SILENT,
                     INTEGRATION_HEADERS, INTEGRATION_INTERVAL, INTEGRATION_MAX_PAGES, INTEGRATION_NAME,
                     INTEGRATION_PAGE_PARAM, INTEGRATION_SCHEDULE, INTEGRATION_SCHEDULE_INTERVAL, INTEGRATION_TIMEOUT,
                     INTEGRATION_TOKEN, INTEGRATION_URL, INTEGRATION_WEBHOOK_SECRET, PAIR_TIMES, TZ,
@@ -1723,17 +1723,43 @@ _TRY_PATHS = ("student-attendance?hemisId={hemis_id}&academicYearId={academic_ye
               "student-timetable/weekly?hemisId={hemis_id}&monday={monday}")
 
 
+async def _sample_diag() -> dict:
+    """Namuna faylida — nima uchun bo'sh chiqqanini bilish uchun (kalit va parolsiz)."""
+    courses, students, real = [], 0, 0
+    for key in db.keys():
+        with use_course(key):
+            rows = await db.fetchall("SELECT hemis_id FROM students")
+        courses.append(key)
+        students += len(rows)
+        real += sum(1 for r in rows if real_hemis(r["hemis_id"]))
+    return {"bot_folder": str(BASE_DIR), "data_dir": str(DATA_DIR.resolve()), "env_file": (BASE_DIR / ".env").exists(),
+            "key_file": CONF_FILE.exists(), "url_set": bool(INTEGRATION_URL), "key_set": bool(INTEGRATION_TOKEN),
+            "courses": courses, "students": students, "real_hemis": real}
+
+
 async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dict, str]:
     """python integration.py yigish — Manage'dan namuna yig'ish (kalitsiz faylga): bir guruh talabalarining fanlari,
     bitta talabaning shu va o'tgan haftalardagi jadvali, ehtimoliy davomat manzillari va API hujjati (Swagger)."""
     import aiohttp
     out: dict = {"created": now_iso(), "base": _safe_url(INTEGRATION_URL), "subjects": {}, "timetable": {}, "tries": {},
-                 "docs": None, "errors": []}
+                 "docs": None, "errors": [], "diag": await _sample_diag()}
     lines = []
     _MISSING.clear()
+    dg = out["diag"]
+    where = (f"Bot papkasi: {dg['bot_folder']} (.env: {'bor' if dg['env_file'] else 'YO‘Q'}, "
+             f"baza: {dg['courses'] or 'YO‘Q'}, talabalar: {dg['students']})")
+    if not INTEGRATION_URL:
+        msg = ("❌ Manage manzili sozlanmagan: .env da INTEGRATION_URL yo'q va bot orqali kalit (curl) kiritilmagan.\n"
+               f"{where}\nBuyruqni bot ishlayotgan papkada bering (u yerda .env va data/ bo'ladi) yoki kalitni kiriting: "
+               "python integration.py kalit")
+        out["errors"].append(msg)
+        return out, msg
     allrows = await targets("subjects")
     if not allrows:
-        return out, "Bazada haqiqiy HEMIS ID li talaba yo'q — avval «Talabalar» faylini yuklang."
+        msg = (f"❌ Bazada haqiqiy HEMIS ID li talaba yo'q (jami talabalar: {dg['students']}).\n{where}\n"
+               "Bot ishlayotgan papkada ishga tushiring yoki avval «Talabalar» (kontingent) faylini yuklang.")
+        out["errors"].append(msg)
+        return out, msg
     by_group: dict[str, list[dict]] = {}
     for r in allrows:
         by_group.setdefault(r["group_key"], []).append(r)
@@ -2059,6 +2085,7 @@ if __name__ == "__main__":
             grp = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--guruh=")), None)
             print(f"Manage'dan namuna yig'ilmoqda ({_safe_url(INTEGRATION_URL)})…")
             data, text = await collect_sample(grp)
+            data["message"] = text
             print(text)
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             out = (DATA_DIR / "manage_namuna.json").resolve()
@@ -2066,7 +2093,10 @@ if __name__ == "__main__":
             if INTEGRATION_TOKEN and INTEGRATION_TOKEN in raw:  # ehtiyot: kalit faylga tushmasin
                 raw = raw.replace(INTEGRATION_TOKEN, "***")
             out.write_text(raw, "utf-8")
-            print(f"\n✅ Tayyor. Shu faylni yuboring (ichida kalit/parol yo'q): {out}")
+            if data["subjects"]:
+                print(f"\n✅ Tayyor. Shu faylni yuboring (ichida kalit/parol yo'q): {out}")
+            else:
+                print(f"\n⚠️ Namuna yig'ilmadi — sababi yuqorida. Tekshiruv fayli (kalitsiz): {out}")
             await db.close()
             await central.close()
             return
