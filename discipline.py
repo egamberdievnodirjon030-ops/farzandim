@@ -272,7 +272,13 @@ async def candidates(scope: set[str] | None = ..., sids: set[int] | None = None)
             if st == "cancelled":
                 st = "new"
             out[m].append({**base, "state": st, "excused_hours": c["hours"] if c and st == "more" else None})
+    stage: dict[int, int] = {}
     for m in AUTO:
+        for x in out[m]:
+            if x["state"] == "draft" and x["order_id"]:
+                if x["order_id"] not in stage:
+                    stage[x["order_id"]] = ((await order(x["order_id"])) or {}).get("stages", {}).get("current", 1)
+                x["stage"] = stage[x["order_id"]]
         out[m].sort(key=lambda x: (x["state"] not in ("new", "more"), -x["hours"], x["name"]))
     out["counts"] = {m: sum(1 for x in out[m] if x["state"] in ("new", "more")) for m in AUTO}
     out["thresholds"] = {m: threshold(m) for m in AUTO}
@@ -447,6 +453,33 @@ async def create_order(measure: str, ground: str, items: list[dict], rule: str =
     return {"ok": True, "id": oid, "students": n}
 
 
+STAGES = {1: "Asos: tushuntirish xati yoki bildirishnoma", 2: "Farmoyish / buyruq", 3: "Ota-onaga xat", 4: "Yakunlangan"}
+
+
+def _stages(o: dict) -> dict:
+    """Chora jarayoni bosqichlari: 1 — asos (talabaning tushuntirish xati / dalolatnoma yoki kurs koordinatori
+    bildirishnomasi), 2 — dekan farmoyishi / universitet buyrug'i (imzolangan, raqam va sana), 3 — ota-onaga xat.
+    Faqat xat (trimestr va h.k.) — bitta bosqich."""
+    cases, issued = o["cases"], o["status"] == "issued"
+    n = len(cases)
+    sent = sum(1 for c in cases if c.get("letter_date"))
+    if o["measure"] == "xat":
+        return {"letters_only": True, "current": 0 if o["status"] == "cancelled" else 4 if issued else 3,
+                "letters": {"done": issued, "sent": sent, "total": n}}
+    with_basis = sum(1 for c in cases if c.get("basis"))
+    by_note = o.get("basis_kind") == "bildirishnoma"
+    b_done = by_note or (n > 0 and with_basis == n)
+    l_done = issued and n > 0 and sent == n
+    current = 0 if o["status"] == "cancelled" else 1 if not (b_done or issued) else 2 if not issued else 3 if not l_done else 4
+    return {"letters_only": False, "current": current,
+            "basis": {"done": b_done or issued, "recorded": b_done, "bildirishnoma": by_note, "date": o.get("basis_date"),
+                      "number": o.get("basis_number"), "students": with_basis, "total": n,
+                      "tushuntirish": sum(1 for c in cases if c.get("basis") == "tushuntirish"),
+                      "dalolatnoma": sum(1 for c in cases if c.get("basis") == "dalolatnoma")},
+            "order": {"done": issued, "number": o.get("number"), "date": o.get("date")},
+            "letters": {"done": l_done, "sent": sent, "total": n}}
+
+
 async def order(oid: int) -> dict | None:
     o = await db.fetchone("SELECT * FROM disc_orders WHERE id = ?", (oid,))
     if not o:
@@ -467,6 +500,10 @@ async def order(oid: int) -> dict | None:
     o["title"] = MEASURES.get(o["measure"], {}).get("title", o["measure"])
     o["ground_title"] = GROUNDS.get(o["ground"], o["ground"])
     o["doc_kinds"] = [{"kind": k, "title": DOC_KINDS[k]} for k in doc_kinds(o["ground"], o["measure"])]
+    o["stages"] = _stages(o)
+    if o["measure"] != "xat":  # farmoyish/buyruqdagi «Asos:» — 1-bosqich hujjatlaridan
+        o["basis_text"] = await _basis_text(o, o["cases"], await coordinator_names(
+            {c["group_key"] for c in o["cases"] if c.get("group_key")}))
     return o
 
 
@@ -523,9 +560,10 @@ async def remove_case(oid: int, case_id: int) -> dict:
     return {"ok": True, "left": left}
 
 
-async def issue_order(bot, oid: int, number: str, d: str, notify: bool = True, user: int | None = None) -> dict:
-    """Farmoyish/buyruq imzolandi: raqam, sana — chora rasman ko'rilgan; ota-onalarga xabar (ixtiyoriy)."""
-    o = await db.fetchone("SELECT * FROM disc_orders WHERE id = ?", (oid,))
+async def issue_order(bot, oid: int, number: str, d: str, notify: bool = False, user: int | None = None) -> dict:
+    """2-bosqich: farmoyish/buyruq imzolandi — raqam, sana (chora rasman ko'rilgan). Avval 1-bosqich (asos) bo'lishi
+    shart. Ota-onalarga xabar odatda 3-bosqichda (xat bilan) boradi; faqat xat bo'lsa — shu yerda (notify)."""
+    o = await order(oid)
     if not o:
         return {"ok": False, "error": "not_found"}
     try:
@@ -533,14 +571,92 @@ async def issue_order(bot, oid: int, number: str, d: str, notify: bool = True, u
     except (TypeError, ValueError):
         return {"ok": False, "error": "bad_date"}
     first = o["status"] != "issued"
+    if first and o["measure"] != "xat" and not o["stages"]["basis"]["done"]:
+        return {"ok": False, "error": "no_basis"}
     now = now_iso()
+    number = (number or "").strip()[:40] or None
     await db.execute("UPDATE disc_orders SET number = ?, date = ?, status = 'issued', issued_at = COALESCE(issued_at, ?), "
-                     "issued_by = COALESCE(issued_by, ?) WHERE id = ?", ((number or "").strip()[:40] or None, d, now, user, oid))
+                     "issued_by = COALESCE(issued_by, ?) WHERE id = ?", (number, d, now, user, oid))
     await db.execute("UPDATE disc_cases SET status = 'issued', updated_at = ? WHERE order_id = ?", (now, oid))
+    if o["measure"] == "xat":  # xatning o'zi — chiquvchi raqam va sana
+        await db.execute("UPDATE disc_cases SET letter_no = ?, letter_date = ?, letter_at = COALESCE(letter_at, ?) "
+                         "WHERE order_id = ?", (number, d, now, oid))
     sent = 0
     if first and notify and bot is not None:
         sent = await notify_parents(bot, oid)
     return {"ok": True, "notified": sent}
+
+
+async def set_basis(oid: int, kind: str | None, d: str | None = None, number: str = "") -> dict:
+    """1-bosqich: kurs koordinatori bildirishnomasi dekanga topshirildi (sana, raqam) yoki bekor qilish (kind=None)."""
+    o = await db.fetchone("SELECT * FROM disc_orders WHERE id = ?", (oid,))
+    if not o:
+        return {"ok": False, "error": "not_found"}
+    if kind not in ("bildirishnoma", None):
+        return {"ok": False, "error": "bad_kind"}
+    if kind:
+        try:
+            d = date.fromisoformat(d).isoformat() if d else today().isoformat()
+        except ValueError:
+            return {"ok": False, "error": "bad_date"}
+    await db.execute("UPDATE disc_orders SET basis_kind = ?, basis_date = ?, basis_number = ? WHERE id = ?",
+                     (kind, d if kind else None, (number or "").strip()[:40] or None if kind else None, oid))
+    return {"ok": True}
+
+
+async def set_case_basis(case_id: int, basis: str | None) -> dict:
+    """1-bosqich (talaba bo'yicha): tushuntirish xati olindi yoki yozishdan bosh tortdi (dalolatnoma); None — bekor."""
+    if basis not in ("tushuntirish", "dalolatnoma", None):
+        return {"ok": False, "error": "bad_kind"}
+    c = await db.fetchone("SELECT id FROM disc_cases WHERE id = ?", (case_id,))
+    if not c:
+        return {"ok": False, "error": "not_found"}
+    await db.execute("UPDATE disc_cases SET basis = ?, basis_at = ? WHERE id = ?", (basis, now_iso() if basis else None, case_id))
+    return {"ok": True}
+
+
+async def mark_letters(bot, oid: int, items: list[dict], d: str, notify: bool = True, send_pdf: bool = False,
+                       user: int | None = None) -> dict:
+    """3-bosqich: ota-onaga xatlar yuborildi — har bir talabaning xati chiquvchi raqami va sanasi; ota-onalarga bot
+    orqali xabar (va yuklangan imzolangan xat PDF nusxasi — send_pdf)."""
+    o = await order(oid)
+    if not o:
+        return {"ok": False, "error": "not_found"}
+    if o["measure"] == "xat":
+        return {"ok": False, "error": "letter_order"}
+    if o["status"] != "issued":
+        return {"ok": False, "error": "not_issued"}
+    try:
+        d = date.fromisoformat(d).isoformat()
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "bad_date"}
+    cases = {c["id"]: c for c in o["cases"]}
+    now, marked, fresh = now_iso(), [], set()
+    for it in items:
+        try:
+            cid = int(it.get("case_id"))
+        except (TypeError, ValueError):
+            continue
+        if cid not in cases:
+            continue
+        if not cases[cid].get("letter_date"):
+            fresh.add(cid)
+        await db.execute("UPDATE disc_cases SET letter_no = ?, letter_date = ?, letter_at = COALESCE(letter_at, ?) WHERE id = ?",
+                         ((str(it.get("number") or "").strip()[:40]) or None, d, now, cid))
+        marked.append(cid)
+    if not marked:
+        return {"ok": False, "error": "no_students"}
+    notified = pdfs = 0
+    if bot is not None and fresh:
+        if notify:
+            notified = await notify_parents(bot, oid, fresh)
+        if send_pdf:
+            for cid in fresh:
+                f = await db.fetchone("SELECT id FROM disc_files WHERE case_id = ? AND kind = 'xat' AND sent_at IS NULL "
+                                      "AND lower(name) LIKE '%.pdf' ORDER BY id DESC LIMIT 1", (cid,))
+                if f and (await send_file(bot, f["id"], user)).get("ok"):
+                    pdfs += 1
+    return {"ok": True, "marked": len(marked), "notified": notified, "pdf": pdfs}
 
 
 async def cancel_order(oid: int) -> dict:
@@ -553,7 +669,7 @@ async def cancel_order(oid: int) -> dict:
     return {"ok": True}
 
 
-async def notify_parents(bot, oid: int) -> int:
+async def notify_parents(bot, oid: int, case_ids: set[int] | None = None) -> int:
     from notifier import send_each
     from i18n import tr
     import loc
@@ -565,6 +681,8 @@ async def notify_parents(bot, oid: int) -> int:
     if o["measure"] == "xat":
         return await _notify_letter(bot, o)
     for c in o["cases"]:
+        if case_ids is not None and c["id"] not in case_ids:
+            continue
         pids = [r["parent_id"] for r in await db.fetchall("SELECT parent_id FROM parent_students WHERE student_id = ?",
                                                           (c["student_id"],))]
         if not pids:
@@ -578,6 +696,8 @@ async def notify_parents(bot, oid: int) -> int:
                     + f"👨‍🎓 {esc(loc.student_name(st))} ({esc(st.get('group_name') or '')})\n"
                     + tr("{doc} bilan «{m}» e'lon qilindi — {why}.", doc=tr(doc), m=tr(MEASURES[o["measure"]]["short"]), why=why)
                     + (f"\n№ {esc(o['number'])}" if o.get("number") else "") + (f", {_dmy(o['date'])}" if o.get("date") else "")
+                    + ("\n\n✉️ " + tr("Bu haqda sizga ogohlantirish xati yuborildi") + (f" (№ {esc(c['letter_no'])}" if c.get("letter_no") else " (")
+                       + (", " if c.get("letter_no") else "") + _dmy(c["letter_date"]) + ")." if c.get("letter_date") else "")
                     + "\n\n" + tr("Farzandingiz bilan suhbatlashing. Savollar bo'lsa — kurs koordinatoriga yozing."))
         sent += await send_each(bot, pids, build, c["student_id"], "att", "threshold")
     return sent
@@ -615,6 +735,29 @@ async def _notify_letter(bot, o: dict) -> int:
 
 
 # ---------------------------------------------------------------- hujjat yaratish
+async def _basis_text(o: dict, cases: list[dict], names: list[str]) -> str:
+    """Farmoyish/buyruqdagi «Asos:» — 1-bosqich hujjatlari (hayfsanda — avvalgi dekan farmoyishi ham)."""
+    parts = []
+    if o["measure"] == "hayfsan":
+        seen = []
+        for items in (await _prior({c["student_id"] for c in cases})).values():
+            for p in items:
+                if p["measure"] == "ogohlantirish" and (p.get("number"), p.get("date")) not in seen:
+                    seen.append((p.get("number"), p.get("date")))
+        for num, d in seen:
+            parts.append("dekanning " + (f"{_date_long(d)}dagi " if d else "") + (f"{num}-sonli " if num else "") + "farmoyishi")
+    if o.get("basis_kind") == "bildirishnoma":
+        parts.append(f"kurs koordinatori {names_ning(names)} " + (f"{_date_long(o['basis_date'])}dagi " if o.get("basis_date") else "")
+                     + "bildirishnomasi")
+    if any(c.get("basis") == "tushuntirish" for c in cases):
+        parts.append("talabaning tushuntirish xati" if len(cases) == 1 else "talabalarning tushuntirish xatlari")
+    if any(c.get("basis") == "dalolatnoma" for c in cases):
+        parts.append("tushuntirish xati yozishdan bosh tortganlik to‘g‘risidagi dalolatnoma")
+    if not any(p.startswith("kurs koordinatori") or p.startswith("talaba") for p in parts):
+        parts.append(f"kurs koordinatori {names_ning(names)} bildirishnomasi")
+    return ", ".join(parts)
+
+
 def _money(x) -> str:
     """4617000 → «4 617 000» (bo'linmas bo'shliq bilan, hujjatdagidek)."""
     return f"{int(round(float(x or 0))):,}".replace(",", "\xa0")
@@ -665,8 +808,8 @@ def _limit_text(h: float) -> str:
     return f"Farzandingiz qoldirgan darslar hajmi dekan ogohlantirishi uchun belgilangan {_num(warn)} soat chegarasiga yaqinlashmoqda."
 
 
-def _letter_date(o: dict) -> str:
-    d = o.get("date") if o["measure"] == "xat" else None
+def _letter_date(o: dict, c: dict) -> str:
+    d = o.get("date") if o["measure"] == "xat" else c.get("letter_date")
     if d:
         x = date.fromisoformat(d)
         return f"“{x.day:02d}” {MONTHS[x.month - 1]} {x.year}-y."
@@ -679,8 +822,8 @@ async def _letter(o: dict, c: dict, names: list[str], stage: str) -> bytes:
     h = float(c.get("hours") or 0)
     note = (c.get("note") or "").strip().rstrip(".")
     values = {
-        "XAT_RAQAM": (o.get("number") or "___________") if o["measure"] == "xat" else "___________",
-        "XAT_SANA": _letter_date(o), "FISH": c["full_name"] or "", "FISH_KATTA": _upper_name(c["full_name"]),
+        "XAT_RAQAM": (o.get("number") if o["measure"] == "xat" else c.get("letter_no")) or "___________",
+        "XAT_SANA": _letter_date(o, c), "FISH": c["full_name"] or "", "FISH_KATTA": _upper_name(c["full_name"]),
         "FISH_KATTA_NING": _upper_name(c["full_name"]) + "NING", "GURUH": c.get("group_name") or "",
         "BOSQICH": c.get("course") or stage or "___", "MANZIL": c.get("address") or "_" * 40,
         "OQUV_YILI": f"{yr}-{yr + 1}", "OTGAN_OQUV_YILI": f"{yr - 1}-{yr}",
@@ -733,7 +876,11 @@ async def build_doc(oid: int, kind: str, case_id: int | None = None) -> tuple[st
     prior = await _prior({c["student_id"] for c in cases})
     yr = academic_year_start()
     sem = "1" if today().month >= 8 or today().month == 1 else "2"
+    asos = await _basis_text(o, cases, names)
+    if kind == "dalolatnoma" and any(c.get("basis") == "dalolatnoma" for c in cases):
+        cases = [c for c in cases if c.get("basis") == "dalolatnoma"]  # faqat tushuntirish xati yozmaganlar
     values = {
+        "ASOS": asos, "ASOS_BOSH": asos[:1].upper() + asos[1:],
         "RAQAM": _order_no(o) or "______", "SANA": _date_quoted(d_issue), "SANA_UZUN": _date_long(d_issue),
         "SANA_QISQA": _dmy(d_issue or today()), "BOSQICH": ", ".join(map(str, stages)) or "___",
         "DAN": _dmy(o.get("period_from") or semester_start()), "GACHA": _dmy(o.get("period_to") or today()),
@@ -816,6 +963,9 @@ async def add_file(oid: int | None, case_id: int | None, kind: str, name: str, d
     fid = await db.execute("INSERT INTO disc_files (order_id, case_id, kind, name, path, size, mime, uploaded_at, by_user) "
                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (oid, case_id, kind, _safe_name(name), rel, len(data), mime,
                                                                   now_iso(), user))
+    if case_id and kind in ("tushuntirish", "dalolatnoma"):  # 1-bosqich: talabaning asosi
+        await db.execute("UPDATE disc_cases SET basis = COALESCE(basis, ?), basis_at = COALESCE(basis_at, ?) WHERE id = ?",
+                         (kind, now_iso(), case_id))
     return {"ok": True, "id": fid}
 
 
@@ -859,8 +1009,9 @@ async def history(scope: set[str] | None = ..., measure: str = "", ground: str =
         from tenancy import viewer_scope
         scope = viewer_scope()
     rows = await db.fetchall(
-        """SELECT c.id AS case_id, c.student_id, c.measure, c.ground, c.hours, c.note, c.amount, c.as_of, o.id AS order_id,
-                  o.number, o.date, o.rule, o.issued_at, o.deadline, s.full_name, s.group_name, s.group_key, s.hemis_id, s.course
+        """SELECT c.id AS case_id, c.student_id, c.measure, c.ground, c.hours, c.note, c.amount, c.as_of, c.basis, c.letter_no,
+                  c.letter_date, o.id AS order_id, o.number, o.date, o.rule, o.issued_at, o.deadline, o.basis_kind, o.basis_date,
+                  s.full_name, s.group_name, s.group_key, s.hemis_id, s.course
            FROM disc_cases c JOIN disc_orders o ON o.id = c.order_id JOIN students s ON s.id = c.student_id
            WHERE c.status = 'issued' AND COALESCE(o.date, substr(o.issued_at, 1, 10)) >= ?
            ORDER BY COALESCE(o.date, o.issued_at) DESC, s.full_name""", (ay_start(),))
@@ -899,7 +1050,9 @@ async def history(scope: set[str] | None = ..., measure: str = "", ground: str =
     kpi.update({g: sum(1 for r in all_rows if r["ground"] == g) for g in GROUNDS})
     kpi.update({"students": len({r["student_id"] for r in all_rows}),
                 "repeat": sum(1 for v in _count_by(all_rows).values() if v > 1),
-                "no_original": sum(1 for r in all_rows if not r["has_original"]), "total": len(all_rows)})
+                "no_original": sum(1 for r in all_rows if not r["has_original"]), "total": len(all_rows),
+                "letters_sent": sum(1 for r in all_rows if r["measure"] != "xat" and r["letter_date"]),
+                "letters_pending": sum(1 for r in all_rows if r["measure"] != "xat" and not r["letter_date"])})
     by_group: dict[str, int] = {}
     for r in all_rows:
         by_group[r["group_name"] or "—"] = by_group.get(r["group_name"] or "—", 0) + 1
@@ -935,14 +1088,17 @@ async def student_record(sid: int) -> dict | None:
     if not st:
         return None
     rows = await db.fetchall(
-        """SELECT c.*, o.number, o.date, o.status AS order_status, o.rule, o.deadline, o.measure AS o_measure
-           FROM disc_cases c LEFT JOIN disc_orders o ON o.id = c.order_id
+        """SELECT c.*, o.number, o.date, o.status AS order_status, o.rule, o.deadline, o.measure AS o_measure, o.basis_kind,
+                  o.basis_date FROM disc_cases c LEFT JOIN disc_orders o ON o.id = c.order_id
            WHERE c.student_id = ? AND c.created_at >= ? ORDER BY COALESCE(o.date, c.created_at) DESC, c.id DESC""",
         (sid, ay_start()))
     files = await _files_index()
-    cases = []
+    cases, stages = [], {}
     for r in rows:
         r = dict(r)
+        if r["order_id"] and r["order_id"] not in stages:
+            stages[r["order_id"]] = ((await order(r["order_id"])) or {}).get("stages")
+        r["stages"] = stages.get(r["order_id"])
         r["title"] = MEASURES.get(r["measure"], {}).get("title", r["measure"])
         r["ground_title"] = GROUNDS.get(r["ground"], r["ground"])
         r["state_title"] = CASE_STATES.get(r["status"], r["status"])
@@ -1004,9 +1160,16 @@ async def panel_stats(scope: set[str] | None = ...) -> dict:
     for x in cand["excluded"]:
         states[x["state"]] = states.get(x["state"], 0) + 1
     drafts = await orders("draft", scope)
+    issued = [o for o in await orders("issued", scope) if o["measure"] != "xat"]
+    mine = lambda o: [c for c in o["cases"] if scope is None or c["group_key"] in scope]  # noqa: E731
+    flow = {"need": sum(pending.values()), "asked": states.get("asked", 0),
+            "basis": sum(len(mine(o)) for o in drafts if o["measure"] != "xat" and o["stages"]["current"] == 1),
+            "order": sum(len(mine(o)) for o in drafts if o["measure"] != "xat" and o["stages"]["current"] == 2),
+            "letters": sum(1 for o in issued for c in mine(o) if not c.get("letter_date")),
+            "done": sum(1 for o in issued for c in mine(o) if c.get("letter_date"))}
     h = await history(scope)
     tri = await trimestr_candidates(scope)
-    return {"pending": pending, "new": sum(pending.values()), "states": states,
+    return {"pending": pending, "new": sum(pending.values()), "states": states, "flow": flow,
             "drafts": len(drafts), "draft_students": sum(len(o["cases"]) for o in drafts),
             "thresholds": cand["thresholds"], "kpi": h["kpi"],
             "dynamics": [{k: x[k] for k in ("label", *MEASURES)} for x in h["dynamics"]],

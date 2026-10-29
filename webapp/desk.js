@@ -797,7 +797,7 @@ function choraList(d, st) {
   const tbl = rows.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl ch-tbl"><thead><tr>
       <th class="cbx"><input type="checkbox" data-all aria-label="Hammasini tanlash"></th><th>Talaba</th><th class="r">Sababsiz</th><th>Holat</th>
       <th>Avval ko‘rilgan chora</th><th class="r">Amallar</th></tr></thead><tbody>
-      ${rows.map(x => { const [lab, tone] = CST[x.state] || [x.state, 'muted']; const can = x.state !== 'draft';
+      ${rows.map(x => { const [lab, tone] = x.state === 'draft' && x.stage ? [STG_S[x.stage] || STG[x.stage], 'muted'] : CST[x.state] || [x.state, 'muted']; const can = x.state !== 'draft';
         return `<tr data-sid="${x.sid}"><td class="cbx">${can ? `<input type="checkbox" data-pick="${x.sid}" ${st.sel.has(x.sid) ? 'checked' : ''} aria-label="Tanlash">` : ''}</td>
         <td class="name click" data-chs="${x.sid}"><b>${esc(x.name)}</b><span>${esc(x.group)}${x.hemis_id ? ', HEMIS ' + esc(x.hemis_id) : ''}</span></td>
         <td class="r nowrap"><b>${pairs(x.hours)}</b><div class="sub-l">${x.percent != null ? `davomat ${Math.round(x.percent)}%` : ''}</div></td>
@@ -897,7 +897,73 @@ function bindChoraTri(d, st) {
     catch (e) { toast('Xat yaratilmadi', true); }
   });
 }
-function orderCard(o) {
+const STG = { 1: 'Asos', 2: 'Farmoyish / buyruq', 3: 'Ota-onaga xat', 4: 'Yakunlangan' };
+const STG_S = { 1: '1-bosqich: asos kutilmoqda', 2: '2-bosqich: farmoyish/buyruq', 3: '3-bosqich: ota-onaga xat' };
+const orderCard = o => (o.measure === 'xat' ? letterCard(o) : stagedCard(o));
+/* chora jarayoni A dan B gacha: 1 — asos (tushuntirish xati / dalolatnoma yoki kurs koordinatori bildirishnomasi),
+   2 — dekan farmoyishi / universitet buyrug'i (1-bosqichsiz ochilmaydi), 3 — ota-onaga xat (2-bosqichdan keyin) */
+function stagedCard(o) {
+  const M = MEAS[o.measure] || MEAS.boshqa, S = o.stages, cur = S.current, B = S.basis, L = S.letters;
+  const draft = o.status === 'draft', issued = o.status === 'issued', cancelled = o.status === 'cancelled';
+  const st = n => (cancelled ? 'lock' : n < cur ? 'done' : n === cur ? 'cur' : 'lock');
+  const has = k => o.doc_kinds.some(x => x.kind === k);
+  const main = o.doc_kinds.find(x => x.kind === 'farmoyish' || x.kind === 'buyruq');
+  const docT = o.measure === 'hayfsan' ? 'Hayfsan — universitet buyrug‘i' : o.measure === 'ogohlantirish' ? 'Dekan ogohlantirishi — dekan farmoyishi' : `${M.t} — qaror`;
+  const fchips = list => list.map(f => `<span class="chip muted">${ic('file')}<a href="#" data-file="${f.id}">${esc(FKIND[f.kind] || f.kind)}: ${esc(f.name)}</a><button data-fdel="${f.id}" aria-label="O‘chirish">${ic('x')}</button></span>`).join('');
+  const common = kinds => o.files.filter(f => !f.case_id && kinds.includes(f.kind));
+  const upl = (kind, label) => `<label class="btn sm ghost">${ic('upload')} ${label}<input type="file" data-upk="${kind}" hidden multiple></label>`;
+  const head = (n, title, chip) => `<div class="st-h"><span class="st-n">${st(n) === 'done' ? ic('check') : n}</span><b>${title}</b>${chip}</div>`;
+  const stChip = cancelled ? '<span class="chip muted">Bekor qilingan</span>' : cur === 4 ? `<span class="chip ok">${ic('check')} Yakunlangan</span>`
+    : `<span class="chip warn">${cur}-bosqich: ${STG[cur]}</span>`;
+  const s1 = `<li class="step ${st(1)}">${head(1, 'Asos: talabaning tushuntirish xati yoki kurs koordinatori bildirishnomasi',
+      B.recorded ? `<span class="chip ok">${[B.bildirishnoma ? `bildirishnoma${B.date ? ' · ' + dmy(B.date) : ''}` : '', B.students ? `tushuntirish xati: ${B.tushuntirish}${B.dalolatnoma ? `, dalolatnoma: ${B.dalolatnoma}` : ''} / ${B.total}` : ''].filter(Boolean).join(' + ')}</span>`
+        : issued ? '<span class="chip muted">qayd etilmagan</span>' : `<span class="chip warn">kutilmoqda${B.students ? ` · ${B.students} / ${B.total}` : ''}</span>`)}
+    <div class="st-b"><div class="opt"><div class="opt-h"><b>A. Kurs koordinatori bildirishnomasi</b> — dekan nomiga, barcha talabalar uchun</div>
+        <div class="wrapc">${has('bildirishnoma') ? `<button class="btn sm" data-doc="bildirishnoma">${ic('download')} Bildirishnoma (Word)</button>` : ''}
+          ${B.bildirishnoma ? `<span class="chip ok">${ic('check')} Dekanga topshirilgan${B.number ? ' · № ' + esc(B.number) : ''}${B.date ? ' · ' + dmy(B.date) : ''}</span>
+              ${draft ? `<button class="btn sm ghost" data-bclear title="Bekor qilish">${ic('refresh')}</button>` : ''}`
+            : draft ? `<button class="btn sm primary" data-bset>${ic('check')} Dekanga topshirildi</button>` : ''}
+          ${fchips(common(['bildirishnoma']))}${upl('bildirishnoma', 'Imzolangan nusxa')}</div></div>
+      <div class="opt-or"><span>yoki</span></div>
+      <div class="opt"><div class="opt-h"><b>B. Talabalarning tushuntirish xatlari</b> — har bir talabadan; yozishdan bosh tortsa — dalolatnoma</div>
+        <ul class="ord-st">${o.cases.map(c => `<li><span><b class="click" data-chs="${c.student_id}">${esc(c.full_name)}</b> <span class="sub-l">${esc(c.group_name || '')}${c.hours != null ? ' · ' + pairs(c.hours) : ''}${c.note ? ' · ' + esc(c.note) : ''}</span>
+            ${c.basis === 'tushuntirish' ? `<span class="chip ok">${ic('check')} tushuntirish xati</span>` : c.basis === 'dalolatnoma' ? '<span class="chip warn">yozmadi — dalolatnoma</span>' : '<span class="chip muted">tushuntirish xati kutilmoqda</span>'}</span>
+          <span class="nowrap">${c.basis ? (draft ? `<button class="btn sm ghost" data-cb="${c.id}" data-v="" title="Bekor qilish">${ic('refresh')}</button>` : '')
+            : `<label class="btn sm ghost" title="Tushuntirish xatini yuklash (PDF yoki rasm)">${ic('upload')} Yuklash<input type="file" data-cup="${c.id}" accept=".pdf,image/*,.doc,.docx" hidden></label>
+              <button class="btn sm ghost" data-cb="${c.id}" data-v="tushuntirish" title="Tushuntirish xati qog‘ozda olindi">${ic('check')} Olindi</button>
+              <button class="btn sm ghost" data-cb="${c.id}" data-v="dalolatnoma" title="Yozishdan bosh tortdi — dalolatnoma tuziladi">Yozmadi</button>`}
+            <button class="btn sm ghost" data-chs="${c.student_id}" title="Talabaning hujjatlari">${ic('folder')}${c.files_n ? ` ${c.files_n}` : ''}</button>
+            ${draft ? `<button class="btn sm ghost" data-dcase="${c.id}" title="Hujjatdan chiqarish">${ic('x')}</button>` : ''}</span></li>`).join('')}</ul>
+        ${B.dalolatnoma && has('dalolatnoma') ? `<div class="wrapc"><button class="btn sm" data-doc="dalolatnoma">${ic('download')} Dalolatnoma (Word) — yozmaganlar</button></div>` : ''}</div></div></li>`;
+  const s2 = `<li class="step ${st(2)}">${head(2, docT, issued ? `<span class="chip ok">${o.number ? '№ ' + esc(o.number) + ' · ' : ''}${dmy(o.date)}</span>`
+      : cur < 2 ? '<span class="chip muted">1-bosqichdan keyin</span>' : '<span class="chip warn">imzolanishi kutilmoqda</span>')}
+    <div class="st-b">${cur < 2 && !issued ? `<p class="hint">Avval 1-bosqich: bildirishnoma dekanga topshirilsin yoki har bir talabaning tushuntirish xati (yozmasa — dalolatnoma) bo‘lsin. Shundan keyin ${main ? main.title.toLowerCase() : 'hujjat'} shu asosda tayyorlanadi.</p>`
+      : `<p class="hint">Asos: <i>${esc(o.basis_text || '')}</i></p>
+      <div class="wrapc">${main ? `<button class="btn sm" data-doc="${main.kind}">${ic('download')} ${main.title} (Word)</button>` : ''}
+        ${draft ? `<button class="btn sm primary" data-issue>${ic('check')} Imzolandi — raqam va sanani kiritish</button>` : issued ? `<button class="btn sm ghost" data-issue>${ic('edit')} Raqam va sana</button>` : ''}
+        ${fchips(common(['imzolangan', 'farmoyish', 'buyruq']))}${issued ? upl('imzolangan', 'Imzolangan nusxa') : ''}</div>`}</div></li>`;
+  const s3 = `<li class="step ${st(3)}">${head(3, 'Ota-onaga xat', issued ? `<span class="chip ${L.done ? 'ok' : 'warn'}">${L.sent} / ${L.total} yuborilgan</span>` : '<span class="chip muted">2-bosqichdan keyin</span>')}
+    <div class="st-b">${!issued ? `<p class="hint">Xatda ${o.measure === 'hayfsan' ? 'buyruq' : 'farmoyish'} raqami va sanasi bo‘ladi — shuning uchun avval 2-bosqich.</p>`
+      : `<ul class="ord-st">${o.cases.map(c => `<li><span><b class="click" data-chs="${c.student_id}">${esc(c.full_name)}</b>
+            ${c.letter_date ? `<span class="chip ok">${ic('check')} ${c.letter_no ? '№ ' + esc(c.letter_no) + ' · ' : ''}${dmy(c.letter_date)}</span>` : '<span class="chip muted">yuborilmagan</span>'}
+            ${!c.address ? `<button class="chip warn" data-caddr="${c.student_id}" title="Xat uchun yashash manzili">${ic('edit')} manzil yo‘q</button>` : ''}</span>
+          <span class="nowrap"><button class="btn sm ghost" data-cxat="${c.id}" title="Shu talabaning ota-onasiga xat (Word)">${ic('mail')} Xat</button>
+            <button class="btn sm ghost" data-chs="${c.student_id}" title="Imzolangan xatni yuklash, PDF ni ota-onaga yuborish">${ic('folder')}${c.files_n ? ` ${c.files_n}` : ''}</button></span></li>`).join('')}</ul>
+        <div class="wrapc">${o.cases.length > 1 ? `<button class="btn sm" data-doc="xat">${ic('mail')} Barcha xatlar (ZIP)</button>` : ''}
+          <button class="btn sm primary" data-letters>${ic('send')} Xatlar yuborildi deb belgilash</button></div>`}</div></li>`;
+  const other = o.files.filter(f => !f.case_id && !['bildirishnoma', 'imzolangan', 'farmoyish', 'buyruq'].includes(f.kind));
+  return `<article class="sec ord" data-oid="${o.id}"><header><h2><span class="h-ic c-${o.measure === 'hayfsan' ? 'risk' : 'acad'}" aria-hidden="true">${ic(o.measure === 'hayfsan' ? 'shield' : 'alert')}</span>
+      ${M.t} <small>${GRND[o.ground] || ''} · ${o.cases.length} ta talaba</small></h2>${stChip}</header>
+    <div class="pad">${o.rule ? `<p class="hint">Qoida: ${esc(o.rule)}</p>` : ''}
+      <ol class="steps">${s1}${s2}${s3}</ol>
+      <div class="ord-files"><span class="lbl">Boshqa hujjatlar:</span>${other.length ? fchips(other) : '<span class="dash">yo‘q</span>'}
+        <label class="btn sm ghost">${ic('upload')} Yuklash<input type="file" data-up hidden multiple></label>
+        <select class="select sm" data-upkind aria-label="Hujjat turi">${Object.entries(FKIND).map(([k, v]) => `<option value="${k}" ${k === 'asos' ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div class="actions"><button class="btn sm ghost" data-doc="zip">${ic('download')} Barcha hujjatlar (ZIP)</button>
+        ${draft ? `<button class="btn sm danger" data-odel>${ic('x')} Loyihani o‘chirish</button>` : issued ? `<button class="btn sm ghost" data-ocancel>Chorani bekor qilish</button>` : ''}</div>
+    </div></article>`;
+}
+function letterCard(o) {
   const M = MEAS[o.measure] || MEAS.boshqa, draft = o.status === 'draft', issued = o.status === 'issued';
   const letter = o.doc_kinds.some(k => k.kind === 'xat'), isXat = o.measure === 'xat';
   const stChip = issued ? `<span class="chip ok">${ic('check')} ${isXat ? 'Yuborilgan' : 'Chiqarilgan'}${o.number ? ` · № ${esc(o.number)}` : ''}${o.date ? ` · ${dmy(o.date)}` : ''}</span>`
@@ -926,7 +992,7 @@ function orderCard(o) {
 }
 function choraDocs(d) {
   const act = d.orders.filter(o => o.status === 'draft'), done = d.orders.filter(o => o.status !== 'draft');
-  return `<p class="hint scope">${ic('info')}<span>Har bir hujjat to‘plami — bitta farmoyish, buyruq yoki ota-onaga xatlar ro‘yxati. Word fayllarni (bildirishnoma, farmoyish/buyruq, har bir talabaning ota-onasiga xat) yuklab oling, imzolangach raqami va sanasini kiriting (talabalar «Chora ko‘rilganlar»ga o‘tadi, ota-onalarga xabar boradi) va imzolangan PDF nusxani biriktiring.</span></p>
+  return `<p class="hint scope">${ic('info')}<span>Chora tartib bilan ko‘riladi: <b>1. Asos</b> — talabaning tushuntirish xati (yozmasa — dalolatnoma) yoki kurs koordinatori bildirishnomasi → <b>2. Dekan farmoyishi / universitet buyrug‘i</b> (shu asosda; imzolangach raqami va sanasi) → <b>3. Ota-onaga xat</b> (farmoyish/buyruq raqami bilan). Keyingi bosqich oldingisi tugagach ochiladi.</span></p>
     ${act.length ? act.map(orderCard).join('') : emptyBox('file', 'Tayyorlanayotgan hujjat yo‘q', '«Chegaraga yetganlar» bo‘limida talabalarni tanlab, «Hujjatlarni tayyorlash» ni bosing.')}
     ${done.length ? `<h3 class="sub-h">O‘quv yilida chiqarilganlar</h3>${done.map(orderCard).join('')}` : ''}`;
 }
@@ -947,6 +1013,40 @@ function bindChoraDocs(d) {
       try { await api(`${base}/files`, { method: 'POST', body: fd }); toast('Yuklandi'); route(); }
       catch (err) { toast(err.message === 'too_big' ? 'Fayl juda katta (20 MB gacha)' : 'Yuklanmadi', true); }
     });
+    const upload = async (url, kind, files) => {
+      if (!files.length) return;
+      const fd = new FormData(); fd.append('kind', kind); files.forEach(f => fd.append('file', f, f.name));
+      try { await api(url, { method: 'POST', body: fd }); toast('Yuklandi'); route(); }
+      catch (err) { toast(err.message === 'too_big' ? 'Fayl juda katta (20 MB gacha)' : 'Yuklanmadi', true); }
+    };
+    card.querySelectorAll('[data-upk]').forEach(i => i.addEventListener('change', e => upload(`${base}/files`, i.dataset.upk, [...e.target.files])));
+    card.querySelectorAll('[data-cup]').forEach(i => i.addEventListener('change', e => upload(`/api/staff/discipline/cases/${i.dataset.cup}/files`, 'tushuntirish', [...e.target.files])));
+    card.querySelectorAll('[data-cb]').forEach(b => b.addEventListener('click', async () => {
+      try { await api(`/api/staff/discipline/cases/${b.dataset.cb}/basis`, { method: 'POST', json: { basis: b.dataset.v || null } }); route(); }
+      catch (e) { toast('Saqlanmadi', true); } }));
+    card.querySelector('[data-bset]')?.addEventListener('click', async () => {
+      const v = await formDlg('Bildirishnoma dekanga topshirildi', `<p>Kurs koordinatori bildirishnomasi — barcha ${o.cases.length} ta talaba uchun asos. Farmoyish/buyruqdagi «Asos:» qatoriga sanasi bilan yoziladi.</p>
+        <div class="cols2"><label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${todayIso()}" required></label>
+        <label class="field"><span>Kiruvchi raqami (bo‘lsa)</span><input class="input" name="number" placeholder="Masalan: 45"></label></div>
+        <p class="hint">Imzolangan nusxani «Imzolangan nusxa» tugmasi orqali yuklab qo‘ying.</p>`, 'Saqlash');
+      if (!v) return;
+      try { await api(`${base}/basis`, { method: 'POST', json: { date: v.get('date'), number: v.get('number') } }); toast('1-bosqich yakunlandi'); route(); }
+      catch (e) { toast('Saqlanmadi', true); } });
+    card.querySelector('[data-bclear]')?.addEventListener('click', async () => {
+      await api(`${base}/basis`, { method: 'POST', json: { kind: null } }); route(); });
+    card.querySelector('[data-letters]')?.addEventListener('click', async () => {
+      const v = await formDlg('Ota-onaga xatlar — yuborildi', `<p>Belgilangan talabalarning ota-onasiga xat yuborilgan deb qayd etiladi; chiquvchi raqami xatga yoziladi.</p>
+        <label class="field"><span>Yuborilgan sana</span><input class="input" type="date" name="date" value="${todayIso()}" required></label>
+        <div class="field"><span>Talabalar va xatlarning chiquvchi raqami</span><ul class="ord-st">${o.cases.map(c => `<li><label class="cbxl"><input type="checkbox" name="c${c.id}" ${c.letter_date ? '' : 'checked'}> ${esc(c.full_name)}</label>
+          <input class="input sm" name="n${c.id}" value="${esc(c.letter_no || '')}" placeholder="№ (masalan, 01-12/345)" aria-label="Chiquvchi raqam"></li>`).join('')}</ul></div>
+        <label class="cbxl"><input type="checkbox" name="notify" checked> Ota-onalarga bot orqali xabar yuborish</label>
+        <label class="cbxl"><input type="checkbox" name="pdf" checked> Imzolangan xat PDF nusxasini ham yuborish (talabaga yuklangan bo‘lsa)</label>`, 'Saqlash');
+      if (!v) return;
+      const items = o.cases.filter(c => v.get(`c${c.id}`) === 'on').map(c => ({ case_id: c.id, number: v.get(`n${c.id}`) || '' }));
+      if (!items.length) { toast('Talaba belgilanmagan', true); return; }
+      try { const r = await api(`${base}/letters`, { method: 'POST', json: { date: v.get('date'), items, notify: v.get('notify') === 'on', send_pdf: v.get('pdf') === 'on' } });
+        toast(`Qayd etildi: ${r.marked}${r.notified ? ` · ota-onalarga xabar: ${r.notified}` : ''}${r.pdf ? ` · PDF: ${r.pdf}` : ''}`); route(); }
+      catch (e) { toast('Saqlanmadi', true); } });
     card.querySelectorAll('[data-cxat]').forEach(b => b.addEventListener('click', async () => {
       b.disabled = true; try { await download(`${base}/doc/xat?case=${b.dataset.cxat}`); } catch (e) { toast('Yuklab bo‘lmadi', true); } b.disabled = false; }));
     card.querySelectorAll('[data-caddr]').forEach(b => b.addEventListener('click', async e => {
@@ -966,12 +1066,13 @@ function bindChoraDocs(d) {
       const v = await formDlg(isXat ? 'Ota-onaga xat — yuborildi' : `${MEAS[o.measure].doc} — imzolandi`, `<div class="cols2">
         <label class="field"><span>${isXat ? 'Chiquvchi raqami' : 'Raqami'}</span><input class="input" name="number" value="${esc(o.number || '')}" placeholder="${isXat ? 'Masalan: 01-12/345' : 'Masalan: 17 yoki 215'}" ${isXat ? '' : 'required'}></label>
         <label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${esc(o.date || todayIso())}" required></label></div>
-        ${first ? `<label class="cbxl"><input type="checkbox" name="notify" checked> Ota-onalarga xabar yuborish (bot orqali)</label>` : ''}
-        <p class="hint">Imzolangan nusxani keyin yuklang: umumiy — «Umumiy hujjatlar»ga, talabaniki (xat) — qatordagi papka tugmasi orqali.</p>`, 'Saqlash');
+        ${first && isXat ? `<label class="cbxl"><input type="checkbox" name="notify" checked> Ota-onalarga xabar yuborish (bot orqali)</label>` : ''}
+        <p class="hint">${isXat ? 'Imzolangan xatni talaba qatoridagi papka tugmasi orqali yuklang — PDF bo‘lsa, ota-onasiga yuboriladi.'
+          : 'Keyingi bosqich — ota-onaga xat: unda shu raqam va sana yoziladi. Imzolangan nusxani «Imzolangan nusxa» tugmasi orqali yuklang.'}</p>`, 'Saqlash');
       if (!v) return;
       try { const r = await api(`${base}/issue`, { method: 'POST', json: { number: v.get('number'), date: v.get('date'), notify: v.get('notify') === 'on' } });
-        toast(first ? `Chiqarildi${r.notified ? ` · ota-onalarga ${r.notified} ta xabar` : ''}` : 'Saqlandi'); route(); }
-      catch (e) { toast('Saqlanmadi', true); }
+        toast(first ? (isXat ? `Yuborildi${r.notified ? ` · ota-onalarga ${r.notified} ta xabar` : ''}` : '2-bosqich yakunlandi — endi ota-onaga xat') : 'Saqlandi'); route(); }
+      catch (e) { toast(e.message === 'no_basis' ? 'Avval 1-bosqich: tushuntirish xati yoki bildirishnoma' : 'Saqlanmadi', true); }
     });
   });
 }
@@ -987,10 +1088,12 @@ async function choraTartib(d) {
     <label class="field"><span>Buzilgan qoida (hujjatga shu matn yoziladi)</span><input class="input" name="rule" list="rules" required placeholder="“Odob-axloq Kodeksi”ning … moddasi (…)">
       <datalist id="rules">${d.rules.map(r => `<option value="${esc(r)}">`).join('')}</datalist></label>
     <div class="field"><span>Talabalar va holat tafsiloti</span><ul id="tsel" class="ord-st"><li class="dash">Talaba tanlanmagan</li></ul></div>
-    <label class="cbxl"><input type="checkbox" id="tdone"> Allaqachon imzolangan (raqami va sanasi bor)</label>
+    <p class="hint">Jarayon: 1. tushuntirish xati yoki bildirishnoma → 2. farmoyish/buyruq → 3. ota-onaga xat («Hujjatlar» yorlig‘ida bosqichma-bosqich).</p>
+    <label class="cbxl"><input type="checkbox" id="tdone"> Farmoyish/buyruq allaqachon imzolangan (raqami va sanasi bor)</label>
     <div class="cols2" id="tiss" hidden><label class="field"><span>Raqami</span><input class="input" name="number"></label>
       <label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${todayIso()}"></label>
-      <label class="cbxl"><input type="checkbox" name="notify" checked> Ota-onalarga xabar yuborish</label></div>
+      <label class="field"><span>Asos (1-bosqich)</span><select class="select" name="basis"><option value="tushuntirish">Talabaning tushuntirish xati</option>
+        <option value="bildirishnoma">Kurs koordinatori bildirishnomasi</option></select></label></div>
     <div class="row"><button class="btn" value="cancel" formnovalidate>Bekor qilish</button><button class="btn primary" value="ok">Saqlash va hujjatlarni tayyorlash</button></div></form>`;
   const paintSel = () => { $('#tsel').innerHTML = sel.size ? [...sel.values()].map(x => `<li><span><b>${esc(x.name)}</b> <span class="sub-l">${esc(x.group || '')}</span>
       <input class="input sm" data-tnote="${x.id}" value="${esc(x.note || '')}" placeholder="Sana, holat (masalan: 27.10 — sport kiyimida)"></span>
@@ -1010,8 +1113,8 @@ async function choraTartib(d) {
     const f = new FormData(dl.querySelector('form'));
     if (!sel.size) { toast('Talaba tanlang', true); return; }
     const body = { measure: f.get('measure'), ground: 'tartib', rule: f.get('rule'), items: [...sel.values()].map(x => ({ sid: x.id, note: x.note })) };
-    if ($('#tdone').checked) body.issue = { number: f.get('number'), date: f.get('date') || todayIso(), notify: f.get('notify') === 'on' };
-    try { await api('/api/staff/discipline/orders', { method: 'POST', json: body }); S.chora.tab = body.issue ? 'hist' : 'docs'; toast('Saqlandi'); route(); }
+    if ($('#tdone').checked) body.issue = { number: f.get('number'), date: f.get('date') || todayIso(), basis: f.get('basis') };
+    try { await api('/api/staff/discipline/orders', { method: 'POST', json: body }); S.chora.tab = 'docs'; toast('Saqlandi'); route(); }
     catch (e) { toast(e.message === 'no_rule' ? 'Buzilgan qoidani yozing' : 'Saqlanmadi', true); }
   };
 }
@@ -1050,7 +1153,8 @@ async function loadChoraHist(st) {
       ${h.items.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Sana</th><th>Talaba</th><th>Chora</th><th>Asos</th><th>Asl hujjatlar</th></tr></thead><tbody>
         ${h.items.map(x => `<tr class="click" data-chs="${x.student_id}"><td class="nowrap">${dmy(x.date)}${x.number ? `<div class="sub-l">№ ${esc(x.number)}</div>` : ''}</td>
           <td class="name"><b>${esc(x.full_name)}</b><span>${esc(x.group_name || '')}</span></td>
-          <td><span class="chip ${(MEAS[x.measure] || MEAS.boshqa).c}">${esc((MEAS[x.measure] || {}).s || x.title)}</span></td>
+          <td><span class="chip ${(MEAS[x.measure] || MEAS.boshqa).c}">${esc((MEAS[x.measure] || {}).s || x.title)}</span>
+            ${x.measure !== 'xat' ? (x.letter_date ? `<div class="sub-l">${ic('mail')} xat: ${x.letter_no ? '№ ' + esc(x.letter_no) + ', ' : ''}${dmy(x.letter_date)}</div>` : '<div class="sub-l warn-t">ota-onaga xat yuborilmagan</div>') : ''}</td>
           <td>${x.ground === 'davomat' ? `Davomat: sababsiz ${pairs(x.hours)}` : x.ground === 'trimestr' ? `Trimestr qarzi: ${money(x.amount)}` : `Ichki tartib: ${esc(x.rule || '')}`}${x.note ? `<div class="sub-l">${esc(x.note)}</div>` : ''}</td>
           <td><div class="wrapc">${x.files.length ? x.files.map(f => `<a href="#" class="chip ${f.shared ? 'muted' : 'ok'}" data-fview="${f.id}" title="${esc(f.name)}${f.shared ? ' (umumiy hujjat)' : ''}">${ic(isPdf(f) ? 'eye' : 'file')} ${esc(FKIND[f.kind] || f.kind)}</a>`).join('')
             : `<span class="chip warn">${ic('alert')} asl hujjat yo‘q</span>`}
@@ -1115,8 +1219,11 @@ async function openChora(sid) {
   const caseBox = c => { const M = MEAS[c.measure] || MEAS.boshqa, issued = c.status === 'issued';
     const tone = issued ? 'ok' : c.status === 'excused' ? 'ok' : c.status === 'draft' ? 'warn' : 'muted';
     return `<div class="box chs-case"><h4><span class="chip ${M.c}">${esc(M.t)}</span> <span class="chip ${tone}">${esc(c.state_title)}</span></h4>
-      <div class="kv"><span>Asos</span><b>${esc(GRND[c.ground] || c.ground_title)}${c.why ? ': ' + esc(c.why) : ''}</b>
-        ${c.order_id ? `<span>${c.o_measure === 'xat' ? 'Xat' : (MEAS[c.measure] || {}).doc || 'Hujjat'}</span><b>${c.number ? '№ ' + esc(c.number) + ', ' : ''}${c.date ? dmy(c.date) : 'loyiha (imzolanmagan)'}</b>` : ''}
+      <div class="kv"><span>Sabab</span><b>${esc(GRND[c.ground] || c.ground_title)}${c.why ? ': ' + esc(c.why) : ''}</b>
+        ${c.order_id && c.measure !== 'xat' ? `<span>1. Asos</span><b>${[c.basis_kind === 'bildirishnoma' ? `kurs koordinatori bildirishnomasi${c.basis_date ? ' · ' + dmy(c.basis_date) : ''}` : '',
+            c.basis === 'tushuntirish' ? 'tushuntirish xati' : c.basis === 'dalolatnoma' ? 'dalolatnoma (yozmagan)' : ''].filter(Boolean).join(' + ') || '<span class="dash">kutilmoqda</span>'}</b>` : ''}
+        ${c.order_id ? `<span>${c.o_measure === 'xat' ? 'Xat' : '2. ' + ((MEAS[c.measure] || {}).doc || 'Hujjat')}</span><b>${c.number ? '№ ' + esc(c.number) + ', ' : ''}${c.date ? dmy(c.date) : 'imzolanmagan'}</b>` : ''}
+        ${c.order_id && c.measure !== 'xat' ? `<span>3. Ota-onaga xat</span><b>${c.letter_date ? `${c.letter_no ? '№ ' + esc(c.letter_no) + ', ' : ''}${dmy(c.letter_date)}` : '<span class="dash">yuborilmagan</span>'}</b>` : ''}
         ${c.deadline ? `<span>To‘lash muddati</span><b>${dmy(c.deadline)}</b>` : ''}${c.note ? `<span>Izoh</span><b>${esc(c.note)}</b>` : ''}</div>
       <div class="chs-sub">Asl hujjatlar</div>
       ${c.files.length ? `<ul class="list chs-files">${c.files.map(f => fileRow(f, c)).join('')}</ul>`
@@ -1154,22 +1261,27 @@ async function openChora(sid) {
 /* «Kurs holati»dagi alohida bo'lim: chora ko'rish bo'yicha aniq sonlar */
 function choraPanel(ch) {
   if (!ch) return '';
-  const k = ch.kpi, s = ch.states || {}, p = ch.pending || {};
+  const k = ch.kpi, s = ch.states || {}, p = ch.pending || {}, f = ch.flow || {};
   const t = (href, icon, label, value, sub, tone = '') => `<a class="ch-t${tone ? ' ' + tone : ''}" href="${href}"><span class="k">${ic(icon)}${label}</span><b class="num">${value}</b><span class="s">${sub}</span></a>`;
+  const fl = (href, n, label, value, sub, tone = '') => `<a class="fl${tone ? ' ' + tone : ''}" href="${href}"><span class="k">${n ? `<i>${n}</i>` : ''}${label}</span><b class="num">${value}</b><span class="s">${sub}</span></a>`;
+  const arr = `<span class="fl-arr" aria-hidden="true">${ic('arrow')}</span>`;
   const any = ch.dynamics.some(x => (x.ogohlantirish || 0) + (x.hayfsan || 0) + (x.boshqa || 0) + (x.xat || 0));
-  return `<section class="sec ch-panel" aria-label="Chora ko‘rish"><header>${H('shield', 'Chora ko‘rish', 'risk')}<span class="hint grow">o‘quv yili boshidan (1-sentabr)</span><a href="#/chora">Bo‘limga o‘tish ${ic('arrow')}</a></header>
-    <div class="pad ch-pgrid"><div class="ch-tiles">
-      ${t('#/chora', 'alert', 'Chora ko‘rish kerak', ch.new, `ogohlantirish (${num(ch.thresholds.ogohlantirish, 0)}+ soat): <b>${p.ogohlantirish || 0}</b> · hayfsan (${num(ch.thresholds.hayfsan, 0)}+): <b>${p.hayfsan || 0}</b>`, ch.new ? 'bad' : '')}
-      ${t('#/chora', 'chat', 'Sababi so‘ralgan', s.asked || 0, 'ota-onadan javob kutilmoqda')}
-      ${t('#/chora', 'check', 'Sababli deb topilgan', s.excused || 0, `ro‘yxatdan o‘chirilgan: ${s.removed || 0}`)}
-      ${t('#/chora?tab=docs', 'file', 'Imzolanishi kutilmoqda', ch.drafts, `hujjat · ${ch.draft_students} ta talaba`, ch.drafts ? 'warn' : '')}
-      ${t('#/chora?tab=hist', 'folder', 'Asl hujjati yuklanmagan', k.no_original, 'imzolangan nusxani yuklang', k.no_original ? 'warn' : '')}
+  return `<section class="sec ch-panel" aria-label="Chora ko‘rish"><header>${H('shield', 'Chora ko‘rish', 'risk')}<span class="hint grow">jarayon va o‘quv yili boshidan (1-sentabr) natijalar</span><a href="#/chora">Bo‘limga o‘tish ${ic('arrow')}</a></header>
+    <div class="pad"><div class="ch-flow" role="list" aria-label="Chora ko‘rish jarayoni">
+      ${fl('#/chora', '', 'Chora ko‘rish kerak', f.need ?? ch.new, `ogohlantirish: <b>${p.ogohlantirish || 0}</b> · hayfsan: <b>${p.hayfsan || 0}</b><br>sababi so‘ralgan: ${s.asked || 0} · sababli: ${s.excused || 0}`, (f.need ?? ch.new) ? 'bad' : '')}${arr}
+      ${fl('#/chora?tab=docs', 1, 'Asos', f.basis || 0, 'tushuntirish xati yoki bildirishnoma kutilmoqda', f.basis ? 'warn' : '')}${arr}
+      ${fl('#/chora?tab=docs', 2, 'Farmoyish / buyruq', f.order || 0, 'imzolanishi kutilmoqda', f.order ? 'warn' : '')}${arr}
+      ${fl('#/chora?tab=docs', 3, 'Ota-onaga xat', f.letters || 0, 'xati yuborilmagan', f.letters ? 'warn' : '')}${arr}
+      ${fl('#/chora?tab=hist', '', 'Yakunlangan', f.done || 0, 'barcha bosqichlar o‘tgan', 'ok')}
+    </div>
+    <div class="ch-pgrid"><div class="ch-tiles three">
       ${t('#/chora?tab=hist', 'alert', 'Dekan ogohlantirishi', k.ogohlantirish, 'o‘quv yilida e’lon qilingan')}
       ${t('#/chora?tab=hist', 'shield', 'Hayfsan', k.hayfsan, 'o‘quv yilida e’lon qilingan')}
       ${t('#/chora?tab=hist', 'book', 'Ichki tartib bo‘yicha', k.tartib, 'qoidabuzarlik uchun choralar')}
-      ${t('#/chora?tab=list&m=trimestr', 'mail', 'Ota-onaga xat', k.xat, `trimestr qarzi: <b>${ch.trimestr.new}</b> ta xat kutmoqda`, ch.trimestr.new ? 'warn' : '')}
+      ${t('#/chora?tab=list&m=trimestr', 'mail', 'Trimestr qarzi — xat', k.xat, `yana <b>${ch.trimestr.new}</b> ta xat kutmoqda`, ch.trimestr.new ? 'warn' : '')}
       ${t('#/chora?tab=hist', 'users', 'Chora ko‘rilgan talabalar', k.students, `jami ${k.total} ta chora · takroriy: ${k.repeat}`)}
-    </div><div class="ch-pchart"><div class="k">Oylar bo‘yicha ko‘rilgan choralar</div>${any ? choraBars(ch.dynamics).replace('class="ch-bars"', 'class="ch-bars mini"') : '<span class="dash">Hali chora ko‘rilmagan</span>'}</div></div></section>`;
+      ${t('#/chora?tab=hist', 'folder', 'Asl hujjati yuklanmagan', k.no_original, 'imzolangan nusxani yuklang', k.no_original ? 'warn' : '')}
+    </div><div class="ch-pchart"><div class="k">Oylar bo‘yicha ko‘rilgan choralar</div>${any ? choraBars(ch.dynamics).replace('class="ch-bars"', 'class="ch-bars mini"') : '<span class="dash">Hali chora ko‘rilmagan</span>'}</div></div></div></section>`;
 }
 
 /* ================================================================ xabarlar */

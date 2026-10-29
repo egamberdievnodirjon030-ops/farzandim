@@ -1477,10 +1477,16 @@ async def api_disc_order_new(request):
                                str(body.get("deadline") or "") or None)
     if not res["ok"]:
         return bad(res["error"])
-    if body.get("issue"):  # allaqachon imzolangan (ichki tartib bo'yicha qo'lda qo'shish)
+    if body.get("issue"):  # allaqachon imzolangan (ichki tartib bo'yicha qo'lda qo'shish): asosi bilan birga
         iss = body["issue"]
-        await D.issue_order(request.app["bot"], res["id"], str(iss.get("number") or ""), str(iss.get("date") or today().isoformat()),
-                            bool(iss.get("notify")), request["user"]["id"])
+        d = str(iss.get("date") or today().isoformat())
+        if iss.get("basis") == "bildirishnoma":
+            await D.set_basis(res["id"], "bildirishnoma", d)
+        else:
+            for c in (await D.order(res["id"]))["cases"]:
+                await D.set_case_basis(c["id"], "tushuntirish")
+        await D.issue_order(request.app["bot"], res["id"], str(iss.get("number") or ""), d, bool(iss.get("notify")),
+                            request["user"]["id"])
     return ok({**res, "order": await D.order(res["id"])})
 
 
@@ -1508,7 +1514,47 @@ async def api_disc_order_issue(request):
         return bad("not_found", 404)
     body = await request.json()
     res = await D.issue_order(request.app["bot"], oid, str(body.get("number") or ""), str(body.get("date") or ""),
-                              bool(body.get("notify", True)), request["user"]["id"])
+                              bool(body.get("notify", False)), request["user"]["id"])
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_order_basis(request):
+    """1-bosqich: kurs koordinatori bildirishnomasi dekanga topshirildi ({"date", "number"}) yoki bekor ({"kind": null})."""
+    import discipline as D
+    oid = int(request.match_info["oid"])
+    if not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    body = await request.json()
+    kind = body.get("kind", "bildirishnoma") or None
+    res = await D.set_basis(oid, kind, str(body.get("date") or "") or None, str(body.get("number") or ""))
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_case_basis(request):
+    """1-bosqich (talaba): tushuntirish xati olindi / yozishdan bosh tortdi (dalolatnoma) / bekor."""
+    import discipline as D
+    cid = int(request.match_info["cid"])
+    c = await db.fetchone("SELECT student_id FROM disc_cases WHERE id = ?", (cid,))
+    if not c or not _visible(await db.get_student(c["student_id"])):
+        return bad("not_found", 404)
+    body = await request.json()
+    res = await D.set_case_basis(cid, body.get("basis") or None)
+    return ok(res) if res["ok"] else bad(res["error"])
+
+
+@staff_route
+async def api_disc_order_letters(request):
+    """3-bosqich: ota-onaga xatlar yuborildi — {"date", "items": [{"case_id", "number"}], "notify", "send_pdf"}."""
+    import discipline as D
+    oid = int(request.match_info["oid"])
+    if not await _disc_order_visible(oid):
+        return bad("not_found", 404)
+    body = await request.json()
+    items = [it for it in (body.get("items") or []) if isinstance(it, dict)]
+    res = await D.mark_letters(request.app["bot"], oid, items, str(body.get("date") or ""), bool(body.get("notify", True)),
+                               bool(body.get("send_pdf")), request["user"]["id"])
     return ok(res) if res["ok"] else bad(res["error"])
 
 
@@ -2150,6 +2196,9 @@ def setup_routes(app: web.Application) -> None:
     r.add_delete("/api/staff/discipline/orders/{oid:\\d+}", api_disc_order_delete)
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/issue", api_disc_order_issue)
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/cancel", api_disc_order_cancel)
+    r.add_post("/api/staff/discipline/orders/{oid:\\d+}/basis", api_disc_order_basis)
+    r.add_post("/api/staff/discipline/orders/{oid:\\d+}/letters", api_disc_order_letters)
+    r.add_post("/api/staff/discipline/cases/{cid:\\d+}/basis", api_disc_case_basis)
     r.add_delete("/api/staff/discipline/orders/{oid:\\d+}/cases/{cid:\\d+}", api_disc_order_case_delete)
     r.add_get("/api/staff/discipline/orders/{oid:\\d+}/doc/{kind}", api_disc_doc)
     r.add_post("/api/staff/discipline/orders/{oid:\\d+}/files", api_disc_upload)

@@ -1164,4 +1164,6 @@ TR: dict[str, dict[str, str]] = {
     "Farzandingiz bilan suhbatlashing. Savollar bo'lsa — kurs koordinatoriga yozing.": {
         'ru': 'Поговорите с ребёнком. Если есть вопросы — напишите координатору курса.',
         'en': "Please talk to your child. If you have questions, write to the course coordinator."},
+    'Bu haqda sizga ogohlantirish xati yuborildi': {'ru': 'Об этом вам направлено письмо-предупреждение',
+                                                     'en': 'A warning letter about this has been sent to you'},
 }

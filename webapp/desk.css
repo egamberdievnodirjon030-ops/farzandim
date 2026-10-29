@@ -670,6 +670,7 @@ button.chip { border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font
 .ch-panel > header .grow { flex: 1; margin: 0; }
 .ch-pgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); gap: 18px; align-items: start; padding-top: 4px; }
 .ch-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.ch-tiles.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .ch-t { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
   color: var(--ink); text-decoration: none; transition: border-color .15s, box-shadow .15s; min-width: 0; }
 .ch-t:hover { border-color: var(--navy-500); box-shadow: var(--shadow); }
@@ -699,4 +700,50 @@ button.chip { border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font
 @media (max-width: 560px) {
   .ch-tiles { grid-template-columns: 1fr 1fr; gap: 8px; } .ch-t { padding: 9px 10px; } .ch-t .k { font-size: 12px; } .ch-t > b { font-size: 22px; }
   .ch-panel > header .grow { display: none; } .ch-pgrid { padding-left: 12px; padding-right: 12px; }
+}
+
+/* chora jarayoni: bosqichlar (A dan B gacha) */
+.steps { list-style: none; margin: 4px 0 14px; padding: 0; display: grid; gap: 0; counter-reset: st; }
+.step { position: relative; padding: 0 0 16px 44px; }
+.step::before { content: ""; position: absolute; left: 15px; top: 34px; bottom: 2px; width: 2px; background: var(--line); }
+.step:last-child::before { display: none; }
+.step.done::before { background: var(--ok); }
+.st-h { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; min-height: 32px; }
+.st-h > b { font-size: 15px; }
+.st-n { position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 700; font-size: 14px; background: var(--surface-2); color: var(--muted); border: 2px solid var(--line); }
+.st-n svg.i { width: 16px; height: 16px; }
+.step.cur .st-n { background: var(--navy-700); color: #fff; border-color: var(--navy-700); }
+.step.done .st-n { background: var(--ok); color: #fff; border-color: var(--ok); }
+.step.lock .st-h > b { color: var(--muted); }
+.st-b { margin-top: 8px; display: grid; gap: 10px; }
+.step.done .st-b { opacity: .92; }
+.st-b > .hint { margin: 0; }
+.opt { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface); display: grid; gap: 8px; }
+.step.cur .opt { border-color: var(--navy-100); }
+.opt-h { font-size: 14px; color: var(--muted); } .opt-h b { color: var(--ink); }
+.opt .ord-st { margin: 0; }
+.opt-or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.opt-or::before, .opt-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.warn-t { color: var(--warn); }
+/* kurs holati: jarayon zanjiri */
+.ch-flow { display: flex; align-items: stretch; gap: 6px; margin-bottom: 16px; }
+.ch-flow .fl { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 11px 13px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--surface); color: var(--ink); text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+.ch-flow .fl:hover { border-color: var(--navy-500); box-shadow: var(--shadow); }
+.ch-flow .fl .k { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.ch-flow .fl .k i { font-style: normal; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px;
+  background: var(--navy-700); color: #fff; flex: none; }
+.ch-flow .fl > b { font-size: 26px; line-height: 1.15; }
+.ch-flow .fl .s { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.ch-flow .fl .s b { color: var(--ink); }
+.ch-flow .fl.bad { border-color: var(--bordo-500); background: var(--bordo-50); } .ch-flow .fl.bad > b { color: var(--bordo-600); }
+.ch-flow .fl.warn { border-color: var(--warn); background: var(--warn-50); } .ch-flow .fl.warn > b { color: var(--warn); }
+.ch-flow .fl.ok > b { color: var(--ok); }
+.fl-arr { display: grid; place-items: center; color: var(--muted); flex: none; }
+.fl-arr svg.i { width: 16px; height: 16px; }
+@media (max-width: 900px) {
+  .ch-flow { flex-direction: column; } .fl-arr { transform: rotate(90deg); height: 14px; }
+  .ch-tiles.three { grid-template-columns: 1fr 1fr; }
+  .step { padding-left: 38px; } .st-n { width: 28px; height: 28px; } .step::before { left: 13px; top: 30px; }
 }
