@@ -197,11 +197,31 @@ def load_conf() -> dict:
         return {}
 
 
+MANAGE_URL = "https://my.uwed.uz/api/integration/v1"  # JIDU Manage manzili (sir emas); kalit — faqat .env yoki bot orqali
+
+
+def _looks_basic(tok: str) -> bool:
+    """«login:parol» yoki uning base64 ko'rinishi (curl'dagi «Authorization: Basic …»)."""
+    if ":" in tok:
+        return True
+    try:
+        return ":" in base64.b64decode(tok + "=" * (-len(tok) % 4), validate=True).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return False
+
+
 def apply_conf() -> None:
-    """data/integration_conf.json (bot orqali kiritilgan kalit) — .env dagi qiymatlar ustiga."""
+    """data/integration_conf.json (bot orqali kiritilgan kalit) — .env dagi qiymatlar ustiga. Kalit bor-u manzil
+    yozilmagan bo'lsa — JIDU Manage manzili; Manage kaliti «login:parol» bo'lsa — Basic."""
     conf = load_conf()
+    g = globals()
     for key, name in _CONF_KEYS.items():
-        globals()[name] = conf[key] if conf.get(key) not in (None, "") else _ENV_BASE[name]
+        g[name] = conf[key] if conf.get(key) not in (None, "") else _ENV_BASE[name]
+    if not g["INTEGRATION_URL"] and g["INTEGRATION_TOKEN"]:
+        g["INTEGRATION_URL"] = MANAGE_URL
+    if (g["INTEGRATION_AUTH"].lower() == "bearer" and "uwed.uz" in g["INTEGRATION_URL"].lower()
+            and _looks_basic(g["INTEGRATION_TOKEN"])):
+        g["INTEGRATION_AUTH"] = "basic"
     for st in STATE.values():
         st["fails"], st["error"] = 0, None
 
@@ -1638,6 +1658,10 @@ def env_report() -> str:
             lines.append(f"  ⚠️ {k}: Windows/tizim muhitida boshqa qiymat o'rnatilgan («{real}») — .env dagisi e'tiborga "
                          "olinmaydi. Uni o'chiring (Tizim → Muhit o'zgaruvchilari) yoki yangi terminal oching")
         lines.append(f"  {k}: {shown}" + (f"  — ⚠️ {len(vals)} marta yozilgan, oxirgisi olinadi" if len(vals) > 1 else ""))
+    if INTEGRATION_URL == MANAGE_URL and not _ENV_BASE["INTEGRATION_URL"] and not load_conf().get("url"):
+        lines.append(f"  INTEGRATION_URL yozilmagan — kalit bor, JIDU Manage manzili olindi: {MANAGE_URL}")
+    if not INTEGRATION_TOKEN:
+        lines.append("  ❌ Kalit yo'q: .env ga INTEGRATION_TOKEN='login:parol' yozing yoki botda /manage_kalit orqali curl'ni kiriting")
     lines.append(f"Bot o'qigani: URL={'bor' if INTEGRATION_URL else 'yoq'}, SCHEDULE={'bor' if INTEGRATION_SCHEDULE else 'yoq'}, "
                  f"ATTENDANCE={'bor' if INTEGRATION_ATTENDANCE else 'yoq'}, SUBJECTS={'bor' if INTEGRATION_SUBJECTS else 'yoq'}, "
                  f"AUTH={INTEGRATION_AUTH}")
@@ -1749,8 +1773,9 @@ async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dic
     where = (f"Bot papkasi: {dg['bot_folder']} (.env: {'bor' if dg['env_file'] else 'YO‘Q'}, "
              f"baza: {dg['courses'] or 'YO‘Q'}, talabalar: {dg['students']})")
     if not INTEGRATION_URL:
-        msg = ("❌ Manage manzili sozlanmagan: .env da INTEGRATION_URL yo'q va bot orqali kalit (curl) kiritilmagan.\n"
-               f"{where}\nBuyruqni bot ishlayotgan papkada bering (u yerda .env va data/ bo'ladi) yoki kalitni kiriting: "
+        msg = ("❌ Manage kaliti topilmadi: .env da INTEGRATION_TOKEN yo'q va bot orqali kalit (curl) kiritilmagan "
+               f"(manzil — {MANAGE_URL} — bot o'zi biladi, faqat kalit kerak).\n{where}\n"
+               "Kalitni kiriting: .env ga INTEGRATION_TOKEN='login:parol' yozing, yoki botda /manage_kalit, yoki: "
                "python integration.py kalit")
         out["errors"].append(msg)
         return out, msg
