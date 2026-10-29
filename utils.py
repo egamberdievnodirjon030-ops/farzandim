@@ -322,6 +322,7 @@ DOC_TYPES = {  # kalit: (belgi, nomi)
     "tushuntirish": ("📝", "Tushuntirish xati"),
     "ogohlantirish": ("⚠️", "Dekan ogohlantirishi"),
     "hayfsan": ("❗", "Hayfsan"),
+    "xat": ("✉️", "Ogohlantirish xati"),
     "boshqa": ("📄", "Rasmiy hujjat"),
 }
 _DOC_KEYWORDS = {

@@ -5,9 +5,11 @@ Akademik nizom (6-bob, 113-modda): sababsiz qoldirilgan darslar 36 soatdan oshsa
 
 Jarayon: bot chegaradan oshganlarni o'zi topadi (kurs koordinatoriga darhol signal) → koordinator sababini aniqlaydi
 (ota-onadan so'raydi, sababli bo'lsa ro'yxatdan chiqaradi) → tanlanganlar uchun hujjatlar avtomatik tayyorlanadi
-(bildirishnoma, farmoyish/buyruq, dalolatnoma — shablonlar/chora/*.docx) → imzolangach raqam va sana kiritilib
-«chiqarildi» deb belgilanadi, imzolangan nusxa va asoslovchi hujjatlar biriktiriladi → «Chora ko'rilganlar»
-(o'quv yili boshidan, hujjatlari va dinamikasi bilan). Ichki tartib qoidalarini buzish bo'yicha choralar qo'lda qo'shiladi.
+(bildirishnoma, farmoyish/buyruq, ota-onaga ogohlantirish xati, dalolatnoma — shablonlar/chora/*.docx) → imzolangach
+raqam va sana kiritilib «chiqarildi» deb belgilanadi, imzolangan nusxa va asoslovchi hujjatlar (talabaga yoki butun
+hujjatga) biriktiriladi, talabaning PDF nusxasi ota-onasiga bot orqali yuboriladi → «Chora ko'rilganlar» (o'quv yili
+boshidan, hujjatlari va dinamikasi bilan). Ichki tartib qoidalarini buzish bo'yicha choralar qo'lda qo'shiladi;
+trimestr to'lovi qarzdorlariga — ota-onaga ogohlantirish xati.
 """
 from __future__ import annotations
 
@@ -33,12 +35,14 @@ MEASURES = {
     "ogohlantirish": {"title": "Dekan ogohlantirishi", "short": "Ogohlantirish", "doc": "farmoyish", "level": 1, "default": 36},
     "hayfsan": {"title": "Hayfsan", "short": "Hayfsan", "doc": "buyruq", "level": 2, "default": 54},
     "boshqa": {"title": "Boshqa chora", "short": "Boshqa", "doc": None, "level": None, "default": None},
+    "xat": {"title": "Ota-onaga ogohlantirish xati", "short": "Ogohlantirish xati", "doc": None, "level": None, "default": None},
 }
 AUTO = ("ogohlantirish", "hayfsan")  # davomat bo'yicha avtomatik aniqlanadiganlar
-GROUNDS = {"davomat": "Davomat (sababsiz dars qoldirish)", "tartib": "Ichki tartib qoidalarini buzish"}
+GROUNDS = {"davomat": "Davomat (sababsiz dars qoldirish)", "tartib": "Ichki tartib qoidalarini buzish",
+           "trimestr": "Trimestr to'lovi qarzdorligi"}
 DOC_KINDS = {"bildirishnoma": "Bildirishnoma", "farmoyish": "Dekan farmoyishi", "buyruq": "Buyruq (hayfsan)",
-             "dalolatnoma": "Dalolatnoma", "tushuntirish": "Tushuntirish xati", "asos": "Asoslovchi hujjat",
-             "imzolangan": "Imzolangan nusxa", "boshqa": "Boshqa hujjat"}
+             "xat": "Ota-onaga xat", "dalolatnoma": "Dalolatnoma", "tushuntirish": "Tushuntirish xati",
+             "asos": "Asoslovchi hujjat", "imzolangan": "Imzolangan nusxa", "boshqa": "Boshqa hujjat"}
 # ichki tartib bo'yicha tez tanlanadigan qoidalar (hujjatga shu matn yoziladi; o'zgartirish mumkin)
 RULE_PRESETS = [
     "“Odob-axloq Kodeksi”ning 11-moddasi 1-qismi 9-bandi (kiyinish talablari)",
@@ -56,6 +60,9 @@ TEMPLATES = {  # (hujjat, asos, chora) → shablon
     ("buyruq", "davomat", "hayfsan"): "hayfsan_davomat.docx",
     ("buyruq", "tartib", "hayfsan"): "hayfsan_tartib.docx",
     ("dalolatnoma", None, None): "dalolatnoma.docx",
+    ("xat", "davomat", None): "xat_davomat.docx",
+    ("xat", "tartib", None): "xat_tartib.docx",
+    ("xat", "trimestr", None): "xat_trimestr.docx",
 }
 TEMPLATE_TITLES = {
     "bildirishnoma_ogohlantirish.docx": "Bildirishnoma — dekan ogohlantirishi (davomat)",
@@ -66,7 +73,11 @@ TEMPLATE_TITLES = {
     "hayfsan_davomat.docx": "Buyruq — hayfsan (davomat)",
     "hayfsan_tartib.docx": "Buyruq — hayfsan (ichki tartib)",
     "dalolatnoma.docx": "Dalolatnoma (tushuntirish xatidan bosh tortganlik)",
+    "xat_davomat.docx": "Ota-onaga xat — uzrli sababsiz dars qoldirish",
+    "xat_tartib.docx": "Ota-onaga xat — ichki tartib qoidalarini buzish",
+    "xat_trimestr.docx": "Ota-onaga xat — trimestr to'lovi qarzdorligi",
 }
+LETTERS = {"xat_davomat.docx", "xat_tartib.docx", "xat_trimestr.docx"}  # har bir talabaga alohida (jadvalsiz)
 BUILTIN_DIR = BASE_DIR / "shablonlar" / "chora"
 CUSTOM_DIR = DATA_DIR / "templates" / "chora"  # super-admin/koordinator yuklagan shablonlar (barcha kurslar uchun)
 MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"]
@@ -104,12 +115,14 @@ def template_for(kind: str, ground: str, measure: str) -> str | None:
 
 def doc_kinds(ground: str, measure: str) -> list[str]:
     """Shu chora uchun tayyorlanadigan hujjatlar."""
+    letter = ["xat"] if template_for("xat", ground, measure) else []
+    if measure == "xat":  # faqat ota-onaga ogohlantirish xati
+        return letter
     out = ["bildirishnoma"]
     doc = (MEASURES.get(measure) or {}).get("doc")
     if doc and template_for(doc, ground, measure):
         out.append(doc)
-    out.append("dalolatnoma")
-    return out
+    return out + letter + ["dalolatnoma"]
 
 
 def short_name(full: str | None) -> str:
@@ -267,6 +280,44 @@ async def candidates(scope: set[str] | None = ..., sids: set[int] | None = None)
     return out
 
 
+async def trimestr_candidates(scope: set[str] | None = ...) -> dict:
+    """Trimestr to'lovi qarzdorlari (oxirgi hisobot bo'yicha) — ota-onaga ogohlantirish xati uchun."""
+    rows = [dict(r) for r in await db.debtors("trimestr")]
+    extra = {r["id"]: r for r in await db.fetchall("SELECT id, hemis_id, address FROM students")}
+    for r in rows:
+        r["hemis_id"], r["address"] = (extra.get(r["id"]) or {}).get("hemis_id"), (extra.get(r["id"]) or {}).get("address")
+    rows = scope_students(rows) if scope is ... else scope_students(rows, scope) if scope is not None else rows
+    last: dict[int, dict] = {}
+    for c in await db.fetchall("""SELECT c.*, o.number, o.date FROM disc_cases c LEFT JOIN disc_orders o ON o.id = c.order_id
+                                  WHERE c.ground = 'trimestr' AND c.created_at >= ? ORDER BY c.id""", (ay_start(),)):
+        if c["status"] != "cancelled":
+            last[c["student_id"]] = dict(c)
+    parents = {r["student_id"]: r["n"] for r in await db.fetchall(
+        "SELECT student_id, COUNT(*) n FROM parent_students GROUP BY student_id")}
+    items = []
+    for r in rows:
+        c = last.get(r["id"])
+        state = "new" if not c else "draft" if c["status"] == "draft" else "sent"
+        items.append({"sid": r["id"], "name": r["full_name"], "group": r["group_name"] or "", "hemis_id": r["hemis_id"],
+                      "course": r["course"], "debt": r["debt"], "as_of": r["as_of"], "contract": r["contract"],
+                      "percent": r["percent"], "address": r["address"] or "", "parents": parents.get(r["id"], 0),
+                      "state": state, "case_id": c["id"] if c else None, "order_id": c["order_id"] if c else None,
+                      "sent_number": c.get("number") if c else None, "sent_date": c.get("date") if c else None,
+                      "sent_amount": c.get("amount") if c else None})
+    rank = {"new": 0, "sent": 1, "draft": 2}
+    items.sort(key=lambda x: (rank[x["state"]], -(x["debt"] or 0), x["name"]))
+    return {"items": items, "count": sum(1 for x in items if x["state"] == "new"),
+            "as_of": max((x["as_of"] for x in items), default=None)}
+
+
+async def set_address(sid: int, address: str) -> dict:
+    """Ota-onaga xat uchun yashash manzili (kontingent faylida bo'lmasa — qo'lda)."""
+    if not await db.get_student(sid):
+        return {"ok": False, "error": "not_found"}
+    await db.execute("UPDATE students SET address = ? WHERE id = ?", (" ".join((address or "").split())[:300] or None, sid))
+    return {"ok": True}
+
+
 async def _case(sid: int, measure: str, ground: str = "davomat") -> dict | None:
     return await db.fetchone("SELECT * FROM disc_cases WHERE student_id = ? AND measure = ? AND ground = ? AND created_at >= ? "
                              "ORDER BY id DESC LIMIT 1", (sid, measure, ground, ay_start()))
@@ -339,12 +390,19 @@ async def ask_parents(bot, sid: int, measure: str, staff_id: int, staff_name: st
 
 # ---------------------------------------------------------------- hujjatlar to'plami (farmoyish / buyruq)
 async def create_order(measure: str, ground: str, items: list[dict], rule: str = "", note: str = "",
-                       user: int | None = None) -> dict:
-    """items: [{"sid": …, "note": …}]. Davomat — joriy sababsiz soat yoziladi; ichki tartib — qoida matni (rule)."""
+                       user: int | None = None, deadline: str | None = None) -> dict:
+    """items: [{"sid": …, "note": …}]. Davomat — joriy sababsiz soat yoziladi; ichki tartib — qoida matni (rule);
+    trimestr — oxirgi hisobotdagi qarz (ota-onaga xat, deadline — to'lash muddati)."""
     if measure not in MEASURES or ground not in GROUNDS:
+        return {"ok": False, "error": "bad_measure"}
+    if (ground == "trimestr") != (measure == "xat") and ground != "tartib":
         return {"ok": False, "error": "bad_measure"}
     if ground == "tartib" and not (rule or "").strip():
         return {"ok": False, "error": "no_rule"}
+    try:
+        deadline = date.fromisoformat(deadline).isoformat() if deadline else None
+    except ValueError:
+        return {"ok": False, "error": "bad_date"}
     sids = []
     for it in items:
         try:
@@ -358,23 +416,30 @@ async def create_order(measure: str, ground: str, items: list[dict], rule: str =
     now = now_iso()
     lim = threshold(measure) if ground == "davomat" else None
     oid = await db.execute(
-        "INSERT INTO disc_orders (measure, ground, rule, period_from, period_to, hours, status, note, created_at, created_by) "
-        "VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)",
+        "INSERT INTO disc_orders (measure, ground, rule, period_from, period_to, hours, status, note, deadline, created_at, "
+        "created_by) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)",
         (measure, ground, (rule or "").strip()[:2000] or None, semester_start().isoformat() if ground == "davomat" else None,
-         today().isoformat() if ground == "davomat" else None, lim, (note or "").strip()[:2000] or None, now, user))
+         today().isoformat() if ground == "davomat" else None, lim, (note or "").strip()[:2000] or None, deadline, now, user))
     notes = {int(it["sid"]): (it.get("note") or "").strip()[:1000] for it in items if str(it.get("sid", "")).isdigit()}
     for sid in sids:
         h = await _hours(sid) if ground == "davomat" else None
-        c = await _case(sid, measure, ground) if ground == "davomat" else None
-        if c and c["status"] in ("draft", "issued"):
+        c = await _case(sid, measure, ground) if ground in ("davomat", "trimestr") else None
+        if c and c["status"] == "draft" or (c and c["status"] == "issued" and ground == "davomat"):
             continue  # boshqa hujjatda
+        amount = as_of = None
+        if ground == "trimestr":
+            p = await db.latest_payment(sid, "trimestr")
+            if not p or not p.get("debt"):
+                continue  # qarzi yo'q
+            amount, as_of = float(p["debt"]), p["as_of"]
         if c and c["status"] in ("asked", "excused", "removed", "cancelled"):
             await db.execute("UPDATE disc_cases SET status = 'draft', order_id = ?, hours = ?, note = COALESCE(?, note), "
-                             "updated_at = ?, by_user = ? WHERE id = ?", (oid, h, notes.get(sid) or None, now, user, c["id"]))
+                             "amount = ?, as_of = ?, updated_at = ?, by_user = ? WHERE id = ?",
+                             (oid, h, notes.get(sid) or None, amount, as_of, now, user, c["id"]))
         else:
-            await db.execute("INSERT INTO disc_cases (student_id, measure, ground, status, hours, note, order_id, created_at, "
-                             "updated_at, by_user) VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?)",
-                             (sid, measure, ground, h, notes.get(sid) or None, oid, now, now, user))
+            await db.execute("INSERT INTO disc_cases (student_id, measure, ground, status, hours, note, order_id, amount, as_of, "
+                             "created_at, updated_at, by_user) VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?)",
+                             (sid, measure, ground, h, notes.get(sid) or None, oid, amount, as_of, now, now, user))
     n = (await db.fetchone("SELECT COUNT(*) n FROM disc_cases WHERE order_id = ?", (oid,)))["n"]
     if not n:
         await db.execute("DELETE FROM disc_orders WHERE id = ?", (oid,))
@@ -388,11 +453,17 @@ async def order(oid: int) -> dict | None:
         return None
     o = dict(o)
     o["cases"] = [dict(r) for r in await db.fetchall(
-        """SELECT c.*, s.full_name, s.group_name, s.group_key, s.course, s.faculty, s.hemis_id FROM disc_cases c
+        """SELECT c.*, s.full_name, s.group_name, s.group_key, s.course, s.faculty, s.hemis_id, s.address FROM disc_cases c
            JOIN students s ON s.id = c.student_id WHERE c.order_id = ? ORDER BY s.full_name""", (oid,))]
-    o["files"] = [dict(r) for r in await db.fetchall("SELECT id, kind, name, size, uploaded_at, case_id FROM disc_files "
-                                                      "WHERE order_id = ? OR case_id IN (SELECT id FROM disc_cases WHERE "
-                                                      "order_id = ?) ORDER BY id", (oid, oid))]
+    o["files"] = [dict(r) for r in await db.fetchall("SELECT id, kind, name, size, mime, uploaded_at, case_id, sent_at FROM "
+                                                      "disc_files WHERE order_id = ? OR case_id IN (SELECT id FROM disc_cases "
+                                                      "WHERE order_id = ?) ORDER BY id", (oid, oid))]
+    per_case: dict[int, int] = {}
+    for f in o["files"]:
+        if f["case_id"]:
+            per_case[f["case_id"]] = per_case.get(f["case_id"], 0) + 1
+    for c in o["cases"]:
+        c["files_n"] = per_case.get(c["id"], 0)
     o["title"] = MEASURES.get(o["measure"], {}).get("title", o["measure"])
     o["ground_title"] = GROUNDS.get(o["ground"], o["ground"])
     o["doc_kinds"] = [{"kind": k, "title": DOC_KINDS[k]} for k in doc_kinds(o["ground"], o["measure"])]
@@ -491,6 +562,8 @@ async def notify_parents(bot, oid: int) -> int:
         return 0
     sent = 0
     doc = "Dekan farmoyishi" if o["measure"] == "ogohlantirish" else "Universitet buyrug'i" if o["measure"] == "hayfsan" else "Qaror"
+    if o["measure"] == "xat":
+        return await _notify_letter(bot, o)
     for c in o["cases"]:
         pids = [r["parent_id"] for r in await db.fetchall("SELECT parent_id FROM parent_students WHERE student_id = ?",
                                                           (c["student_id"],))]
@@ -510,8 +583,127 @@ async def notify_parents(bot, oid: int) -> int:
     return sent
 
 
+async def _notify_letter(bot, o: dict) -> int:
+    """Ota-onaga ogohlantirish xati yuborildi — bot orqali qisqa xabar (xatning o'zi pochta yoki PDF orqali)."""
+    from notifier import send_each
+    from i18n import tr
+    import loc
+    sent = 0
+    for c in o["cases"]:
+        pids = [r["parent_id"] for r in await db.fetchall("SELECT parent_id FROM parent_students WHERE student_id = ?",
+                                                          (c["student_id"],))]
+        if not pids:
+            continue
+        st = await db.get_student(c["student_id"])
+
+        async def build(st=st, c=c) -> str:
+            why = {"davomat": tr("uzrli sababsiz dars qoldirish"), "tartib": tr("ichki tartib qoidalarini buzish"),
+                   "trimestr": tr("qayta o'qish (trimestr) shartnomasi bo'yicha to'lov qarzdorligi")}.get(o["ground"], "")
+            lines = ["✉️ <b>" + tr("Ogohlantirish xati") + "</b>", "",
+                     f"👨‍🎓 {esc(loc.student_name(st))} ({esc(st.get('group_name') or '')})",
+                     tr("Fakultet dekanati sizga ogohlantirish xati yubordi: {why}.", why=why)]
+            if o["ground"] == "trimestr" and c.get("amount"):
+                lines.append(tr("Qarzdorlik: {s} so'm ({d} holatiga).", s=_money(c["amount"]), d=_dmy(c.get("as_of")))
+                             + (" " + tr("To'lash muddati — {d}.", d=_dmy(o["deadline"])) if o.get("deadline") else ""))
+            if o.get("number") or o.get("date"):
+                lines.append((f"№ {esc(o['number'])}" if o.get("number") else "") + (", " if o.get("number") and o.get("date") else "")
+                             + _dmy(o.get("date")))
+            lines += ["", tr("Farzandingiz bilan suhbatlashing. Savollar bo'lsa — kurs koordinatoriga yozing.")]
+            return "\n".join(lines)
+        sent += await send_each(bot, pids, build, c["student_id"], "pay" if o["ground"] == "trimestr" else "att", "threshold")
+    return sent
+
+
 # ---------------------------------------------------------------- hujjat yaratish
-async def build_doc(oid: int, kind: str) -> tuple[str, bytes] | None:
+def _money(x) -> str:
+    """4617000 → «4 617 000» (bo'linmas bo'shliq bilan, hujjatdagidek)."""
+    return f"{int(round(float(x or 0))):,}".replace(",", "\xa0")
+
+
+def _upper_name(full: str | None) -> str:
+    """Hujjatdagidek katta harflarda: «Aliyev Vali Karim o'g'li» → «ALIYEV VALI KARIM O‘G‘LI»."""
+    s = re.sub(r"(?<=[OoGg])['`ʻʼ‘’]", "‘", " ".join((full or "").split()))
+    return re.sub(r"['`ʼ]", "’", s).upper()
+
+
+def _order_no(o: dict) -> str:
+    """Hayfsan buyrug'i raqami «215-T» shaklida yoziladi (shablonda «-T-sonli» bor)."""
+    n = (o.get("number") or "").strip()
+    return re.sub(r"\s*-\s*T$", "", n, flags=re.I) if o["measure"] == "hayfsan" else n
+
+
+def _chora_text(o: dict) -> str:
+    """Xatdagi «ko'rilgan chora» jumlasi (bo'sh joy bilan boshlanadi; faqat xat bo'lsa — bo'sh)."""
+    m = o["measure"]
+    if m == "xat":
+        return ""
+    if m not in ("ogohlantirish", "hayfsan"):
+        return " Shu munosabat bilan farzandingizga nisbatan intizomiy chora ko‘rildi." if o["status"] == "issued" else ""
+    name = "“Ogohlantirish”" if m == "ogohlantirish" else "“Hayfsan”"
+    if o["status"] == "issued":
+        when = f"{_date_long(o['date'])}dagi " if o.get("date") else ""
+        num = f"{_order_no(o)}{'-T' if m == 'hayfsan' and _order_no(o) else ''}-sonli " if o.get("number") else ""
+        who = "dekanning" if m == "ogohlantirish" else "universitetning"
+        doc = "farmoyishi" if m == "ogohlantirish" else "buyrug‘i"
+        return f" Shu munosabat bilan farzandingizga {who} {when}{num}{doc} bilan {name} e’lon qilindi.".replace("  ", " ")
+    doc = "dekan farmoyishi" if m == "ogohlantirish" else "universitet buyrug‘i"
+    return f" Shu munosabat bilan farzandingizga {doc} bilan {name} e’lon qilinadi."
+
+
+def _limit_text(h: float) -> str:
+    """Xatdagi chegara jumlasi (davomat): qaysi chegaradan oshgani."""
+    lv = absence.LEVELS
+    warn, rep, out = (lv[i] if i < len(lv) else d for i, d in ((1, 36), (2, 54), (3, 74)))
+    if h > out:
+        return (f"Farzandingiz qoldirgan darslar hajmi hayfsan uchun belgilangan {_num(rep)} soatdan tashqari, talabalar safidan "
+                f"chetlatish uchun belgilangan {_num(out)} soat chegarasidan ham oshib ketgan.")
+    if h > rep:
+        return f"Farzandingiz qoldirgan darslar hajmi hayfsan uchun belgilangan {_num(rep)} soat chegarasidan oshgan."
+    if h > warn:
+        return (f"Farzandingiz qoldirgan darslar hajmi dekan ogohlantirishi uchun belgilangan {_num(warn)} soat chegarasidan "
+                "oshgan.")
+    return f"Farzandingiz qoldirgan darslar hajmi dekan ogohlantirishi uchun belgilangan {_num(warn)} soat chegarasiga yaqinlashmoqda."
+
+
+def _letter_date(o: dict) -> str:
+    d = o.get("date") if o["measure"] == "xat" else None
+    if d:
+        x = date.fromisoformat(d)
+        return f"“{x.day:02d}” {MONTHS[x.month - 1]} {x.year}-y."
+    return f"“____” ____________ {today().year}-y."
+
+
+async def _letter(o: dict, c: dict, names: list[str], stage: str) -> bytes:
+    """Bitta talabaning ota-onasiga ogohlantirish xati."""
+    yr = academic_year_start().year
+    h = float(c.get("hours") or 0)
+    note = (c.get("note") or "").strip().rstrip(".")
+    values = {
+        "XAT_RAQAM": (o.get("number") or "___________") if o["measure"] == "xat" else "___________",
+        "XAT_SANA": _letter_date(o), "FISH": c["full_name"] or "", "FISH_KATTA": _upper_name(c["full_name"]),
+        "FISH_KATTA_NING": _upper_name(c["full_name"]) + "NING", "GURUH": c.get("group_name") or "",
+        "BOSQICH": c.get("course") or stage or "___", "MANZIL": c.get("address") or "_" * 40,
+        "OQUV_YILI": f"{yr}-{yr + 1}", "OTGAN_OQUV_YILI": f"{yr - 1}-{yr}",
+        "SEMESTR": "1" if today().month >= 8 or today().month == 1 else "2",
+        "HOLAT_SANA": _dmy(c.get("as_of") or o.get("period_to") or today()), "SOAT": _num(h), "PARA": _num(h / 2),
+        "CHEGARA_MATNI": _limit_text(h), "CHORA_MATNI": _chora_text(o), "QOIDA": o.get("rule") or "______________",
+        "IZOH": note, "IZOH_MATNI": f" Holat: {note}." if note else "", "QARZ": _money(c.get("amount")),
+        "MUDDAT": _dmy(o.get("deadline")) or "__________", "TEL": (await db.get_setting("disc:phone") or "").strip()
+        or "_______________", "IJROCHI": ", ".join(names) or "______________",
+    }
+    path = template_path(template_for("xat", o["ground"], o["measure"]))
+    return docxfill.fill(path.read_bytes(), values)
+
+
+def _letter_name(o: dict, c: dict) -> str:
+    tag = {"davomat": "nb", "tartib": "tartib", "trimestr": "trimestr"}.get(o["ground"], "xat")
+    words = [re.sub(r"[^\w\-]+", "", w) for w in (c["full_name"] or "").split()[:2]]
+    return f"xat_{tag}_{'_'.join(w for w in words if w) or c['student_id']}.docx"
+
+
+async def build_doc(oid: int, kind: str, case_id: int | None = None) -> tuple[str, bytes] | None:
+    """Hujjat: jadvalli (bildirishnoma, farmoyish/buyruq, dalolatnoma) — bitta fayl; ota-onaga xat — har bir talabaga
+    alohida (case_id berilsa — o'sha talabaniki, bir nechta talaba bo'lsa — ZIP)."""
     o = await order(oid)
     if not o or kind not in doc_kinds(o["ground"], o["measure"]):
         return None
@@ -525,12 +717,24 @@ async def build_doc(oid: int, kind: str) -> tuple[str, bytes] | None:
     if not stages:
         m = re.match(r"(\d+)", course_title() or "")
         stages = [int(m.group(1))] if m else []
-    prior = await _prior({c["student_id"] for c in cases})
     d_issue = o.get("date")
+    if kind == "xat":
+        pick = [c for c in cases if case_id is None or c["id"] == case_id]
+        if not pick:
+            return None
+        stage = ", ".join(map(str, stages))
+        if len(pick) == 1:
+            return _letter_name(o, pick[0]), await _letter(o, pick[0], names, stage)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for c in pick:
+                z.writestr(_letter_name(o, c), await _letter(o, c, names, stage))
+        return f"Ota-onaga_xatlar_{MEASURES[o['measure']]['short'].replace(' ', '_')}_{_dmy(d_issue or today())}.zip", buf.getvalue()
+    prior = await _prior({c["student_id"] for c in cases})
     yr = academic_year_start()
     sem = "1" if today().month >= 8 or today().month == 1 else "2"
     values = {
-        "RAQAM": o.get("number") or "______", "SANA": _date_quoted(d_issue), "SANA_UZUN": _date_long(d_issue),
+        "RAQAM": _order_no(o) or "______", "SANA": _date_quoted(d_issue), "SANA_UZUN": _date_long(d_issue),
         "SANA_QISQA": _dmy(d_issue or today()), "BOSQICH": ", ".join(map(str, stages)) or "___",
         "DAN": _dmy(o.get("period_from") or semester_start()), "GACHA": _dmy(o.get("period_to") or today()),
         "SOAT": _num(o.get("hours") or threshold(o["measure"])), "KOORDINATORLAR": ", ".join(names) or "______________",
@@ -543,14 +747,14 @@ async def build_doc(oid: int, kind: str) -> tuple[str, bytes] | None:
     for c in cases:
         fac = faculty or c.get("faculty") or "Xalqaro munosabatlar"
         prev = [p for p in prior.get(c["student_id"], []) if not (p["measure"] == o["measure"] and p.get("number") == o.get("number"))]
-        rows.append({"FISH": (c["full_name"] or "").upper(), "BOSQICH": c.get("course") or (stages[0] if stages else ""),
+        rows.append({"FISH": _upper_name(c["full_name"]), "BOSQICH": c.get("course") or (stages[0] if stages else ""),
                      "FAKULTET": fac, "FAKULTET_QISQA": _faculty_short(fac), "GURUH": c.get("group_name") or "",
                      "SOAT": _num(c.get("hours")), "PARA": _num((c.get("hours") or 0) / 2), "AVVAL": prior_text(prev),
                      "IZOH": c.get("note") or ""})
     data = docxfill.fill(path.read_bytes(), values, rows)
     label = {"bildirishnoma": "Bildirishnoma", "farmoyish": "Dekan_farmoyishi", "buyruq": "Buyruq_hayfsan",
              "dalolatnoma": "Dalolatnoma"}[kind]
-    return f"{label}_{MEASURES[o['measure']]['short']}_{_dmy(d_issue or today())}.docx", data
+    return f"{label}_{MEASURES[o['measure']]['short'].replace(' ', '_')}_{_dmy(d_issue or today())}.docx", data
 
 
 async def build_zip(oid: int) -> tuple[str, bytes] | None:
@@ -560,14 +764,23 @@ async def build_zip(oid: int) -> tuple[str, bytes] | None:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for k in doc_kinds(o["ground"], o["measure"]):
+            if k == "xat":
+                for c in o["cases"]:
+                    res = await build_doc(oid, k, c["id"])
+                    if res:
+                        z.writestr(f"ota-onaga_xatlar/{res[0]}", res[1])
+                continue
             res = await build_doc(oid, k)
             if res:
                 z.writestr(res[0], res[1])
+        names = {c["id"]: c["full_name"] for c in o["cases"]}
         for f in o["files"]:
-            p = _course_dir().parent / f["path"]
-            if p.exists():
-                z.writestr(f"ilovalar/{f['id']}_{f['name']}", p.read_bytes())
-    return f"Chora_{MEASURES[o['measure']]['short']}_{o['id']}.zip", buf.getvalue()
+            row = await db.fetchone("SELECT path FROM disc_files WHERE id = ?", (f["id"],))
+            p = _course_dir().parent / row["path"] if row else None
+            if p and p.exists():
+                who = f"{_safe_name(names.get(f['case_id'], ''))}_" if f.get("case_id") else ""
+                z.writestr(f"ilovalar/{who}{f['id']}_{f['name']}", p.read_bytes())
+    return f"Chora_{MEASURES[o['measure']]['short'].replace(' ', '_')}_{o['id']}.zip", buf.getvalue()
 
 
 # ---------------------------------------------------------------- fayllar (imzolangan nusxa, tushuntirish xati, asos)
@@ -623,36 +836,44 @@ async def delete_file(fid: int) -> dict:
     return {"ok": True}
 
 
-async def file_order(fid: int) -> int | None:
-    f = await db.fetchone("SELECT order_id, case_id FROM disc_files WHERE id = ?", (fid,))
-    if not f:
-        return None
-    if f["order_id"]:
-        return f["order_id"]
-    c = await db.fetchone("SELECT order_id FROM disc_cases WHERE id = ?", (f["case_id"],))
-    return c["order_id"] if c else None
-
-
 # ---------------------------------------------------------------- chora ko'rilganlar: tarix va dinamika
+async def _files_index() -> dict[int, list[dict]]:
+    """Fayllar: kalit — hujjat (order_id) yoki talaba ishi (−case_id)."""
+    out: dict[int, list] = {}
+    for f in await db.fetchall("SELECT id, order_id, case_id, kind, name, size, mime, uploaded_at, sent_at FROM disc_files ORDER BY id"):
+        out.setdefault(f["order_id"] or -f["case_id"], []).append({**dict(f), "shared": bool(f["order_id"])})
+    return out
+
+
+def _why(r: dict) -> str:
+    if r["ground"] == "davomat":
+        return f"sababsiz {fmt_pairs(r.get('hours') or 0)}"
+    if r["ground"] == "trimestr":
+        return f"{_money(r.get('amount'))} so‘m"
+    return r.get("rule") or ""
+
+
 async def history(scope: set[str] | None = ..., measure: str = "", ground: str = "") -> dict:
     """O'quv yili boshidan rasman ko'rilgan choralar: ro'yxat (hujjatlari bilan), ko'rsatkichlar, oylar bo'yicha dinamika."""
     if scope is ...:
         from tenancy import viewer_scope
         scope = viewer_scope()
     rows = await db.fetchall(
-        """SELECT c.id AS case_id, c.student_id, c.measure, c.ground, c.hours, c.note, o.id AS order_id, o.number, o.date,
-                  o.rule, o.issued_at, s.full_name, s.group_name, s.group_key, s.hemis_id, s.course
+        """SELECT c.id AS case_id, c.student_id, c.measure, c.ground, c.hours, c.note, c.amount, c.as_of, o.id AS order_id,
+                  o.number, o.date, o.rule, o.issued_at, o.deadline, s.full_name, s.group_name, s.group_key, s.hemis_id, s.course
            FROM disc_cases c JOIN disc_orders o ON o.id = c.order_id JOIN students s ON s.id = c.student_id
            WHERE c.status = 'issued' AND COALESCE(o.date, substr(o.issued_at, 1, 10)) >= ?
            ORDER BY COALESCE(o.date, o.issued_at) DESC, s.full_name""", (ay_start(),))
     rows = [dict(r) for r in rows if scope is None or r["group_key"] in scope]
-    files: dict[int, list] = {}
-    for f in await db.fetchall("SELECT id, order_id, case_id, kind, name, size FROM disc_files"):
-        files.setdefault(f["order_id"] or -f["case_id"], []).append(dict(f))
+    files = await _files_index()
     for r in rows:
-        r["files"] = files.get(r["order_id"], []) + files.get(-r["case_id"], [])
+        own = files.get(-r["case_id"], [])
+        r["files"] = files.get(r["order_id"], []) + own
+        r["own_files"] = len(own)
+        r["has_original"] = bool(r["files"])
         r["title"] = MEASURES.get(r["measure"], {}).get("title", r["measure"])
         r["ground_title"] = GROUNDS.get(r["ground"], r["ground"])
+        r["why"] = _why(r)
     all_rows = rows
     if measure:
         rows = [r for r in rows if r["measure"] == measure]
@@ -665,7 +886,7 @@ async def history(scope: set[str] | None = ..., measure: str = "", ground: str =
         months.append((y, m))
         y, m = (y + 1, 1) if m == 12 else (y, m + 1)
     dyn = []
-    cum = {"ogohlantirish": 0, "hayfsan": 0, "boshqa": 0}
+    cum = {k: 0 for k in MEASURES}
     for y, m in months:
         key = f"{y}-{m:02d}"
         cnt = {k: sum(1 for r in all_rows if (r["date"] or r["issued_at"] or "")[:7] == key and r["measure"] == k) for k in cum}
@@ -673,17 +894,12 @@ async def history(scope: set[str] | None = ..., measure: str = "", ground: str =
                      for g in GROUNDS}
         for k in cum:
             cum[k] += cnt[k]
-        dyn.append({"month": key, "label": MONTHS[m - 1], **cnt, "davomat": by_ground["davomat"],
-                    "tartib": by_ground["tartib"], "cumulative": dict(cum)})
-    kpi = {
-        "ogohlantirish": sum(1 for r in all_rows if r["measure"] == "ogohlantirish"),
-        "hayfsan": sum(1 for r in all_rows if r["measure"] == "hayfsan"),
-        "boshqa": sum(1 for r in all_rows if r["measure"] == "boshqa"),
-        "davomat": sum(1 for r in all_rows if r["ground"] == "davomat"),
-        "tartib": sum(1 for r in all_rows if r["ground"] == "tartib"),
-        "students": len({r["student_id"] for r in all_rows}),
-        "repeat": sum(1 for v in _count_by(all_rows).values() if v > 1),
-    }
+        dyn.append({"month": key, "label": MONTHS[m - 1], **cnt, **by_ground, "cumulative": dict(cum)})
+    kpi = {k: sum(1 for r in all_rows if r["measure"] == k) for k in MEASURES}
+    kpi.update({g: sum(1 for r in all_rows if r["ground"] == g) for g in GROUNDS})
+    kpi.update({"students": len({r["student_id"] for r in all_rows}),
+                "repeat": sum(1 for v in _count_by(all_rows).values() if v > 1),
+                "no_original": sum(1 for r in all_rows if not r["has_original"]), "total": len(all_rows)})
     by_group: dict[str, int] = {}
     for r in all_rows:
         by_group[r["group_name"] or "—"] = by_group.get(r["group_name"] or "—", 0) + 1
@@ -701,10 +917,101 @@ def _count_by(rows: list[dict]) -> dict[int, int]:
 async def student_measures(sid: int) -> list[dict]:
     """Talabaga o'quv yilida rasman ko'rilgan choralar (talaba kartasi va ota-ona sahifasi uchun)."""
     rows = await db.fetchall(
-        """SELECT c.measure, c.ground, c.hours, c.note, o.number, o.date, o.rule FROM disc_cases c
-           JOIN disc_orders o ON o.id = c.order_id WHERE c.student_id = ? AND c.status = 'issued' AND c.created_at >= ?
-           ORDER BY o.date""", (sid, ay_start()))
-    return [{**dict(r), "title": MEASURES.get(r["measure"], {}).get("title", r["measure"])} for r in rows]
+        """SELECT c.id AS case_id, c.order_id, c.measure, c.ground, c.hours, c.note, c.amount, o.number, o.date, o.rule
+           FROM disc_cases c JOIN disc_orders o ON o.id = c.order_id WHERE c.student_id = ? AND c.status = 'issued'
+           AND c.created_at >= ? ORDER BY o.date""", (sid, ay_start()))
+    files = await _files_index()
+    return [{**dict(r), "title": MEASURES.get(r["measure"], {}).get("title", r["measure"]),
+             "files": len(files.get(r["order_id"], [])) + len(files.get(-r["case_id"], []))} for r in rows]
+
+
+CASE_STATES = {"asked": "Sababi so‘ralgan", "excused": "Sababli deb topilgan", "removed": "Ro‘yxatdan o‘chirilgan",
+               "draft": "Hujjat tayyorlanmoqda", "issued": "Chiqarilgan", "cancelled": "Bekor qilingan"}
+
+
+async def student_record(sid: int) -> dict | None:
+    """Talabaning o'quv yilidagi barcha choralari — asl hujjatlari (yuklangan PDF/skan) va shablondan hujjatlar bilan."""
+    st = await db.get_student(sid)
+    if not st:
+        return None
+    rows = await db.fetchall(
+        """SELECT c.*, o.number, o.date, o.status AS order_status, o.rule, o.deadline, o.measure AS o_measure
+           FROM disc_cases c LEFT JOIN disc_orders o ON o.id = c.order_id
+           WHERE c.student_id = ? AND c.created_at >= ? ORDER BY COALESCE(o.date, c.created_at) DESC, c.id DESC""",
+        (sid, ay_start()))
+    files = await _files_index()
+    cases = []
+    for r in rows:
+        r = dict(r)
+        r["title"] = MEASURES.get(r["measure"], {}).get("title", r["measure"])
+        r["ground_title"] = GROUNDS.get(r["ground"], r["ground"])
+        r["state_title"] = CASE_STATES.get(r["status"], r["status"])
+        r["why"] = _why(r)
+        r["files"] = files.get(-r["id"], []) + (files.get(r["order_id"], []) if r["order_id"] else [])
+        r["docs"] = ([{"kind": k, "title": DOC_KINDS[k] + (" (shu talaba)" if k == "xat" else "")}
+                      for k in doc_kinds(r["ground"], r["measure"])] if r["order_id"] else [])
+        cases.append(r)
+    sm = (await summaries([st])).get(sid)
+    return {"student": {"id": sid, "name": st["full_name"], "group": st.get("group_name") or "", "hemis_id": st.get("hemis_id"),
+                        "course": st.get("course"), "address": st.get("address") or "",
+                        "hours": float(sm["counted"] or 0) if sm else None},
+            "cases": cases, "parents": (await db.fetchone("SELECT COUNT(*) n FROM parent_students WHERE student_id = ?",
+                                                          (sid,)))["n"]}
+
+
+async def send_file(bot, fid: int, user: int | None = None) -> dict:
+    """Talabaga biriktirilgan PDF (imzolangan xat, farmoyish ko'chirmasi) — ota-onasiga bot orqali, «📄 Hujjatlar» bo'limiga.
+    Butun hujjatga biriktirilgan fayl (bir necha talaba bor) yuborilmaydi — unda boshqa talabalar ma'lumotlari bor."""
+    import docstore
+    from staffops import deliver_document
+    f = await db.fetchone("SELECT * FROM disc_files WHERE id = ?", (fid,))
+    if not f:
+        return {"ok": False, "error": "not_found"}
+    if not f["case_id"]:
+        return {"ok": False, "error": "shared_file"}
+    if not (f["name"] or "").lower().endswith(".pdf"):
+        return {"ok": False, "error": "not_pdf"}
+    c = await db.fetchone("SELECT * FROM disc_cases WHERE id = ?", (f["case_id"],))
+    st = await db.get_student(c["student_id"]) if c else None
+    if not st:
+        return {"ok": False, "error": "not_found"}
+    res = await get_file(fid)
+    if not res:
+        return {"ok": False, "error": "not_found"}
+    o = await db.fetchone("SELECT * FROM disc_orders WHERE id = ?", (c["order_id"],)) if c["order_id"] else None
+    dtype = "xat" if f["kind"] == "xat" or c["measure"] == "xat" else c["measure"] if c["measure"] in ("ogohlantirish", "hayfsan") \
+        else "tushuntirish" if f["kind"] == "tushuntirish" else "boshqa"
+    comment = (f"№ {o['number']}" if o and o.get("number") else "") or None
+    file_id = docstore.save_local(current_course() or "_", res[1])
+    did = await db.add_document(st["id"], dtype, file_id, None, f["name"], len(res[1]), (o or {}).get("date") or today().isoformat(),
+                                comment, user or 0)
+    sent, total = await deliver_document(bot, did, st) if bot is not None else (0, 0)
+    await db.execute("UPDATE disc_files SET sent_doc_id = ?, sent_at = ? WHERE id = ?", (did, now_iso(), fid))
+    return {"ok": True, "sent": sent, "parents": total, "document_id": did}
+
+
+async def panel_stats(scope: set[str] | None = ...) -> dict:
+    """«Kurs holati» uchun aniq sonlar: kutilayotgan choralar, holatlar, hujjatlar, o'quv yilidagi choralar."""
+    if scope is ...:
+        from tenancy import viewer_scope
+        scope = viewer_scope()
+    cand = await candidates(scope=scope)
+    pending = {m: cand["counts"][m] for m in AUTO}
+    states: dict[str, int] = {}
+    for m in AUTO:
+        for x in cand[m]:
+            states[x["state"]] = states.get(x["state"], 0) + 1
+    for x in cand["excluded"]:
+        states[x["state"]] = states.get(x["state"], 0) + 1
+    drafts = await orders("draft", scope)
+    h = await history(scope)
+    tri = await trimestr_candidates(scope)
+    return {"pending": pending, "new": sum(pending.values()), "states": states,
+            "drafts": len(drafts), "draft_students": sum(len(o["cases"]) for o in drafts),
+            "thresholds": cand["thresholds"], "kpi": h["kpi"],
+            "dynamics": [{k: x[k] for k in ("label", *MEASURES)} for x in h["dynamics"]],
+            "trimestr": {"new": tri["count"], "total": len(tri["items"]),
+                         "sent": sum(1 for x in tri["items"] if x["state"] == "sent")}}
 
 
 # ---------------------------------------------------------------- signal: yangi chegaradan oshganlar
@@ -780,8 +1087,10 @@ def save_template(name: str, data: bytes) -> dict:
         found = docxfill.placeholders(data)
     except (zipfile.BadZipFile, KeyError, UnicodeDecodeError):
         return {"ok": False, "error": "not_docx"}
-    need = {"T_FISH"}
-    if not need <= found:
+    if name in LETTERS:  # xat — bitta talabaga: ismi bo'lishi shart
+        if not found & {"FISH", "FISH_KATTA", "FISH_KATTA_NING"}:
+            return {"ok": False, "error": "no_name", "found": sorted(found)}
+    elif "T_FISH" not in found:
         return {"ok": False, "error": "no_table", "found": sorted(found)}
     CUSTOM_DIR.mkdir(parents=True, exist_ok=True)
     (CUSTOM_DIR / name).write_bytes(data)

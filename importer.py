@@ -60,6 +60,13 @@ ALIASES: dict[str, dict[str, list[str]]] = {
         "tutor_phone": ["kurs koordinatori telefoni", "koordinator telefoni", "kurs koordinatori tel",
                         "kurs koordinatori telefon raqami", "kurs koordinatorining telefoni", "tyutor telefoni",
                         "tyutor tel", "tutor phone", "tyutor telefon raqami", "kurator telefoni"],
+        # yashash manzili — ota-onaga ogohlantirish xati uchun (HEMIS'da viloyat va tuman alohida bo'lishi mumkin)
+        "region": ["viloyat", "viloyati", "doimiy yashash viloyati", "yashash viloyati", "oblast", "region"],
+        "district": ["tuman", "tumani", "tuman shahar", "tuman shahri", "doimiy yashash tumani", "yashash tumani",
+                     "rayon", "district"],
+        "address": ["yashash manzili", "doimiy yashash manzili", "doimiy yashash joyi", "yashash joyi", "manzil",
+                    "manzili", "doimiy manzil", "doimiy manzili", "uy manzili", "propiska", "adres", "address",
+                    "adres prozhivaniya", "mesto prozhivaniya", "postoyannyy adres"],
     },
     # HEMIS «O'quvchilarni darslarga qatnashish statistikasi» — har bir talaba uchun jami ko'rsatkichlar
     "attendance_stats": {
@@ -504,7 +511,18 @@ def _student(g) -> dict:
         "student_phones": [] if is_masked(g("student_phones")) else split_phones(g("student_phones")),
         "tutor_name": cell_str(g("tutor_name")) or None,
         "tutor_phone": normalize_phone(g("tutor_phone")),
+        "address": _address(g),
     }
+
+
+def _address(g) -> str | None:
+    """Yashash manzili: «Viloyat», «Tuman» va «Manzil» ustunlari alohida bo'lsa — birlashtiriladi."""
+    parts = []
+    for fld in ("region", "district", "address"):
+        v = " ".join(cell_str(g(fld)).split())
+        if v and not is_masked(v) and not any(normalize_text(v) in normalize_text(p) for p in parts):
+            parts = [p for p in parts if normalize_text(p) not in normalize_text(v)] + [v]
+    return ", ".join(parts)[:300] or None
 
 
 def _student_ref(g) -> dict:

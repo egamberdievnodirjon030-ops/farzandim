@@ -342,7 +342,7 @@ Botga `/shablon` yozsangiz, o'n bitta Excel namunasi keladi (har birining ikkinc
 
 Talabalar, davomat va baholar uchun **HEMIS eksport fayllarini o'zgartirmasdan yuborish mumkin** — bot ularning tuzilishini o'zi taniydi:
 
-1. **Talabalar** — HEMIS «Talabalar kontingenti» fayli (Talaba ID, Full Name of student, Tug'ilgan sana, Telefon, Talaba kursi, Guruh, Fakultet; pasport, manzil kabi ustunlar e'tiborsiz qoldiriladi, ikki qatorli sarlavha ham tushuniladi). HEMIS faylida ota-ona telefoni yo'q — uni faylning oxiriga «Ota-ona telefoni» ustuni qilib qo'shing (kerak bo'lsa «Kurs koordinatori», «Kurs koordinatori telefoni» ham). Katta harflardagi ismlar chiroyli yozuvga o'tkaziladi («G‘ANIJONOV … O‘G‘LI» → «G‘anijonov … o‘g‘li»). HEMIS eksportida tug'ilgan sana va telefonlar `***` bilan yashirilgan bo'lsa, ular saqlanmaydi: talabaning raqami bo'yicha aniqlash uchun «Talaba telefonlari» faylini alohida yuklang, qo'lda bog'lashda esa ota-ona HEMIS ID ni kiritadi.
+1. **Talabalar** — HEMIS «Talabalar kontingenti» fayli (Talaba ID, Full Name of student, Tug'ilgan sana, Telefon, Talaba kursi, Guruh, Fakultet, Yashash manzili — ota-onaga xat uchun, HEMIS'dagi «Viloyat», «Tuman», «Manzil» ustunlari birlashtiriladi; pasport kabi ustunlar e'tiborsiz qoldiriladi, ikki qatorli sarlavha ham tushuniladi). HEMIS faylida ota-ona telefoni yo'q — uni faylning oxiriga «Ota-ona telefoni» ustuni qilib qo'shing (kerak bo'lsa «Kurs koordinatori», «Kurs koordinatori telefoni» ham). Katta harflardagi ismlar chiroyli yozuvga o'tkaziladi («G‘ANIJONOV … O‘G‘LI» → «G‘anijonov … o‘g‘li»). HEMIS eksportida tug'ilgan sana va telefonlar `***` bilan yashirilgan bo'lsa, ular saqlanmaydi: talabaning raqami bo'yicha aniqlash uchun «Talaba telefonlari» faylini alohida yuklang, qo'lda bog'lashda esa ota-ona HEMIS ID ni kiritadi.
 2. **Dars jadvali (asosiy fanlar)** — guruh, hafta kuni, juftlik, vaqt, fan, mashg'ulot turi, o'qituvchi, xona, hafta (har/toq/juft), seminar raqami. Mashg'ulot turi ota-onaga **«Leksiya»** yoki **«Seminar»** deb ko'rsatiladi: «ma'ruza», «лекция», «katta guruh» — leksiya; «amaliy», «laboratoriya», «kichik guruh» — seminar. «Kichik guruh» ustuni nomi eski fayllarda ham qabul qilinadi. Bu yerga faqat guruhning **asosiy fanlari** kiritiladi — ular guruhdagi barcha talabalarga ko'rsatiladi. Bir katakda bir nechta guruh vergul bilan yozilishi mumkin. Yuklangan guruhlarning eski jadvali almashtiriladi.
 3. **Davomat** — bot formatni o'zi aniqlaydi:
    - HEMIS «O'quvchilarni darslarga qatnashish statistikasi» (FIO, Hemis ID, Guruh nomi, Qatnashganlar soni, Qatnashmaganlar soni, Sabablilar soni) — har bir talaba uchun jami ko'rsatkichlar. Har yuklash sana bilan saqlanadi: ota-ona jami soatlar, oldingi yuklashdan beri o'zgarish va chegaralarni ko'radi. Holat sanasi fayl izohidagi sanadan (masalan `24.09.2026`), bo'lmasa fayl nomidagi sanadan, bo'lmasa yuklash kunidan olinadi;
@@ -526,34 +526,42 @@ Tushuntirish xati, dekan ogohlantirishi, hayfsan yoki boshqa rasmiy hujjat PDF k
 
 Fayllar Telegram serverida saqlanadi, bot bazasida faqat ularning identifikatori, nechta joy yopilgani, kim va qachon yuborgani yoziladi. Hujjatlarning asl nusxasi dekanatda saqlanishi kerak. Intizomiy hujjatlarni ota-onaga yuborish tartibi (masalan, avval talabaning o'zi tanishtirilishi) universitet ichki tartibi bilan kelishilgan bo'lishi lozim.
 
-## Chora ko'rish: dekan ogohlantirishi, hayfsan, ichki tartib
+## Chora ko'rish: dekan ogohlantirishi, hayfsan, ichki tartib, ota-onaga xat
 
-Kompyuter versiyasida (boshqaruv paneli) **«Chora ko'rish»** bo'limi: davomat chegarasidan oshgan talabalar uchun hujjatlarni tayyorlash, sababini aniqlashtirish va o'quv yili davomida ko'rilgan barcha choralarni asoslovchi hujjatlari bilan saqlash.
+Kompyuter versiyasida (boshqaruv paneli) **«Chora ko'rish»** bo'limi: davomat chegarasidan oshgan talabalar uchun hujjatlarni tayyorlash, sababini aniqlashtirish, ota-onaga ogohlantirish xati va o'quv yili davomida ko'rilgan barcha choralarni asl hujjatlari bilan saqlash.
 
-| Sababsiz qoldirilgan (semestr boshidan) | Chora | Hujjatlar |
+| Asos | Chora | Hujjatlar |
 |---|---|---|
-| 36 soat va undan ko'p | Dekan ogohlantirishi | Bildirishnoma + dekan farmoyishi |
-| 54 soat va undan ko'p | Hayfsan | Bildirishnoma (avvalgi dekan ogohlantirishi raqami va sanasi bilan) + buyruq |
-| Ichki tartib qoidalarini buzish | Ogohlantirish, hayfsan yoki boshqa | Bildirishnoma + farmoyish/buyruq, dalolatnoma |
+| Sababsiz 36 soat va undan ko'p (semestr boshidan) | Dekan ogohlantirishi | Bildirishnoma + dekan farmoyishi + ota-onaga xat |
+| Sababsiz 54 soat va undan ko'p | Hayfsan | Bildirishnoma (avvalgi dekan ogohlantirishi raqami va sanasi bilan) + buyruq + ota-onaga xat |
+| Ichki tartib qoidalarini buzish | Ogohlantirish, hayfsan, faqat ota-onaga xat yoki boshqa | Bildirishnoma + farmoyish/buyruq, ota-onaga xat, dalolatnoma |
+| Trimestr to'lovi qarzdorligi | Ota-onaga ogohlantirish xati | Xat (qarz miqdori, sana va to'lash muddati bilan) |
 
-Chegaralar `ABSENCE_WARN_LEVELS` dagi 2- va 3-qiymat (36, 54). Soatlar Manage'dan (yoki HEMIS statistikasi / kunlik davomatdan) olinadi.
+Chegaralar `ABSENCE_WARN_LEVELS` dagi 2- va 3-qiymat (36, 54). Soatlar Manage'dan (yoki HEMIS statistikasi / kunlik davomatdan), trimestr qarzi — oxirgi «Trimestr qarzdorligi» hisobotidan olinadi.
 
-**Darhol signal.** Har bir davomat yangilanishidan keyin (Manage'dan avtomatik yoki fayl yuklanganda) chegaradan yangi oshgan talabalar haqida kurs koordinatoriga Telegram xabari boradi: «🔔 Chora ko'rish kerak» — talabalar ro'yxati va soatlari bilan. Har bir talaba va chora uchun bir marta; «sababli» deb belgilangan talabaning soatlari keyin yana oshsa — qayta. Guruh biriktirilgan koordinatorga faqat o'z guruhlari haqida xabar boradi. Bo'lim belgisida (chap menyu) va «Kurs holati» sahifasidagi «Chora ko'rish» kartasida ham yangi talabalar soni ko'rinadi.
+**Darhol signal.** Har bir davomat yangilanishidan keyin (Manage'dan avtomatik yoki fayl yuklanganda) chegaradan yangi oshgan talabalar haqida kurs koordinatoriga Telegram xabari boradi: «🔔 Chora ko'rish kerak» — talabalar ro'yxati va soatlari bilan. Har bir talaba va chora uchun bir marta; «sababli» deb belgilangan talabaning soatlari keyin yana oshsa — qayta. Guruh biriktirilgan koordinatorga faqat o'z guruhlari haqida xabar boradi.
+
+**«Kurs holati»da alohida bo'lim** — aniq sonlar bilan, har biri bosilsa tegishli ro'yxat ochiladi:
+- joriy ish: chora ko'rish kerak (ogohlantirish / hayfsan bo'yicha alohida), sababi so'ralgan, sababli deb topilgan (va ro'yxatdan o'chirilgan), imzolanishi kutilayotgan hujjatlar (nechta talaba), asl hujjati yuklanmagan choralar;
+- o'quv yili boshidan: dekan ogohlantirishi, hayfsan, ichki tartib bo'yicha, ota-onaga xat (trimestr qarzi bo'yicha xat kutayotganlar soni), chora ko'rilgan talabalar (jami va takroriy);
+- oylar bo'yicha dinamika.
 
 **Ish tartibi.**
-1. **«Chegaraga yetganlar»** — dekan ogohlantirishi va hayfsan bo'yicha ro'yxat (soat, guruh, holat). Har bir talaba uchun:
+1. **«Chegaraga yetganlar»** — dekan ogohlantirishi, hayfsan va «Trimestr qarzi — ota-onaga xat» ro'yxatlari. Davomat bo'yicha har bir talaba uchun:
    - **«So'rash»** — ota-onadan bot orqali qoldirish sababini so'raydi (javob «Xabarlar»da keladi);
-   - **«Sababli»** — sababli deb topilsa (izoh bilan) ro'yxatdan chiqariladi; sababsiz soatlari keyin yana oshsa, ro'yxatga qaytadi;
+   - **«Sababli»** — sababli deb topilsa (izoh bilan) ro'yxatdan chiqariladi; sababsiz soatlari keyin yana oshsa, ro'yxatga qaytadi. Tasdiqlovchi hujjat (ma'lumotnoma) talabaning hujjatlariga yuklanadi;
    - **✕** — ro'yxatdan o'chirish (izoh bilan). Chiqarilganlar pastdagi bo'limda turadi, **«Qaytarish»** bilan qaytariladi.
 
-   Kerakli talabalarni belgilab **«Tanlanganlar uchun hujjatlarni tayyorlash»** bosiladi.
-2. **«Hujjatlar»** — har bir to'plam — bitta farmoyish yoki buyruq. Tayyor Word fayllar: bildirishnoma, farmoyish/buyruq (ichki tartib bo'yicha — dalolatnoma ham) yoki hammasi ZIP'da. Hujjat imzolangach **«Imzolandi — chiqarildi deb belgilash»**: raqami va sanasi kiritiladi (Word fayllarga ham yoziladi), talabalar «Chora ko'rilganlar»ga o'tadi, ota-onalarga xabar boradi (o'chirib qo'yish mumkin). Imzolangan nusxa, tushuntirish xati, dalolatnoma va boshqa asoslovchi hujjatlar (PDF, rasm, Word — 20 MB gacha) shu yerga biriktiriladi.
-3. **«Chora ko'rilganlar»** — o'quv yili boshidan (1-sentabr) hozirgacha: jami ogohlantirish, hayfsan, ichki tartib bo'yicha choralar, takroriy chora ko'rilgan talabalar; oylar bo'yicha dinamika, guruhlar kesimi, har bir talaba — hujjat raqami, sanasi va biriktirilgan fayllari bilan. Chora turi va asos bo'yicha filtr.
-4. **«Ichki tartib bo'yicha chora»** tugmasi — davomatdan tashqari choralar: talaba(lar)ni qidirib tanlash, chora turi, buzilgan qoida (tayyor variantlardan yoki o'zingiz yozasiz), izoh. Darhol «chiqarilgan» deb saqlash (raqami va sanasi bilan) yoki avval hujjatlarni tayyorlash mumkin.
+   Kerakli talabalarni belgilab **«Tanlanganlar uchun hujjatlarni tayyorlash»** bosiladi. Trimestr qarzdorlari uchun — **«Tanlanganlar uchun ota-onaga xat tayyorlash»** (to'lash muddati so'raladi); ro'yxatda qarz, hisobot sanasi, yashash manzili va holat (xat yuborilmagan / tayyorlanmoqda / yuborilgan — raqami va sanasi bilan) ko'rinadi.
+2. **«Hujjatlar»** — har bir to'plam — bitta farmoyish, buyruq yoki xatlar ro'yxati. Tayyor Word fayllar: bildirishnoma, farmoyish/buyruq, **ota-onaga xat — har bir talabaga alohida** (talaba qatoridagi «✉ Xat» yoki barchasi ZIP'da), dalolatnoma yoki hammasi ZIP'da. Hujjat imzolangach **«Imzolandi — chiqarildi»** (xat uchun — **«Xatlar yuborildi»**): raqami va sanasi kiritiladi (Word fayllarga ham yoziladi), talabalar «Chora ko'rilganlar»ga o'tadi, ota-onalarga bot orqali xabar boradi (o'chirib qo'yish mumkin). «Umumiy hujjatlar»ga butun farmoyish/buyruqning imzolangan nusxasi yuklanadi.
+3. **«Chora ko'rilganlar»** — o'quv yili boshidan (1-sentabr) hozirgacha: ko'rsatkichlar (ogohlantirish, hayfsan, ota-onaga xat, davomat va ichki tartib bo'yicha, talabalar, asl hujjati yo'qlar), oylar bo'yicha dinamika, guruhlar kesimi; har bir talaba — hujjat raqami, sanasi va asl hujjatlari bilan (yo'q bo'lsa — «asl hujjat yo'q»). Chora turi va asos bo'yicha filtr.
+4. **«Ichki tartib bo'yicha chora»** tugmasi — davomatdan tashqari choralar: talaba(lar)ni qidirib tanlash, chora turi (faqat ota-onaga xat ham), buzilgan qoida (tayyor variantlardan yoki o'zingiz yozasiz), izoh. Darhol «chiqarilgan» deb saqlash (raqami va sanasi bilan) yoki avval hujjatlarni tayyorlash mumkin.
 
-Talaba kartasida «Ko'rilgan choralar» bloki, ota-onaning farzand sahifasida — e'lon qilingan chora (hujjat raqami va sanasi bilan) ko'rinadi.
+**Talabaning hujjatlari (asl nusxalar).** Talaba bosilganda (ro'yxatlarda, hujjat to'plamida 📁 tugmasi, talaba kartasidagi «Hujjatlarni ochish») uning o'quv yilidagi barcha choralari ochiladi: asos, hujjat raqami va sanasi, izoh va **asl hujjatlar** — talabaning o'zi uchun yuklangan to'liq tayyor PDF (imzolangan xat, farmoyish ko'chirmasi, tushuntirish xati, ma'lumotnoma, dalolatnoma) va butun farmoyish/buyruqning imzolangan nusxasi. Har birini brauzerda ko'rish, yuklab olish, o'chirish mumkin; talabaning o'z **PDF hujjatini ota-onasiga yuborish** — bot orqali, ilovadagi «📄 Hujjatlar» bo'limiga («Ogohlantirish xati», «Dekan ogohlantirishi» yoki «Hayfsan» turi bilan). Bir necha talaba bor umumiy hujjat yuborilmaydi (boshqa talabalar ma'lumotlari bor — buning uchun «Hujjat yuborish» bo'limi ularni yopib yuboradi). Shu yerda shablondan Word hujjatlar (shu talabaning xati) va yashash manzili ham bor.
 
-**Shablonlar.** `shablonlar/chora/` dagi Word fayllar (dekan farmoyishi, hayfsan buyrug'i, dalolatnoma — universitet namunalari asosida; bildirishnomalar — dekan nomiga). «Shablonlar va sozlama» yorlig'ida har birini yuklab olish, Word'da tahrirlab qayta yuklash (super-admin) va asl holiga qaytarish mumkin. Yuklangan shablonlar `data/templates/chora/` da saqlanadi va barcha kurslarga amal qiladi. Shablondagi belgilar:
+**Ota-onaga xat.** JIDU blankasidagi «OGOHLANTIRISH XATI» — universitet namunalari asosida uch xil: uzrli sababsiz dars qoldirish (soat va para, qaysi chegaradan oshgani — 36 / 54 / 74 soat — va ko'rilgan chora: «dekanning 2026-yil 20-oktabrdagi 17-sonli farmoyishi bilan “Ogohlantirish” e'lon qilindi»), ichki tartib qoidalarini buzish (qoida va holat) va trimestr to'lovi qarzdorligi (qarz miqdori, hisobot sanasi, to'lash muddati). Xatda talabaning F.I.Sh. (katta harflarda, «…NING ota-onasiga»), guruhi, kursi, **yashash manzili**, chiquvchi raqam va sana (xat yuborilganda), telefon va ijrochi (kurs koordinatori) bo'ladi. Yashash manzili kontingent faylidagi «Yashash manzili» (yoki HEMIS'dagi «Viloyat», «Tuman», «Manzil») ustunidan o'qiladi, bo'lmasa — xat tayyorlashda ✎ tugmasi bilan kiritiladi.
+
+**Shablonlar.** `shablonlar/chora/` dagi Word fayllar (dekan farmoyishi, hayfsan buyrug'i, dalolatnoma, ota-onaga xatlar — universitet namunalari asosida; bildirishnomalar — dekan nomiga). «Shablonlar va sozlama» yorlig'ida har birini yuklab olish, Word'da tahrirlab qayta yuklash (super-admin) va asl holiga qaytarish mumkin. Yuklangan shablonlar `data/templates/chora/` da saqlanadi va barcha kurslarga amal qiladi. Shablondagi belgilar:
 
 | Belgi | Qiymat |
 |---|---|
@@ -562,8 +570,12 @@ Talaba kartasida «Ko'rilgan choralar» bloki, ota-onaning farzand sahifasida �
 | `{{KOORDINATORLAR}}`, `{{KOORDINATORLAR_NING}}` | kurs koordinatorlari: «N.Egamberdiyev», «N.Egamberdiyevning» |
 | `{{OQUV_YILI}}`, `{{SEMESTR}}`, `{{QOIDA}}`, `{{CHORA}}` | o'quv yili, semestr, buzilgan qoida, chora nomi |
 | `{{T_N}}`, `{{T_FISH}}`, `{{T_BOSQICH}}`, `{{T_FAKULTET}}`, `{{T_FAKULTET_QISQA}}`, `{{T_GURUH}}`, `{{T_SOAT}}`, `{{T_PARA}}`, `{{T_AVVAL}}`, `{{T_IZOH}}` | jadval satri — har bir talaba uchun takrorlanadi (`{{T_FISH}}` bo'lishi shart) |
+| Xatlarda: `{{FISH_KATTA}}`, `{{FISH_KATTA_NING}}`, `{{FISH}}`, `{{GURUH}}`, `{{MANZIL}}` | talaba: «ALIYEV VALI», «ALIYEV VALINING», guruhi, yashash manzili (xatda ism bo'lishi shart) |
+| `{{XAT_RAQAM}}`, `{{XAT_SANA}}`, `{{HOLAT_SANA}}`, `{{SOAT}}`, `{{PARA}}` | chiquvchi raqam va sana, ma'lumot sanasi, sababsiz soat va para |
+| `{{CHEGARA_MATNI}}`, `{{CHORA_MATNI}}`, `{{IZOH_MATNI}}` | qaysi chegaradan oshgani, ko'rilgan chora (farmoyish/buyruq raqami va sanasi bilan), holat tafsiloti |
+| `{{QARZ}}`, `{{MUDDAT}}`, `{{OTGAN_OQUV_YILI}}`, `{{TEL}}`, `{{IJROCHI}}` | trimestr qarzi, to'lash muddati, o'tgan o'quv yili, telefon, ijrochi |
 
-Sozlama (shu yorliqda, kurs bo'yicha): hujjatlardagi koordinatorlar ismi (bo'sh bo'lsa — kurs koordinatorlari ro'yxatidan) va fakultet nomi.
+Sozlama (shu yorliqda, kurs bo'yicha): hujjatlardagi koordinatorlar ismi (bo'sh bo'lsa — kurs koordinatorlari ro'yxatidan; xatlarda — «Ijrochi»), fakultet nomi va xatlardagi telefon.
 
 Hujjatlar va fayllar `data/<kurs>/chora/` da saqlanadi (zaxira nusxaga kiradi). Rasmiy hujjat imzolanib, raqam olgandan keyingina «chiqarildi» deb belgilang — ota-onalarga xabar shu paytda boradi.
 

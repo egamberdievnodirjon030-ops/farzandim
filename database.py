@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS students (
     tutor_phone  TEXT,
     updated_at   TEXT,
     payment_form TEXT,     -- «Davlat granti» yoki «To'lov-shartnoma»
-    full_name_cyr TEXT     -- rasmiy kirill yozuvi (ixtiyoriy): rus tilidagi ota-onaga shu ko'rsatiladi
+    full_name_cyr TEXT,    -- rasmiy kirill yozuvi (ixtiyoriy): rus tilidagi ota-onaga shu ko'rsatiladi
+    address      TEXT      -- yashash manzili (ota-onaga xat uchun): kontingent faylidan yoki «Chora ko'rish»da qo'lda
 );
 CREATE INDEX IF NOT EXISTS idx_students_group ON students(group_key);
 
@@ -180,8 +181,8 @@ CREATE INDEX IF NOT EXISTS idx_acad_debts_student ON academic_debts(student_id);
 -- qoidalari bo'yicha. Bitta farmoyish/buyruq — bir nechta talaba (disc_orders → disc_cases).
 CREATE TABLE IF NOT EXISTS disc_orders (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    measure     TEXT NOT NULL,              -- ogohlantirish | hayfsan | boshqa
-    ground      TEXT NOT NULL,              -- davomat | tartib
+    measure     TEXT NOT NULL,              -- ogohlantirish | hayfsan | boshqa | xat (ota-onaga ogohlantirish xati)
+    ground      TEXT NOT NULL,              -- davomat | tartib | trimestr
     rule        TEXT,                       -- ichki tartib: buzilgan qoida (hujjatga shu matn yoziladi)
     number      TEXT,                       -- farmoyish/buyruq raqami (chiqarilganda)
     date        TEXT,                       -- farmoyish/buyruq sanasi
@@ -189,6 +190,7 @@ CREATE TABLE IF NOT EXISTS disc_orders (
     hours       REAL,                       -- davomat: chegara (36 / 54 soat)
     status      TEXT NOT NULL DEFAULT 'draft',  -- draft | issued | cancelled
     note        TEXT,
+    deadline    TEXT,                       -- xat: qarzni to'lash muddati
     created_at  TEXT NOT NULL, created_by INTEGER,
     issued_at   TEXT, issued_by INTEGER
 );
@@ -202,6 +204,8 @@ CREATE TABLE IF NOT EXISTS disc_cases (
     note        TEXT,                       -- sabab / izoh (sababli deb topilgani, qoidabuzarlik tafsiloti)
     order_id    INTEGER REFERENCES disc_orders(id) ON DELETE SET NULL,
     asked_at    TEXT,                       -- ota-onadan sababi so'ralgan vaqt
+    amount      REAL,                       -- trimestr: qarz miqdori (so'm)
+    as_of       TEXT,                       -- trimestr: qarz qaysi sana holatiga
     created_at  TEXT NOT NULL, updated_at TEXT, by_user INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_disc_cases_student ON disc_cases(student_id, measure, ground);
@@ -209,11 +213,12 @@ CREATE TABLE IF NOT EXISTS disc_files (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id    INTEGER REFERENCES disc_orders(id) ON DELETE CASCADE,
     case_id     INTEGER REFERENCES disc_cases(id) ON DELETE CASCADE,
-    kind        TEXT NOT NULL,              -- farmoyish | buyruq | bildirishnoma | dalolatnoma | tushuntirish | asos | boshqa
+    kind        TEXT NOT NULL,              -- imzolangan | xat | farmoyish | buyruq | bildirishnoma | dalolatnoma | tushuntirish | asos | boshqa
     name        TEXT NOT NULL,
     path        TEXT NOT NULL,              -- kurs papkasidagi nisbiy yo'l (chora/...)
     size        INTEGER, mime TEXT,
-    uploaded_at TEXT NOT NULL, by_user INTEGER
+    uploaded_at TEXT NOT NULL, by_user INTEGER,
+    sent_doc_id INTEGER, sent_at TEXT       -- ota-onaga yuborilgan bo'lsa: documents.id va vaqti
 );
 
 CREATE TABLE IF NOT EXISTS warnings_sent (
@@ -590,6 +595,15 @@ class Database:
             await self.conn.execute("ALTER TABLE students ADD COLUMN payment_form TEXT")
         if "full_name_cyr" not in cols:
             await self.conn.execute("ALTER TABLE students ADD COLUMN full_name_cyr TEXT")
+        if "address" not in cols:
+            await self.conn.execute("ALTER TABLE students ADD COLUMN address TEXT")
+        for t, add in (("disc_orders", (("deadline", "TEXT"),)), ("disc_cases", (("amount", "REAL"), ("as_of", "TEXT"))),
+                       ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT")))):
+            async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
+                have = {r[1] for r in await cur.fetchall()}
+            for col, ddl in add:
+                if col not in have:
+                    await self.conn.execute(f"ALTER TABLE {t} ADD COLUMN {col} {ddl}")
         async with self.conn.execute("PRAGMA table_info(payments)") as cur:
             if "kind" not in {r[1] for r in await cur.fetchall()}:
                 # oldingi versiya: kontrakt va trimestr ajratilmagan — mavjud yozuvlar «kontrakt» deb olinadi
@@ -662,8 +676,8 @@ class Database:
             await self.conn.execute(
                 """INSERT INTO students (hemis_id, full_name, name_norm, group_name, group_key, faculty,
                                          course, birth_date, tutor_name, tutor_phone, updated_at, payment_form,
-                                         full_name_cyr)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                         full_name_cyr, address)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(hemis_id) DO UPDATE SET
                      full_name   = excluded.full_name,
                      name_norm   = excluded.name_norm,
@@ -676,13 +690,14 @@ class Database:
                      tutor_phone = COALESCE(excluded.tutor_phone, students.tutor_phone),
                      payment_form = COALESCE(excluded.payment_form, students.payment_form),
                      full_name_cyr = COALESCE(excluded.full_name_cyr, students.full_name_cyr),
+                     address     = COALESCE(excluded.address, students.address),
                      updated_at  = excluded.updated_at""",
                 (
                     r["hemis_id"], r["full_name"], normalize_text(r["full_name"]),
                     r.get("group_name") or None, group_key(r.get("group_name")) or None,
                     r.get("faculty") or None, r.get("course"), r.get("birth_date"),
                     r.get("tutor_name") or None, r.get("tutor_phone") or None, ts, r.get("payment_form") or None,
-                    r.get("full_name_cyr") or None,
+                    r.get("full_name_cyr") or None, r.get("address") or None,
                 ),
             )
             if r["hemis_id"] in existing:
