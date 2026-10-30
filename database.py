@@ -1,6 +1,7 @@
 """SQLite ma'lumotlar bazasi: sxema va barcha so'rovlar."""
 from __future__ import annotations
 
+from datetime import date, timedelta
 from pathlib import Path
 
 import re
@@ -265,6 +266,7 @@ CREATE TABLE IF NOT EXISTS visit_students (
     notified_at      TEXT, responded_at TEXT, reminder_sent_at TEXT,
     source           TEXT NOT NULL DEFAULT 'koordinator',  -- koordinator (qo'lda) | bot (e'londa o'zi yozildi)
     registered_at    TEXT,
+    conflict         TEXT,  -- talaba shu vaqtdagi darsi / boshqa tadbiri ko'rsatilgach «Baribir qo'shilaman» ni bosgan
     UNIQUE (plan_id, student_id)
 );
 CREATE INDEX IF NOT EXISTS idx_visit_students_student ON visit_students(student_id);
@@ -324,6 +326,19 @@ CREATE TABLE IF NOT EXISTS student_categories (
 );
 CREATE INDEX IF NOT EXISTS idx_student_categories_cat ON student_categories(category);
 -- Talabaning Telegram hisobi (tashrif xabarlari uchun): shaxsiy havola yoki ota-onani tasdiqlash orqali
+-- Talabaning shaxsiy (Manage) jadvali — sanali darslar: tadbirga yozilishda vaqt to'qnashuvini tekshirish uchun
+-- (Manage javob bermasa — shu nusxa). Har hafta yangilanganda o'sha hafta qatorlari almashtiriladi.
+CREATE TABLE IF NOT EXISTS student_lessons (
+    student_id  INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    date        TEXT NOT NULL,
+    start_time  TEXT, end_time TEXT, pair INTEGER,
+    subject     TEXT NOT NULL, lesson_type TEXT, room TEXT,
+    exam        INTEGER NOT NULL DEFAULT 0,
+    online      INTEGER NOT NULL DEFAULT 0,
+    fetched_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_student_lessons ON student_lessons(student_id, date);
+
 CREATE TABLE IF NOT EXISTS student_accounts (
     student_id INTEGER PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
     tg_id      INTEGER NOT NULL,
@@ -729,7 +744,8 @@ class Database:
                        ("visit_plans", (("eve_reminded_at", "TEXT"), ("announce", "INTEGER NOT NULL DEFAULT 0"),
                                         ("audience", "TEXT"), ("capacity", "INTEGER"), ("reg_closed_at", "TEXT"),
                                         ("list_sig", "TEXT"))),
-                       ("visit_students", (("source", "TEXT NOT NULL DEFAULT 'koordinator'"), ("registered_at", "TEXT")))):
+                       ("visit_students", (("source", "TEXT NOT NULL DEFAULT 'koordinator'"), ("registered_at", "TEXT"),
+                                           ("conflict", "TEXT")))):
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 have = {r[1] for r in await cur.fetchall()}
             for col, ddl in add:
@@ -1334,6 +1350,35 @@ class Database:
         await self.store_code_credits(rows, commit=False)
         await self.conn.commit()
         return len(rows), sorted({r["subject"] for r in rows})
+
+    async def save_student_lessons(self, sid: int, weeks: list[str], lessons: list[dict]) -> None:
+        """Talabaning shaxsiy (Manage) jadvali: so'ralgan haftalar (dushanba sanalari) qatorlari almashtiriladi."""
+        days = set()
+        for w in weeks:
+            m = date.fromisoformat(w)
+            days |= {(m + timedelta(days=i)).isoformat() for i in range(7)}
+        days |= {x["date"] for x in lessons}
+        if days:
+            qm = ",".join("?" * len(days))
+            await self.conn.execute(f"DELETE FROM student_lessons WHERE student_id = ? AND date IN ({qm})", (sid, *sorted(days)))
+        ts = now_iso()
+        await self.conn.executemany(
+            """INSERT INTO student_lessons (student_id, date, start_time, end_time, pair, subject, lesson_type, room, exam,
+               online, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [(sid, x["date"], x["start"], x["end"], x["pair"], x["subject"], x["lesson_type"], x["room"], int(x["exam"]),
+              int(x["online"]), ts) for x in lessons])
+        await self.conn.commit()
+
+    async def student_lessons_on(self, sid: int, d: str) -> list[dict] | None:
+        """Saqlangan shaxsiy jadval: shu kun darslari; o'sha hafta umuman olinmagan bo'lsa — None."""
+        rows = await self.fetchall("SELECT * FROM student_lessons WHERE student_id = ? AND date = ? ORDER BY start_time, pair", (sid, d))
+        if rows:
+            return rows
+        day = date.fromisoformat(d)
+        mon = day - timedelta(days=day.weekday())
+        got = await self.fetchone("SELECT 1 FROM student_lessons WHERE student_id = ? AND date BETWEEN ? AND ? LIMIT 1",
+                                  (sid, mon.isoformat(), (mon + timedelta(days=6)).isoformat()))
+        return [] if got else None
 
     async def elective_lessons(self, weekday: int, week_type: str) -> list[dict]:
         return await self.fetchall(

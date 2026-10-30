@@ -922,6 +922,115 @@ def _weekly(rows: list[dict], explicit_week: bool) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- talabaning shaxsiy jadvali (bitta talaba, bitta hafta)
+# Tadbirga ro'yxatdan o'tishda vaqt to'qnashuvini tekshirish uchun: Manage'dagi talabaning o'z haftalik jadvali (sanali
+# darslar — tanlov fani, 2-til, oraliq nazorat ham). Qisqa vaqt keshda turadi; so'rov muvaffaqiyatsiz bo'lsa — None.
+_TT_CACHE: dict[tuple[str, str], tuple[float, list[dict]]] = {}
+TT_TTL = 20 * 60
+TT_TIMEOUT = 8
+_EXAM = re.compile(r"mid ?term|final|exam|imtihon|nazorat|retake|qayta topshir", re.I)
+_TT_TYPES = {k.replace(" ", ""): v for k, v in LESSON_TYPES.items()} | LESSON_TYPES
+
+
+def timetable_path() -> str:
+    """Talabaning shaxsiy haftalik jadvali manzili ({hemis_id} bilan): .env dagi INTEGRATION_SCHEDULE yoki Manage
+    (UWED) ning ma'lum manzili. Bo'sh — manba sozlanmagan."""
+    path = endpoint("schedule")
+    if "{hemis_id}" in path:
+        return path
+    if INTEGRATION_URL and "uwed.uz" in INTEGRATION_URL.lower() and not dead("schedule") and not path:
+        return KNOWN_PATHS["schedule"]
+    return ""
+
+
+def lessons_from(records: list[dict]) -> list[dict]:
+    """Manba yozuvlari → sanali darslar: {date, start, end, pair, subject, lesson_type, room, exam, online}."""
+    records = [flatten(r) if any(isinstance(v, (dict, list)) for v in r.values()) else r for r in records]
+    if not records:
+        return []
+    m = mapping_for(list(dict.fromkeys(k for r in records for k in r)), "schedule", records)
+    get = lambda r, f: r.get(m[f]) if f in m else None  # noqa: E731
+    out = []
+    for r in records:
+        d = to_date(get(r, "date"))
+        if not d and r.get("_ctx_week") and get(r, "weekday"):
+            wd = parse_weekday(get(r, "weekday"))
+            d = (to_date(r["_ctx_week"]) + timedelta(days=wd - 1)) if wd else None
+        rng = re.findall(r"\d{1,2}[:.]\d{2}", cell_str(get(r, "time_range")))
+        start = to_time(get(r, "start_time")) or (parse_time(rng[0]) if rng else None)
+        end = to_time(get(r, "end_time")) or (parse_time(rng[1]) if len(rng) > 1 else None)
+        subject = " ".join(cell_str(get(r, "subject")).split())
+        if not d or not subject:
+            continue
+        kind = " ".join(cell_str(get(r, "lesson_type")).split())
+        study = cell_str(r.get("study_type") or r.get("studyType"))
+        exam = bool(_EXAM.search(f"{kind} {study}")) and "academic" not in study.lower()
+        if exam:  # «Mid Term 1», «MIDTERM» → «Oraliq nazorat»
+            label = ("Oraliq nazorat" if re.search(r"mid ?term", f"{kind} {study}", re.I) else
+                     "Yakuniy nazorat" if re.search(r"final", f"{kind} {study}", re.I) else kind or "Nazorat")
+        else:
+            label = _TT_TYPES.get(normalize_text(kind), kind)
+        pair = get(r, "pair")
+        out.append({"date": d.isoformat(), "start": start, "end": end,
+                    "pair": parse_int(re.sub(r"\D+", " ", cell_str(pair)).split()[0]) if re.search(r"\d", cell_str(pair)) else None,
+                    "subject": subject, "lesson_type": label, "room": " ".join(cell_str(get(r, "room")).split()), "exam": exam,
+                    "online": "online" in cell_str(r.get("lesson_format") or r.get("lessonFormat")).lower()})
+    return sorted(out, key=lambda x: (x["date"], x["start"] or "", x["pair"] or 0))
+
+
+async def student_lessons(hemis: str, d: date) -> list[dict] | None:
+    """Talabaning shu sanadagi haftasi bo'yicha shaxsiy jadvali (Manage). None — manba sozlanmagan, talaba Manage'da
+    yo'q yoki javob kelmadi (chaqiruvchi saqlangan nusxa yoki guruh jadvalidan foydalanadi)."""
+    path = timetable_path()
+    if not path or not real_hemis(hemis) or not (INTEGRATION_URL or path.startswith("http")):
+        return None
+    monday = d - timedelta(days=d.weekday())
+    key = (str(hemis), monday.isoformat())
+    hit = _TT_CACHE.get(key)
+    if hit and _time.monotonic() - hit[0] < TT_TTL:
+        return hit[1]
+    import aiohttp
+    url, _ = await build_url("schedule", str(hemis), monday, path=path)
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=TT_TIMEOUT)) as session:
+            recs, _, _ = await _fetch_url(session, url, 5, False)
+    except IntegrationError as e:  # talaba Manage'da yo'q — odatiy holat (guruh jadvalidan tekshiriladi)
+        (log.info if _not_in_manage(e) else log.warning)("%s: talaba jadvali olinmadi (%s): %s", INTEGRATION_NAME,
+                                                         _safe_url(url), e)
+        return None
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        log.warning("%s: talaba jadvali olinmadi (%s): %s", INTEGRATION_NAME, _safe_url(url), type(e).__name__)
+        return None
+    for r in recs:
+        r.setdefault("_ctx_week", monday.isoformat())
+    out = lessons_from(recs)
+    _TT_CACHE[key] = (_time.monotonic(), out)
+    if len(_TT_CACHE) > 5000:
+        _TT_CACHE.clear()
+    return out
+
+
+async def store_personal(records: list[dict]) -> int:
+    """Jadval so'rovidagi talabalarning (har guruhdan bittasi yoki hammasi) sanali darslari — kurs bazalariga: Manage
+    vaqtincha javob bermasa, vaqt to'qnashuvi shu nusxadan tekshiriladi."""
+    by: dict[str, list[dict]] = {}
+    for r in records:
+        hid = cell_str(r.get("_ctx.hemis_id"))
+        if hid:
+            by.setdefault(hid, []).append(r)
+    n = 0
+    for hid, recs in by.items():
+        lessons = lessons_from(recs)
+        weeks = sorted({cell_str(r.get("_ctx_week")) for r in recs if r.get("_ctx_week")})
+        for key in db.keys():
+            with use_course(key):
+                st = await db.fetchone("SELECT id FROM students WHERE hemis_id = ?", (hid,))
+                if st:
+                    await db.save_student_lessons(st["id"], weeks, lessons)
+                    n += 1
+    return n
+
+
 # ---------------------------------------------------------------- talabaning fanlari (fan bo'yicha davomat va kredit)
 _HOUR_WORDS = ("hour", "hours", "soat", "soatlar", "chas", "chasov")
 
@@ -1245,9 +1354,10 @@ async def targets(kind: str) -> list[dict]:
     return out
 
 
-async def build_url(kind: str, hemis: str | None = None, monday: date | None = None) -> tuple[str, bool]:
-    """To'liq manzil va «to'liq oraliqmi» (incremental {since} bo'lsa — yo'q)."""
-    path = endpoint(kind)
+async def build_url(kind: str, hemis: str | None = None, monday: date | None = None,
+                    path: str | None = None) -> tuple[str, bool]:
+    """To'liq manzil va «to'liq oraliqmi» (incremental {since} bo'lsa — yo'q). path — boshqa yo'l (shaxsiy jadval)."""
+    path = path or endpoint(kind)
     url = path if path.startswith("http") else f"{INTEGRATION_URL}/{path.lstrip('/')}"
     d1, d2 = window(kind)
     ts = lambda d, end=False: int(datetime(d.year, d.month, d.day, 23 if end else 0, 59 if end else 0,  # noqa: E731
@@ -1436,6 +1546,11 @@ async def ingest(bot, kind: str, records: list[dict], complete_window: tuple[dat
     if kind == "subjects":
         return await ingest_subjects(bot, records, origin)
     from handlers.admin import _process_import_body
+    if kind == "schedule":
+        try:
+            await store_personal(records)
+        except Exception:  # noqa: BLE001  (shaxsiy nusxa — qo'shimcha; guruh jadvali importini to'xtatmasin)
+            log.exception("Talabalarning shaxsiy jadvali saqlanmadi")
     table, info = build_table(records, kind)
     result = {"kind": kind, "records": len(records), "mapping": info["mapping"], "unmapped": info["unmapped"],
               "mode": info["mode"], "courses": {}, "changed": False, "errors": 0, "origin": origin}

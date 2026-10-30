@@ -38,7 +38,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import botlar
-from config import DATA_DIR, SUPERADMIN_IDS, TZ, UNIVERSITY_NAME
+from config import DATA_DIR, PAIR_TIMES, SUPERADMIN_IDS, TZ, UNIVERSITY_NAME
 from database import db
 from tenancy import central, current_course, use_course
 from utils import esc, fmt_phone, group_key, now, now_iso, today
@@ -1072,6 +1072,8 @@ def _elon_view(p: dict, sid: int, removed: bool = False):
     if row is not None:
         mine = row.get("source") == "bot"
         tail = "Oldingi kuni va boshlanishidan oldin eslatma yuboriladi."
+        if row.get("conflict"):
+            tail = f"⚠️ <b>Shu vaqtda sizda:</b> {esc(row['conflict'])}.\n" + tail
         if mine and st in ("open", "full"):
             tail += "\nQatnasha olmasangiz — «Ro'yxatdan chiqish» tugmasini bosing."
         kb = _kb([[("↩️ Ro'yxatdan chiqish", cb("unreg", p["id"], sid))]]) if mine and st in ("open", "full") else None
@@ -1149,14 +1151,116 @@ async def _refresh_elon(bot, p: dict, sids: list[int] | None = None, skip: int |
         await _edit_msg(bot, r["chat_id"], r["message_id"], text, kb)
 
 
-async def register(bot, pid: int, sid: int) -> dict:
-    """Talaba e'londagi «Ro'yxatdan o'tish» ni bosdi — ishtirokchilar ro'yxatiga qo'shiladi (joy bo'lsa)."""
-    p = await get(pid, full=False)
+# ---------------------------------------------------------------- vaqt to'qnashuvi (ro'yxatdan o'tishdan oldin)
+_HHMM = re.compile(r"(\d{1,2})[:.](\d{2})")
+
+
+def _span(start, end) -> tuple[int, int] | None:
+    a, b = _HHMM.match(str(start or "").strip()), _HHMM.match(str(end or "").strip())
+    if not a or not b:
+        return None
+    x, y = int(a[1]) * 60 + int(a[2]), int(b[1]) * 60 + int(b[2])
+    return (x, y) if y > x else None
+
+
+def _lesson_span(les: dict) -> tuple[int, int] | None:
+    """Dars vaqti: jadvaldagi boshlanish–tugash, bo'lmasa juftlik vaqtlari (super-admin «Tizim» yoki PAIR_TIMES)."""
+    got = _span(les.get("start_time"), les.get("end_time"))
+    if got:
+        return got
+    pt = PAIR_TIMES.get(les.get("pair"))
+    if pt:
+        return _span(*pt)
+    if les.get("start_time"):  # faqat boshlanishi ma'lum — bir juftlik (80 daqiqa) deb olinadi
+        m = _HHMM.match(str(les["start_time"]).strip())
+        if m:
+            x = int(m[1]) * 60 + int(m[2])
+            return x, x + 80
+    return None
+
+
+async def student_day(st: dict, d: date) -> tuple[list[dict], str]:
+    """Talabaning shu kungi darslari va manbasi:
+      • «manage» — Manage'dagi o'z haftalik jadvali (sanali: tanlov fani, 2-til, oraliq nazorat ham); olingani bazaga
+        saqlanadi;
+      • «saqlangan» — Manage hozir javob bermadi: oxirgi olingan nusxa (shu hafta olingan bo'lsa);
+      • «jadval» — Manage sozlanmagan yoki talaba unda yo'q: guruh jadvali + tanlov fani va 2-til (individual.py)."""
+    import integration
+    live = await integration.student_lessons(st.get("hemis_id") or "", d)
+    if live is not None:
+        mon = d - timedelta(days=d.weekday())
+        await db.save_student_lessons(st["id"], [mon.isoformat()], live)
+        day = [x for x in live if x["date"] == d.isoformat()]
+        return [{**x, "start_time": x["start"], "end_time": x["end"]} for x in day], "manage"
+    saved = await db.student_lessons_on(st["id"], d.isoformat())
+    if saved is not None:
+        return saved, "saqlangan"
+    import individual
+    return await individual.lessons_on(st, d), "jadval"
+
+
+async def conflicts(p: dict, sid: int) -> list[dict]:
+    """Talabaning tadbir vaqtiga to'g'ri keladigan darslari (Manage'dagi shaxsiy jadvali — student_day) va boshqa
+    tashrif / tadbirlari. [{kind: dars | reja, time, title, sub, exam}] — vaqt bo'yicha."""
+    span = _span(p.get("start_time"), p.get("end_time"))
+    st = await db.get_student(sid)
+    if not span or not st:
+        return []
+    out = []
+    try:
+        lessons, _src = await student_day(st, date.fromisoformat(p["visit_date"]))
+    except Exception:  # noqa: BLE001  (jadval bo'lmasa ham ro'yxatdan o'tish to'xtamasin)
+        log.exception("Talaba jadvali (%s)", sid)
+        lessons = []
+    for les in lessons:
+        ls = _lesson_span(les)
+        if ls and ls[0] < span[1] and span[0] < ls[1]:
+            extra = [les.get("lesson_type"), f"{les['room']}-xona" if les.get("room") else "", "onlayn" if les.get("online") else ""]
+            pair = f"{les['pair']}-juftlik" if les.get("pair") else ""
+            out.append({"kind": "dars", "start": ls[0], "time": f"{_hhmm(ls[0])}–{_hhmm(ls[1])}", "exam": bool(les.get("exam")),
+                        "title": les["subject"], "sub": ", ".join(x for x in [pair, *extra] if x) or "dars"})
+    for r in await db.fetchall(
+            """SELECT vp.id, vp.type, vp.title, vp.start_time, vp.end_time, vp.place FROM visit_plans vp
+               JOIN visit_students vs ON vs.plan_id = vp.id
+               WHERE vs.student_id = ? AND vp.visit_date = ? AND vp.id != ? AND vp.status IN (?, ?) AND vs.response != ?""",
+            (sid, p["visit_date"], p["id"], TALABA, TASDIQLANGAN, RAD_ETDI)):
+        rs = _span(r["start_time"], r["end_time"])
+        if rs and rs[0] < span[1] and span[0] < rs[1]:
+            out.append({"kind": "reja", "start": rs[0], "time": f"{_hhmm(rs[0])}–{_hhmm(rs[1])}", "title": r["title"],
+                        "sub": TURLAR.get(r["type"], r["type"]) + (f", {r['place']}" if r.get("place") else "")})
+    return sorted(out, key=lambda x: x["start"])
+
+
+def conflict_note(items: list[dict]) -> str:
+    """Panel va eslatma uchun qisqa: «dars 14:00–15:20 Iqtisodiyot nazariyasi; Teatrga borish 16:00–18:00»."""
+    return "; ".join(f"{('nazorat ' if x.get('exam') else 'dars ') if x['kind'] == 'dars' else ''}{x['time']} {x['title']}"
+                     for x in items)[:300]
+
+
+def conflict_text(p: dict, items: list[dict]) -> str:
+    """Talabaga: tadbir vaqtida nima borligi va «Baribir qo'shilaman» taklifi."""
+    lines = [f"{'❗️' if x.get('exam') else '📚' if x['kind'] == 'dars' else '📌'} <b>{esc(x['time'])}</b> — {esc(x['title'])} "
+             f"<i>({esc(x['sub'])})</i>" for x in items]
+    kinds = {x["kind"] for x in items}
+    what = ("darslaringiz va tadbirlaringiz" if len(kinds) > 1 else
+            "darslaringiz" if "dars" in kinds else "tadbir va tashriflaringiz")
+    tail = f"<b>Shu vaqtdagi {what}:</b>\n" + "\n".join(lines)
+    if any(x.get("exam") for x in items):
+        tail += "\n\n❗️ <b>Shu vaqtda nazorat (imtihon) bor</b> — uni qoldirish baholaringizga ta'sir qiladi."
+    if "dars" in kinds:
+        tail += ("\n\nTadbirga borsangiz, darsni qoldirgan bo'lasiz — bu haqda kurs koordinatoringiz bilan oldindan "
+                 "kelishib oling.")
+    return event_text(p, "<b>⚠️ Bu vaqtda sizda boshqa mashg'ulot bor</b>", tail + "\n\nBaribir qatnashasizmi?",
+                      short=True)
+
+
+async def can_register(p: dict | None, sid: int) -> bool:
+    """Talaba shu e'londa ro'yxatdan o'ta oladimi: False — allaqachon ro'yxatda; mumkin bo'lmasa — VisitError."""
     if not p or p["type"] not in ISHTIROK or not p.get("announce"):
         raise VisitError("not_found", "Bu e'lon topilmadi.")
     if any(s["student_id"] == sid for s in p["students"]):
-        return p
-    rec = await db.fetchone("SELECT removed_at FROM visit_announces WHERE plan_id = ? AND student_id = ?", (pid, sid))
+        return False
+    rec = await db.fetchone("SELECT removed_at FROM visit_announces WHERE plan_id = ? AND student_id = ?", (p["id"], sid))
     if rec and rec["removed_at"]:
         raise VisitError("removed", "Kurs koordinatori sizni bu ro'yxatdan chiqargan — savol bo'lsa, unga murojaat qiling.")
     st = await db.get_student(sid)
@@ -1167,18 +1271,33 @@ async def register(bot, pid: int, sid: int) -> dict:
         raise VisitError("full", "Afsuski, joylar to'ldi.")
     if state != "open":
         raise VisitError("closed", "Ro'yxatga olish yopilgan.")
+    return True
+
+
+def conflict_kb(pid: int, sid: int):
+    return _kb([[("✅ Baribir qo'shilaman", cb("regf", pid, sid))], [("↩️ Qo'shilmayman", cb("regx", pid, sid))]])
+
+
+async def register(bot, pid: int, sid: int, conflict: str | None = None) -> dict:
+    """Talaba e'londagi «Ro'yxatdan o'tish» ni bosdi — ishtirokchilar ro'yxatiga qo'shiladi (joy bo'lsa). conflict —
+    vaqt to'qnashuvi ko'rsatilgach «Baribir qo'shilaman» bosilgan bo'lsa (panelda ko'rinadi)."""
+    p = await get(pid, full=False)
+    if not await can_register(p, sid):
+        return p
+    st = await db.get_student(sid)
     ts = now_iso()
     cur = await db.conn.execute(  # joylar soni — bitta so'rovda tekshiriladi (bir vaqtda bosilsa ham oshib ketmaydi)
-        """INSERT OR IGNORE INTO visit_students (plan_id, student_id, response, source, registered_at, notified_at)
-           SELECT ?, ?, ?, 'bot', ?, ? WHERE ? IS NULL OR (SELECT COUNT(*) FROM visit_students WHERE plan_id = ?) < ?""",
-        (pid, sid, KUTILMOQDA, ts, ts, p.get("capacity"), pid, p.get("capacity")))
+        """INSERT OR IGNORE INTO visit_students (plan_id, student_id, response, source, registered_at, notified_at, conflict)
+           SELECT ?, ?, ?, 'bot', ?, ?, ? WHERE ? IS NULL OR (SELECT COUNT(*) FROM visit_students WHERE plan_id = ?) < ?""",
+        (pid, sid, KUTILMOQDA, ts, ts, conflict or None, p.get("capacity"), pid, p.get("capacity")))
     await db.conn.commit()
     if not cur.rowcount:
         p = await get(pid, full=False)
         if any(x["student_id"] == sid for x in p["students"]):  # ikki marta bosildi
             return p
         raise VisitError("full", "Afsuski, joylar to'ldi.")
-    await _log(pid, "talaba", "talaba_royxatdan_otdi", sid, st["full_name"])
+    await _log(pid, "talaba", "talaba_royxatdan_otdi", sid, st["full_name"],
+               detail=f"vaqti to'g'ri kelmaydi: {conflict}" if conflict else None)
     p = await get(pid, full=False)
     if reg_state(p) == "full":
         await _refresh_elon(bot, p, skip=sid)

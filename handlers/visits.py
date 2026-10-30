@@ -40,7 +40,7 @@ home_router.message.filter(F.chat.type == "private")
 redirect_router = Router(name="student_redirect")
 redirect_router.message.filter(F.chat.type == "private")
 
-STUDENT_ACTS = r"^tv:(ok|time|no|reg|unreg):"
+STUDENT_ACTS = r"^tv:(ok|time|no|reg|regf|regx|unreg):"
 MY_EVENTS = "📅 Tadbirlarim"
 
 
@@ -118,7 +118,7 @@ async def on_student_button(cb: CallbackQuery, state: FSMContext) -> None:
     if key != "_" and key not in db.keys():
         await cb.answer("Bu xabar eskirgan.", show_alert=True)
         return
-    if action in ("reg", "unreg"):
+    if action in ("reg", "regf", "regx", "unreg"):
         await _registration(cb, action, key, pid, sid)
         return
     with _course(key):
@@ -152,14 +152,33 @@ async def on_student_button(cb: CallbackQuery, state: FSMContext) -> None:
 
 
 async def _registration(cb: CallbackQuery, action: str, key: str, pid: int, sid: int) -> None:
-    """E'londagi «Ro'yxatdan o'tish» / «Ro'yxatdan chiqish» — xabar joriy holatga keltiriladi."""
+    """E'londagi «Ro'yxatdan o'tish» / «Ro'yxatdan chiqish» — xabar joriy holatga keltiriladi. Ro'yxatdan o'tishdan
+    oldin talabaning shu vaqtdagi darslari va boshqa tadbirlari tekshiriladi: bo'lsa — darhol ko'rsatiladi va
+    «Baribir qo'shilaman» (regf) yoki «Qo'shilmayman» (regx — e'longa qaytish) so'raladi."""
     with _course(key):
         if not await _student_ok(cb, sid):
             await cb.answer("Bu tugma boshqa talaba uchun.", show_alert=True)
             return
         try:
-            p = await (V.register if action == "reg" else V.unregister)(cb.bot, pid, sid)
-            await cb.answer("✅ Ro'yxatdan o'tdingiz" if action == "reg" else "Ro'yxatdan chiqdingiz")
+            if action == "regx":
+                p = await V.get(pid, full=False)
+                await cb.answer("Ro'yxatdan o'tmadingiz")
+            elif action == "unreg":
+                p = await V.unregister(cb.bot, pid, sid)
+                await cb.answer("Ro'yxatdan chiqdingiz")
+            else:
+                p = await V.get(pid, full=False)
+                clash = await V.conflicts(p, sid) if await V.can_register(p, sid) else []
+                if clash and action == "reg":
+                    await cb.answer("⚠️ Bu vaqtda sizda boshqa mashg'ulot bor")
+                    text, kb = V.conflict_text(p, clash), V.conflict_kb(pid, sid)
+                    try:
+                        await cb.message.edit_text(text, reply_markup=kb, disable_web_page_preview=True)
+                    except Exception:  # noqa: BLE001  (juda eski xabar — yangisi yuboriladi)
+                        await cb.message.answer(text, reply_markup=kb, disable_web_page_preview=True)
+                    return
+                p = await V.register(cb.bot, pid, sid, conflict=V.conflict_note(clash) if clash else None)
+                await cb.answer("✅ Ro'yxatdan o'tdingiz")
         except V.VisitError as e:
             await cb.answer(e.message[:190], show_alert=True)
             p = await V.get(pid, full=False)

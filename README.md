@@ -672,6 +672,18 @@ qoralama ─┬─ ijara tashrifi ─► talabalar tasdig'i (botda) ─┬─►
    - Botga keyinroq ulangan talabaga (havola yoki ota-onani tasdiqlash orqali) ochiq e'lon bir necha daqiqada o'zi
      boradi; har bir talabaga bir marta. Vaqt o'zgarsa yoki bekor qilinsa, yuborilgan e'lonlar ham yangilanadi.
    - Koordinator ro'yxatdan chiqargan talaba qayta yozila olmaydi (qo'lda qayta qo'shish mumkin).
+   - **Vaqt to'qnashuvi.** Talaba «Ro'yxatdan o'tish» ni bosganda bot uning shu vaqtdagi **darslarini** va **boshqa
+     tadbir / tashriflarini** o'qib chiqadi. Kesishadigani bo'lsa — darhol shu xabarning o'zida ko'rsatiladi: vaqti, fan
+     nomi, juftlik, mashg'ulot turi, xona (onlayn bo'lsa — «onlayn»); oraliq yoki yakuniy nazorat bo'lsa — alohida
+     ogohlantirish. Ostida **«✅ Baribir qo'shilaman»** va **«↩️ Qo'shilmayman»** (e'longa qaytadi). «Baribir» bosilsa —
+     talaba ro'yxatga qo'shiladi, xabarida «Shu vaqtda sizda: …» eslatmasi qoladi, panelda ishtirokchi yonida «shu vaqtda
+     darsi bor» / «nazorat bor» / «boshqa tadbiri bor» belgisi (ustiga olib borilsa — nima ekanligi), jurnalda ham yoziladi.
+     To'qnashuv bo'lmasa — avvalgidek darhol ro'yxatdan o'tadi.
+     Darslar **Manage'dagi talabaning shaxsiy haftalik jadvalidan** olinadi (`student-timetable/weekly?hemisId=…&monday=…`
+     — sanali darslar: tanlov fani, 2-til, oraliq nazorat ham; tadbir haftasi uchun HEMIS ID bo'yicha so'raladi, 20 daqiqa
+     keshda turadi va bazaga saqlanadi). Manage o'sha payt javob bermasa — oxirgi saqlangan nusxadan; Manage sozlanmagan
+     yoki talaba unda topilmasa — guruh jadvali + tanlov fani va 2-til jadvalidan (juftlik vaqtlari — «Tizim» yoki
+     `PAIR_TIMES`). Faqat kesishgan vaqt hisoblanadi: tadbir 17:00 da boshlansa, 17:00 da tugaydigan dars to'qnashmaydi.
 2. **Qo'lda kiritish** — reja tuzishda yoki aktual rejada («Ishtirokchilar» → «Qo'lda kiritish»): qidiruv orqali
    alohida talaba yoki «Butun guruhni qo'shish» tugmasi bilan guruh. Qo'lda kiritilgan talaba e'lonsiz ham ishtirokchi;
    uni talaba o'zi ro'yxatdan chiqara olmaydi.
@@ -967,6 +979,12 @@ INTEGRATION_SUBJECTS_INTERVAL=900
 **Avvalgi javob ko'rinishida** (`subjectName`, `lessonCount`, `doneLessonCount`, `subjectTypes` — ma'ruza/seminar) **davomat ham, kredit ham yo'q**, lekin fanga ajratilgan darslar soni (`lessonCount`) bor — 25% chegarasi aynan shundan hisoblanadi: 30 para → 7, 20 → 5, 45 → 11 (kreditdan aniqroq; faqat koordinator qo'lda kiritgan kredit undan ustun). `doneLessonCount` nimani bildirishini bot ma'lumotdan o'zi aniqlaydi (`INTEGRATION_DONE_MEANS=auto`): bir oqimdagi (`subjectTypes[].academicGroupId` — bir xil darslarni birga o'tadigan talabalar) talabalarda qiymat **har xil** bo'lsa — bu talabaning yo'qlamada «keldi» deb belgilangan darslari: qoldirgan = oqimdagi eng ko'p − talabaniki (sababli/sababsiz ajratilmaydi); **bir xil** bo'lsa — o'tilgan darslar soni, davomat emas. Tekshirish: `python integration.py tahlil` (birinchi guruh) yoki `--guruh=3-10c-24` — har bir oqim bo'yicha qiymatlar, kamroq chiqqan talabalar va xulosa (`data/integration_tahlil.txt`). Aniq ko'rsatish: `INTEGRATION_DONE_MEANS=held` yoki `attended`. Davomatning o'zi hozircha HEMIS fan statistikasi fayllaridan yoki Manage davomat manzilidan (`INTEGRATION_ATTENDANCE`) keladi. Agar keyinchalik javobga davomat qo'shilsa, bot uni ham o'qiydi: har bir fan: nomi, kodi, krediti va shu fan bo'yicha davomat (qatnashgan / qoldirgan / sababli — jami son, foiz yoki darslar ro'yxati; maydon nomida `hours`/`soat` bo'lsa soat deb olinib paraga o'giriladi, aniq ko'rsatish: `INTEGRATION_SUBJECTS_UNIT=pair|hour`). Natija — fan bo'yicha HEMIS statistikasi fayli bilan bir xil: fanlar kesimi, umumiy davomat (fanlar yig'indisi), 25% chegarasi, ota-onaga «Fan bo'yicha davomat» va chegara xabarlari (bir kunda qayta olinganda takrorlanmaydi). **Kreditlar barcha fanlar (tillar ham) bo'yicha shu yerdan olinadi** (Manage «kredit» maydoni fan kodidagidan ustun). O'quv yili bo'yicha javobda ikki semestr fanlari bo'lsa — davomat faqat joriy semestrdan olinadi. Tekshirish va javobni ko'rish: `python integration.py fanlar --dump` (javob `data/integration_sample_subjects.json` ga saqlanadi); maydon noto'g'ri tanilsa: `/integratsiya_moslash fanlar qatnashgan=attendance.present`.
 
 **Super-admin:** `/integratsiya` — holat (oxirgi olish, yozuvlar, har bir kurs bo'yicha natija, xatolar) va tugmalar: «🔄 Hozir yangilash», «🔍 Tekshirish» (birinchi sahifa, tanilgan maydonlar, namunaviy qatorlar, bazadagi talabalarga mosligi — bazaga yozilmaydi), «⏸ To'xtatish / ▶️ Yoqish». Biror maydon noto'g'ri tanilsa: `/integratsiya_moslash davomat sana=lesson_date juftlik=lessonPair.code` (`tozalash` — hammasi avtomatik). Terminalda tekshirish: `python integration.py davomat jadval fanlar`.
+
+**Talabaning shaxsiy jadvali.** Jadval so'rovida `{hemis_id}` bo'lsa (Manage: `student-timetable/weekly`), olingan
+talabaning sanali darslari bazaga ham saqlanadi (`student_lessons`). Talaba tadbirga ro'yxatdan o'tayotganda vaqt
+to'qnashuvi uning o'z jadvalidan tekshiriladi — shu hafta uchun Manage'dan darhol so'raladi («Tashriflar» bo'limidagi
+«Vaqt to'qnashuvi»ga qarang). `INTEGRATION_URL` Manage (UWED) bo'lsa, `INTEGRATION_SCHEDULE` yozilmagan bo'lsa ham shu
+ma'lum manzil ishlatiladi.
 
 Kalit berilganda: `.env` ni to'ldiring → botni qayta ishga tushiring → `/integratsiya` → «🔍 Tekshirish». Manage dasturchilari uchun qisqa talablar: `INTEGRATSIYA.md`. Integratsiya yoqilgandan keyin ham davomat va jadvalni Excel bilan yuklash mumkin (zaxira yo'l) — keyingi avtomatik yangilanishda manbadagi ma'lumot ustun.
 
