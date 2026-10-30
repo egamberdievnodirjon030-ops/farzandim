@@ -149,6 +149,19 @@ ALIASES: dict[str, dict[str, list[str]]] = {
         "group_name": _GROUP,
         "student_phones": _SELF_PHONE,
     },
+    # Talabalar hozir yashayotgan (ijara) manzillari: F.I.Sh. + manzil (HEMIS ID ixtiyoriy) — tashriflar uchun
+    "addresses": {
+        "hemis_id": _ID,
+        "full_name": _NAME,
+        "group_name": _GROUP,
+        "course": ["kurs", "course", "bosqich", "kursi"],
+        "address": ["ijarada yashash manzili", "ijara manzili", "ijaradagi manzili", "ijaradagi manzil", "ijara xonadoni manzili",
+                    "ijarada yashash joyi", "ijaradagi yashash manzili", "ijara uy manzili", "hozirgi yashash manzili",
+                    "hozirgi manzili", "hozirgi manzil", "vaqtincha yashash manzili", "amaldagi yashash manzili",
+                    "toshkentdagi manzili", "toshkentdagi yashash manzili", "yashash manzili", "yashash joyi", "manzil",
+                    "manzili", "turar joy manzili", "adres", "address", "adres prozhivaniya", "mesto prozhivaniya"],
+        "student_phones": _SELF_PHONE,
+    },
     "grades": {
         "hemis_id": _ID,
         "full_name": _NAME,
@@ -193,25 +206,26 @@ REQUIRED = {
     "schedule": ["group_name", "weekday", "pair", "subject"],
     "grades": ["subject", "control_type", "score"],
     "phones": ["student_phones"],
+    "addresses": ["address"],
     "attendance_stats": ["absent"],
     "enroll": [],
     "elsched": ["subject", "weekday", "pair"],
     "acad_debts": ["subject"],
     "gpa": ["gpa"],
 }
-NEED_STUDENT_REF = {"attendance", "grades", "phones", "attendance_stats", "enroll", "acad_debts", "gpa"}  # HEMIS ID yoki F.I.Sh ustunidan biri bo'lishi shart
+NEED_STUDENT_REF = {"attendance", "grades", "phones", "addresses", "attendance_stats", "enroll", "acad_debts", "gpa"}  # HEMIS ID yoki F.I.Sh ustunidan biri bo'lishi shart
 
 FIELD_TITLES = {
     "hemis_id": "HEMIS ID", "full_name": "F.I.Sh", "group_name": "Guruh", "date": "Sana",
     "pair": "Juftlik", "subject": "Fan", "status": "Holat", "weekday": "Hafta kuni",
     "control_type": "Nazorat turi", "score": "Ball", "student_phones": "Talaba telefoni",
-    "absent": "Qatnashmaganlar soni", "credits": "Kredit", "semester": "Semestr",
+    "absent": "Qatnashmaganlar soni", "credits": "Kredit", "semester": "Semestr", "address": "Yashash manzili",
 }
 
 KIND_TITLES = {"translations": "Tarjimalar (fan va fakultet nomlari)", "students": "Talabalar", "attendance": "Davomat", "schedule": "Dars jadvali", "grades": "Baholar",
                "attendance_stats": "Davomat (HEMIS statistikasi)", "enroll": "Tanlov fanlari va 2-til (biriktirish)",
                "elsched": "Tanlov fanlari va 2-til jadvali",
-               "phones": "Talaba telefonlari", "debts": "Kontrakt qarzdorligi",
+               "phones": "Talaba telefonlari", "addresses": "Manzillar (ijarada yashash)", "debts": "Kontrakt qarzdorligi",
                "debts_t": "Trimestr qarzdorligi", "acad_debts": "Akademik qarzdorlar (HEMIS ro'yxati)",
                "gpa": "GPA (HEMIS)"}
 
@@ -279,7 +293,7 @@ def parse_file(path: str, kind: str) -> ParseResult:
 # Tanlangan import turi bilan mos keladigan aniqlangan turlar
 COMPATIBLE = {"translations": {"translations"}, "students": {"students"}, "attendance": {"attendance"}, "schedule": {"schedule"},
               "elsched": {"elsched"}, "grades": {"grades"}, "enroll": {"enroll", "grades"},
-              "phones": {"phones", "students"}, "debts": {"debts"}, "debts_t": {"debts_t"},
+              "phones": {"phones", "students"}, "addresses": {"addresses"}, "debts": {"debts"}, "debts_t": {"debts_t"},
               "acad_debts": {"acad_debts"}, "gpa": {"gpa"}}
 
 
@@ -324,6 +338,11 @@ def detect_kinds(all_rows: list[tuple], file_name: str = "") -> list[str]:
     if ("acad_debts" not in found and (enr & {"lang2", "subject"}) and (enr & {"hemis_id", "full_name"}) and "score" not in grades
             and "weekday" not in sched and "date" not in daily and "absent" not in stats):
         found.append("enroll")
+    addr, addr_idx = _best_header(all_rows, ALIASES["addresses"])
+    if {"full_name", "address"} <= set(addr) and not found:
+        found.append("addresses")
+    elif {"full_name", "address"} <= set(addr) and "students" in found and rent_header(all_rows[addr_idx], addr):
+        found.insert(0, "addresses")  # «Ijarada yashash manzili» — talabalar ro'yxati emas, manzillar
     tr_cols = set(_best_header(all_rows, ALIASES["translations"])[0])
     if "uz" in tr_cols and tr_cols & {"ru", "en"}:
         found.insert(0, "translations")
@@ -383,13 +402,15 @@ def parse_rows(all_rows: list[tuple], kind: str) -> ParseResult:
 
     header = all_rows[header_idx]
     res.columns = {f: cell_str(header[i]) for f, i in best.items()}
+    if kind == "addresses":
+        res.meta["rent"] = rent_header(header, best)
 
     def get(row, fld):
         i = best.get(fld)
         return row[i] if i is not None and i < len(row) else None
 
     parser = {"students": _student, "attendance": _attendance, "schedule": _schedule, "grades": _grade,
-              "phones": _self_phones, "attendance_stats": _att_stats, "enroll": _enroll, "translations": _translation,
+              "phones": _self_phones, "addresses": _rent_address, "attendance_stats": _att_stats, "enroll": _enroll, "translations": _translation,
               "elsched": _elective, "acad_debts": _acad_debt, "gpa": _gpa}[kind]
     has_ref = kind == "students" or kind in NEED_STUDENT_REF
     # jadval ustidagi «Guruh: 3-1a-24» kabi qatorlar — qatorda guruh bo'sh bo'lsa shundan olinadi
@@ -399,7 +420,8 @@ def parse_rows(all_rows: list[tuple], kind: str) -> ParseResult:
         if len(vals) >= 2:
             meta[normalize_text(vals[0])] = vals[1]
     meta_group = meta.get("guruh") or meta.get("guruh nomi") or ""
-    res.meta = {"group": meta_group} if meta_group else {}
+    if meta_group:
+        res.meta["group"] = meta_group
     masked = 0
     for n, row in enumerate(all_rows[header_idx + 1:], start=header_idx + 2):
         if not any(v not in (None, "") for v in row):
@@ -632,6 +654,72 @@ def _self_phones(g) -> dict | list:
     if not phones:
         raise ValueError(f"telefon raqam tanilmadi: {raw!r}")
     return {**ref, "student_phones": phones}
+
+
+_NO_ADDRESS = {"", "yoq", "yo q", "mavjud emas", "korsatilmagan", "nomalum", "net", "none", "nan"}
+
+
+def rent_header(header: tuple, colmap: dict) -> bool:
+    """Manzil ustuni ijara (hozirgi) manzilimi — «Ijarada yashash manzili», «Ijara manzili» va h.k."""
+    i = colmap.get("address")
+    h = normalize_text(header[i]) if i is not None and i < len(header) else ""
+    return any(w in h.split() for w in ("ijarada", "ijara", "ijaradagi"))
+
+
+def _rent_address(g) -> dict | list:
+    """Manzillar fayli: talaba (HEMIS ID yoki F.I.Sh.) + hozirgi yashash manzili (+ o'z telefoni)."""
+    ref = _student_ref(g)
+    raw = " ".join(cell_str(g("address")).split()).strip(" ,;")
+    no = not raw or is_masked(raw) or normalize_text(raw) in _NO_ADDRESS or not any(ch.isalnum() for ch in raw)
+    phones = [] if is_masked(g("student_phones")) else split_phones(g("student_phones"))
+    return {**ref, "address": None if no else raw[:300], "student_phones": phones, "course": parse_course(g("course"))}
+
+
+_PATRONYM_TAIL = {"ogli", "qizi", "ugli", "kizi", "oglu", "kyzy", "uly", "xxx"}
+
+
+def core_name(name_norm: str) -> str:
+    """F.I.Sh. ning «o'g'li / qizi» siz ko'rinishi (fayllarda bir xil yozilmaydi)."""
+    w = name_norm.split()
+    while len(w) > 2 and w[-1] in _PATRONYM_TAIL:
+        w = w[:-1]
+    return " ".join(w)
+
+
+def resolve_loose(rows: list[dict], students: list[dict]) -> tuple[list[dict], list[str]]:
+    """HEMIS ID siz fayllar: HEMIS ID → F.I.Sh. + guruh → F.I.Sh. → «o'g'li/qizi» siz F.I.Sh. (+ guruh). Bir xil
+    ismlilar guruh, bo'lmasa kurs bo'yicha ajratiladi; aniqlab bo'lmasa — xato ro'yxatiga."""
+    by_hemis = {normalize_text(st["hemis_id"]).replace(" ", ""): st for st in students if st.get("hemis_id")}
+    full: dict[str, list[dict]] = {}
+    core: dict[str, list[dict]] = {}
+    for st in students:
+        full.setdefault(st["name_norm"], []).append(st)
+        core.setdefault(core_name(st["name_norm"]), []).append(st)
+    ok, errors = [], []
+    for r in rows:
+        st = by_hemis.get(normalize_text(r.get("hemis_id") or "").replace(" ", "")) if r.get("hemis_id") else None
+        if st is None:
+            nn, gk = normalize_text(r.get("full_name") or ""), group_key(r.get("group_name") or "")
+            for cand in (full.get(nn, []), core.get(core_name(nn), [])):
+                if len(cand) > 1 and gk:
+                    cand = [x for x in cand if (x.get("group_key") or "") == gk] or cand
+                if len(cand) > 1 and r.get("course"):
+                    cand = [x for x in cand if x.get("course") == r["course"]] or cand
+                if len(cand) == 1:
+                    st = cand[0]
+                    break
+                if len(cand) > 1:
+                    errors.append(f"{r['_row']}-qator: bir xil F.I.Sh. li {len(cand)} ta talaba — aniqlab bo'lmadi "
+                                  f"({r.get('full_name')})")
+                    st = False
+                    break
+        if not st:
+            if st is None:
+                errors.append(f"{r['_row']}-qator: talaba bazada topilmadi ({r.get('hemis_id') or r.get('full_name')})")
+            continue
+        r["student_id"] = st["id"]
+        ok.append(r)
+    return ok, errors
 
 
 def _grade(g) -> dict:

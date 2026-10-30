@@ -1348,7 +1348,7 @@ function viewStaffAnnounce() {
 }
 function viewStaffFiles() {
   const kinds = [['auto', 'Turini bot aniqlasin'], ['students', 'Talabalar'], ['attendance', 'Davomat'], ['schedule', 'Dars jadvali'], ['grades', 'Baholar'],
-    ['enroll', 'Tanlov/2-til: kim o‘qiydi'], ['elsched', 'Tanlov/2-til: jadval'], ['debts', 'Kontrakt qarzdorligi'], ['debts_t', 'Trimestr qarzdorligi'], ['acad_debts', 'Akademik qarzdorlar (HEMIS)'], ['phones', 'Talaba telefonlari'], ['translations', 'Tarjimalar']];
+    ['enroll', 'Tanlov/2-til: kim o‘qiydi'], ['elsched', 'Tanlov/2-til: jadval'], ['debts', 'Kontrakt qarzdorligi'], ['debts_t', 'Trimestr qarzdorligi'], ['acad_debts', 'Akademik qarzdorlar (HEMIS)'], ['phones', 'Talaba telefonlari'], ['addresses', 'Manzillar (ijara)'], ['translations', 'Tarjimalar']];
   page({ title: 'Fayllar', active: '#/staff/files', body: `<a class="card desk-card" href="#/staff/docs" style="margin-bottom:16px"><span class="ic-badge">${ic('file')}</span>
       <div style="flex:1;text-align:left"><b style="display:block">Rasmiy hujjat yuborish (PDF)</b><span class="muted small">Buyruq, ogohlantirish, hayfsan — ota-onalarga</span></div>${ic('chev')}</a>
     <h2 class="screen-title">Ma’lumot yuklash</h2>

@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS students (
     updated_at   TEXT,
     payment_form TEXT,     -- «Davlat granti» yoki «To'lov-shartnoma»
     full_name_cyr TEXT,    -- rasmiy kirill yozuvi (ixtiyoriy): rus tilidagi ota-onaga shu ko'rsatiladi
-    address      TEXT      -- yashash manzili (ota-onaga xat uchun): kontingent faylidan yoki «Chora ko'rish»da qo'lda
+    address      TEXT      -- doimiy yashash manzili (ota-onaga xat uchun): kontingent faylidan yoki «Chora ko'rish»da qo'lda
 );
 CREATE INDEX IF NOT EXISTS idx_students_group ON students(group_key);
 
@@ -703,6 +703,12 @@ class Database:
         for col, ddl in (("lat", "REAL"), ("lon", "REAL"), ("living", "TEXT"), ("zone", "TEXT"), ("visit_code", "TEXT")):
             if col not in cols:
                 await self.conn.execute(f"ALTER TABLE students ADD COLUMN {col} {ddl}")
+        # hozirgi (ijara) manzili — tashriflar va xarita uchun; doimiy manzil (address) — ota-onaga xat uchun, alohida.
+        # Oldin ikkalasi bitta ustunda edi: koordinator «Ijara xonadonida» deb belgilaganlarning manzili ko'chiriladi
+        if "rent_address" not in cols:
+            await self.conn.execute("ALTER TABLE students ADD COLUMN rent_address TEXT")
+            await self.conn.execute("UPDATE students SET rent_address = address WHERE living = 'ijara' "
+                                    "AND TRIM(COALESCE(address, '')) <> ''")
         for t, add in (("disc_orders", (("deadline", "TEXT"), ("basis_kind", "TEXT"), ("basis_date", "TEXT"), ("basis_number", "TEXT"),
                                         ("archived_at", "TEXT"))),
                        ("disc_cases", (("amount", "REAL"), ("as_of", "TEXT"), ("basis", "TEXT"), ("basis_at", "TEXT"),
@@ -866,6 +872,38 @@ class Database:
             await self._replace_self_phones(sid, phones)
         await self.conn.commit()
         return len(merged)
+
+    async def set_addresses(self, rows: list[dict], rent: bool) -> dict:
+        """«Manzillar» fayli: talabaning hozirgi (ijara) manzili — rent_address (doimiy manzil — address, ota-onaga xat
+        uchun — o'zgarmaydi). rent — sarlavhada «ijara»: yashash turi «ijara». Manzil o'zgarsa, xaritadagi eski nuqta
+        olib tashlanadi (yangi manzil bo'yicha qayta aniqlanadi). Telefon raqamlari talabaning o'z raqamlariga
+        qo'shiladi (eskilari o'chirilmaydi). Manzili «-» yoki bo'sh — tegilmaydi."""
+        out = {"updated": 0, "same": 0, "empty": 0, "moved": 0, "phones": 0, "living": 0}
+        for r in rows:
+            st = await self.fetchone("SELECT rent_address, living, lat FROM students WHERE id = ?", (r["student_id"],))
+            if not st:
+                continue
+            for ph in r.get("student_phones") or []:
+                cur = await self.conn.execute("INSERT OR IGNORE INTO student_self_phones (student_id, phone) VALUES (?, ?)",
+                                              (r["student_id"], ph))
+                out["phones"] += cur.rowcount > 0
+            addr = r.get("address")
+            if not addr:
+                out["empty"] += 1
+                continue
+            same = normalize_text(addr) == normalize_text(st["rent_address"] or "")
+            living = "ijara" if rent else st["living"]
+            if same and living == st["living"]:
+                out["same"] += 1
+                continue
+            await self.conn.execute(
+                "UPDATE students SET rent_address = ?, living = ?, lat = CASE WHEN ? THEN lat END, "
+                "lon = CASE WHEN ? THEN lon END WHERE id = ?", (addr, living, same, same, r["student_id"]))
+            out["updated"] += 1
+            out["moved"] += (not same and st["lat"] is not None)
+            out["living"] += living != st["living"]
+        await self.conn.commit()
+        return out
 
     async def add_self_phone(self, sid: int, phone: str) -> None:
         await self.execute("INSERT OR IGNORE INTO student_self_phones (student_id, phone) VALUES (?, ?)", (sid, phone))

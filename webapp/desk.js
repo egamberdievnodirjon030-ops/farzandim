@@ -1587,7 +1587,7 @@ async function pAnnounce() {
 /* ================================================================ ma'lumot yuklash va hisobot */
 const KINDS = [['auto', 'Turini bot aniqlasin'], ['students', 'Talabalar'], ['attendance', 'Davomat (kunlik)'], ['attendance_stats', 'Davomat (HEMIS statistikasi)'],
   ['schedule', 'Dars jadvali'], ['grades', 'Baholar'], ['enroll', 'Tanlov fanlari va 2-til: kim o‘qiydi'], ['elsched', 'Tanlov fanlari va 2-til: jadval'],
-  ['debts', 'Kontrakt qarzdorligi'], ['debts_t', 'Trimestr qarzdorligi'], ['acad_debts', 'Akademik qarzdorlar (HEMIS ro‘yxati)'], ['phones', 'Talaba telefonlari'], ['translations', 'Tarjimalar']];
+  ['debts', 'Kontrakt qarzdorligi'], ['debts_t', 'Trimestr qarzdorligi'], ['acad_debts', 'Akademik qarzdorlar (HEMIS ro‘yxati)'], ['phones', 'Talaba telefonlari'], ['addresses', 'Manzillar (ijarada yashash)'], ['translations', 'Tarjimalar']];
 const SECTIONS_EXP = [['all', 'To‘liq hisobot'], ['prob', 'Muammoli talabalar'], ['att', 'Davomati past talabalar'], ['acad', 'Akademik qarzdorlar'],
   ['kontrakt', 'Kontrakt qarzdorlari'], ['trimestr', 'Trimestr qarzdorlari']];
 async function pFiles() {

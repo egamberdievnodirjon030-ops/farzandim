@@ -438,7 +438,7 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
             lines.append("⚠️ Faylda guruhlaringizga tegishli talaba topilmadi — hech narsa saqlanmadi. Guruhlar "
                          "noto'g'ri biriktirilgan bo'lsa, super-adminga murojaat qiling.")
 
-    if kind in ("students", "phones"):
+    if kind in ("students", "phones", "addresses"):
         cols = result.columns
         lines.append("Tanilgan ustunlar: " + ", ".join(
             f"{COLUMN_ROLES[f]} ← «{esc(h)}»" for f, h in cols.items() if f in COLUMN_ROLES))
@@ -466,6 +466,31 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         lines.append(f"Talabalarning o'z raqamlari yangilandi: {n} ta talaba "
                      f"({sum(len(r['student_phones']) for r in rows)} ta raqam)")
         lines += await _after_phone_import(bot)
+
+    elif kind == "addresses":  # hozirgi (ijara) manzillari: HEMIS ID siz — F.I.Sh. (+ guruh) bo'yicha
+        from importer import resolve_loose
+        rows, unknown = resolve_loose(result.rows, await db.all_students_brief(scope))
+        errors += unknown
+        rent = bool(result.meta.get("rent"))
+        r = await db.set_addresses(rows, rent)
+        lines.append(f"Talabalar topildi: {len(rows)} ta; manzili yangilandi: {r['updated']}, o'zgarmagan: {r['same']}"
+                     + (f"; manzili ko'rsatilmagan («-» yoki bo'sh) — tegilmadi: {r['empty']}" if r["empty"] else ""))
+        if rent:
+            lines.append("🏠 Ustun — ijara manzili: talabalar «Ijara xonadonida» deb belgilandi"
+                         + (f" (o'zgargani: {r['living']})" if r["living"] else ""))
+        if r["moved"]:
+            lines.append(f"📍 Manzili o'zgargan {r['moved']} ta talabaning xaritadagi eski nuqtasi olib tashlandi — yangi "
+                         "manzil bo'yicha qayta aniqlanadi.")
+        if r["phones"]:
+            lines.append(f"Talabaning o'z raqami qo'shildi: {r['phones']} ta (talabalar botiga telefon bilan ulanish uchun)")
+            lines += await _after_phone_import(bot)
+        lines.append("Manzillar — talaba kartasida («Ijara manzili»), ijara tashriflarida va «Tashriflar → Yashash joylari» "
+                     "xaritasida. Ota-onaga xatdagi doimiy manzil (kontingentdan) o'zgarmaydi.")
+        try:
+            import visits
+            visits._wake_geo()  # yangi manzillarni xaritadan aniqlash (fon oqimi)
+        except Exception:  # noqa: BLE001
+            pass
 
     elif kind == "attendance" and result.kind == "attendance_stats" and stats_subj:
         # HEMIS statistikasi BITTA FAN bo'yicha — fanlar kesimiga yoziladi, umumiy davomatga tegilmaydi
@@ -1001,7 +1026,7 @@ def _crossings_lines(crossings: list[dict], limit: int = 30) -> list[str]:
     return out
 
 
-COLUMN_ROLES = {"hemis_id": "ID", "full_name": "F.I.Sh", "group_name": "guruh",
+COLUMN_ROLES = {"hemis_id": "ID", "full_name": "F.I.Sh", "group_name": "guruh", "address": "manzil", "course": "kurs",
                 "student_phones": "talabaning o'z raqami", "phones": "ota-ona raqami",
                 "phones_father": "otasining raqami", "phones_mother": "onasining raqami"}
 

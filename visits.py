@@ -328,9 +328,9 @@ async def student_visits(sid: int) -> dict:
         "SELECT * FROM visit_acts WHERE student_id = ? ORDER BY id DESC", (sid,))]
     acc = await db.fetchone("SELECT tg_id, tg_name, via, linked_at FROM student_accounts WHERE student_id = ?", (sid,))
     zone = acts[0]["category"] if acts and acts[0]["category"] else st.get("zone")
-    return {"living": st.get("living") or ("ijara" if (st.get("address") or "").strip() else None),
+    return {"living": st.get("living") or ("ijara" if (st.get("rent_address") or "").strip() else None),
             "zone": zone, "zone_from": "act" if acts and acts[0]["category"] else ("manual" if st.get("zone") else None),
-            "address": st.get("address") or "", "lat": st.get("lat"), "lon": st.get("lon"),
+            "address": st.get("rent_address") or "", "lat": st.get("lat"), "lon": st.get("lon"),
             "visits": rows, "acts": acts, "account": acc}
 
 
@@ -363,14 +363,15 @@ def _check(d: dict) -> None:
 
 
 async def _attach(pid: int, sids: list[int], scope: set[str] | None, address: bool = True) -> int:
-    """Talabalarni rejaga biriktirish (ko'rinish doirasidagilar). Ijara manzili — faqat ijara tashrifiga."""
+    """Talabalarni rejaga biriktirish (ko'rinish doirasidagilar). Ijara manzili (rent_address; doimiy manzil emas) —
+    faqat ijara tashrifiga."""
     n = 0
     for sid in dict.fromkeys(int(x) for x in sids or []):
         st = await db.get_student(sid)
         if not st or (scope is not None and st.get("group_key") not in scope):
             continue
         await db.conn.execute("INSERT OR IGNORE INTO visit_students (plan_id, student_id, address, response) VALUES (?, ?, ?, ?)",
-                              (pid, sid, ((st.get("address") or "").strip() or None) if address else None, KUTILMOQDA))
+                              (pid, sid, ((st.get("rent_address") or "").strip() or None) if address else None, KUTILMOQDA))
         n += 1
     await db.conn.commit()
     return n
@@ -1392,7 +1393,7 @@ def _all_addresses() -> list[str]:
         try:
             with sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5) as c:
                 out += [r[0] for r in c.execute(
-                    "SELECT DISTINCT address FROM students WHERE address IS NOT NULL AND TRIM(address) <> '' "
+                    "SELECT DISTINCT rent_address FROM students WHERE rent_address IS NOT NULL AND TRIM(rent_address) <> '' "
                     "AND COALESCE(living, 'ijara') = 'ijara'")]
                 out += [r[0] for r in c.execute(
                     """SELECT DISTINCT vs.address FROM visit_students vs JOIN visit_plans p ON p.id = vs.plan_id
@@ -1555,8 +1556,8 @@ async def set_home(sid: int, d: dict) -> dict:
         sets["living"] = d["living"] if d["living"] in LIVING else None
     if "zone" in d:
         sets["zone"] = d["zone"] if d["zone"] in ZONES else None
-    if "address" in d:
-        sets["address"] = (d.get("address") or "").strip()[:300] or None
+    if "address" in d:  # ijara (hozirgi) manzili; doimiy manzil — kontingentdan, ota-onaga xat uchun
+        sets["rent_address"] = (d.get("address") or "").strip()[:300] or None
     if "location" in d:
         txt = (d.get("location") or "").strip()
         if not txt:
@@ -1576,10 +1577,10 @@ async def set_home(sid: int, d: dict) -> dict:
     if sets:
         await db.execute(f"UPDATE students SET {', '.join(f'{k} = ?' for k in sets)} WHERE id = ?", (*sets.values(), sid))
     st = await db.get_student(sid)
-    if ("lat" in sets or "address" in sets) and _geo_on():
+    if ("lat" in sets or "rent_address" in sets) and _geo_on():
         from tashrif import yol
         if st.get("lat") is not None:
-            await asyncio.to_thread(yol.joy_belgila, st.get("address") or "", st["lat"], st["lon"])
+            await asyncio.to_thread(yol.joy_belgila, st.get("rent_address") or "", st["lat"], st["lon"])
         _wake_geo()
     out = await student_visits(sid)
     if st.get("lat") is not None:
@@ -1606,7 +1607,7 @@ async def student_route(sid: int, here: tuple[float, float] | None = None) -> di
         raise VisitError("geo_off", "Yo'l ma'lumoti o'chirilgan (YOL_MALUMOTI=yoq)")
     from tashrif import yol
     return await asyncio.to_thread(yol.talaba_yoli, {"id": st["id"], "full_name": st["full_name"],
-                                                     "address": st.get("address") or "", "lat": st.get("lat"),
+                                                     "address": st.get("rent_address") or "", "lat": st.get("lat"),
                                                      "lon": st.get("lon")}, here)
 
 
@@ -1629,8 +1630,8 @@ async def dashboard(scope: set[str] | None) -> dict:
     """Ko'rsatkichlar (yashash turi, xonadon toifasi), xaritadagi nuqtalar, tumanlar va xonadonlar kesimi.
     Tarmoqdan hech narsa so'ralmaydi (tashrif-py panel.py)."""
     from tashrif import tuman, yol
-    rows = [r for r in await db.fetchall("SELECT id, full_name, group_name, group_key, address, lat, lon, living, zone "
-                                          "FROM students ORDER BY full_name")
+    rows = [r for r in await db.fetchall("SELECT id, full_name, group_name, group_key, rent_address AS address, lat, lon, "
+                                          "living, zone FROM students ORDER BY full_name")
             if scope is None or r["group_key"] in scope]
     acts = {}
     for a in await db.fetchall("SELECT student_id, category, plan_id, updated_at FROM visit_acts WHERE category IS NOT NULL "
@@ -1877,7 +1878,7 @@ async def pick_students(scope: set[str] | None, q: str = "") -> list[dict]:
     ulanganmi."""
     from utils import normalize_text
     rows = await db.fetchall(
-        """SELECT s.id, s.full_name, s.name_norm, s.group_name, s.group_key, s.hemis_id, s.address, s.living, s.zone,
+        """SELECT s.id, s.full_name, s.name_norm, s.group_name, s.group_key, s.hemis_id, s.rent_address AS address, s.living, s.zone,
                   s.lat, s.lon, a.tg_id FROM students s LEFT JOIN student_accounts a ON a.student_id = s.id
            ORDER BY s.group_name, s.full_name""")
     qn = normalize_text(q)

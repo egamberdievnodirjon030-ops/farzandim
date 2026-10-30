@@ -745,7 +745,7 @@ async function loadStudentHome(sid, course) {
   $('[data-hliv]', box).addEventListener('change', e => save({ living: e.target.value }));
   $('[data-hzone]', box)?.addEventListener('change', e => save({ zone: e.target.value }));
   $('[data-haddr]', box).addEventListener('click', async () => {
-    const f = await formDlg('Ijara manzili', `<p>Tuman, ko‘cha (mavze), uy, xonadon — masalan: «Uchtepa tumani, 14-kvartal, 2-uy, 63-xonadon». Shu manzil ota-onaga xatda ham ishlatiladi.</p>
+    const f = await formDlg('Ijara manzili', `<p>Tuman, ko‘cha (mavze), uy, xonadon — masalan: «Uchtepa tumani, 14-kvartal, 2-uy, 63-xonadon». Bu — talaba hozir yashayotgan (ijara) manzili: tashriflar va xarita uchun. Ota-onaga xatdagi doimiy manzil (kontingentdan) bundan alohida va o‘zgarmaydi.</p>
       <label class="field"><span>Manzil</span><input class="input" name="address" value="${esc(d.address)}"></label>`, 'Saqlash');
     if (f) save({ address: f.get('address') }); });
   $('[data-hloc]', box).addEventListener('click', async () => {

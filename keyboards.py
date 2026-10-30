@@ -296,7 +296,8 @@ IMPORT_KINDS = (("👥 Talabalar", "students"), ("📊 Davomat", "attendance"),
                 ("🎯 Tanlov/2-til: kim o'qiydi", "enroll"), ("🗓 Tanlov/2-til: jadval", "elsched"),
                 ("💰 Kontrakt qarzdorligi", "debts"), ("🗓 Trimestr qarzdorligi", "debts_t"),
                 ("📚 Akademik qarzdorlar", "acad_debts"), ("🎓 GPA (HEMIS)", "gpa"),
-                ("📱 Talaba telefonlari", "phones"), ("🌐 Tarjimalar", "translations"))
+                ("📱 Talaba telefonlari", "phones"), ("🏠 Manzillar (ijarada yashash)", "addresses"),
+                ("🌐 Tarjimalar", "translations"))
 
 
 def import_kb() -> InlineKeyboardMarkup:
