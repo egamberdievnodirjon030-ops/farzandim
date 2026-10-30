@@ -25,6 +25,8 @@ def _pair_times(value: str) -> dict[int, tuple[str, str]]:
 
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
+# Talabalar uchun alohida bot (tashrif so'rovlari, tadbir e'lonlari, ota-onani tasdiqlash). Bo'sh — hammasi bitta botda
+STUDENT_BOT_TOKEN = os.getenv("STUDENT_BOT_TOKEN", "").strip()
 # Kurs koordinatorlarining Telegram ID raqamlari, vergul bilan: 123456789,987654321
 ADMIN_IDS: set[int] = set(_int_list(os.getenv("ADMIN_IDS", "")))
 

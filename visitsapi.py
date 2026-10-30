@@ -7,6 +7,7 @@ from datetime import date, timedelta
 
 from aiohttp import web
 
+import botlar
 import visits as V
 from database import db
 from tenancy import viewer_scope
@@ -53,7 +54,11 @@ async def api_visits(request):
     frm = q.get("from") or (t - timedelta(days=t.weekday() + 7 * 5)).isoformat()
     to = q.get("to") or (t + timedelta(days=7 * 10)).isoformat()
     rows = await V.plans(uid, frm, to, q.get("status", ""))
-    return ok({"items": [_pub(r, uid) for r in rows], "from": frm, "to": to, "counts": await V.counts(uid),
+    try:  # talabalar boti (alohida bo'lsa) — koordinator talabalarga ulashadi
+        sbot = (await botlar.student_bot(request.app["bot"]).me()).username if botlar.separate() else None
+    except Exception:  # noqa: BLE001  (Telegram javob bermadi — sahifa baribir ochiladi)
+        sbot = None
+    return ok({"items": [_pub(r, uid) for r in rows], "from": frm, "to": to, "counts": await V.counts(uid), "student_bot": sbot,
                "super": V.is_super(uid), "types": V.TURLAR, "statuses": V.HOLATLAR, "answers": V.JAVOBLAR,
                "living": V.LIVING, "zones": V.ZONES, "geo": V._geo_on()})
 

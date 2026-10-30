@@ -1,4 +1,5 @@
-"""Ota-onalar uchun davomat boti — ishga tushirish nuqtasi.
+"""Ota-onalar uchun davomat boti — ishga tushirish nuqtasi. STUDENT_BOT_TOKEN bo'lsa, shu jarayonda talabalar boti
+ham ishlaydi (tashrif so'rovlari, tadbir e'lonlari, ota-onani tasdiqlash — botlar.py).
 
     python bot.py
 """
@@ -14,7 +15,8 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ErrorEvent
 
-from config import ADMIN_IDS, BOT_TOKEN, COURSES, DATA_DIR, DB_PATH, SUPERADMIN_IDS
+import botlar
+from config import ADMIN_IDS, BOT_TOKEN, COURSES, DATA_DIR, DB_PATH, STUDENT_BOT_TOKEN, SUPERADMIN_IDS
 from database import db
 from handlers import admin, appgate, common, groups, mobileapp, parent, search, staff, studentconfirm, superadmin
 from handlers import integration as integration_h
@@ -30,7 +32,9 @@ from logsetup import alert_handler, setup_logging
 from i18n import tr, use_lang
 from tenancy import central, course_keys, course_title, is_staff, reload_registry, use_course
 
-def build_dispatcher() -> Dispatcher:
+def build_dispatcher(separate: bool = False) -> Dispatcher:
+    """Asosiy (ota-onalar) boti. separate — talabalar uchun alohida bot bor: talaba oqimlari o'sha botda, bu yerda
+    faqat eski talaba havolalari va tugmalari yo'naltiriladi."""
     dp = Dispatcher(storage=MemoryStorage())
     # Birinchi: so'rov qaysi kurs bazasiga tegishli (kurs koordinatori — o'z kursi, ota-ona — farzandining kursi)
     register_parent_callbacks(ChildCb, AttCb, SchCb, DocGetCb)
@@ -43,10 +47,49 @@ def build_dispatcher() -> Dispatcher:
     dp.callback_query.outer_middleware(BlockedUserMiddleware())
     # Tartib muhim: guruhlar -> super-admin -> kurs koordinatori menyusi -> ota-ona menyusi -> ro'yxatdan o'tish ->
     # admin buyruqlari -> ism bo'yicha qidiruv (oxirida)
-    dp.include_routers(groups.router, studentconfirm.router, visits_h.router, mobileapp.router, integration_h.router, superadmin.router, staff.router, appgate.router, parent.router, common.router, admin.router,
+    student = [visits_h.redirect_router] if separate else [studentconfirm.router, visits_h.router]
+    dp.include_routers(groups.router, *student, visits_h.staff_router, mobileapp.router, integration_h.router,
+                       superadmin.router, staff.router, appgate.router, parent.router, common.router, admin.router,
                        search.router)
     dp.errors.register(on_error)
     return dp
+
+
+def build_student_dispatcher() -> Dispatcher:
+    """Talabalar boti: ota-onani tasdiqlash, shaxsiy havola, tashrif javoblari, e'londa ro'yxatdan o'tish, /start
+    (telefon bilan ulanish) va «Tadbirlarim». Ota-ona menyusi va bloklash yo'q."""
+    dp = Dispatcher(storage=MemoryStorage())
+    dp.message.outer_middleware(LangMiddleware())
+    dp.callback_query.outer_middleware(LangMiddleware())
+    dp.include_routers(studentconfirm.router, visits_h.router, visits_h.home_router)
+    dp.errors.register(on_error)
+    return dp
+
+
+async def _student_bot() -> Bot | None:
+    """STUDENT_BOT_TOKEN bo'yicha talabalar boti; token noto'g'ri bo'lsa — ogohlantirish, hammasi bitta botda."""
+    if not STUDENT_BOT_TOKEN:
+        return None
+    if STUDENT_BOT_TOKEN == BOT_TOKEN:
+        logging.error("STUDENT_BOT_TOKEN asosiy BOT_TOKEN bilan bir xil — talabalar uchun @BotFather da alohida bot "
+                      "yarating. Hozircha hammasi bitta botda ishlaydi.")
+        return None
+    sbot = Bot(STUDENT_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    try:
+        me = await sbot.get_me()
+    except TelegramUnauthorizedError:
+        await sbot.session.close()
+        logging.error("Telegram STUDENT_BOT_TOKEN ni qabul qilmadi (Unauthorized) — @BotFather → /mybots → talabalar boti → "
+                      "API Token. Hozircha talabaga tegishli hammasi asosiy botda ishlaydi.")
+        return None
+    logging.info("Talabalar boti: @%s (id %s)", me.username, me.id)
+    try:
+        from aiogram.types import BotCommand
+        await sbot.set_my_commands([BotCommand(command="start", description="Boshlash / ulanish"),
+                                    BotCommand(command="tadbirlar", description="Yaqin tashrif va tadbirlarim")])
+    except Exception:  # noqa: BLE001  (buyruqlar menyusi — majburiy emas)
+        logging.warning("Talabalar boti buyruqlari o'rnatilmadi")
+    return sbot
 
 
 async def on_error(event: ErrorEvent) -> bool:
@@ -168,7 +211,9 @@ async def main() -> None:
             "BOT_TOKEN= qatoriga qo'ying va botni qayta ishga tushiring.")
     logging.info("Bot: @%s (id %s)", me.username, me.id)
     alert_handler.attach(bot)
-    dp = build_dispatcher()
+    sbot = await _student_bot()
+    botlar.set_bots(bot, sbot)
+    dp = build_dispatcher(separate=sbot is not None)
     await setup_commands(bot)
     scheduler = asyncio.create_task(scheduler_loop(bot))
     from handlers.mobileapp import apk_loop
@@ -182,9 +227,18 @@ async def main() -> None:
     except Exception:
         logging.exception("Yo'l moduli ishga tushmadi")
     web_runner = await webserver.start(bot)  # Telegram Web App (bot ichidagi ilova)
+    sdp = build_student_dispatcher() if sbot else None
+    student_task = asyncio.create_task(sdp.start_polling(sbot, handle_signals=False, allowed_updates=sdp.resolve_used_update_types())) \
+        if sdp else None
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        if student_task:
+            try:
+                await sdp.stop_polling()
+            except (RuntimeError, LookupError):
+                pass
+            student_task.cancel()
         scheduler.cancel()
         apk_task.cancel()
         integ_task.cancel()
@@ -194,6 +248,8 @@ async def main() -> None:
         await db.close()
         await central.close()
         await bot.session.close()
+        if sbot:
+            await sbot.session.close()
 
 
 if __name__ == "__main__":

@@ -53,7 +53,9 @@ async def issue_token(rid: int) -> str:
 
 
 async def confirm_url(bot, token: str) -> str:
-    me = await bot.me()
+    """Talabaga beriladigan havola — talabalar botida (alohida bot sozlanmagan bo'lsa — asosiy botda)."""
+    import botlar
+    me = await botlar.student_bot(bot).me()
     return f"https://t.me/{me.username}?start={START_PREFIX}{token}"
 
 
@@ -137,12 +139,15 @@ def mask_phone(phone: str | None) -> str:
 
 
 async def student_decide(bot, key: str, rid: int, student_tg: int, approve: bool) -> tuple[bool, str]:
-    """Talabaning qarori. Qaytaradi: (bajarildimi, talabaga ko'rsatiladigan javob)."""
+    """Talabaning qarori. Qaytaradi: (bajarildimi, talabaga ko'rsatiladigan javob). Ota-ona va koordinatorga xabar —
+    asosiy bot orqali (talaba talabalar botida tasdiqlagan bo'lsa ham)."""
     import appmode
+    import botlar
     import live
     from i18n import tr, use_lang
     from notifier import safe_send
     from staffops import _coord_notice
+    bot = botlar.main_bot(bot)
     with use_course(None if key == "_" else key):
         r = await db.fetchone("SELECT * FROM link_requests WHERE id = ?", (rid,))
         if not r or r["status"] != "pending" or r["student_tg"] != student_tg or r["student_ok_at"]:

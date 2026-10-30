@@ -22,6 +22,8 @@ Telegram bot ota-onalarga farzandining qaysi kunlarda, qaysi fanlardan darsga qa
 
 **Kompyuter versiyasi:** kurs koordinatori va super-admin uchun brauzerdagi boshqaruv paneli — butun kurs bitta jadvalda (saralash, filtrlar), xabarlar va suhbat yonma-yon, so'rovlar, e'lon (uch tildagi ko'rinishi bilan), fayllarni sudrab yuklash, hisobotni yuklab olish; super-admin — barcha kurslar, kurslar va koordinatorlar, zaxira nusxa va xatolar jurnali. Kirish — botdagi «💻 Kompyuter versiyasi» tugmasi (parolsiz). Batafsil — «Kompyuter versiyasi» bo'limi.
 
+**Ikki bot:** ota-onalar boti va alohida talabalar boti (talaba telefon raqami bilan o'zi ulanadi; tashrif, tadbir e'lonlari va eslatmalar — o'sha botda).
+
 **Tashriflar:** ijara xonadonlariga tashrif, madaniy tashrif, tadbir va koordinatorlik soati rejalari — talaba botda tasdiqlaydi yoki boshqa vaqt taklif qiladi, tadbir va madaniy tashrif botda e'lon qilinadi — talaba «Ro'yxatdan o'tish» tugmasi bilan o'zi yoziladi (qo'lda kiritish ham bor), ishtirokchilarga nomi, joyi, vaqti va eslatma boradi, koordinatorga manzilga qanday borilishi (bekat, avtobus, metro), talabalar yashash joylari xaritasi, dalolatnoma (telefonda imzo, bir betli Word) va hisobot (batafsil — «Tashriflar» bo'limida).
 
 **Universitet tizimi bilan integratsiya:** davomat va dars jadvali «Manage» tizimidan avtomatik, real vaqtga yaqin olinadi (API kaliti yoki webhook; javob ko'rinishi va shabloni qat'iy emas). Batafsil — «Integratsiya» bo'limi.
@@ -203,9 +205,39 @@ Ota-ona ilovada uch qadamni ko'radi: **1. Telefon → 2. Farzand → 3. Tasdiqla
 
 Talabalar botga ota-ona sifatida kira olmasligi saqlanadi: tasdiqlash havolasi bloklangan talabaga ham ochiladi, lekin u faqat «ha/yo'q» deydi — ota-ona menyusiga va ilovaga kirmaydi.
 
-## Talabalar botga kira olmaydi
+## Ikki bot: ota-onalar va talabalar uchun
 
-Bot faqat ota-onalar uchun. Talaba o'z raqami bilan ro'yxatdan o'tib, «ota-ona» bo'lib olmasligi uchun ikki usul birga ishlaydi.
+Tizim ikki botda ishlaydi (bitta dastur, bitta baza):
+
+| | Ota-onalar boti (`BOT_TOKEN`) | Talabalar boti (`STUDENT_BOT_TOKEN`) |
+|---|---|---|
+| Kimlar | ota-onalar; kurs koordinatorlari va super-admin (buyruqlar, ilova, bildirishnomalar) | talabalar |
+| Nima | davomat, baholar, to'lovlar, hujjatlar, xabarnomalar; koordinatorga tashrif javoblari, yo'l ma'lumoti (`/yol`), «joylar to'ldi» | ota-onani tasdiqlash havolasi; ijara xonadoniga tashrif so'rovi (✅ / 🕒 / ❌); tadbir va madaniy tashrif e'lonlari («Ro'yxatdan o'tish»), ma'lumot va eslatmalar; «📅 Tadbirlarim» |
+
+**Talabalar botini yoqish.** @BotFather → `/newbot` bilan ikkinchi bot yarating (masalan, «JIDU talabalar»), tokenini
+`.env` dagi `STUDENT_BOT_TOKEN=` ga qo'ying va dasturni qayta ishga tushiring — ikkala bot bitta jarayonda ishlaydi.
+Jurnalda `Talabalar boti: @...` yozuvi chiqadi; boshqaruv paneli → «Tashriflar» sahifasida talabalar botining havolasi
+ko'rinadi (talabalarga ulashing). `STUDENT_BOT_TOKEN` bo'sh, noto'g'ri yoki asosiy token bilan bir xil bo'lsa — hammasi
+bitta botda ishlaydi (oldingidek), jurnalda sababi yoziladi.
+
+**Talaba qanday ulanadi** (talabalar botida):
+- `/start` → «📱 Raqamimni yuborish»: Telegram raqami bazadagi talaba raqami (talabalar faylidagi «Talaba telefoni»)
+  bilan solishtiriladi — mos kelsa, darhol ulanadi. Raqam bazada bo'lmasa yoki bir nechta talabada bo'lsa — ulanmaydi;
+- kurs koordinatori bergan **shaxsiy havola** (talaba kartasi yoki reja oynasidagi «Havola»);
+- ota-ona yuborgan **tasdiqlash havolasi** — talaba ota-onasini tasdiqlagach, bot uni taniydi.
+
+Ulangan talaba `/start` bossa — kimligi, javob kutayotgan tashriflari va ochiq e'lonlar qayta keladi; «📅 Tadbirlarim» —
+yaqin tashrif va tadbirlari hamda ro'yxatdan o'tish mumkin bo'lgan e'lonlar.
+
+**Bitta botdan ikki botga o'tish.** Eski havolalar (ota-onalar botidagi `?start=t_...`, `?start=v_...`) va eski
+xabarlardagi talaba tugmalari endi talabalar botiga yo'naltiradi («... da ochish» tugmasi, shu havolaning o'zi bilan).
+Avval ulangan talabalarning hisobi saqlanadi (Telegram ID bir xil), lekin Telegram bot talabaga birinchi bo'lib yoza
+olmaydi: talaba talabalar botini bir marta ochishi (`/start`) kerak — shunda unga yetmay qolgan tashrif so'rovlari va
+e'lonlar keladi. Shuning uchun talabalar botining havolasini guruhlarga tarqating.
+
+## Talabalar ota-onalar botiga kira olmaydi
+
+Ota-onalar boti faqat ota-onalar uchun (talabalarniki — talabalar boti, yuqorida). Talaba o'z raqami bilan ro'yxatdan o'tib, «ota-ona» bo'lib olmasligi uchun ikki usul birga ishlaydi.
 
 **Talabalar raqamlari bazasi.** Talabalar faylida «Talaba telefoni» ustuni bo'lsa yoki alohida «📱 Talaba telefonlari» fayli yuklansa (`/shablon` dagi 5-namuna), bot bu raqamlarni eslab qoladi. Kimdir shu raqam bilan ro'yxatdan o'tmoqchi bo'lsa, rad etiladi. Qo'shimchasiz «Telefon» yoki «Telefon raqami» ustuni talabaning o'z raqami deb olinadi, chunki HEMIS ro'yxatlarida odatda shunday. Ota-ona raqamlari faqat aniq nom bilan olinadi: «Ota-ona telefoni», «Otasining telefoni», «Onasining telefoni» va h.k. Import natijasida qaysi ustun qanday tanilgani ko'rsatiladi — uni albatta tekshiring.
 
@@ -305,7 +337,8 @@ Kurs koordinatori va super-admin uchun kompyuter brauzerida ishlaydigan to'liq b
 ## O'rnatish
 
 1. Python 3.10 yoki undan yangi versiyasini o'rnating (tavsiya: 3.12).
-2. Telegramda **@BotFather** → `/newbot` → bot nomi va username bering → token oling.
+2. Telegramda **@BotFather** → `/newbot` → bot nomi va username bering → token oling. Talabalar uchun ikkinchi botni ham
+   shu yo'l bilan yarating (tavsiya etiladi — «Ikki bot» bo'limi).
 3. O'z Telegram ID raqamingizni **@userinfobot** orqali bilib oling.
 4. Loyiha papkasida:
 
@@ -317,7 +350,8 @@ pip install -r requirements.txt
 cp .env.example .env        # Windows: copy .env.example .env
 ```
 
-5. `.env` faylini oching va kamida `BOT_TOKEN`, `ADMIN_IDS`, `SEMESTER_START` ni to'ldiring. Bir nechta kurs koordinatori bo'lsa ID lar vergul bilan yoziladi.
+5. `.env` faylini oching va kamida `BOT_TOKEN`, `ADMIN_IDS`, `SEMESTER_START` ni to'ldiring (talabalar boti bo'lsa —
+   `STUDENT_BOT_TOKEN` ham). Bir nechta kurs koordinatori bo'lsa ID lar vergul bilan yoziladi.
 6. Ishga tushirish: `python bot.py`
 
 Bot faqat dastur ishlab turganda javob beradi. Doimiy ishlashi uchun uni server (VPS) ga joylashtiring (pastda).
@@ -651,7 +685,8 @@ holati: «o'zi yozildi», «xabar yetdi», «botda» yoki «ulanmagan» (+ shaxs
 ulanmaganlar ro'yxati koordinatorga havolalari bilan keladi; talaba havolani keyinroq ochsa, o'tmagan tadbir haqidagi
 xabar unga darhol keladi. Yo'l ma'lumoti («Qanday boriladi») — faqat ijara tashrifida.
 
-**Talabani botga ulash.** Talaba ota-ona menyusiga kirmaydi — faqat tashrif va tadbir xabarlarini oladi. Ikki yo'l: talabaning
+**Talabani botga ulash.** Talaba ota-ona menyusiga kirmaydi — tashrif va tadbir xabarlarini **talabalar botida**
+oladi («Ikki bot» bo'limi; u sozlanmagan bo'lsa — asosiy botda). Talaba botga o'z telefon raqami bilan o'zi ulanadi yoki: talabaning
 **shaxsiy havolasi** (talaba kartasi yoki reja oynasidagi «Havola» — `t.me/<bot>?start=v_...`; ochsa, javob kutayotgan
 tashriflar darhol keladi) yoki ota-onasini **o'z raqami bilan tasdiqlagan** talaba avtomatik taniladi. Botga ulanmagan
 talabalar bo'lsa, rejani yuborganda koordinatorga ularning havolalari ro'yxati keladi.
@@ -742,6 +777,8 @@ Bog'lash so'rovlari va ota-ona savollari kurs koordinatoriga tugmalar bilan kela
 ## Sozlamalar (.env)
 
 `ABSENCE_WARN_LEVELS`, `ABSENCE_WARN_ACTIONS`, `ABSENCE_COUNT_EXCUSED`, `HEMIS_STATS_HOURS_PER_UNIT` — dars qoldirish chegaralari («Dars qoldirish chegaralari» bo'limi). `SUBJECT_WARN_PERCENT` (25%) — bitta fandan sababsiz qoldirishlar ulushi (faqat kunlik davomatda). `SUBJECT_LIMIT_PERCENT`, `AUDITORIUM_PAIRS_PER_CREDIT`, `SUBJECT_LIMIT_PAIRS` — fan bo'yicha yakuniy nazoratga kiritilmaslik chegarasi («Fan bo'yicha chegara»). `DAILY_DIGEST_TIME` — kunlik xulosa vaqti, `DIGEST_DAY_OFFSET=1` qilsangiz xulosa kechagi kun bo'yicha yuboriladi (davomat kechroq yuklanadigan bo'lsa qulay). `PAIR_TIMES` — jadval faylida vaqt ustuni bo'lmasa juftlik vaqtlari (rasmiy qo'ng'iroq jadvali bo'yicha to'ldiring). `HOURS_PER_PAIR` — «Soat» ustuni bo'lmasa bitta juftlik necha soat hisoblanishi.
+
+`STUDENT_BOT_TOKEN` — talabalar boti (tashrif so'rovlari, tadbir e'lonlari, ota-onani tasdiqlash; «Ikki bot» bo'limi). Bo'sh — hammasi bitta botda.
 
 `WEBAPP_URL`, `WEBAPP_HOST`, `WEBAPP_PORT`, `WEBAPP_AUTH_TTL` — Telegram Web App («Telegram Web App» bo'limi). `WEBAPP_DEV_USER` — faqat sinov uchun (ilovani brauzerda Telegram'siz ochish); serverda bo'sh qoldiring.
 
@@ -899,7 +936,8 @@ Telegram bot orqali yuklanadigan fayl hajmi 20 MB dan oshmasligi kerak (katta fa
 ## Fayllar tuzilishi
 
 ```
-bot.py            — ishga tushirish, buyruqlar menyusi, rejalashtiruvchi
+bot.py            — ishga tushirish (ota-onalar boti va talabalar boti), buyruqlar menyusi, rejalashtiruvchi
+botlar.py         — ikki bot: talabaga xabar — talabalar botidan, ota-ona va koordinatorga — asosiy botdan
 config.py         — .env sozlamalari
 database.py       — SQLite jadvallari va so'rovlar
 importer.py       — Excel fayllarni o'qish (ustunlarni avtomatik aniqlash)
@@ -933,7 +971,8 @@ docxfill.py       — Word (.docx) shablonlarini to'ldirish ({{KALIT}} belgilar,
 visits.py         — tashriflar: rejalar, holatlar, talaba javoblari, tadbir ishtirokchilari, eslatmalar, dalolatnoma,
                     yashash joylari, hisobot
 visitsapi.py      — «Tashriflar» bo'limi API si (boshqaruv paneli)
-handlers/visits.py — tashrif bot oqimlari: talaba havolasi va javoblari, /yol (turgan joydan yo'l)
+handlers/visits.py — tashrif va tadbir bot oqimlari: talaba havolasi, javoblari, e'londa ro'yxatdan o'tish, talabalar
+                    boti menyusi (/start, telefon bilan ulanish, «Tadbirlarim»); koordinator: /yol (turgan joydan yo'l)
 tashrif/          — «Qanday boriladi»: manzilni xaritadan topish, bekatlar, metro, yo'nalish (tashrif-py dan), tuman
                     chegaralari; malumot/ — shahar bekatlari, mavze/mahallalar, tumanlar (OpenStreetMap)
 middlewares.py    — bloklangan foydalanuvchi so'rovlarini to'xtatish

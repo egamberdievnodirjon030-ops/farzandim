@@ -122,7 +122,8 @@ async function pTashrif(parts, q) {
   S.badges.tashrif = tashrifBadge(d.counts); paintBadges();
   if (!['plans', 'homes', 'report'].includes(st.tab)) st.tab = 'plans';
   const tab = (k, icn, label, n) => `<button data-vtab="${k}" class="${st.tab === k ? 'on' : ''}" role="tab" aria-selected="${st.tab === k}">${ic(icn)} ${label}${n ? ` <span class="n">${n}</span>` : ''}</button>`;
-  const tabs = `<div class="toolbar"><div class="seg" role="tablist">${tab('plans', 'cal', 'Rejalar', d.counts.week)}${tab('homes', 'map', 'Yashash joylari')}${tab('report', 'chart', 'Hisobot')}</div></div>`;
+  const sbot = d.student_bot ? `<span class="grow"></span><a class="chip ok" href="https://t.me/${esc(d.student_bot)}" target="_blank" rel="noopener" title="Talabaga tegishli hammasi shu botda: tashrif so‘rovlari, tadbir e’lonlari, eslatmalar. Talaba telefon raqami bilan o‘zi ulanadi.">${ic('telegram')} Talabalar boti: @${esc(d.student_bot)}</a>` : '';
+  const tabs = `<div class="toolbar"><div class="seg" role="tablist">${tab('plans', 'cal', 'Rejalar', d.counts.week)}${tab('homes', 'map', 'Yashash joylari')}${tab('report', 'chart', 'Hisobot')}</div>${sbot}</div>`;
   let body = '';
   if (st.tab === 'plans') body = plansView(d, st);
   else if (st.tab === 'homes') body = `<div id="v-homes">${skel(110)}${skel(420)}</div>`;

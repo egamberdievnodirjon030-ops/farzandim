@@ -36,6 +36,7 @@ import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import botlar
 from config import DATA_DIR, SUPERADMIN_IDS, TZ
 from database import db
 from tenancy import central, current_course, use_course
@@ -465,7 +466,7 @@ async def set_participants(bot, pid: int, uid: int, sids: list[int], scope: set[
         p["delivery"] = await _inform(bot, p, [s for s in p["students"] if s["student_id"] not in old])
         for s in gone:
             if s.get("tg_id") and s.get("notified_at"):
-                await _send(bot, s["tg_id"], event_text(p, f"<b>ℹ️ Siz {_nom(p).lower()} ishtirokchilari ro'yxatidan "
+                await _to_student(bot, s["tg_id"], event_text(p, f"<b>ℹ️ Siz {_nom(p).lower()} ishtirokchilari ro'yxatidan "
                                                            "chiqarildingiz</b>", short=True))
         if p.get("announce"):  # e'londagi tugmalar: chiqarilgan qayta yozila olmaydi; joylar to'lsa/bo'shasa — hammaga
             ids = [s["student_id"] for s in gone]
@@ -585,7 +586,7 @@ async def confirm(bot, pid: int, uid: int | None, kind: str = "koordinator", for
                                       "Reja aktual holatga o'tdi.")
     for s in p["students"]:
         if s.get("tg_id") and s["response"] == TASDIQLADI:
-            await _send(bot, s["tg_id"], f"<b>✅ Tashrif tasdiqlandi</b>\n\n<b>Sana va vaqt:</b> {esc(p['when'])}\n"
+            await _to_student(bot, s["tg_id"], f"<b>✅ Tashrif tasdiqlandi</b>\n\n<b>Sana va vaqt:</b> {esc(p['when'])}\n"
                                          f"<b>Kurs koordinatori:</b> {esc(p['coordinator_name'] or '')}\n\n"
                                          "Belgilangan vaqtda uyda bo'lishingizni so'raymiz.")
     return p
@@ -616,7 +617,7 @@ async def change_time(bot, pid: int, uid: int, d: str | None = None, start: str 
     elif p.get("sent_at") and p["type"] in ISHTIROK:  # aktual tadbir — ishtirokchilarga yangi vaqt
         text = event_text(p, f"<b>🔄 {_nom(p)} vaqti o'zgartirildi</b>", "Yangi vaqtni yozib qo'ying — oldidan eslatma boradi.")
         for s in p["students"]:
-            await _send(bot, s.get("tg_id"), text)
+            await _to_student(bot, s.get("tg_id"), text)
         if p.get("announce"):  # e'londagi vaqt ham yangilanadi
             await _refresh_elon(bot, p)
     return p
@@ -664,7 +665,7 @@ async def cancel(bot, pid: int, uid: int, reason: str) -> dict:
             if p["type"] in ISHTIROK else f"<b>❌ Tashrif bekor qilindi</b>\n\n{esc(p['when'])}\n<b>Sabab:</b> {esc(reason)}"
         for s in p["students"]:
             if s.get("tg_id"):
-                await _send(bot, s["tg_id"], text)
+                await _to_student(bot, s["tg_id"], text)
         if p.get("announce"):
             await _refresh_elon(bot, p)
     return p
@@ -686,7 +687,7 @@ async def invite_code(sid: int) -> str:
 
 
 async def invite_url(bot, sid: int) -> str:
-    me = await bot.me()
+    me = await botlar.student_bot(bot).me()
     return f"https://t.me/{me.username}?start={START_PREFIX}{current_course() or '_'}_{await invite_code(sid)}"
 
 
@@ -721,14 +722,27 @@ async def open_for_student(sid: int) -> list[dict]:
 
 
 async def catch_up(bot, sid: int) -> int:
-    """Talaba botga endi ulandi: u belgilangan, hali o'tmagan aktual tadbir va madaniy tashriflar haqida xabar
-    (reja yuborilganda xabar yetmagan bo'lsa) va guruhiga ochiq e'lonlar."""
+    """Talaba botni ochdi yoki endi ulandi: javob kutayotgan ijara tashriflari (eski xabardagi tugmalar olinadi — qayta
+    keladi), u belgilangan, hali o'tmagan aktual tadbir va madaniy tashriflar (xabar yetmagan bo'lsa) va guruhiga ochiq
+    e'lonlar. Joriy kurs bazasida."""
+    acc = await db.fetchone("SELECT tg_id FROM student_accounts WHERE student_id = ?", (sid,))
+    if not acc:
+        return 0
+    n = 0
+    for r in await open_for_student(sid):
+        p = await get(r["id"], full=False)
+        row = next((x for x in p["students"] if x["student_id"] == sid), {})
+        await _collapse(bot, p["id"], "talaba", sid)
+        msg = await _to_student(bot, acc["tg_id"], student_text(p, row), student_kb(p["id"], sid))
+        if msg is not None:
+            n += 1
+            await _remember(p["id"], "talaba", msg, sid)
+            await _notified(p["id"], sid)
     rows = await db.fetchall(
         f"""SELECT p.id FROM visit_plans p JOIN visit_students vs ON vs.plan_id = p.id
             WHERE vs.student_id = ? AND vs.notified_at IS NULL AND p.status = ? AND p.sent_at IS NOT NULL
             AND p.type IN ({','.join('?' * len(ISHTIROK))}) AND p.visit_date >= ? ORDER BY p.visit_date, p.start_time""",
         (sid, TASDIQLANGAN, *ISHTIROK, today().isoformat()))
-    n = 0
     for r in rows:
         p = await get(r["id"], full=False)
         if p and not passed(p["visit_date"], p["end_time"]):
@@ -740,6 +754,70 @@ async def catch_up(bot, sid: int) -> int:
         p = await get(r["id"], full=False)
         n += (await _announce_pending(bot, p, only=sid))["sent"]
     return n
+
+
+async def student_opened(tg_id: int) -> list[tuple[str, dict]]:
+    """Talabalar botida /start: shu Telegram hisobiga bog'langan talabalar (barcha kurslar). Hisob «yangilanadi» —
+    alohida botga o'tilganda yetmay qolgan e'lonlar endi qayta yuboriladi."""
+    out = []
+    for key in db.keys():
+        with use_course(key):
+            rows = await students_of_tg(tg_id)
+            if rows:
+                await db.execute("UPDATE student_accounts SET linked_at = ? WHERE tg_id = ?", (now_iso(), tg_id))
+                out += [(key, st) for st in rows]
+    return out
+
+
+async def bind_by_phone(phone: str, tg_id: int, tg_name: str = "") -> list[tuple[str, dict]]:
+    """Talaba o'z raqamini (Telegram tugmasi orqali — raqam shu hisobniki) yubordi: raqam bazada bitta talabaniki bo'lsa,
+    hisob bog'lanadi. Bir xil raqam bir nechta talabada bo'lsa — bog'lanmaydi (shaxsiy havola kerak)."""
+    out = []
+    for key in db.keys():
+        with use_course(key):
+            rows = await db.students_by_self_phone(phone)
+            if len(rows) != 1:
+                continue
+            st = rows[0]
+            await db.execute("""INSERT INTO student_accounts (student_id, tg_id, tg_name, via, linked_at)
+                                VALUES (?, ?, ?, 'telefon', ?) ON CONFLICT(student_id) DO UPDATE SET tg_id = excluded.tg_id,
+                                tg_name = excluded.tg_name, via = excluded.via, linked_at = excluded.linked_at""",
+                             (st["id"], tg_id, (tg_name or "")[:80], now_iso()))
+            out.append((key, st))
+    return out
+
+
+async def student_agenda(sid: int) -> dict:
+    """Talabalar boti «📅 Tadbirlarim»: yaqin tashrif va tadbirlari (ishtirokchi) va guruhiga ochiq e'lonlar."""
+    t = today().isoformat()
+    mine = []
+    for r in await db.fetchall(
+            """SELECT p.id, vs.response FROM visit_plans p JOIN visit_students vs ON vs.plan_id = p.id
+               WHERE vs.student_id = ? AND p.status IN (?, ?) AND p.visit_date >= ? ORDER BY p.visit_date, p.start_time""",
+            (sid, TALABA, TASDIQLANGAN, t)):
+        p = await get(r["id"], full=False)
+        if not passed(p["visit_date"], p["end_time"]):
+            mine.append({**p, "response": r["response"]})
+    st = await db.get_student(sid) or {}
+    gk = group_key(st.get("group_name") or "")
+    open_ = []
+    for r in await db.fetchall(
+            f"""SELECT id FROM visit_plans WHERE announce = 1 AND status = ? AND visit_date >= ?
+                AND type IN ({','.join('?' * len(ISHTIROK))}) ORDER BY visit_date, start_time""", (TASDIQLANGAN, t, *ISHTIROK)):
+        p = await get(r["id"], full=False)
+        if gk in {group_key(g) for g in audience_of(p)} and reg_state(p) == "open" \
+                and not any(x["student_id"] == sid for x in p["students"]):
+            open_.append(p)
+    return {"mine": mine, "open": open_}
+
+
+async def remember_announce(pid: int, sid: int, msg) -> None:
+    """E'lon qayta yuborildi («Tadbirlarim») — keyingi yangilanishlar shu xabarga."""
+    if getattr(msg, "message_id", None) and getattr(msg, "chat", None):
+        await db.execute("INSERT INTO visit_announces (plan_id, student_id, chat_id, message_id, sent_at) VALUES (?, ?, ?, ?, ?) "
+                         "ON CONFLICT(plan_id, student_id) DO UPDATE SET chat_id = excluded.chat_id, "
+                         "message_id = excluded.message_id, sent_at = excluded.sent_at",
+                         (pid, sid, msg.chat.id, msg.message_id, now_iso()))
 
 
 # ---------------------------------------------------------------- bot xabarlari
@@ -775,6 +853,11 @@ async def _send(bot, chat_id: int | None, text: str, kb=None):
     return None
 
 
+async def _to_student(bot, chat_id: int | None, text: str, kb=None):
+    """Talabaga — talabalar boti orqali (alohida bot sozlanmagan bo'lsa — asosiy bot)."""
+    return await _send(botlar.student_bot(bot), chat_id, text, kb)
+
+
 async def _remember(pid: int, kind: str, msg, sid: int | None = None) -> None:
     if getattr(msg, "message_id", None) and getattr(msg, "chat", None):
         await db.execute("INSERT INTO visit_messages (plan_id, student_id, chat_id, message_id, kind, sent_at) "
@@ -785,6 +868,7 @@ async def _collapse(bot, pid: int, kind: str, sid: int | None = None) -> None:
     """Eski xabarlardagi tugmalar olinadi — ikki marta bosib bo'lmasin."""
     rows = await db.fetchall("SELECT * FROM visit_messages WHERE plan_id = ? AND kind = ?" + (" AND student_id = ?" if sid else ""),
                              (pid, kind, sid) if sid else (pid, kind))
+    bot = botlar.student_bot(bot) if kind == "talaba" else botlar.main_bot(bot)  # taklif, uzatish — koordinatorniki
     for m in rows:
         if bot is not None:
             try:
@@ -818,7 +902,7 @@ async def _notify_students(bot, p: dict, again: bool = False) -> dict:
     await _collapse(bot, p["id"], "talaba")
     sent, missed = 0, []
     for s in p["students"]:
-        msg = await _send(bot, s.get("tg_id"), student_text(p, s, again), student_kb(p["id"], s["student_id"])) \
+        msg = await _to_student(bot, s.get("tg_id"), student_text(p, s, again), student_kb(p["id"], s["student_id"])) \
             if s.get("tg_id") else None
         if msg is not None:
             sent += 1
@@ -893,7 +977,7 @@ async def _inform(bot, p: dict, rows: list[dict], quiet: bool = False) -> dict:
     sent, missed = 0, []
     text = invite_text(p)
     for s in rows:
-        msg = await _send(bot, s.get("tg_id"), text) if s.get("tg_id") else None
+        msg = await _to_student(bot, s.get("tg_id"), text) if s.get("tg_id") else None
         if msg is not None:
             sent += 1
             await _notified(p["id"], s["student_id"])
@@ -958,7 +1042,7 @@ async def _elon_cfg(d: dict, scope: set[str] | None) -> dict:
 
 async def _audience(p: dict) -> list[dict]:
     keys = {group_key(g) for g in audience_of(p)}
-    return [r for r in await db.fetchall("SELECT s.id, s.group_name, a.tg_id FROM students s "
+    return [r for r in await db.fetchall("SELECT s.id, s.group_name, a.tg_id, a.linked_at FROM students s "
                                          "LEFT JOIN student_accounts a ON a.student_id = s.id")
             if group_key(r["group_name"] or "") in keys]
 
@@ -1014,17 +1098,22 @@ async def _announce_pending(bot, p: dict, only: int | None = None) -> dict:
     if reg_state(p) != "open":
         return out
     inside = {s["student_id"] for s in p["students"]}
-    done = {r["student_id"] for r in await db.fetchall("SELECT student_id FROM visit_announces WHERE plan_id = ?", (p["id"],))}
+    done = {r["student_id"]: r for r in await db.fetchall("SELECT * FROM visit_announces WHERE plan_id = ?", (p["id"],))}
     for r in await _audience(p):
-        if r["id"] in inside or r["id"] in done or (only and r["id"] != only):
+        if r["id"] in inside or (only and r["id"] != only):
+            continue
+        old = done.get(r["id"])  # yetmagan bo'lsa — talaba botni keyinroq ochgach (hisobi yangilangach) qayta urinadi
+        if old and (old["message_id"] or not r["linked_at"] or r["linked_at"] < old["sent_at"]):
             continue
         if not r["tg_id"]:
             out["unlinked"] += 1
             continue
         text, kb = _elon_view(p, r["id"])
-        mid = getattr(await _send(bot, r["tg_id"], text, kb), "message_id", None)
-        await db.execute("INSERT OR IGNORE INTO visit_announces (plan_id, student_id, chat_id, message_id, sent_at) "
-                         "VALUES (?, ?, ?, ?, ?)", (p["id"], r["id"], r["tg_id"] if mid else None, mid, now_iso()))
+        mid = getattr(await _to_student(bot, r["tg_id"], text, kb), "message_id", None)
+        await db.execute("INSERT INTO visit_announces (plan_id, student_id, chat_id, message_id, sent_at) VALUES (?, ?, ?, ?, ?) "
+                         "ON CONFLICT(plan_id, student_id) DO UPDATE SET chat_id = excluded.chat_id, "
+                         "message_id = excluded.message_id, sent_at = excluded.sent_at",
+                         (p["id"], r["id"], r["tg_id"] if mid else None, mid, now_iso()))
         out["sent"] += bool(mid)
     return out
 
@@ -1050,6 +1139,7 @@ async def _edit_msg(bot, chat_id: int, message_id: int, text: str, kb=None) -> N
 
 async def _refresh_elon(bot, p: dict, sids: list[int] | None = None, skip: int | None = None) -> None:
     """Yuborilgan e'lonlarni joriy holatga keltirish (vaqt, joylar, tugma, bekor qilingan)."""
+    bot = botlar.student_bot(bot)
     for r in await db.fetchall("SELECT * FROM visit_announces WHERE plan_id = ? AND message_id IS NOT NULL", (p["id"],)):
         if (sids is not None and r["student_id"] not in sids) or r["student_id"] == skip:
             continue
@@ -1151,7 +1241,8 @@ async def announce(bot, pid: int, uid: int, d: dict, scope: set[str] | None = No
 
 
 async def _to_coordinator(bot, p: dict, text: str, kb=None):
-    return await _send(bot, p["coordinator_id"], text, kb)
+    """Kurs koordinatoriga — asosiy (ota-onalar) bot orqali: u talabalar botiga kirmaydi."""
+    return await _send(botlar.main_bot(bot), p["coordinator_id"], text, kb)
 
 
 async def _notify_answer(bot, p: dict, s: dict, resp: str) -> None:
@@ -1196,7 +1287,7 @@ async def reminders(bot) -> dict:
         for s in quiet:
             await db.execute("UPDATE visit_students SET reminder_sent_at = ? WHERE plan_id = ? AND student_id = ?",
                              (now_iso(), p["id"], s["student_id"]))
-            msg = await _send(bot, s.get("tg_id"), f"<b>🔔 Javobingiz kutilmoqda</b>\n\n{esc(p['when'])} ga rejalashtirilgan "
+            msg = await _to_student(bot, s.get("tg_id"), f"<b>🔔 Javobingiz kutilmoqda</b>\n\n{esc(p['when'])} ga rejalashtirilgan "
                                                    "tashrifni tasdiqlashingiz yoki boshqa vaqt taklif qilishingiz kerak.",
                               student_kb(p["id"], s["student_id"])) if s.get("tg_id") else None
             await _remember(p["id"], "talaba", msg, s["student_id"])
@@ -1222,7 +1313,7 @@ async def reminders(bot) -> dict:
             text = event_text(p, f"<b>⏰ Eslatma: ertaga — {_nom(p).lower()}</b>", "Vaqtida yetib kelishni rejalashtiring.")
             for s in p["students"]:
                 if s.get("tg_id") and not _fresh(s.get("notified_at"), ts, 3):
-                    out["eve"] += bool(await _send(bot, s["tg_id"], text))
+                    out["eve"] += bool(await _to_student(bot, s["tg_id"], text))
     edge = ts + timedelta(hours=sozlama.eslatma_soat)
     for r in await db.fetchall("SELECT id, visit_date, start_time FROM visit_plans WHERE status = ? AND reminded_at IS NULL",
                                (TASDIQLANGAN,)):
@@ -1237,10 +1328,10 @@ async def reminders(bot) -> dict:
                 continue
             if p["type"] in ISHTIROK:
                 if not _fresh(s.get("notified_at"), ts, 1):  # xabar hozirgina borgan bo'lsa — takrorlanmaydi
-                    await _send(bot, s["tg_id"], event_text(p, f"<b>⏰ Eslatma: {kun} — {_nom(p).lower()}</b>",
+                    await _to_student(bot, s["tg_id"], event_text(p, f"<b>⏰ Eslatma: {kun} — {_nom(p).lower()}</b>",
                                                             "Kechikmasdan yetib keling.", short=True))
             else:
-                await _send(bot, s["tg_id"], f"<b>⏰ Eslatma: {kun} tashrif bor</b>\n\n<b>Vaqt:</b> {p['start_time']}–"
+                await _to_student(bot, s["tg_id"], f"<b>⏰ Eslatma: {kun} tashrif bor</b>\n\n<b>Vaqt:</b> {p['start_time']}–"
                                              f"{p['end_time']}\n" + (f"<b>Manzil:</b> {esc(s['address'])}\n" if s.get("address") else "")
                             + f"<b>Kurs koordinatori:</b> {esc(p.get('coordinator_name') or '')}")
         await _to_coordinator(bot, p, f"<b>⏰ {kun.capitalize() if kun in ('bugun', 'ertaga') else 'Yaqinlashayotgan'}: "
@@ -1433,7 +1524,7 @@ async def send_route(bot, chat_id: int, p: dict, students: list[dict], here: tup
         return False
     for i in range(0, len(rows), 5):
         part = rows[i:i + 5]
-        await _send(bot, chat_id, route_text(when(p) if i == 0 else "", part, here=bool(here)), route_kb(part))
+        await _send(botlar.main_bot(bot), chat_id, route_text(when(p) if i == 0 else "", part, here=bool(here)), route_kb(part))
     return True
 
 
