@@ -3,7 +3,8 @@
   • Talaba shaxsiy havolani ochadi (t.me/<bot>?start=v_<kurs>_<kod>) — Telegram hisobi bog'lanadi, javob kutayotgan
     tashriflar darhol keladi. Ota-onasini o'z raqami bilan tasdiqlagan talaba ham avtomatik taniladi.
   • Tashrif xabaridagi tugmalar: ✅ tasdiqlayman, 🕒 boshqa vaqt (yoziladi: «22.10 14:00»), ❌ bu manzilda yashamayman.
-  • Tadbir va madaniy tashrif ishtirokchilariga — faqat ma'lumot va eslatma (tugmasiz, visits.py).
+  • Tadbir va madaniy tashrif ishtirokchilariga — ma'lumot va eslatma (visits.py). Botda e'lon qilingan bo'lsa,
+    talaba «✅ Ro'yxatdan o'tish» ni bosib o'zi yoziladi va ro'yxat ochiq ekan «↩️ Ro'yxatdan chiqish» mumkin.
   • Barcha talabalar tasdiqlagach, reja o'zi aktual bo'ladi. Koordinator: talaba taklif qilgan vaqtni qabul qiladi,
     javob bermaganlar bo'lsa — rejani shundayligicha tasdiqlaydi; /yol — turgan joyidan (GPS) yaqin tashriflar
     manziliga qaysi avtobus yoki metro boradi (joylashuv saqlanmaydi).
@@ -54,8 +55,8 @@ async def open_invite(message: Message, state: FSMContext) -> None:
         return
     await message.answer(f"✅ <b>{html.escape(st['full_name'])}</b>, siz botga ulandingiz.\n\nKurs koordinatoringiz ijara "
                          "xonadoningizga tashrif rejalashtirsa, xabar shu yerga keladi — tasdiqlaysiz yoki o'zingizga qulay "
-                         "vaqtni taklif qilasiz. Sizni tadbir yoki madaniy tashrifga belgilasa — nomi, joyi va vaqti, "
-                         "oldidan esa eslatma keladi.", reply_markup=ReplyKeyboardRemove())
+                         "vaqtni taklif qilasiz. Tadbir va madaniy tashriflar e'lonlari ham shu yerga keladi — «Ro'yxatdan "
+                         "o'tish» tugmasi bilan yozilasiz, oldidan eslatma boradi.", reply_markup=ReplyKeyboardRemove())
     with _course(key):
         for p in pending:
             row = next((s for s in p["students"] if s["student_id"] == st["id"]), {})
@@ -81,6 +82,9 @@ async def on_button(cb: CallbackQuery, state: FSMContext) -> None:
         await cb.answer("Bu xabar eskirgan.", show_alert=True)
         return
     uid = cb.from_user.id
+    if action in ("reg", "unreg"):
+        await _registration(cb, action, key, pid, sid)
+        return
     with _course(key):
         try:
             if action in ("ok", "time", "no"):
@@ -128,6 +132,28 @@ async def on_button(cb: CallbackQuery, state: FSMContext) -> None:
             await _drop_kb(cb)
             return
     await cb.answer()
+
+
+async def _registration(cb: CallbackQuery, action: str, key: str, pid: int, sid: int) -> None:
+    """E'londagi «Ro'yxatdan o'tish» / «Ro'yxatdan chiqish» — xabar joriy holatga keltiriladi."""
+    with _course(key):
+        if not await _student_ok(cb, sid):
+            await cb.answer("Bu tugma boshqa talaba uchun.", show_alert=True)
+            return
+        try:
+            p = await (V.register if action == "reg" else V.unregister)(cb.bot, pid, sid)
+            await cb.answer("✅ Ro'yxatdan o'tdingiz" if action == "reg" else "Ro'yxatdan chiqdingiz")
+        except V.VisitError as e:
+            await cb.answer(e.message[:190], show_alert=True)
+            p = await V.get(pid, full=False)
+        if not p:
+            await _drop_kb(cb)
+            return
+        text, kb = await V.elon_message(p, sid)
+    try:
+        await cb.message.edit_text(text, reply_markup=kb, disable_web_page_preview=True)
+    except Exception:  # noqa: BLE001  (o'zgarmagan yoki juda eski xabar)
+        pass
 
 
 async def _edit(cb: CallbackQuery, text: str) -> None:

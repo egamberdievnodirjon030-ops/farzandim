@@ -22,7 +22,7 @@ Telegram bot ota-onalarga farzandining qaysi kunlarda, qaysi fanlardan darsga qa
 
 **Kompyuter versiyasi:** kurs koordinatori va super-admin uchun brauzerdagi boshqaruv paneli — butun kurs bitta jadvalda (saralash, filtrlar), xabarlar va suhbat yonma-yon, so'rovlar, e'lon (uch tildagi ko'rinishi bilan), fayllarni sudrab yuklash, hisobotni yuklab olish; super-admin — barcha kurslar, kurslar va koordinatorlar, zaxira nusxa va xatolar jurnali. Kirish — botdagi «💻 Kompyuter versiyasi» tugmasi (parolsiz). Batafsil — «Kompyuter versiyasi» bo'limi.
 
-**Tashriflar:** ijara xonadonlariga tashrif, madaniy tashrif, tadbir va koordinatorlik soati rejalari — talaba botda tasdiqlaydi yoki boshqa vaqt taklif qiladi, tadbir va madaniy tashrifga belgilangan talabalarga botda nomi, joyi, vaqti va eslatma boradi, koordinatorga manzilga qanday borilishi (bekat, avtobus, metro), talabalar yashash joylari xaritasi, dalolatnoma (telefonda imzo, bir betli Word) va hisobot (batafsil — «Tashriflar» bo'limida).
+**Tashriflar:** ijara xonadonlariga tashrif, madaniy tashrif, tadbir va koordinatorlik soati rejalari — talaba botda tasdiqlaydi yoki boshqa vaqt taklif qiladi, tadbir va madaniy tashrif botda e'lon qilinadi — talaba «Ro'yxatdan o'tish» tugmasi bilan o'zi yoziladi (qo'lda kiritish ham bor), ishtirokchilarga nomi, joyi, vaqti va eslatma boradi, koordinatorga manzilga qanday borilishi (bekat, avtobus, metro), talabalar yashash joylari xaritasi, dalolatnoma (telefonda imzo, bir betli Word) va hisobot (batafsil — «Tashriflar» bo'limida).
 
 **Universitet tizimi bilan integratsiya:** davomat va dars jadvali «Manage» tizimidan avtomatik, real vaqtga yaqin olinadi (API kaliti yoki webhook; javob ko'rinishi va shabloni qat'iy emas). Batafsil — «Integratsiya» bo'limi.
 
@@ -620,20 +620,37 @@ qoralama ─┬─ ijara tashrifi ─► talabalar tasdig'i (botda) ─┬─►
 - Tashrifdan `REMINDER_HOURS_BEFORE` (3) soat oldin talabalar va koordinatorga eslatma (har biri bir marta).
 - Har bir harakat jurnalga yoziladi (kim, qachon, nima); hisobotga faqat tasdiqlangan va o'tkazilgan rejalar kiradi.
 
-**Tadbir va madaniy tashrif ishtirokchilari.** Reja tuzishda ishtirokchi talabalar belgilanadi (ixtiyoriy): qidiruv
-orqali bittalab yoki «Butun guruhni qo'shish» tugmasi bilan. Tanlanganlar guruhlab ko'rinadi, botga ulanganlari soni
-bilan. Talabadan javob so'ralmaydi — botga faqat ma'lumot va eslatma boradi:
+**Tadbir va madaniy tashrif ishtirokchilari** ikki yo'l bilan yig'iladi (birgalikda ham):
+
+1. **Botda e'lon** (yangi tadbirda yoqilgan). Reja aktual bo'lishi bilan tanlangan guruhlardagi (standart — barcha
+   guruhlaringiz) botga ulangan talabalarga «📣 E'lon» boradi: nomi, sanasi va vaqti, joyi, koordinator, izoh va
+   **«✅ Ro'yxatdan o'tish»** tugmasi. Bosgan talaba ishtirokchilar ro'yxatiga qo'shiladi (panelda «o'zi yozildi»),
+   xabari «✅ Siz ro'yxatdan o'tdingiz» ga almashadi va ro'yxat ochiq ekan **«↩️ Ro'yxatdan chiqish»** mumkin.
+   - **Joylar soni** (ixtiyoriy): to'lsa, ro'yxatga olish o'zi yopiladi — e'lonlardagi tugmalar o'chadi, koordinatorga
+     «Joylar to'ldi» keladi; kimdir chiqsa, joy bo'shaydi va tugmalar qaytadi. Bir vaqtda bosilsa ham joydan oshmaydi.
+   - Reja oynasidagi «Botda e'lon» bo'limi: guruhlar, nechta talabaga yuborildi, nechtasi botga ulanmagan, nechtasi
+     yozildi, joylar; **«Ro'yxatni yopish»** (ro'yxat tayyor — endi o'zi yozila/chiqa olmaydi) va «Qayta ochish»;
+     «Sozlash» — guruh qo'shish, joylar sonini o'zgartirish. E'lonsiz aktual rejani ham keyin «E'lon qilish» mumkin.
+   - Botga keyinroq ulangan talabaga (havola yoki ota-onani tasdiqlash orqali) ochiq e'lon bir necha daqiqada o'zi
+     boradi; har bir talabaga bir marta. Vaqt o'zgarsa yoki bekor qilinsa, yuborilgan e'lonlar ham yangilanadi.
+   - Koordinator ro'yxatdan chiqargan talaba qayta yozila olmaydi (qo'lda qayta qo'shish mumkin).
+2. **Qo'lda kiritish** — reja tuzishda yoki aktual rejada («Ishtirokchilar» → «Qo'lda kiritish»): qidiruv orqali
+   alohida talaba yoki «Butun guruhni qo'shish» tugmasi bilan guruh. Qo'lda kiritilgan talaba e'lonsiz ham ishtirokchi;
+   uni talaba o'zi ro'yxatdan chiqara olmaydi.
+
+Ishtirokchilardan javob so'ralmaydi — botga ma'lumot va eslatma boradi:
 
 - reja aktual bo'lishi bilan: 🎉 tadbir / 🎭 madaniy tashrif — **nomi, sanasi va vaqti, joyi**, kurs koordinatori, izoh;
 - oldingi kuni kechqurun (`REMINDER_EVE_HOUR`, standart 18:00 dan) — «⏰ Eslatma: ertaga»;
 - boshlanishidan `REMINDER_HOURS_BEFORE` soat oldin — «⏰ Eslatma: bugun» (joyi bilan);
 - vaqt o'zgarsa — yangi vaqt, bekor qilinsa — sababi bilan.
 
-Xabar hozirgina borgan talabaga eslatma takrorlanmaydi. Aktual rejada ham ishtirokchilar o'zgaradi (reja oynasi →
-«Ishtirokchilar» → «O'zgartirish»): yangi qo'shilganlarga darhol xabar boradi, ro'yxatdan chiqarilganlarga — bildirish.
-Reja oynasida har bir ishtirokchining holati: «xabar yetdi», «botda» yoki «ulanmagan» (+ shaxsiy havola). Botga
+Xabar hozirgina borgan talabaga eslatma takrorlanmaydi. Aktual rejada ham ishtirokchilar o'zgaradi: yangi
+qo'shilganlarga darhol xabar boradi, ro'yxatdan chiqarilganlarga — bildirish. Reja oynasida har bir ishtirokchining
+holati: «o'zi yozildi», «xabar yetdi», «botda» yoki «ulanmagan» (+ shaxsiy havola). Qo'lda kiritilgan, botga
 ulanmaganlar ro'yxati koordinatorga havolalari bilan keladi; talaba havolani keyinroq ochsa, o'tmagan tadbir haqidagi
 xabar unga darhol keladi. Yo'l ma'lumoti («Qanday boriladi») — faqat ijara tashrifida.
+
 **Talabani botga ulash.** Talaba ota-ona menyusiga kirmaydi — faqat tashrif va tadbir xabarlarini oladi. Ikki yo'l: talabaning
 **shaxsiy havolasi** (talaba kartasi yoki reja oynasidagi «Havola» — `t.me/<bot>?start=v_...`; ochsa, javob kutayotgan
 tashriflar darhol keladi) yoki ota-onasini **o'z raqami bilan tasdiqlagan** talaba avtomatik taniladi. Botga ulanmagan

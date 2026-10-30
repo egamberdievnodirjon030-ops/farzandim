@@ -108,7 +108,7 @@ async def api_visit_delete(request):
 @staff_route
 async def api_visit_action(request):
     """Holat o'zgartiruvchi amallar: yuborish, vaqt, taklifni qabul, shundayligicha tasdiqlash, bajarildi, bekor qilish,
-    talaba javobini belgilash, tadbir ishtirokchilari."""
+    talaba javobini belgilash, tadbir ishtirokchilari, botda e'lon va ro'yxatga olish."""
     pid, act, uid, bot = int(request.match_info["pid"]), request.match_info["act"], _uid(request), request.app["bot"]
     d = await _body(request)
     try:
@@ -126,6 +126,10 @@ async def api_visit_action(request):
             p = await V.cancel(bot, pid, uid, d.get("reason") or "")
         elif act == "students":  # tadbir / madaniy tashrif ishtirokchilari (aktual rejada ham)
             p = await V.set_participants(bot, pid, uid, d.get("student_ids") or [], viewer_scope())
+        elif act == "announce":  # botda e'lon (aktual rejada): guruhlar, joylar soni
+            p = await V.announce(bot, pid, uid, d, viewer_scope())
+        elif act in ("regclose", "regopen"):  # e'londa ro'yxatga olishni yopish / qayta ochish
+            p = await V.set_registration(bot, pid, uid, act == "regopen")
         elif act == "answer":  # talaba og'zaki (telefonda) javob berdi — koordinator belgilaydi
             cur = await V.get(pid, full=False)
             if not cur or not V.can_manage(cur, uid):

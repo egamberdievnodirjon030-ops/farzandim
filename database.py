@@ -247,6 +247,10 @@ CREATE TABLE IF NOT EXISTS visit_plans (
     student_deadline TEXT,                      -- talaba javobi muddati (ISO)
     sent_at          TEXT, completed_at TEXT, result TEXT, problem TEXT, cancel_reason TEXT, reminded_at TEXT,
     eve_reminded_at  TEXT,                      -- tadbir / madaniy tashrif: oldingi kungi eslatma
+    announce         INTEGER NOT NULL DEFAULT 0, -- tadbir / madaniy tashrif botda e'lon qilinadi (ro'yxatdan o'tish)
+    audience         TEXT,                      -- e'lon guruhlari (JSON: guruh nomlari)
+    capacity         INTEGER,                   -- joylar soni (bo'sh — cheklanmagan)
+    reg_closed_at    TEXT,                      -- koordinator ro'yxatga olishni yopdi
     created_at       TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_visit_plans_date ON visit_plans(visit_date, status);
@@ -258,6 +262,8 @@ CREATE TABLE IF NOT EXISTS visit_students (
     response         TEXT NOT NULL DEFAULT 'kutilmoqda',  -- kutilmoqda | tasdiqladi | vaqt_taklif_qildi | rad_etdi | javob_bermadi
     proposed_date    TEXT, proposed_time TEXT, comment TEXT,
     notified_at      TEXT, responded_at TEXT, reminder_sent_at TEXT,
+    source           TEXT NOT NULL DEFAULT 'koordinator',  -- koordinator (qo'lda) | bot (e'londa o'zi yozildi)
+    registered_at    TEXT,
     UNIQUE (plan_id, student_id)
 );
 CREATE INDEX IF NOT EXISTS idx_visit_students_student ON visit_students(student_id);
@@ -297,6 +303,15 @@ CREATE TABLE IF NOT EXISTS visit_messages (
     sent_at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_visit_messages_plan ON visit_messages(plan_id, kind);
+-- Tadbir / madaniy tashrif e'loni: kimga yuborilgan (bir marta) va xabari (tugmasini yangilash uchun)
+CREATE TABLE IF NOT EXISTS visit_announces (
+    plan_id    INTEGER NOT NULL REFERENCES visit_plans(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    chat_id    INTEGER, message_id INTEGER,     -- yetmagan bo'lsa — bo'sh (qayta yuborilmaydi)
+    sent_at    TEXT NOT NULL,
+    removed_at TEXT,                            -- koordinator ro'yxatdan chiqargan — qayta yozila olmaydi
+    PRIMARY KEY (plan_id, student_id)
+);
 -- Talabaning Telegram hisobi (tashrif xabarlari uchun): shaxsiy havola yoki ota-onani tasdiqlash orqali
 CREATE TABLE IF NOT EXISTS student_accounts (
     student_id INTEGER PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
@@ -694,7 +709,9 @@ class Database:
                                        ("letter_no", "TEXT"), ("letter_date", "TEXT"), ("letter_at", "TEXT"))),
                        ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT"), ("send_note", "TEXT"),
                                        ("doc_number", "TEXT"), ("doc_date", "TEXT"))),
-                       ("visit_plans", (("eve_reminded_at", "TEXT"),))):
+                       ("visit_plans", (("eve_reminded_at", "TEXT"), ("announce", "INTEGER NOT NULL DEFAULT 0"),
+                                        ("audience", "TEXT"), ("capacity", "INTEGER"), ("reg_closed_at", "TEXT"))),
+                       ("visit_students", (("source", "TEXT NOT NULL DEFAULT 'koordinator'"), ("registered_at", "TEXT")))):
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 have = {r[1] for r in await cur.fetchall()}
             for col, ddl in add:

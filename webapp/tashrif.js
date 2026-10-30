@@ -46,8 +46,13 @@ const EV_T = {
   talaba_vaqt_taklif_qildi: 'Talaba boshqa vaqt taklif qildi', talaba_rad_etdi: 'Talaba: bu manzilda yashamayman',
   vaqti_ozgartirildi: 'Vaqti o‘zgartirildi', tasdiqlandi: 'Tasdiqlandi — reja aktual', tasdiqlandi_javobsiz: 'Shundayligicha tasdiqlandi (javobsizlar bilan)',
   bajarildi: 'O‘tkazildi', bekor_qilindi: 'Bekor qilindi', dalolatnoma: 'Dalolatnoma tuzildi',
-  ishtirokchilar_ozgartirildi: 'Ishtirokchilar o‘zgartirildi'
+  ishtirokchilar_ozgartirildi: 'Ishtirokchilar o‘zgartirildi', elon_yuborildi: 'Botda e’lon qilindi',
+  talaba_royxatdan_otdi: 'Talaba botda ro‘yxatdan o‘tdi', talaba_royxatdan_chiqdi: 'Talaba ro‘yxatdan chiqdi',
+  royxat_yopildi: 'Ro‘yxatga olish yopildi', royxat_ochildi: 'Ro‘yxatga olish qayta ochildi'
 };
+/* e'londa ro'yxatga olish holati */
+const REG_S = { open: ['ok', 'ro‘yxatga olish ochiq'], full: ['warn', 'joylar to‘ldi'], closed: ['muted', 'ro‘yxat yopilgan'],
+  started: ['muted', 'ro‘yxatga olish yakunlangan'], over: ['muted', 'yakunlangan'], draft: ['muted', 'aktual qilinganda yuboriladi'] };
 const EVT = ['tadbir', 'madaniy_tashrif'];            // ishtirokchi talabalar belgilanadi — botda ma'lumot va eslatma
 const withStu = t => t === 'ijara_tashrifi' || EVT.includes(t);
 const WHO_T = { koordinator: 'koordinator', talaba: 'talaba', tizim: 'tizim' };
@@ -56,9 +61,10 @@ const VERR = {
   no_title: 'Reja nomini yozing', bad_time: 'Vaqt noto‘g‘ri: tugash vaqti boshlanishidan keyin bo‘lsin', bad_date: 'Sana noto‘g‘ri',
   early: 'Tashrif vaqti hali kelmagan', no_reason: 'Bekor qilish sababini yozing',
   not_all: 'Hali barcha talabalar tasdiqlamagan', forbidden: 'Bu amal sizga ruxsat etilmagan', bad_location: 'Joylashuvni tushunmadim',
-  bad_type: 'Bu reja turida bu amal yo‘q'
+  bad_type: 'Bu reja turida bu amal yo‘q', no_audience: 'E’lon uchun kamida bitta guruh tanlang', bad_capacity: 'Joylar soni noto‘g‘ri'
 };
-const delivTxt = d => !d ? '' : ` · botda xabar: ${d.sent} ta${d.missed ? `, ulanmagan: ${d.missed} ta (koordinatorga havolalar yuborildi)` : ''}`;
+const delivTxt = d => !d ? '' : (d.sent || d.missed ? ` · botda xabar: ${d.sent} ta${d.missed ? `, ulanmagan: ${d.missed} ta (koordinatorga havolalar yuborildi)` : ''}` : '')
+  + (d.elon ? ` · e’lon: ${d.elon.sent} ta talabaga${d.elon.unlinked ? ` (botga ulanmagan: ${d.elon.unlinked} ta)` : ''}` : '');
 const verr = e => (e && e.data && e.data.message) || VERR[e && e.message] || 'Bajarilmadi';
 
 /* ---------------------------------------------------------------- kichik yordamchilar */
@@ -137,7 +143,8 @@ function bindPlanCards(root) {
 function planCard(p, compact = false) {
   const a = p.answers || {}, vt = VT[p.type] || {};
   const who = p.type === 'ijara_tashrifi' ? `<span class="pc-st">${ic('users')} ${a.total || 0} talaba${p.status === 'talaba_tasdigida' ? ` · ✅ ${a.tasdiqladi || 0}/${a.total || 0}` : ''}</span>`
-    : (p.place ? `<span class="pc-st">${ic('pin')} ${esc(p.place)}</span>` : '') + (a.total ? `<span class="pc-st">${ic('users')} ${a.total} ishtirokchi</span>` : '');
+    : (p.place ? `<span class="pc-st">${ic('pin')} ${esc(p.place)}</span>` : '') + (a.total || p.capacity ? `<span class="pc-st">${ic('users')} ${a.total || 0}${p.capacity ? '/' + p.capacity : ''} ishtirokchi</span>` : '')
+      + (p.announce ? `<span class="pc-st" title="Botda e’lon — talabalar o‘zi ro‘yxatdan o‘tadi">${ic('mega')} e’lon</span>` : '');
   return `<a href="#" class="pcard ${vt.c || ''} st-${p.status}" data-vp="${p.id}" title="${esc(p.title)}">
     <span class="pc-t">${esc(p.start_time)}–${esc(p.end_time)}${compact ? '' : ' · ' + esc(vt.s || '')}</span>
     <b>${esc(p.title)}</b>${who}${vChip(p.status)}${p.acts_n ? `<span class="chip ok">${ic('file')} ${p.acts_n}</span>` : ''}</a>`;
@@ -221,7 +228,7 @@ async function openPlan(pid) {
         <span class="grow"></span><button class="btn sm ghost" data-vroute1="${s.student_id}">${ic('route')} Yo‘l</button>
         <button class="btn sm ghost" data-vstu="${s.student_id}" title="Talaba kartasi">${ic('users')}</button></div></li>`;
   const partRow = s => `<li class="vst"><div class="vst-h"><span class="t"><b>${esc(s.full_name)}</b></span>
-      <span class="wrapc">${s.notified_at ? `<span class="chip ok" title="Botda xabar yetkazildi: ${esc(when(s.notified_at))}">${ic('check')} xabar yetdi</span>`
+      <span class="wrapc">${s.source === 'bot' ? `<span class="chip muted" title="E’londagi tugma orqali o‘zi ro‘yxatdan o‘tgan${s.registered_at ? ': ' + esc(when(s.registered_at)) : ''}">${ic('mega')} o‘zi yozildi</span>` : ''}${s.notified_at ? `<span class="chip ok" title="Botda xabar yetkazildi: ${esc(when(s.notified_at))}">${ic('check')} xabar yetdi</span>`
         : s.linked ? `<span class="chip ok" title="Reja aktual bo‘lganda xabar botda keladi">${ic('telegram')} botda</span>`
         : `<span class="chip warn" title="Talaba botga ulanmagan — shaxsiy havolani yuboring">${ic('telegram')} ulanmagan</span><button class="btn sm ghost" data-vinv="${s.student_id}">${ic('link')} Havola</button>`}
         <button class="btn sm ghost" data-vstu="${s.student_id}" title="Talaba kartasi" aria-label="Talaba kartasi">${ic('users')}</button></span></div></li>`;
@@ -259,10 +266,11 @@ async function openPlan(pid) {
         <button class="btn sm" data-vroute>${ic('route')} Qanday boriladi</button></h4>
       <ul class="vsts">${S_.map(studRow).join('')}</ul>
       <p class="hint" style="margin:8px 0 0">Talaba botda ✅ tasdiqlaydi, 🕒 boshqa vaqt taklif qiladi yoki ❌ «bu manzilda yashamayman» deydi. Tasdiqlashi bilan sizga shu manzilga qanday borilishi keladi (talabaga — yo‘q).</p></div>` : ''}
+    ${ev ? elonBox(p, own, ended) : ''}
     ${ev ? `<div class="box"><h4 class="h4row"><span>Ishtirokchilar — ${S_.length} ta${S_.length ? ` <span class="sub-l" style="display:inline">· botda ${S_.filter(s => s.linked).length} · xabar yetgan ${S_.filter(s => s.notified_at).length}</span>` : ''}</span>
-        ${canPart ? `<button class="btn sm" data-vpart>${ic('users')} ${S_.length ? 'O‘zgartirish' : 'Talabalarni belgilash'}</button>` : ''}</h4>
-      ${S_.length ? partGroups() : '<span class="dash">Ishtirokchi talabalar belgilanmagan.</span>'}
-      <p class="hint" style="margin:8px 0 0">Reja aktual bo‘lishi bilan botga ulangan ishtirokchilarga nomi, sanasi, vaqti va joyi yuboriladi; oldingi kuni kechqurun va boshlanishidan oldin eslatma boradi, vaqt o‘zgarsa yoki bekor qilinsa — ham. Ulanmagan talabaga shaxsiy havolani yuboring: ochishi bilan xabar keladi.</p></div>` : ''}
+        ${canPart ? `<button class="btn sm" data-vpart title="Alohida talaba yoki butun guruhni qo‘shish, olib tashlash">${ic('users')} Qo‘lda kiritish</button>` : ''}</h4>
+      ${S_.length ? partGroups() : `<span class="dash">${p.elon && p.elon.on ? 'Hali hech kim yozilmagan.' : 'Ishtirokchi talabalar belgilanmagan.'}</span>`}
+      <p class="hint" style="margin:8px 0 0">Ishtirokchilar — qo‘lda kiritilganlar va e’londa o‘zi yozilganlar («o‘zi yozildi»). Botga ulanganlarga nomi, sanasi, vaqti va joyi yuboriladi; oldingi kuni kechqurun va boshlanishidan oldin eslatma boradi, vaqt o‘zgarsa yoki bekor qilinsa — ham. Ulanmagan talabaga shaxsiy havolani yuboring: ochishi bilan xabar keladi.</p></div>` : ''}
     ${ij && ['tasdiqlangan', 'bajarildi'].includes(p.status) ? `<div class="box"><h4>Dalolatnomalar — ${acts.length} ta</h4>
       ${acts.length ? `<ul class="list chs-files">${acts.map(actRow).join('')}</ul>` : `<div class="note ${p.status === 'bajarildi' ? 'warn' : ''}">${ic(p.status === 'bajarildi' ? 'alert' : 'info')}<span>Har bir talaba uchun dalolatnoma to‘ldiriladi (16 band, imzolar) — Word fayli bitta betda, qog‘oz namunadagidek chiqadi. 14-band (xonadon toifasi) «Yashash joylari» xaritasiga tushadi.</span></div>`}
       ${canAct ? `<div style="margin-top:10px"><button class="btn sm primary" data-vanew>${ic('plus')} Dalolatnoma</button></div>` : ''}</div>` : ''}
@@ -275,10 +283,16 @@ async function openPlan(pid) {
   $$('[data-vdo]', B).forEach(b => b.addEventListener('click', async () => {
     const act = b.dataset.vdo;
     if (act === 'send' && ij && !await confirmDlg('Talabalarga yuborish', `${S_.length} ta talabaga botda tashrif so‘rovi yuboriladi. Hammasi tasdiqlagach, reja o‘zi aktual bo‘ladi.`, 'Yuborish')) return;
-    if (act === 'send' && ev && S_.length && !await confirmDlg('Aktual qilish', `Reja aktual bo‘ladi va ${S_.length} ta ishtirokchiga botda ${esc(VT[p.type].t.toLowerCase())} haqida xabar yuboriladi: nomi, sanasi, vaqti va joyi.`, 'Aktual qilish')) return;
+    const E = p.elon || {};
+    if (act === 'send' && ev && (S_.length || E.on) && !await confirmDlg('Aktual qilish', `Reja aktual bo‘ladi.${S_.length ? ` ${S_.length} ta ishtirokchiga botda ${esc(VT[p.type].t.toLowerCase())} haqida xabar yuboriladi: nomi, sanasi, vaqti va joyi.` : ''}${E.on ? ` ${esc((E.groups || []).join(', '))} guruhlari talabalariga botda e’lon boradi — «Ro‘yxatdan o‘tish» tugmasi bilan${E.capacity ? ` (${E.capacity} ta joy)` : ''}.` : ''}`, 'Aktual qilish')) return;
     b.disabled = true; await vAct(pid, act, {}, ij ? 'Yuborildi' : 'Aktual qilindi', true); b.disabled = false; }));
   $('[data-vedit]', B)?.addEventListener('click', () => planEditor(p));
   $('[data-vpart]', B)?.addEventListener('click', () => editParticipants(p));
+  $('[data-vann]', B)?.addEventListener('click', () => announceDlg(p));
+  $('[data-vreg]', B)?.addEventListener('click', async e => {
+    const open = e.currentTarget.dataset.vreg === 'open';
+    if (open || await confirmDlg('Ro‘yxatga olishni yopish', 'E’londagi «Ro‘yxatdan o‘tish» tugmalari o‘chadi, talabalar o‘zi yozila va chiqa olmaydi. Qo‘lda qo‘shish mumkin bo‘lib qoladi; ro‘yxatni keyin qayta ochish mumkin.', 'Yopish'))
+      vAct(pid, open ? 'regopen' : 'regclose', {}, open ? 'Ro‘yxatga olish qayta ochildi' : 'Ro‘yxatga olish yopildi', true); });
   $('[data-vforce]', B)?.addEventListener('click', async () => {
     if (await confirmDlg('Shundayligicha tasdiqlash', 'Javob bermagan talabalar «javob bermadi» deb belgilanadi va reja aktual bo‘ladi. Tasdiqlagan talabalarga yakuniy xabar ketadi.', 'Tasdiqlash')) vAct(pid, 'confirm', {}, 'Tasdiqlandi', true); });
   $('[data-vtime]', B)?.addEventListener('click', async () => {
@@ -346,7 +360,7 @@ async function copyInvite(sid) {
 const stuOf = s => ({ id: s.student_id, name: s.full_name, group: s.group_name || '', address: s.address, linked: s.linked });
 /* sel — tanlanganlar (Map id → talaba); mode() — 'ijara' (manzil bo'yicha, bittalab) yoki 'event' (guruh bilan) */
 function stuPicker(sel, mode) {
-  let all = null, loading = false;
+  let all = null;
   const q = el('input', { class: 'input', type: 'search', oninput: () => paintRes() });
   const groups = el('div', { class: 'vgrp' }), res = el('div', { class: 'vpick-res' }), chosen = el('div', { class: 'vpick-box' });
   const changed = () => { paintRes(); paintSel(); };
@@ -393,20 +407,33 @@ function stuPicker(sel, mode) {
       el('div', { class: 'vsel-chips' }, l.sort((a, b) => a.name.localeCompare(b.name)).map(s => el('span', { class: 'vchipx' + (s.linked ? ' on' : ''), title: s.linked ? 'Botga ulangan' : 'Botga ulanmagan' },
         shortName(s.name), el('button', { type: 'button', 'aria-label': 'Olib tashlash', onclick: () => { sel.delete(s.id); changed(); }, html: ic('x') })))))));
   };
-  const load = () => {
-    if (all || loading) return;
-    loading = true;
-    api('/api/staff/visits/students').then(r => {
-      all = r.items;
-      for (const s of all) if (sel.has(s.id)) sel.set(s.id, { ...sel.get(s.id), linked: s.linked });
-      changed();
-    }).catch(() => { res.textContent = 'Ro‘yxatni yuklab bo‘lmadi'; }).finally(() => { loading = false; });
-  };
+  let loadP = null;
+  const load = () => loadP || (loadP = api('/api/staff/visits/students').then(r => {
+    all = r.items;
+    for (const s of all) if (sel.has(s.id)) sel.set(s.id, { ...sel.get(s.id), linked: s.linked });
+    changed();
+    return all;
+  }).catch(() => { res.textContent = 'Ro‘yxatni yuklab bo‘lmadi'; loadP = null; return []; }));
   return { groups, q, res, chosen, load, repaint: changed };
 }
 
 /* ---------------------------------------------------------------- reja tuzish / tahrirlash */
-const TYPE_HINT = { ijara_tashrifi: 'talabalar tasdiqlaydi', tadbir: 'ishtirokchilarga botda xabar', madaniy_tashrif: 'ishtirokchilarga botda xabar', koordinatorlik_soati: 'yuborilishi bilan aktual' };
+const TYPE_HINT = { ijara_tashrifi: 'talabalar tasdiqlaydi', tadbir: 'botda e’lon, ro‘yxatdan o‘tish', madaniy_tashrif: 'botda e’lon, ro‘yxatdan o‘tish', koordinatorlik_soati: 'yuborilishi bilan aktual' };
+/* e'lon guruhlari: [{name, n}] → tugmalar; tanlanmagan bo'lsa — barchasi */
+const groupsOf = all => { const by = {}; (all || []).forEach(s => { const g = s.group || '—'; by[g] = (by[g] || 0) + 1; });
+  return Object.entries(by).sort(([a], [b]) => a.localeCompare(b, 'uz')).map(([name, n]) => ({ name, n })); };
+function audPicker(chosen) {
+  const sel = new Set(chosen || []), box = el('div', { class: 'vaud' });
+  let groups = [];
+  const paint = () => {
+    const all = !sel.size || groups.every(g => sel.has(g.name));
+    fillKids(box, el('button', { type: 'button', class: 'vgchip' + (all ? ' on' : ''), onclick: () => { sel.clear(); paint(); } }, `Barcha guruhlarim (${groups.length})`),
+      groups.map(g => el('button', { type: 'button', class: 'vgchip' + (!all && sel.has(g.name) ? ' on' : ''), 'aria-pressed': String(!all && sel.has(g.name)),
+        onclick: () => { if (all) sel.clear(); sel.has(g.name) ? sel.delete(g.name) : sel.add(g.name); if (groups.every(x => sel.has(x.name))) sel.clear(); paint(); },
+        html: `${esc(g.name)} <small>${g.n}</small>` })));
+  };
+  return { node: box, set: g => { groups = g; paint(); }, value: () => (groups.length && groups.every(g => sel.has(g.name)) ? [] : [...sel]) };
+}
 const TITLE_PH = { ijara_tashrifi: 'Masalan: Ijara xonadonlariga tashrif — XM-21', tadbir: 'Masalan: Mustaqillik bayrami konserti', madaniy_tashrif: 'Masalan: Temuriylar tarixi muzeyiga sayohat', koordinatorlik_soati: 'Masalan: Koordinatorlik soati — XM-21' };
 async function planEditor(p, preset = {}) {
   const isNew = !p;
@@ -420,17 +447,27 @@ async function planEditor(p, preset = {}) {
   const pk = stuPicker(sel, () => v.type === 'ijara_tashrifi' ? 'ijara' : 'event');
   const stuLbl = el('span'), stuNote = el('p', { class: 'hint', style: 'margin:0' });
   const stuBox = el('div', { class: 'field' }, stuLbl, stuNote, pk.groups, pk.q, pk.res, pk.chosen);
+  // botda e'lon: yangi tadbirda — yoqilgan, barcha guruhlarga
+  const E = p ? (p.elon || {}) : { on: true };
+  const annOn = el('input', { type: 'checkbox', checked: !!E.on, onchange: () => paint() });
+  const aud = audPicker(E.groups);
+  const capIn = el('input', { class: 'input', type: 'number', min: 1, max: 5000, placeholder: 'cheklanmagan', value: E.capacity || '' });
+  const annBody = el('div', { class: 'vel-b' }, el('span', { class: 'sub-l', text: 'Kimlarga (shu guruhlardagi botga ulangan talabalarga):' }), aud.node,
+    el('label', { class: 'field', style: 'margin:6px 0 0;max-width:220px' }, el('span', { text: 'Joylar soni' }), capIn));
+  const annBox = el('div', { class: 'field vel' }, el('label', { class: 'vel-h' }, annOn,
+    el('span', { html: `<b>${ic('mega')} Botda e’lon qilish</b><small>Talabalar e’londagi «✅ Ro‘yxatdan o‘tish» tugmasini bosib o‘zi yoziladi va ishtirokchilar ro‘yxatiga qo‘shiladi. Joylar to‘lsa, ro‘yxatga olish o‘zi yopiladi.</small>` })), annBody);
   const placeBox = el('label', { class: 'field' }, el('span', { text: 'Joyi' }), inp('place', 'text', { placeholder: 'Masalan: Milliy teatr, universitet akt zali' }));
   const err = el('div', { class: 'note bordo', hidden: true });
   const titleIn = inp('title', 'text', { required: true });
   const paint = () => {
     const ij = v.type === 'ijara_tashrifi';
     stuBox.hidden = !withStu(v.type); placeBox.hidden = ij;
-    stuLbl.textContent = ij ? 'Talabalar (ijara manzili talaba kartasidan olinadi)' : 'Ishtirokchi talabalar (ixtiyoriy)';
-    stuNote.textContent = ij ? '' : 'Reja aktual bo‘lishi bilan botga ulangan ishtirokchilarga nomi, sanasi, vaqti va joyi yuboriladi; oldingi kuni kechqurun va boshlanishidan oldin eslatma boradi.';
+    annBox.hidden = !EVT.includes(v.type); annBody.hidden = !annOn.checked;
+    stuLbl.textContent = ij ? 'Talabalar (ijara manzili talaba kartasidan olinadi)' : 'Qo‘lda kiritish (ixtiyoriy) — alohida talaba yoki butun guruh';
+    stuNote.textContent = ij ? '' : 'Qo‘lda kiritilganlar e’lonsiz ham ishtirokchi bo‘ladi: reja aktual bo‘lishi bilan ularga botda nomi, sanasi, vaqti va joyi yuboriladi; oldingi kuni kechqurun va boshlanishidan oldin eslatma boradi.';
     stuNote.hidden = ij;
     titleIn.placeholder = TITLE_PH[v.type] || '';
-    if (withStu(v.type)) pk.load();
+    if (withStu(v.type)) pk.load().then(all => aud.set(groupsOf(all)));
     pk.repaint();
   };
   const submit = async send => {
@@ -439,7 +476,8 @@ async function planEditor(p, preset = {}) {
       v.title = v.type === 'ijara_tashrifi' ? `Ijara xonadonlariga tashrif${sel.size ? ' — ' + [...new Set([...sel.values()].map(s => s.group).filter(Boolean))].join(', ') : ''}` : VT[v.type].t;
     }
     const body = { type: v.type, title: v.title, visit_date: v.visit_date, start_time: v.start_time, end_time: v.end_time, place: v.place, note: v.note,
-      student_ids: withStu(v.type) ? [...sel.keys()] : undefined };
+      student_ids: withStu(v.type) ? [...sel.keys()] : undefined,
+      ...(EVT.includes(v.type) ? { announce: annOn.checked, audience: aud.value(), capacity: annOn.checked ? capIn.value : '' } : {}) };
     try {
       let r;
       if (isNew) r = await api('/api/staff/visits', { method: 'POST', json: { ...body, send } });
@@ -461,9 +499,10 @@ async function planEditor(p, preset = {}) {
       el('label', { class: 'field' }, el('span', { text: 'Sana' }), inp('visit_date', 'date', { required: true })),
       el('label', { class: 'field' }, el('span', { text: 'Boshlanishi' }), inp('start_time', 'time', { required: true })),
       el('label', { class: 'field' }, el('span', { text: 'Tugashi' }), inp('end_time', 'time', { required: true }))),
-    stuBox, placeBox,
+    placeBox,
     el('label', { class: 'field' }, el('span', { text: 'Izoh (talabaga ko‘rinadi)' }),
       el('textarea', { class: 'textarea', rows: 2, oninput: e => { v.note = e.target.value; } }, v.note || '')),
+    annBox, stuBox,
     err,
     el('div', { class: 'row' },
       el('button', { class: 'btn', type: 'button', onclick: () => { dl.close(); dl.remove(); } }, 'Bekor qilish'),
@@ -493,6 +532,43 @@ function editParticipants(p) {
   dl.addEventListener('close', () => dl.remove());
   pk.load(); pk.repaint();
   dl.showModal();
+}
+
+/* reja oynasidagi «Botda e'lon» bo'limi */
+function elonBox(p, own, ended) {
+  const E = p.elon || {}, act = own && p.status === 'tasdiqlangan' && !ended;
+  if (!E.on) return act ? `<div class="box"><h4 class="h4row"><span>${ic('mega')} Botda e’lon</span><button class="btn sm primary" data-vann>${ic('mega')} E’lon qilish</button></h4>
+    <span class="dash">E’lon qilinmagan. E’lon qilsangiz, tanlangan guruhlar talabalari botda «Ro‘yxatdan o‘tish» tugmasini bosib o‘zi yoziladi.</span></div>` : '';
+  const rs = REG_S[E.state] || ['muted', E.state], open = ['open', 'full'].includes(E.state);
+  return `<div class="box"><h4 class="h4row"><span>${ic('mega')} Botda e’lon <span class="chip ${rs[0]}">${esc(rs[1])}</span></span>
+      ${act ? `<span class="nowrap">${E.state === 'closed' ? `<button class="btn sm" data-vreg="open">${ic('check')} Qayta ochish</button>` : open ? `<button class="btn sm" data-vreg="close">${ic('x')} Ro‘yxatni yopish</button>` : ''}
+        <button class="btn sm ghost" data-vann title="Guruh qo‘shish, joylar soni">${ic('edit')} Sozlash</button></span>` : ''}</h4>
+    <div class="kv"><span>Guruhlar</span><b>${esc((E.groups || []).join(', '))}</b>
+      ${E.state !== 'draft' ? `<span>E’lon yuborildi</span><b>${E.sent} ta talabaga${E.audience - E.linked ? ` <span class="sub-l" style="display:inline">· botga ulanmagan: ${E.audience - E.linked} ta</span>` : ''}</b>
+      <span>Botda ro‘yxatdan o‘tgan</span><b>${E.registered} ta</b>` : `<span>Talabalar</span><b>${E.audience} ta, botga ulangan: ${E.linked} ta</b>`}
+      <span>Joylar</span><b>${E.capacity ? `${E.total} / ${E.capacity}${E.free != null ? ` <span class="sub-l" style="display:inline">· bo‘sh ${E.free}</span>` : ''}` : 'cheklanmagan'}</b></div>
+    ${open ? '<p class="hint" style="margin:8px 0 0">Botga keyinroq ulangan talabalarga e’lon bir necha daqiqada o‘zi boradi. Ro‘yxatdan o‘tganlar quyidagi «Ishtirokchilar» ro‘yxatiga qo‘shiladi; ularga ham eslatmalar boradi.</p>' : ''}</div>`;
+}
+/* aktual rejani e'lon qilish yoki e'lonni kengaytirish (guruh qo'shish, joylar soni) */
+async function announceDlg(p) {
+  const E = p.elon || {};
+  const aud = audPicker(E.on ? E.groups : []);
+  const capIn = el('input', { class: 'input', type: 'number', min: 1, max: 5000, placeholder: 'cheklanmagan', value: E.capacity || '' });
+  const dl = el('dialog', { class: 'vdlg' });
+  const go = el('button', { class: 'btn primary', type: 'button', onclick: async () => {
+    go.disabled = true;
+    const r = await vAct(p.id, 'announce', { audience: aud.value(), capacity: capIn.value }, E.on ? 'E’lon yangilandi' : 'E’lon yuborildi', true);
+    if (r) dl.close(); else go.disabled = false; } }, E.on ? 'Saqlash va yuborish' : 'E’lon qilish');
+  dl.append(el('form', { method: 'dialog', class: 'wide', onsubmit: e => e.preventDefault() },
+    el('h3', { text: E.on ? 'E’lon sozlamalari' : 'Botda e’lon qilish' }), el('p', { class: 'hint', style: 'margin-top:-6px', text: `${p.title} · ${pWhen(p)}` }),
+    el('p', { text: E.on ? 'Yangi qo‘shilgan guruhlarga e’lon boradi; avval yuborilgan e’lonlardagi joylar soni yangilanadi.' : 'Tanlangan guruhlardagi botga ulangan talabalarga e’lon boradi — «✅ Ro‘yxatdan o‘tish» tugmasi bilan. Yozilganlar ishtirokchilar ro‘yxatiga qo‘shiladi.' }),
+    el('div', { class: 'field' }, el('span', { text: 'Kimlarga' }), aud.node),
+    el('label', { class: 'field', style: 'max-width:220px' }, el('span', { text: 'Joylar soni' }), capIn),
+    el('div', { class: 'row' }, el('button', { class: 'btn', type: 'button', onclick: () => dl.close() }, 'Bekor qilish'), go)));
+  document.body.append(dl);
+  dl.addEventListener('close', () => dl.remove());
+  dl.showModal();
+  try { aud.set(groupsOf((await api('/api/staff/visits/students')).items)); } catch (_) { toast('Guruhlarni yuklab bo‘lmadi', true); }
 }
 
 /* ================================================================ xarita (Leaflet — serverdan) */
