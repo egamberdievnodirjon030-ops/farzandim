@@ -359,10 +359,26 @@ apply_conf()  # bot orqali kiritilgan kalit (data/integration_conf.json) — .en
 KNOWN_PATHS = {"schedule": "student-timetable/weekly?hemisId={hemis_id}&monday={monday}",
                "subjects": "student-subjects?hemisId={hemis_id}&academicYearId={academic_year}"}
 _FIXED: set[str] = set()
+# Manba «bunday manzil yo'q» (HTTP 404: Cannot GET) degan yo'llar: tur → (yo'l, qachon). Shu yo'l .env da o'zgarmaguncha
+# har daqiqada so'rab xato yuborilmaydi — DEAD_RECHECK soatda bir marta jim qayta tekshiriladi
+_DEAD: dict[str, tuple[str, float]] = {}
+DEAD_RECHECK = 6 * 3600
+
+
+def _raw_path(kind: str) -> str:
+    return {"attendance": INTEGRATION_ATTENDANCE, "schedule": INTEGRATION_SCHEDULE, "subjects": INTEGRATION_SUBJECTS}[kind]
+
+
+def dead(kind: str) -> bool:
+    """Shu tur manzili manbada yo'q deb vaqtincha o'chirilganmi (.env dagi yo'l o'zgarsa — darhol qayta yoqiladi)."""
+    d = _DEAD.get(kind)
+    return bool(d) and d[0] == _raw_path(kind) and _time.monotonic() - d[1] < DEAD_RECHECK
 
 
 def endpoint(kind: str) -> str:
-    path = {"attendance": INTEGRATION_ATTENDANCE, "schedule": INTEGRATION_SCHEDULE, "subjects": INTEGRATION_SUBJECTS}[kind]
+    if dead(kind):
+        return ""
+    path = _raw_path(kind)
     known = KNOWN_PATHS.get(kind)
     if not known or "uwed.uz" not in INTEGRATION_URL.lower() or path.startswith("http"):
         return path
@@ -1505,6 +1521,8 @@ async def pull(bot, kind: str) -> dict:
             win = window(kind) if info["complete"] and not info["truncated"] else None
             res = await ingest(bot, kind, records, win)
         except Exception as e:
+            if isinstance(e, IntegrationError) and e.status == 404 and "cannot get" in str(e).lower():
+                return _mark_dead(kind, e)
             st["fails"] = st.get("fails", 0) + 1
             st["error"] = _err_text(e)
             level = logging.ERROR if st["fails"] in (3, 30) or st["fails"] % 360 == 0 else logging.WARNING
@@ -1513,13 +1531,35 @@ async def pull(bot, kind: str) -> dict:
             return {"error": st["error"]}
         if st.get("fails", 0) >= 3:
             log.warning("%s: %s yana olinmoqda (%s marta xatodan keyin)", INTEGRATION_NAME, TITLES[kind], st["fails"])
-        st.update(fails=0, error=None, last_ok=now_iso(), pages=info["pages"], format=info["format"],
-                  truncated=info["truncated"], result=res, missing=info.get("missing", 0),
+        _DEAD.pop(kind, None)
+        st.update(fails=0, error=None, disabled=None, disabled_hint=None, last_ok=now_iso(), pages=info["pages"],
+                  format=info["format"], truncated=info["truncated"], result=res, missing=info.get("missing", 0),
                   missing_total=sum(1 for d in _MISSING.values() if d == today()))
         if res["changed"]:
             st["last_change"] = st["last_ok"]
         await central.set_meta(f"integ_last_ok_{kind}", st["last_ok"])
         return res
+
+
+def _mark_dead(kind: str, e: Exception) -> dict:
+    """Manbada bunday manzil yo'q — tur vaqtincha o'chiriladi (birinchi marta — tushunarli xabar, keyin jim)."""
+    first = kind not in _DEAD
+    _DEAD[kind] = (_raw_path(kind), _time.monotonic())
+    st = STATE[kind]
+    manage = "uwed.uz" in INTEGRATION_URL.lower()
+    hint = (f"Manage'da alohida davomat manzili yo'q — davomat fanlar orqali (student-subjects) keladi: .env dagi "
+            f"{ENV_NAMES[kind]} qatorini bo'sh qoldiring (yoki o'chiring) va botni qayta ishga tushiring."
+            if manage and kind == "attendance" else
+            f".env dagi {ENV_NAMES[kind]} qatorini tekshiring (to'g'ri manzilni yozing yoki bo'sh qoldiring).")
+    m = re.search(r"https?://\S+?(?=\.?(?:\s|$))", str(e))
+    where = m.group(0) if m else ""
+    st.update(fails=0, error=None, disabled=f"manbada bunday manzil yo'q (HTTP 404){': ' + where if where else ''}",
+              disabled_hint=hint)
+    log.log(logging.ERROR if first else logging.INFO,
+            "%s: %s avtomatik olish o'chirildi — manbada bunday manzil yo'q (HTTP 404: Cannot GET)%s. %s "
+            "Har %s soatda bir marta qayta tekshiriladi.", INTEGRATION_NAME, TITLES[kind],
+            f": {where}" if where else "", hint, DEAD_RECHECK // 3600)
+    return {"error": str(e), "disabled": True}
 
 
 async def push(bot, kind: str, body: bytes, ctype: str) -> dict:
@@ -1590,7 +1630,7 @@ def _ago(iso: str | None) -> str:
 
 async def status_text() -> str:
     lines = [f"🔌 <b>Integratsiya: {esc(INTEGRATION_NAME)}</b>"]
-    if not configured() and not INTEGRATION_WEBHOOK_SECRET:
+    if not configured() and not INTEGRATION_WEBHOOK_SECRET and not any(dead(k) for k in KINDS):
         lines.append("\nHali sozlanmagan. Eng osoni: «🔑 Kalitni kiritish» tugmasini bosib, Manage'dagi curl buyrug'ini "
                      "(Authorization: Basic … bilan) shu yerga yuboring. Yoki .env faylida to'ldiring:\n"
                      "<code>INTEGRATION_URL=https://manage.example.uz/api\nINTEGRATION_TOKEN=…\n"
@@ -1609,7 +1649,9 @@ async def status_text() -> str:
     for kind in KINDS:
         st = STATE[kind]
         lines.append(f"\n<b>{TITLES[kind]}</b>")
-        if not configured(kind):
+        if dead(kind):
+            lines.append(f"  ⏸ o'chirilgan: {esc(st.get('disabled') or '')}\n  {esc(st.get('disabled_hint') or '')}")
+        elif not configured(kind):
             lines.append("  avtomatik olish sozlanmagan" + (" (faqat webhook)" if INTEGRATION_WEBHOOK_SECRET else ""))
         else:
             lines.append(f"  har {interval(kind)} soniyada; oxirgi urinish: {_ago(st.get('last_try'))}, "
