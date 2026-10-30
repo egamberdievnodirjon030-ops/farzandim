@@ -586,7 +586,9 @@ function loadLeaflet() {
 }
 function baseMap(box, center, zoom = 12, opts = {}) {
   const map = L.map(box, { zoomControl: true, scrollWheelZoom: !!opts.wheel, zoomSnap: 0.5 }).setView(center, zoom);
-  const o = { maxZoom: 19, attribution: '© OpenStreetMap' };
+  // OpenStreetMap sayt manzili (Referer) siz so'rovlarni «Access blocked» rasmi bilan rad etadi; sahifamiz esa
+  // no-referrer — faqat xarita rasmlariga sayt domeni (yo'lsiz) yuboriladi
+  const o = { maxZoom: 19, attribution: '© OpenStreetMap', referrerPolicy: 'strict-origin-when-cross-origin' };
   const main_ = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', o).addTo(map);
   main_.on('tileerror', () => { if (map._altTiles) return; map._altTiles = true;
     try { map.removeLayer(main_); L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', { ...o, maxZoom: 18 }).addTo(map); } catch (e) { /* */ } });
