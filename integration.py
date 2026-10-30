@@ -33,6 +33,7 @@ import logging
 import os
 import re
 import time as _time
+from collections import Counter
 from datetime import date, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
@@ -1298,6 +1299,8 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
     timeout = aiohttp.ClientTimeout(total=INTEGRATION_TIMEOUT)
     fatal: list[Exception] = []
 
+    marked: list[str] = []  # shu so'rovda «Manage'da yo'q» deb belgilanganlar
+
     async def one(session, st, monday):
         if fatal:
             return
@@ -1311,6 +1314,7 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
                 if st and _not_in_manage(e):  # talaba Manage bazasida yo'q — xato emas, o'tkazib yuboriladi
                     info["missing"] += 1
                     _MISSING[st["hemis_id"]] = today()
+                    marked.append(st["hemis_id"])
                     return
                 info["failed"] += 1
                 if e.status == 404 and "cannot get" in str(e).lower():  # manzil (yo'l) umuman yo'q — talabaga bog'liq emas
@@ -1355,8 +1359,13 @@ async def fetch(kind: str, max_pages: int | None = None) -> tuple[list[dict], di
         raise fatal[0]
     total = len(tg) * len(weeks) - info["missing"]
     if per_student(kind) and info["missing"] and not info["requests"] and not info["failed"]:
-        raise IntegrationError(f"so'ralgan {info['missing']} ta talabaning birortasi Manage bazasida yo'q («User not found in DB») — "
-                               "Manage'da bor guruh talabasi bilan sinang: --hemis=… yoki --guruh=…")
+        # Hech bir talaba topilmadi — bu odatda Manage tomonidagi vaqtinchalik nosozlik (kecha shu talabalar bor edi):
+        # ularni bugun «yo'q» deb tashlab qo'ymaymiz, keyingi urinishda qayta so'raladi
+        for hid in marked:
+            _MISSING.pop(hid, None)
+        raise IntegrationError(f"so'ralgan {info['missing']} ta talabaning birortasi Manage'da topilmadi («User not found in DB»). "
+                               "Bu odatda Manage tomonidagi vaqtinchalik nosozlik — keyingi urinishda qayta so'raladi. "
+                               "Takrorlansa: bot bazasidagi HEMIS ID lar Manage'dagi bilan bir xilmi (--hemis=… bilan sinang)")
     if info["failed"] and info["failed"] * 2 > total:
         raise IntegrationError(f"so'rovlarning ko'pi bajarilmadi: {info['failed']} / {total}")
     if info["failed"]:
@@ -1761,6 +1770,39 @@ async def _sample_diag() -> dict:
             "courses": courses, "students": students, "real_hemis": real}
 
 
+def _brief(data) -> str:
+    """Javobning qisqa matni (namuna fayli uchun; talaba ma'lumotisiz — faqat xato javoblar saqlanadi)."""
+    if isinstance(data, (dict, list)):
+        data = json.dumps(data, ensure_ascii=False)
+    return " ".join(str(data or "").split())[:200]
+
+
+def _why_none(checks: list[dict]) -> str:
+    """Birorta guruh Manage'da «topilmadi» — sababi javob kodiga qarab (oldin hammasi «User not found» deyilardi)."""
+    sts = [c["status"] for c in checks]
+    sample = next((c["body"] for c in checks if c["status"] != 200 and c["body"]), "")
+    tail = f"\n   Javob: {sample}" if sample else ""
+    if not checks:
+        return "❌ Manage'ga so'rov yuborilmadi."
+    if all(s is None for s in sts):
+        return ("❌ Manage'ga ulanib bo'lmadi (tarmoq xatosi yoki javob kutish vaqti tugadi). Internet va my.uwed.uz "
+                "ochilishini tekshiring, birozdan keyin qayta urinib ko'ring." + tail)
+    if any(s in (401, 403) for s in sts):
+        return ("❌ Manage kalitni (login:parol) qabul qilmadi (HTTP 401/403). Kalit o'zgargan bo'lishi mumkin — yangilang: "
+                "botda /manage_kalit yoki .env dagi INTEGRATION_TOKEN." + tail)
+    if any(s == 429 for s in sts):
+        return "❌ Manage so'rovlarni vaqtincha cheklamoqda (HTTP 429). 10–15 daqiqadan keyin qayta urinib ko'ring." + tail
+    if any(s is not None and s >= 500 for s in sts):
+        return "❌ Manage serverida xato (HTTP 5xx) — vaqtinchalik nosozlik. Birozdan keyin qayta urinib ko'ring." + tail
+    if all(s in (400, 404, 422) for s in sts):
+        return ("❌ Manage so'ralgan barcha talabalarga «topilmadi» dedi (HTTP " + "/".join(sorted({str(s) for s in sts}))
+                + "). Avval shu talabalar topilgan bo'lsa (HEMIS ID lar o'zgarmagan) — bu Manage tomonidagi vaqtinchalik "
+                "nosozlik: birozdan keyin qayta yig'ing. Birinchi marta bo'lsa — bot bazasidagi HEMIS ID lar Manage'dagi "
+                "bilan bir xilmi, tekshiring." + tail)
+    return "❌ Birorta guruh talabasi Manage'dan olinmadi (javoblar: " + ", ".join(
+        sorted({"tarmoq" if s is None else str(s) for s in sts})) + ")." + tail
+
+
 async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dict, str]:
     """python integration.py yigish — Manage'dan namuna yig'ish (kalitsiz faylga): bir guruh talabalarining fanlari,
     bitta talabaning shu va o'tgan haftalardagi jadvali, ehtimoliy davomat manzillari va API hujjati (Swagger)."""
@@ -1811,13 +1853,21 @@ async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dic
     async with aiohttp.ClientSession(timeout=timeout) as session:
         sub_path = endpoint("subjects") or KNOWN_PATHS["subjects"]
         sem = asyncio.Semaphore(INTEGRATION_CONCURRENCY)
-        # qaysi guruhlar Manage'da bor: har bir guruhdan 2 talaba
+        # qaysi guruhlar Manage'da bor: har bir guruhdan 2 talaba (tarmoq / server xatosida — bir marta qayta)
         avail: dict[str, bool] = {}
+        checks: list[dict] = []
 
         async def check_group(gk, rs):
             for r in rs[:2]:
-                async with sem:
-                    st, _, _ = await get(session, sub_path, r["hemis_id"])
+                for attempt in range(2):
+                    async with sem:
+                        st, data, _ = await get(session, sub_path, r["hemis_id"])
+                    if st is None or st == 429 or st >= 500:
+                        if attempt == 0:
+                            await asyncio.sleep(2)
+                            continue
+                    break
+                checks.append({"group": rs[0]["group_name"], "status": st, "body": _brief(data)})
                 if st == 200:
                     avail[gk] = True
                     return
@@ -1827,16 +1877,22 @@ async def collect_sample(group: str | None = None, limit: int = 40) -> tuple[dic
         yes = sorted(names[g] for g, ok in avail.items() if ok)
         no = sorted(names[g] for g, ok in avail.items() if not ok)
         out["groups_in_manage"], out["groups_not_in_manage"] = yes, no
+        out["checks"] = checks
         lines.append(f"Manage'da bor guruhlar ({len(yes)}): {', '.join(yes) or '—'}")
         lines.append(f"Manage'da yo'q guruhlar ({len(no)}): {', '.join(no) or '—'}")
+        bad = [c for c in checks if c["status"] != 200]
+        if bad:
+            lines.append("Javoblar: " + ", ".join(f"{k} — {n} ta" for k, n in Counter(
+                "tarmoq/vaqt" if c["status"] is None else f"HTTP {c['status']}" for c in bad).most_common()))
         gk = group_key(group) if group else None
         if gk and not avail.get(gk):
             lines.append(f"⚠️ {group} guruhi talabalari Manage'da topilmadi — Manage'da bor guruhdan olinadi")
             gk = None
         gk = gk or next((g for g, ok in avail.items() if ok), None)
         if not gk:
-            return out, "\n".join(lines + ["❌ Birorta guruh talabasi Manage'da topilmadi («User not found in DB»). "
-                                            "Bot bazasidagi HEMIS ID lar Manage'dagi bilan bir xilmi — tekshiring."])
+            reason = _why_none(checks)
+            out["errors"].append(reason)
+            return out, "\n".join(lines + [reason])
         rows = by_group[gk][:limit]
         out["group"] = rows[0]["group_name"]
         hid0 = next((r["hemis_id"] for r in rows), None)
