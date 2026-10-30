@@ -28,6 +28,7 @@ yoki bekor qilinsa — xabar beriladi.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -37,10 +38,10 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import botlar
-from config import DATA_DIR, SUPERADMIN_IDS, TZ
+from config import DATA_DIR, SUPERADMIN_IDS, TZ, UNIVERSITY_NAME
 from database import db
 from tenancy import central, current_course, use_course
-from utils import esc, group_key, now, now_iso, today
+from utils import esc, fmt_phone, group_key, now, now_iso, today
 
 log = logging.getLogger(__name__)
 
@@ -1183,7 +1184,9 @@ async def register(bot, pid: int, sid: int) -> dict:
         await _refresh_elon(bot, p, skip=sid)
         await _to_coordinator(bot, p, f"<b>✅ Joylar to'ldi</b>\n\n{esc(p['title'])}\n{esc(p['when'])}\n\n"
                                       f"Ishtirokchilar: {len(p['students'])} ta (botda ro'yxatdan o'tgan: "
-                                      f"{p['elon']['registered']} ta). Ro'yxat — boshqaruv paneli → «Tashriflar».")
+                                      f"{p['elon']['registered']} ta). Ro'yxat — Word faylda (quyida) va boshqaruv paneli → "
+                                      "«Tashriflar».")
+        await send_list(bot, p, "joylar to'ldi")
     return p
 
 
@@ -1221,6 +1224,8 @@ async def set_registration(bot, pid: int, uid: int, open_: bool) -> dict:
     await _refresh_elon(bot, p)
     if open_:
         p["delivery"] = {"sent": 0, "missed": 0, "elon": await _announce_pending(bot, p)}
+    else:  # ro'yxat tayyor — Word jadval koordinatorga
+        p["list_sent"] = await send_list(bot, p, "ro'yxatga olish yopildi")
     return p
 
 
@@ -1239,6 +1244,74 @@ async def announce(bot, pid: int, uid: int, d: dict, scope: set[str] | None = No
     await _refresh_elon(bot, p)
     p["delivery"] = {"sent": 0, "missed": 0, "elon": await _announce_log(bot, p, uid)}
     return p
+
+
+# ---------------------------------------------------------------- ishtirokchilar ro'yxati (Word)
+def _list_sig(p: dict) -> str:
+    return hashlib.sha1(",".join(sorted(str(s["student_id"]) for s in p["students"])).encode()).hexdigest()[:16]
+
+
+def participants_docx(p: dict) -> tuple[bytes, str]:
+    """Rejaga biriktirilgan talabalar — Word jadval (tadbir / madaniy tashrif: imzo ustuni bilan; ijara: manzil va javob)."""
+    import docxtable
+    rows = sorted(p["students"], key=lambda s: ((s.get("group_name") or ""), s["full_name"]))
+    nom = _nom(p).lower()
+    if p["type"] == IJARA:
+        short = {KUTILMOQDA: "kutilmoqda", TASDIQLADI: "tasdiqladi", VAQT_TAKLIF: "boshqa vaqt", RAD_ETDI: "yashamaydi",
+                 JAVOB_BERMADI: "javobsiz"}
+        cols = [("№", 5, "center"), ("F.I.Sh.", 25, "left"), ("Guruh", 10, "center"), ("Ijara manzili", 29, "left"),
+                ("Telefon", 19, "center"), ("Javobi", 13, "center")]
+        data = [[str(i), s["full_name"], s.get("group_name") or "", s.get("address") or "", fmt_phone(s.get("phone")),
+                 short.get(s["response"], "")] for i, s in enumerate(rows, 1)]
+        title = f"«{p['title']}» — tashrif buyuriladigan talabalar ro'yxati"
+    else:
+        cols = [("№", 5, "center"), ("F.I.Sh.", 30, "left"), ("Guruh", 11, "center"), ("Kurs", 7, "center"),
+                ("Telefon", 19, "center"), ("Qo'shilgan", 13, "center"), ("Imzo", 13, "center")]
+        data = [[str(i), s["full_name"], s.get("group_name") or "", str(s.get("course") or ""), fmt_phone(s.get("phone")),
+                 "o'zi yozildi" if s.get("source") == "bot" else "koordinator", ""] for i, s in enumerate(rows, 1)]
+        title = f"«{p['title']}» — {nom} ishtirokchilari ro'yxati"
+    reg = sum(1 for s in rows if s.get("source") == "bot")
+    info = [("Sana va vaqt", when(p))] + ([("Joyi", p["place"])] if p.get("place") else []) + [
+        ("Kurs koordinatori", p.get("coordinator_name") or ""),
+        ("Jami", f"{len(rows)} ta talaba" + (f" (botda ro'yxatdan o'tgan: {reg} ta)" if reg else ""))]
+    stamp = now()
+    footer = [f"Kurs koordinatori: ______________________ {p.get('coordinator_name') or ''}",
+              f"Ro'yxat {stamp:%d.%m.%Y %H:%M} holatiga tuzildi."]
+    blob = docxtable.build(title, info, cols, data, footer, top=UNIVERSITY_NAME, row_height=0 if p["type"] == IJARA else 420)
+    safe = re.sub(r"[^\w\-]+", "_", p["title"], flags=re.UNICODE).strip("_")[:50] or "royxat"
+    return blob, f"Royxat_{safe}_{p['visit_date']}.docx"
+
+
+async def send_list(bot, p: dict, why: str) -> bool:
+    """Ishtirokchilar ro'yxati (Word) — kurs koordinatoriga botda (asosiy bot). Shu ro'yxat avval yuborilgan bo'lsa —
+    takrorlanmaydi."""
+    if not p["students"]:
+        return False
+    sig = _list_sig(p)
+    if p.get("list_sig") == sig:
+        return False
+    blob, name = participants_docx(p)
+    ok = await _send_doc(botlar.main_bot(bot), p["coordinator_id"], blob, name,
+                         f"📄 «{p['title']}» — ishtirokchilar ro'yxati: {len(p['students'])} ta ({why}).\n{p['when']}")
+    if ok:
+        await db.execute("UPDATE visit_plans SET list_sig = ? WHERE id = ?", (sig, p["id"]))
+        p["list_sig"] = sig
+    return ok
+
+
+async def _send_doc(bot, chat_id: int | None, data: bytes, name: str, caption: str) -> bool:
+    if bot is None or not chat_id:
+        return False
+    from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+    from aiogram.types import BufferedInputFile
+    try:
+        await bot.send_document(chat_id, BufferedInputFile(data, name), caption=caption[:1024])
+        return True
+    except (TelegramForbiddenError, TelegramBadRequest) as e:
+        log.warning("Ro'yxat yuborilmadi %s: %s", chat_id, e)
+    except Exception:  # noqa: BLE001  (tarmoq — panelda yuklab olish mumkin)
+        log.exception("Ro'yxat yuborilmadi %s", chat_id)
+    return False
 
 
 async def _to_coordinator(bot, p: dict, text: str, kb=None):
@@ -1272,7 +1345,7 @@ async def reminders(bot) -> dict:
     (REMINDER_EVE_HOUR dan) eslatma; tashrifdan REMINDER_HOURS_BEFORE soat oldin talabalar va koordinatorga eslatma
     (+ ijara manziliga yo'l). Har biri bir marta."""
     from tashrif.sozlama import sozlama
-    out = {"answer": 0, "visit": 0, "eve": 0, "elon": 0}
+    out = {"answer": 0, "visit": 0, "eve": 0, "elon": 0, "list": 0}
     ts = now()
     for r in await db.fetchall("SELECT id, student_deadline FROM visit_plans WHERE status = ? AND student_deadline IS NOT NULL",
                                (TALABA,)):
@@ -1303,6 +1376,13 @@ async def reminders(bot) -> dict:
             f"""SELECT id FROM visit_plans WHERE announce = 1 AND status = ? AND reg_closed_at IS NULL AND visit_date >= ?
                 AND type IN ({','.join('?' * len(ISHTIROK))})""", (TASDIQLANGAN, ts.date().isoformat(), *ISHTIROK)):
         out["elon"] += (await _announce_pending(bot, await get(r["id"], full=False)))["sent"]
+    for r in await db.fetchall(  # tadbir boshlandi — ro'yxatga olish yakunlandi: Word ro'yxat koordinatorga (o'zgargan bo'lsa)
+            f"""SELECT id FROM visit_plans WHERE status = ? AND visit_date = ? AND type IN ({','.join('?' * len(ISHTIROK))})
+                AND EXISTS (SELECT 1 FROM visit_students vs WHERE vs.plan_id = visit_plans.id)""",
+            (TASDIQLANGAN, ts.date().isoformat(), *ISHTIROK)):
+        p = await get(r["id"], full=False)
+        if passed(p["visit_date"], p["start_time"]) and not passed(p["visit_date"], p["end_time"]):
+            out["list"] += await send_list(bot, p, "tadbir boshlandi — yakuniy ro'yxat")
     eve = sozlama.ertaga_soat
     if eve is not None and ts.hour >= eve:  # ertangi tadbirlar — kechqurun bir marta
         tom = (ts.date() + timedelta(days=1)).isoformat()
@@ -1361,8 +1441,8 @@ async def loop(bot) -> None:
                 with use_course(key):
                     n = await reminders(bot)
                 if any(n.values()):
-                    log.info("[%s] Tashrif eslatmalari: javob %s, tashrif %s, ertangi tadbir %s, e'lon %s", key,
-                             n["answer"], n["visit"], n["eve"], n["elon"])
+                    log.info("[%s] Tashrif eslatmalari: javob %s, tashrif %s, ertangi tadbir %s, e'lon %s, ro'yxat %s", key,
+                             n["answer"], n["visit"], n["eve"], n["elon"], n["list"])
             except Exception:  # noqa: BLE001  (sikl to'xtab qolmasligi kerak)
                 log.exception("Tashrif eslatmalari (%s)", key)
         await asyncio.sleep(300)

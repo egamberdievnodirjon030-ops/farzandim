@@ -21,7 +21,7 @@ from utils import now_iso
 
 log = logging.getLogger("imports")
 
-NOT_DELETABLE = {"phones", "addresses", "translations"}
+NOT_DELETABLE = {"phones", "addresses", "categories", "translations"}
 LEGACY_WINDOW = timedelta(minutes=15)  # talabalar import_id siz yozilgan eski yuklamalar: fayl vaqtidan shu oraliqda
 
 

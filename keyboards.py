@@ -297,6 +297,7 @@ IMPORT_KINDS = (("👥 Talabalar", "students"), ("📊 Davomat", "attendance"),
                 ("💰 Kontrakt qarzdorligi", "debts"), ("🗓 Trimestr qarzdorligi", "debts_t"),
                 ("📚 Akademik qarzdorlar", "acad_debts"), ("🎓 GPA (HEMIS)", "gpa"),
                 ("📱 Talaba telefonlari", "phones"), ("🏠 Manzillar (ijarada yashash)", "addresses"),
+                ("🤝 Ijtimoiy toifalar", "categories"),
                 ("🌐 Tarjimalar", "translations"))
 
 

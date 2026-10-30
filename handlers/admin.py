@@ -409,7 +409,11 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
     scope = group_scope(user_id) if kind not in UNSCOPED_KINDS else None
     tag = f"{n}-fayl «{esc(file_name)}» — " if n else ""
     try:
-        result = await asyncio.to_thread(parse_rows, rows, kind)
+        if kind == "categories":  # ro'yxat bitta toifaga bo'lsa — toifa fayl nomidan ham olinadi
+            from importer import parse_categories
+            result = await asyncio.to_thread(parse_categories, rows, file_name)
+        else:
+            result = await asyncio.to_thread(parse_rows, rows, kind)
     except Exception as e:
         log.exception("Import xatosi: %s, «%s»", KIND_TITLES.get(kind, kind), file_name)
         await progress.edit_text(f"❌ {tag}faylni o'qib bo'lmadi: {esc(e)}")
@@ -438,10 +442,11 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
             lines.append("⚠️ Faylda guruhlaringizga tegishli talaba topilmadi — hech narsa saqlanmadi. Guruhlar "
                          "noto'g'ri biriktirilgan bo'lsa, super-adminga murojaat qiling.")
 
-    if kind in ("students", "phones", "addresses"):
+    if kind in ("students", "phones", "addresses", "categories"):
         cols = result.columns
         lines.append("Tanilgan ustunlar: " + ", ".join(
-            f"{COLUMN_ROLES[f]} ← «{esc(h)}»" for f, h in cols.items() if f in COLUMN_ROLES))
+            f"{COLUMN_ROLES[f.split('_')[0] if f.startswith('toifa_') else f]} ← «{esc(h)}»" for f, h in cols.items()
+            if f in COLUMN_ROLES or f.startswith("toifa_")))
 
     if kind == "students":
         # boshqa kursda ro'yxatdan o'tgan yoki farzandi topilmay kutib turgan ota-onalar — shu kursga ham
@@ -466,6 +471,27 @@ async def _process_import_body(bot, progress: Message, kind: str, rows: list, ca
         lines.append(f"Talabalarning o'z raqamlari yangilandi: {n} ta talaba "
                      f"({sum(len(r['student_phones']) for r in rows)} ta raqam)")
         lines += await _after_phone_import(bot)
+
+    elif kind == "categories":  # ijtimoiy toifalar: nogironlik, ijtimoiy himoya, chin yetim, mehribonlik uyi
+        import socialcat
+        from importer import resolve_loose
+        rows, unknown = resolve_loose(result.rows, await db.all_students_brief(scope))
+        errors += unknown
+        new = {c: 0 for c in socialcat.CATS}
+        have = 0
+        for r in rows:
+            for cat, sub in r["items"]:
+                if await socialcat.add(r["student_id"], cat, sub, r.get("note") or "", "fayl", user_id):
+                    new[cat] += 1
+                else:
+                    have += 1
+        if result.meta.get("mode") == "title":
+            lines.append(f"Toifa fayl nomi / sarlavhadan olindi: {esc(', '.join(result.meta['default']))}")
+        lines.append(f"Talabalar topildi: {len(rows)} ta; yangi toifa berildi: {sum(new.values())}"
+                     + (f", avvaldan bor edi: {have}" if have else ""))
+        lines += [f"   • {socialcat.CATS[c]['title']}: +{n}" for c, n in new.items() if n]
+        lines.append("Kurs holatidagi «Ijtimoiy toifalar» kartalarida va talaba kartasida ko'rinadi; qo'lda ham "
+                     "belgilash va olib tashlash mumkin.")
 
     elif kind == "addresses":  # hozirgi (ijara) manzillari: HEMIS ID siz — F.I.Sh. (+ guruh) bo'yicha
         from importer import resolve_loose
@@ -1027,6 +1053,7 @@ def _crossings_lines(crossings: list[dict], limit: int = 30) -> list[str]:
 
 
 COLUMN_ROLES = {"hemis_id": "ID", "full_name": "F.I.Sh", "group_name": "guruh", "address": "manzil", "course": "kurs",
+                "category": "toifa", "toifa": "toifa", "dis_group": "nogironlik guruhi", "note": "izoh",
                 "student_phones": "talabaning o'z raqami", "phones": "ota-ona raqami",
                 "phones_father": "otasining raqami", "phones_mother": "onasining raqami"}
 

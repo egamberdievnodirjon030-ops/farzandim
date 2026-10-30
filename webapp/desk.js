@@ -387,8 +387,9 @@ function tone(v, bad = 'bordo') { return v ? bad : 'ok'; }
 async function pPanel() {
   document.title = 'Kurs holati — Boshqaruv paneli';
   view(head('Kurs holati', courseSub()) + skel(110) + skel(360));
-  const [d, ib, rq, ch, vt] = await Promise.all([api('/api/staff/panel'), api('/api/staff/inbox'), api('/api/staff/requests'),
-    api('/api/staff/discipline/badge').catch(() => null), api('/api/staff/visits/badge').catch(() => null)]);
+  const [d, ib, rq, ch, vt, sc] = await Promise.all([api('/api/staff/panel'), api('/api/staff/inbox'), api('/api/staff/requests'),
+    api('/api/staff/discipline/badge').catch(() => null), api('/api/staff/visits/badge').catch(() => null),
+    typeof socialSection === 'function' ? api('/api/staff/social').catch(() => null) : null]);
   const cover = pct(d.linked, d.total);
   const unread = ib.items.reduce((a, i) => a + (i.unread || 0), 0);
   const share = n => (d.total ? `${pct(n, d.total)}% talabalar` : '');
@@ -424,7 +425,8 @@ async function pPanel() {
   const msgs = fresh.length ? `<ul class="list">${fresh.map(i => `<li><a href="#/inbox/${i.sid}/${i.pid}"><span class="av-s">${esc(initials(i.parent))}</span>
       <div class="t"><b>${esc(i.parent)} <span class="chip bordo" style="height:20px;margin-left:4px">${i.unread}</span></b><p>${esc(i.student)}: ${esc(i.last)}</p></div><time>${when(i.at)}</time></a></li>`).join('')}</ul>`
     : `<div class="pad"><div class="note ok">${ic('ok')}<span>Javob kutayotgan xabar yo‘q.</span></div></div>`;
-  view(head('Kurs holati', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + band + dynSection(d.dynamics) + `
+  view(head('Kurs holati', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + band + dynSection(d.dynamics)
+    + (sc ? socialSection(sc, d.total) : '') + `
     <div class="grid-2">
       <section class="sec"><header>${H('target', 'E’tibor talab qiladigan talabalar', 'risk')}<a href="#/students?f=prob">Barchasi ${ic('arrow')}</a></header>${top}</section>
       <div class="stack">
@@ -615,6 +617,7 @@ async function openStudent(id, course = null) {
       ${m.ground === 'davomat' ? `davomat, sababsiz ${pairs(m.hours)}` : m.ground === 'trimestr' ? `trimestr qarzi ${money(m.amount)}` : `ichki tartib: ${esc(m.rule || '')}`}
       ${m.files ? `<span class="chip ok">${ic('file')} ${m.files} ta hujjat</span>` : '<span class="chip warn">asl hujjat yo‘q</span>'}</span><b>${m.number ? '№ ' + esc(m.number) + ', ' : ''}${dmy(m.date)}</b></div>`).join('')}
       <div style="margin-top:10px"><button class="btn sm" data-chs="${id}">${ic('folder')} Hujjatlarni ochish</button></div></div>` : ''}
+    <div class="box" id="stu-social">${skel(40)}</div>
     <div class="box" id="stu-home">${skel(60)}</div>
     ${d.subjects && d.subjects.length ? `<div class="box"><h4>Fanlar bo‘yicha davomat</h4><div class="subj-list">${d.subjects.map(subjRow).join('')}</div></div>` : ''}
     <div class="box"><h4>Haftalik jadval</h4><div id="stu-week">${skel(80)}</div></div>
@@ -627,6 +630,7 @@ async function openStudent(id, course = null) {
   $('#drawer header b').textContent = c.name;
   loadStudentWeek(id, course, '');
   if (typeof loadStudentHome === 'function') loadStudentHome(id, course); else $('#stu-home')?.remove();
+  if (typeof loadStudentSocial === 'function') loadStudentSocial(id, course); else $('#stu-social')?.remove();
 }
 /* fan qatori: nomi, davomat chizig'i va foizi, sababsiz/sababli */
 function attTone(p) { return p == null ? '' : p >= 90 ? 'ok' : p >= 75 ? 'warn' : 'bad'; }
@@ -1587,7 +1591,7 @@ async function pAnnounce() {
 /* ================================================================ ma'lumot yuklash va hisobot */
 const KINDS = [['auto', 'Turini bot aniqlasin'], ['students', 'Talabalar'], ['attendance', 'Davomat (kunlik)'], ['attendance_stats', 'Davomat (HEMIS statistikasi)'],
   ['schedule', 'Dars jadvali'], ['grades', 'Baholar'], ['enroll', 'Tanlov fanlari va 2-til: kim o‘qiydi'], ['elsched', 'Tanlov fanlari va 2-til: jadval'],
-  ['debts', 'Kontrakt qarzdorligi'], ['debts_t', 'Trimestr qarzdorligi'], ['acad_debts', 'Akademik qarzdorlar (HEMIS ro‘yxati)'], ['phones', 'Talaba telefonlari'], ['addresses', 'Manzillar (ijarada yashash)'], ['translations', 'Tarjimalar']];
+  ['debts', 'Kontrakt qarzdorligi'], ['debts_t', 'Trimestr qarzdorligi'], ['acad_debts', 'Akademik qarzdorlar (HEMIS ro‘yxati)'], ['phones', 'Talaba telefonlari'], ['addresses', 'Manzillar (ijarada yashash)'], ['categories', 'Ijtimoiy toifalar'], ['translations', 'Tarjimalar']];
 const SECTIONS_EXP = [['all', 'To‘liq hisobot'], ['prob', 'Muammoli talabalar'], ['att', 'Davomati past talabalar'], ['acad', 'Akademik qarzdorlar'],
   ['kontrakt', 'Kontrakt qarzdorlari'], ['trimestr', 'Trimestr qarzdorlari']];
 async function pFiles() {
@@ -1845,6 +1849,11 @@ async function pSuperOverview() {
   const cover = pct(tot.linked, tot.total);
   const moneyCell = (m, icon) => m.count ? `<span class="mcell" title="${money(m.sum)}">${ic(icon)}<b>${mlnPlain(m.sum)}</b><small>${m.count} ta talaba</small></span>` : '<span class="dash">—</span>';
   const countCell = (n, icon, cls) => n ? `<span class="icnt ${cls}">${ic(icon)}${n}</span>` : '<span class="dash">0</span>';
+  // chora ko'rilganlar — barcha kurslar (o'quv yili boshidan)
+  const DS = ['students', 'total', 'repeat', 'pending', 'ogohlantirish', 'hayfsan', 'boshqa', 'xat', 'davomat', 'tartib', 'trimestr', 'letters'];
+  const disc = d.courses.reduce((a, c) => { DS.forEach(k => { a[k] += (c.disc && c.disc[k]) || 0; }); return a; }, Object.fromEntries(DS.map(k => [k, 0])));
+  const discTitle = x => x ? `O‘quv yilida: ${x.total} ta chora — ogohlantirish ${x.ogohlantirish}, hayfsan ${x.hayfsan}, boshqa ${x.boshqa}, xat ${x.xat}; asos: davomat ${x.davomat}, ichki tartib ${x.tartib}, trimestr ${x.trimestr}` : 'ma’lumot yo‘q';
+  const discCell = x => !x ? '<span class="dash">—</span>' : `<span title="${esc(discTitle(x))}">${countCell(x.students, 'shield', x.pending ? 'bad' : '')}${x.pending ? `<small class="warn-t" style="display:block">kutilmoqda: ${x.pending}</small>` : ''}</span>`;
   view(head('Barcha kurslar', todayLabel(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
     <section class="kpis k3" aria-label="Universitet bo‘yicha ko‘rsatkichlar">
       ${kpi({ href: '#/super/courses', icon: 'layers', c: 'people', label: 'Kurslar', value: d.courses.length, unit: 'ta', sub: `${ic('users')} kurs koordinatorlari: <b>${d.coordinators}</b>` })}
@@ -1855,13 +1864,23 @@ async function pSuperOverview() {
       ${kpi({ href: '#/super/system', icon: 'server', c: 'sys', label: 'Tizim', value: d.errors_24h ? d.errors_24h : 'Barqaror', unit: d.errors_24h ? 'ta xato' : '',
         state: d.errors_24h ? 'bad' : 'ok', sub: `${ic('db')} zaxira: ${d.last_backup ? when(d.last_backup) : 'hali olinmagan'}` })}
     </section>
+    <section class="kpis k2" aria-label="Talabalar bo‘yicha choralar">
+      ${kpi({ icon: 'shield', c: 'risk', label: 'Chora ko‘rilganlar (barcha kurslar)', value: disc.students, unit: 'talaba', state: disc.pending ? 'bad' : null,
+        title: `O‘quv yili boshidan rasman ko‘rilgan choralar: ${disc.total} ta`,
+        sub: `<span class="ln">dekan ogohlantirishi: <b>${disc.ogohlantirish}</b> · hayfsan: <b>${disc.hayfsan}</b> · boshqa: <b>${disc.boshqa}</b></span>
+          <span class="ln">asos — davomat: <b>${disc.davomat}</b> · ichki tartib: <b>${disc.tartib}</b> · trimestr: <b>${disc.trimestr}</b></span>
+          <span class="ln">ota-onaga xat: <b>${disc.letters}</b>${disc.repeat ? ` · takroriy: <b>${disc.repeat}</b> talaba` : ''}</span>
+          ${disc.pending ? `<span class="ln warn-t">chora kutilmoqda: <b>${disc.pending}</b> ta talaba</span>` : ''}` })}
+      ${typeof socialKpi === 'function' ? socialKpi(d.courses) : ''}
+    </section>
     <section class="sec"><header>${H('layers', 'Kurslar kesimida', 'people')}<a href="#/super/courses">Kurslarni boshqarish ${ic('arrow')}</a></header>
       ${d.courses.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl courses"><thead><tr><th>Kurs</th><th>Kurs koordinatorlari</th><th class="r">Talabalar</th><th>Ota-onasi ulangan</th>
-        <th class="r">Muammoli</th><th class="r">Davomat</th><th class="r">Akademik</th><th class="r">Kontrakt qarzi</th><th class="r">Trimestr qarzi</th><th></th></tr></thead><tbody>
+        <th class="r">Muammoli</th><th class="r">Davomat</th><th class="r">Akademik</th><th class="r" title="O‘quv yilida chora ko‘rilgan talabalar">Chora</th><th class="r">Kontrakt qarzi</th><th class="r">Trimestr qarzi</th><th></th></tr></thead><tbody>
         ${d.courses.map(c => `<tr><td class="name"><div class="cname"><span class="h-ic sm c-people" aria-hidden="true">${ic('layers')}</span><b>${esc(c.title)}</b></div></td>
           <td>${c.admins.length ? `<div class="people">${c.admins.map(a => `<span class="person"><span class="av-s">${/^\p{L}/u.test(a.label) && !/^ID\b/.test(a.label) ? esc(initials(a.label)) : ic('users')}</span>${esc(a.label)}</span>`).join('')}</div>` : `<span class="chip warn">${ic('alert')}tayinlanmagan</span>`}</td>
           <td class="r">${c.total}</td><td>${pctCell(c.total ? pct(c.linked, c.total) : null)}</td>
           <td class="r">${countCell(c.prob, 'flame', c.multi ? 'bad' : '')}</td><td class="r">${countCell(c.att, 'calx', 'bad')}</td><td class="r">${countCell(c.acad, 'bookx', 'bad')}</td>
+          <td class="r">${discCell(c.disc)}</td>
           <td class="r">${moneyCell(c.kontrakt, 'dollar')}</td><td class="r">${moneyCell(c.trimestr, 'receipt')}</td>
           <td class="r"><button class="btn sm" data-act="enter" data-key="${esc(c.key)}">Kirish ${ic('arrow')}</button></td></tr>`).join('')}</tbody></table></div>`
         : emptyBox('building', 'Hali kurs yo‘q', '', `<a class="btn primary" href="#/super/courses">${ic('plus')} Kurs yaratish</a>`)}</section>`);

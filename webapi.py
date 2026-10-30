@@ -1874,18 +1874,30 @@ async def api_super_overview(request):
     import export
     from handlers.superadmin import courses_info
     from logsetup import errors_since
+    import discipline
+    import socialcat
     info = {c["key"]: c for c in await courses_info()}
     rows = []
     for key in db.keys():
         with use_course(None if key == "_" else key):
             d = await export.collect("")
+            try:  # chora ko'rilganlar (o'quv yili boshidan) va kutilayotganlar — dekan / super-admin uchun
+                ds = await discipline.panel_stats(None)
+                k = ds["kpi"]
+                disc = {"students": k["students"], "total": k["total"], "repeat": k["repeat"], "pending": ds["new"],
+                        **{m: k.get(m, 0) for m in discipline.MEASURES}, **{g: k.get(g, 0) for g in discipline.GROUNDS},
+                        "letters": k["letters"]["sent"]}
+            except Exception:  # noqa: BLE001  (bitta kursdagi xato butun sahifani to'xtatmasin)
+                log.exception("Chora ko'rsatkichlari (%s)", key)
+                disc = None
+            social = await socialcat.summary(None)
         c = info.get(key, {})
         rows.append({"key": key, "title": course_title(key) if key != "_" else "Kurs", "admins": c.get("admins", []),
                      "total": d["total"], "linked": d["linked"], "prob": len(d["prob"]),
                      "multi": sum(1 for r in d["prob"] if r["count"] >= 3), "att": len(d["att"]), "acad": len(d["acad"]),
                      "kontrakt": {"count": len(d["kontrakt"]), "sum": sum(r["debt"] for r in d["kontrakt"])},
                      "trimestr": {"count": len(d["trimestr"]), "sum": sum(r["debt"] for r in d["trimestr"])},
-                     "parents": c.get("parents", 0)})
+                     "parents": c.get("parents", 0), "disc": disc, "social": social})
     last = await central.get_meta("last_backup")
     return ok({"courses": rows, "coordinators": sum(len(r["admins"]) for r in rows), "last_backup": last,
                "errors_24h": errors_since(24)})
@@ -2337,3 +2349,5 @@ def setup_routes(app: web.Application) -> None:
     r.add_post("/api/super/backup", api_super_backup)
     import visitsapi  # «Tashriflar» bo'limi (tashrif moduli)
     visitsapi.setup(r)
+    import socialapi  # talabalarning ijtimoiy toifalari
+    socialapi.setup(r)

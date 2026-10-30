@@ -149,6 +149,17 @@ ALIASES: dict[str, dict[str, list[str]]] = {
         "group_name": _GROUP,
         "student_phones": _SELF_PHONE,
     },
+    # Ijtimoiy toifalar (socialcat.py): F.I.Sh. (yoki HEMIS ID) + «Toifa» ustuni yoki har bir toifa alohida ustunda
+    "categories": {
+        "hemis_id": _ID,
+        "full_name": _NAME,
+        "group_name": _GROUP,
+        "course": ["kurs", "course", "bosqich", "kursi"],
+        "category": ["toifa", "toifasi", "ijtimoiy toifa", "ijtimoiy toifasi", "ijtimoiy holati", "ijtimoiy holat", "holati",
+                     "kategoriya", "toifa nomi", "ijtimoiy kategoriya", "talaba toifasi"],
+        "dis_group": ["nogironlik guruhi", "nogironligi guruhi", "nogironlik darajasi", "nogironlik guruh"],
+        "note": ["izoh", "izohlar", "asos", "asos hujjat", "hujjat", "hujjat raqami", "malumotnoma", "guvohnoma"],
+    },
     # Talabalar hozir yashayotgan (ijara) manzillari: F.I.Sh. + manzil (HEMIS ID ixtiyoriy) — tashriflar uchun
     "addresses": {
         "hemis_id": _ID,
@@ -207,6 +218,7 @@ REQUIRED = {
     "grades": ["subject", "control_type", "score"],
     "phones": ["student_phones"],
     "addresses": ["address"],
+    "categories": [],
     "attendance_stats": ["absent"],
     "enroll": [],
     "elsched": ["subject", "weekday", "pair"],
@@ -225,7 +237,8 @@ FIELD_TITLES = {
 KIND_TITLES = {"translations": "Tarjimalar (fan va fakultet nomlari)", "students": "Talabalar", "attendance": "Davomat", "schedule": "Dars jadvali", "grades": "Baholar",
                "attendance_stats": "Davomat (HEMIS statistikasi)", "enroll": "Tanlov fanlari va 2-til (biriktirish)",
                "elsched": "Tanlov fanlari va 2-til jadvali",
-               "phones": "Talaba telefonlari", "addresses": "Manzillar (ijarada yashash)", "debts": "Kontrakt qarzdorligi",
+               "phones": "Talaba telefonlari", "addresses": "Manzillar (ijarada yashash)", "categories": "Ijtimoiy toifalar",
+               "debts": "Kontrakt qarzdorligi",
                "debts_t": "Trimestr qarzdorligi", "acad_debts": "Akademik qarzdorlar (HEMIS ro'yxati)",
                "gpa": "GPA (HEMIS)"}
 
@@ -293,7 +306,8 @@ def parse_file(path: str, kind: str) -> ParseResult:
 # Tanlangan import turi bilan mos keladigan aniqlangan turlar
 COMPATIBLE = {"translations": {"translations"}, "students": {"students"}, "attendance": {"attendance"}, "schedule": {"schedule"},
               "elsched": {"elsched"}, "grades": {"grades"}, "enroll": {"enroll", "grades"},
-              "phones": {"phones", "students"}, "addresses": {"addresses"}, "debts": {"debts"}, "debts_t": {"debts_t"},
+              "phones": {"phones", "students"}, "addresses": {"addresses"}, "categories": {"categories"},
+              "debts": {"debts"}, "debts_t": {"debts_t"},
               "acad_debts": {"acad_debts"}, "gpa": {"gpa"}}
 
 
@@ -343,6 +357,9 @@ def detect_kinds(all_rows: list[tuple], file_name: str = "") -> list[str]:
         found.append("addresses")
     elif {"full_name", "address"} <= set(addr) and "students" in found and rent_header(all_rows[addr_idx], addr):
         found.insert(0, "addresses")  # «Ijarada yashash manzili» — talabalar ro'yxati emas, manzillar
+    lay = categories_layout(all_rows, file_name)
+    if lay and (lay["mode"] in ("column", "wide") or (lay["mode"] == "title" and not found)):
+        found.append("categories")
     tr_cols = set(_best_header(all_rows, ALIASES["translations"])[0])
     if "uz" in tr_cols and tr_cols & {"ru", "en"}:
         found.insert(0, "translations")
@@ -361,6 +378,8 @@ def _best_header(all_rows: list[tuple], aliases: dict) -> tuple[dict, int]:
 def parse_rows(all_rows: list[tuple], kind: str) -> ParseResult:
     if kind in ("debts", "debts_t"):
         return parse_debts(all_rows, kind)
+    if kind == "categories":
+        return parse_categories(all_rows)
     if kind == "attendance":
         # HEMIS statistikasi (jami ko'rsatkichlar) yoki kunlik (dars bo'yicha) davomat — ustunlarga qarab
         stats, _ = _best_header(all_rows, ALIASES["attendance_stats"])
@@ -654,6 +673,85 @@ def _self_phones(g) -> dict | list:
     if not phones:
         raise ValueError(f"telefon raqam tanilmadi: {raw!r}")
     return {**ref, "student_phones": phones}
+
+
+def categories_layout(all_rows: list[tuple], file_name: str = "") -> dict | None:
+    """Ijtimoiy toifalar fayli qanday tuzilgan: «Toifa» ustuni (column), har bir toifa alohida ustunda (wide) yoki
+    ro'yxat bitta toifaga — toifa fayl nomida yoki jadval ustidagi sarlavhada (title)."""
+    from socialcat import parse_label
+    best, idx = _best_header(all_rows, ALIASES["categories"])
+    if idx < 0 or not ({"full_name", "hemis_id"} & set(best)):
+        return None
+    used = set(best.values())
+    wide = {}
+    for i, cell in enumerate(all_rows[idx]):
+        items = parse_label(cell_str(cell)) if i not in used else []
+        if len(items) == 1:
+            wide[i] = items[0]
+    default = []
+    if "category" not in best and not wide:
+        title = " ".join(cell_str(c) for row in all_rows[:idx] for c in row if c not in (None, ""))
+        default = parse_label(f"{title} {file_name}")
+    mode = "column" if "category" in best else "wide" if wide else "title" if default else None
+    return {"best": best, "idx": idx, "wide": wide, "default": default, "mode": mode}
+
+
+def parse_categories(all_rows: list[tuple], file_name: str = "") -> ParseResult:
+    """Ijtimoiy toifalar fayli → qatorlar: talaba (HEMIS ID / F.I.Sh. + guruh, kurs) va toifalari [(toifa, kichik toifa)]."""
+    from socialcat import disability_group, label, parse_label, truthy
+    res = ParseResult(kind="categories")
+    lay = categories_layout(all_rows, file_name)
+    if not lay or not lay["mode"]:
+        res.fatal = ("«Ijtimoiy toifalar» fayli uchun ustunlar topilmadi: F.I.Sh. (yoki HEMIS ID) va «Toifa» ustuni (masalan: "
+                     "«Temir daftar», «Nogironligi bor, II guruh», «Chin yetim»), yoki har bir toifa alohida ustunda "
+                     "(«Nogironligi», «Temir daftar», «Chin yetim» … — «ha» yoki «+»). Ro'yxat bitta toifaga bo'lsa — toifa "
+                     "fayl nomida yoki jadval ustidagi sarlavhada bo'lsin. /shablon dagi 15-namunaga qarang.")
+        return res
+    best, idx, header = lay["best"], lay["idx"], all_rows[lay["idx"]]
+    res.columns = {f: cell_str(header[i]) for f, i in best.items()}
+    res.columns.update({f"toifa_{i}": cell_str(header[i]) for i in lay["wide"]})
+    res.meta = {"mode": lay["mode"], "default": [label(c, s_) for c, s_ in lay["default"]]}
+    empty = 0
+    for n, row in enumerate(all_rows[idx + 1:], start=idx + 2):
+        if not any(v not in (None, "") for v in row):
+            continue
+
+        def get(f, row=row):
+            i = best.get(f)
+            return row[i] if i is not None and i < len(row) else None
+        name, hemis = cell_str(get("full_name")), cell_str(get("hemis_id"))
+        if not name and not hemis:
+            continue
+        if _is_sample(row):
+            res.skipped += 1
+            continue
+        items: list[tuple[str, str]] = []
+        raw = cell_str(get("category"))
+        if raw:
+            found = parse_label(raw)
+            if not found:
+                res.errors.append(f"{n}-qator: toifa tanilmadi: «{raw}»")
+            items += found
+        for i, (cat, sub) in lay["wide"].items():
+            v = row[i] if i < len(row) else None
+            if truthy(v):
+                items.append((cat, (disability_group(v) or sub) if cat == "nogironlik" else sub))
+        if not items and lay["mode"] == "title":
+            items = list(lay["default"])
+        dg = disability_group(get("dis_group"))
+        if dg:  # «Nogironlik guruhi» to'ldirilgan — talabaning nogironligi bor (toifa katagida yozilmagan bo'lsa ham)
+            items = [(c, dg if c == "nogironlik" else s_) for c, s_ in items]
+            if not any(c == "nogironlik" for c, _ in items):
+                items.append(("nogironlik", dg))
+        if not items:
+            empty += raw == ""
+            continue
+        res.rows.append({"_row": n, "hemis_id": hemis, "full_name": nice_name(name) if name else "",
+                         "group_name": cell_str(get("group_name")), "course": parse_course(get("course")),
+                         "items": list(dict.fromkeys(items)), "note": cell_str(get("note")) or None})
+    if empty:
+        res.notes.append(f"Toifasi ko'rsatilmagan {empty} ta qator o'tkazib yuborildi.")
+    return res
 
 
 _NO_ADDRESS = {"", "yoq", "yo q", "mavjud emas", "korsatilmagan", "nomalum", "net", "none", "nan"}

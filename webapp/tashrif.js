@@ -264,12 +264,14 @@ async function openPlan(pid) {
     ${p.result || p.problem ? `<div class="box"><h4>Natija</h4>${p.result ? `<p style="margin:0">${esc(p.result)}</p>` : ''}${p.problem ? `<p class="warn-t" style="margin:6px 0 0">Muammo: ${esc(p.problem)}</p>` : ''}</div>` : ''}
     ${A.length ? `<div class="vacts">${A.join('')}</div>` : ''}
     ${ij ? `<div class="box"><h4 class="h4row"><span>Talabalar — ${p.answers.total} ta <span class="sub-l" style="display:inline">· tasdiqlagan ${p.answers.tasdiqladi}</span></span>
-        <button class="btn sm" data-vroute>${ic('route')} Qanday boriladi</button></h4>
+        <span class="nowrap"><button class="btn sm ghost" data-vlist title="Talabalar ro‘yxati — Word jadval">${ic('download')} Word</button>
+        <button class="btn sm" data-vroute>${ic('route')} Qanday boriladi</button></span></h4>
       <ul class="vsts">${S_.map(studRow).join('')}</ul>
       <p class="hint" style="margin:8px 0 0">Talaba botda ✅ tasdiqlaydi, 🕒 boshqa vaqt taklif qiladi yoki ❌ «bu manzilda yashamayman» deydi. Tasdiqlashi bilan sizga shu manzilga qanday borilishi keladi (talabaga — yo‘q).</p></div>` : ''}
     ${ev ? elonBox(p, own, ended) : ''}
     ${ev ? `<div class="box"><h4 class="h4row"><span>Ishtirokchilar — ${S_.length} ta${S_.length ? ` <span class="sub-l" style="display:inline">· botda ${S_.filter(s => s.linked).length} · xabar yetgan ${S_.filter(s => s.notified_at).length}</span>` : ''}</span>
-        ${canPart ? `<button class="btn sm" data-vpart title="Alohida talaba yoki butun guruhni qo‘shish, olib tashlash">${ic('users')} Qo‘lda kiritish</button>` : ''}</h4>
+        <span class="nowrap">${S_.length ? `<button class="btn sm ghost" data-vlist title="Ishtirokchilar ro‘yxati — Word jadval (imzo ustuni bilan)">${ic('download')} Word</button>` : ''}
+        ${canPart ? `<button class="btn sm" data-vpart title="Alohida talaba yoki butun guruhni qo‘shish, olib tashlash">${ic('users')} Qo‘lda kiritish</button>` : ''}</span></h4>
       ${S_.length ? partGroups() : `<span class="dash">${p.elon && p.elon.on ? 'Hali hech kim yozilmagan.' : 'Ishtirokchi talabalar belgilanmagan.'}</span>`}
       <p class="hint" style="margin:8px 0 0">Ishtirokchilar — qo‘lda kiritilganlar va e’londa o‘zi yozilganlar («o‘zi yozildi»). Botga ulanganlarga nomi, sanasi, vaqti va joyi yuboriladi; oldingi kuni kechqurun va boshlanishidan oldin eslatma boradi, vaqt o‘zgarsa yoki bekor qilinsa — ham. Ulanmagan talabaga shaxsiy havolani yuboring: ochishi bilan xabar keladi.</p></div>` : ''}
     ${ij && ['tasdiqlangan', 'bajarildi'].includes(p.status) ? `<div class="box"><h4>Dalolatnomalar — ${acts.length} ta</h4>
@@ -289,6 +291,10 @@ async function openPlan(pid) {
     b.disabled = true; await vAct(pid, act, {}, ij ? 'Yuborildi' : 'Aktual qilindi', true); b.disabled = false; }));
   $('[data-vedit]', B)?.addEventListener('click', () => planEditor(p));
   $('[data-vpart]', B)?.addEventListener('click', () => editParticipants(p));
+  $$('[data-vlist]', B).forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    try { await download(`/api/staff/visits/${pid}/list.docx`); } catch (_) { toast('Ro‘yxatni yuklab bo‘lmadi', true); }
+    b.disabled = false; }));
   $('[data-vann]', B)?.addEventListener('click', () => announceDlg(p));
   $('[data-vreg]', B)?.addEventListener('click', async e => {
     const open = e.currentTarget.dataset.vreg === 'open';
@@ -359,15 +365,16 @@ async function copyInvite(sid) {
 
 /* ---------------------------------------------------------------- talaba tanlash (reja muharriri, ishtirokchilar) */
 const stuOf = s => ({ id: s.student_id, name: s.full_name, group: s.group_name || '', address: s.address, linked: s.linked });
-/* sel — tanlanganlar (Map id → talaba); mode() — 'ijara' (manzil bo'yicha, bittalab) yoki 'event' (guruh bilan) */
+/* sel — tanlanganlar (Map id → talaba); mode() — 'ijara' (manzil bo'yicha, bittalab), 'event' (guruh bilan) yoki
+   'plain' (guruh bilan, bot belgilarisiz — masalan, ijtimoiy toifa berish) */
 function stuPicker(sel, mode) {
   let all = null;
   const q = el('input', { class: 'input', type: 'search', oninput: () => paintRes() });
   const groups = el('div', { class: 'vgrp' }), res = el('div', { class: 'vpick-res' }), chosen = el('div', { class: 'vpick-box' });
   const changed = () => { paintRes(); paintSel(); };
-  const tgChip = s => s.linked ? `<span class="chip ok" title="Botga ulangan — xabar o‘ziga boradi">${ic('telegram')}</span>` : '';
+  const tgChip = s => s.linked && mode() !== 'plain' ? `<span class="chip ok" title="Botga ulangan — xabar o‘ziga boradi">${ic('telegram')}</span>` : '';
   const paintRes = () => {
-    const ev = mode() === 'event', t = q.value.trim().toLowerCase();
+    const ev = mode() !== 'ijara', t = q.value.trim().toLowerCase();
     q.placeholder = ev ? 'F.I.Sh. yoki guruh bo‘yicha qidirish' : 'F.I.Sh., guruh yoki manzil bo‘yicha qidirish';
     groups.hidden = !ev || !all;
     if (!all) return;
@@ -390,22 +397,22 @@ function stuPicker(sel, mode) {
   };
   const paintSel = () => {
     const L = [...sel.values()];
-    if (mode() !== 'event') {
+    if (mode() === 'ijara') {
       fillKids(chosen, el('ul', { class: 'vpick-sel' }, L.map(s => el('li', {},
         el('span', { html: `<b>${esc(s.name)}</b> <small>${esc(s.group || '')}${s.address ? ' · ' + esc(s.address) : ''}</small>` }),
         el('button', { type: 'button', class: 'btn sm ghost', 'aria-label': 'Olib tashlash', onclick: () => { sel.delete(s.id); changed(); }, html: ic('x') }))),
         L.length ? null : el('li', { class: 'dash', text: 'Talaba tanlanmagan' })));
       return;
     }
-    if (!L.length) { fillKids(chosen, el('span', { class: 'dash', text: 'Ishtirokchi tanlanmagan — guruh tugmasi yoki qidiruv orqali qo‘shing' })); return; }
+    if (!L.length) { fillKids(chosen, el('span', { class: 'dash', text: `${mode() === 'plain' ? 'Talaba' : 'Ishtirokchi'} tanlanmagan — guruh tugmasi yoki qidiruv orqali qo‘shing` })); return; }
     const by = {}; L.forEach(s => (by[s.group || '—'] = by[s.group || '—'] || []).push(s));
     fillKids(chosen, el('div', { class: 'vsel-h' }, el('b', { text: `Tanlangan: ${L.length} ta` }),
-      el('span', { class: 'sub-l', text: `botga ulangan: ${L.filter(s => s.linked).length} ta` }), el('span', { class: 'grow' }),
+      mode() === 'plain' ? null : el('span', { class: 'sub-l', text: `botga ulangan: ${L.filter(s => s.linked).length} ta` }), el('span', { class: 'grow' }),
       el('button', { type: 'button', class: 'btn sm ghost', onclick: () => { sel.clear(); changed(); } }, 'Hammasini olib tashlash')),
     Object.entries(by).sort(([a], [b]) => a.localeCompare(b, 'uz')).map(([g, l]) => el('div', { class: 'vsel-g' },
       el('div', { class: 'vsel-gh' }, el('b', { text: g }), el('small', { text: `${l.length} ta` }), el('span', { class: 'grow' }),
         el('button', { type: 'button', class: 'btn sm ghost', onclick: () => { l.forEach(s => sel.delete(s.id)); changed(); } }, 'Guruhni olib tashlash')),
-      el('div', { class: 'vsel-chips' }, l.sort((a, b) => a.name.localeCompare(b.name)).map(s => el('span', { class: 'vchipx' + (s.linked ? ' on' : ''), title: s.linked ? 'Botga ulangan' : 'Botga ulanmagan' },
+      el('div', { class: 'vsel-chips' }, l.sort((a, b) => a.name.localeCompare(b.name)).map(s => el('span', mode() === 'plain' ? { class: 'vchipx' } : { class: 'vchipx' + (s.linked ? ' on' : ''), title: s.linked ? 'Botga ulangan' : 'Botga ulanmagan' },
         shortName(s.name), el('button', { type: 'button', 'aria-label': 'Olib tashlash', onclick: () => { sel.delete(s.id); changed(); }, html: ic('x') })))))));
   };
   let loadP = null;
@@ -548,7 +555,7 @@ function elonBox(p, own, ended) {
       ${E.state !== 'draft' ? `<span>E’lon yuborildi</span><b>${E.sent} ta talabaga${E.audience - E.linked ? ` <span class="sub-l" style="display:inline">· botga ulanmagan: ${E.audience - E.linked} ta</span>` : ''}</b>
       <span>Botda ro‘yxatdan o‘tgan</span><b>${E.registered} ta</b>` : `<span>Talabalar</span><b>${E.audience} ta, botga ulangan: ${E.linked} ta</b>`}
       <span>Joylar</span><b>${E.capacity ? `${E.total} / ${E.capacity}${E.free != null ? ` <span class="sub-l" style="display:inline">· bo‘sh ${E.free}</span>` : ''}` : 'cheklanmagan'}</b></div>
-    ${open ? '<p class="hint" style="margin:8px 0 0">Botga keyinroq ulangan talabalarga e’lon bir necha daqiqada o‘zi boradi. Ro‘yxatdan o‘tganlar quyidagi «Ishtirokchilar» ro‘yxatiga qo‘shiladi; ularga ham eslatmalar boradi.</p>' : ''}</div>`;
+    ${open ? '<p class="hint" style="margin:8px 0 0">Botga keyinroq ulangan talabalarga e’lon bir necha daqiqada o‘zi boradi. Ro‘yxatdan o‘tganlar quyidagi «Ishtirokchilar» ro‘yxatiga qo‘shiladi; ularga ham eslatmalar boradi. Ro‘yxat yopilganda (qo‘lda, joylar to‘lganda yoki tadbir boshlanganda) ishtirokchilar jadvali Word faylda sizga botda keladi.</p>' : ''}</div>`;
 }
 /* aktual rejani e'lon qilish yoki e'lonni kengaytirish (guruh qo'shish, joylar soni) */
 async function announceDlg(p) {

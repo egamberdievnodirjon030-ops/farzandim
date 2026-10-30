@@ -251,6 +251,7 @@ CREATE TABLE IF NOT EXISTS visit_plans (
     audience         TEXT,                      -- e'lon guruhlari (JSON: guruh nomlari)
     capacity         INTEGER,                   -- joylar soni (bo'sh — cheklanmagan)
     reg_closed_at    TEXT,                      -- koordinator ro'yxatga olishni yopdi
+    list_sig         TEXT,                      -- koordinatorga Word da yuborilgan ishtirokchilar ro'yxati (takrorlanmasin)
     created_at       TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_visit_plans_date ON visit_plans(visit_date, status);
@@ -312,6 +313,16 @@ CREATE TABLE IF NOT EXISTS visit_announces (
     removed_at TEXT,                            -- koordinator ro'yxatdan chiqargan — qayta yozila olmaydi
     PRIMARY KEY (plan_id, student_id)
 );
+-- Talabaning ijtimoiy toifalari (socialcat.py): nogironlik (guruhi), ijtimoiy himoya (reestr, xotin-qizlar reestri,
+-- ayollar / temir / yoshlar daftari, boshqa), chin yetim, mehribonlik uyi — fayldan yoki qo'lda
+CREATE TABLE IF NOT EXISTS student_categories (
+    student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    category   TEXT NOT NULL,                   -- nogironlik | ijtimoiy | chin_yetim | mehribonlik
+    sub        TEXT NOT NULL DEFAULT '',        -- nogironlik: 1 | 2 | 3; ijtimoiy: reestr | xotin_qizlar | ayollar | temir | yoshlar | boshqa
+    note       TEXT, source TEXT NOT NULL DEFAULT 'qolda', set_by INTEGER, set_at TEXT NOT NULL,
+    PRIMARY KEY (student_id, category, sub)
+);
+CREATE INDEX IF NOT EXISTS idx_student_categories_cat ON student_categories(category);
 -- Talabaning Telegram hisobi (tashrif xabarlari uchun): shaxsiy havola yoki ota-onani tasdiqlash orqali
 CREATE TABLE IF NOT EXISTS student_accounts (
     student_id INTEGER PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
@@ -716,7 +727,8 @@ class Database:
                        ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT"), ("send_note", "TEXT"),
                                        ("doc_number", "TEXT"), ("doc_date", "TEXT"))),
                        ("visit_plans", (("eve_reminded_at", "TEXT"), ("announce", "INTEGER NOT NULL DEFAULT 0"),
-                                        ("audience", "TEXT"), ("capacity", "INTEGER"), ("reg_closed_at", "TEXT"))),
+                                        ("audience", "TEXT"), ("capacity", "INTEGER"), ("reg_closed_at", "TEXT"),
+                                        ("list_sig", "TEXT"))),
                        ("visit_students", (("source", "TEXT NOT NULL DEFAULT 'koordinator'"), ("registered_at", "TEXT")))):
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 have = {r[1] for r in await cur.fetchall()}

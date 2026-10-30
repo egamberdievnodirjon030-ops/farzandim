@@ -24,7 +24,9 @@ Telegram bot ota-onalarga farzandining qaysi kunlarda, qaysi fanlardan darsga qa
 
 **Ikki bot:** ota-onalar boti va alohida talabalar boti (talaba telefon raqami bilan o'zi ulanadi; tashrif, tadbir e'lonlari va eslatmalar — o'sha botda).
 
-**Tashriflar:** ijara xonadonlariga tashrif, madaniy tashrif, tadbir va koordinatorlik soati rejalari — talaba botda tasdiqlaydi yoki boshqa vaqt taklif qiladi, tadbir va madaniy tashrif botda e'lon qilinadi — talaba «Ro'yxatdan o'tish» tugmasi bilan o'zi yoziladi (qo'lda kiritish ham bor), ishtirokchilarga nomi, joyi, vaqti va eslatma boradi, koordinatorga manzilga qanday borilishi (bekat, avtobus, metro), talabalar yashash joylari xaritasi, dalolatnoma (telefonda imzo, bir betli Word) va hisobot (batafsil — «Tashriflar» bo'limida).
+**Tashriflar:** ijara xonadonlariga tashrif, madaniy tashrif, tadbir va koordinatorlik soati rejalari — talaba botda tasdiqlaydi yoki boshqa vaqt taklif qiladi, tadbir va madaniy tashrif botda e'lon qilinadi — talaba «Ro'yxatdan o'tish» tugmasi bilan o'zi yoziladi (qo'lda kiritish ham bor), ishtirokchilarga nomi, joyi, vaqti va eslatma boradi, koordinatorga manzilga qanday borilishi (bekat, avtobus, metro), talabalar yashash joylari xaritasi, dalolatnoma (telefonda imzo, bir betli Word) va hisobot; ro'yxat yopilganda ishtirokchilar jadvali Word faylda koordinatorga o'zi keladi (batafsil — «Tashriflar» bo'limida).
+
+**Ijtimoiy toifalar:** nogironligi borlar (I/II/III guruh), ijtimoiy himoyaga muhtojlar (ijtimoiy himoya reestri, xotin-qizlar reestri, ayollar daftari, temir daftar, yoshlar daftari, boshqa), chin yetimlar va mehribonlik uyi tarbiyalanuvchilari — «Kurs holati» kartalarida; fayl bilan yoki talabalarni (butun guruhni ham) tanlab qo'lda belgilanadi (batafsil — «Ijtimoiy toifalar» bo'limida).
 
 **Universitet tizimi bilan integratsiya:** davomat va dars jadvali «Manage» tizimidan avtomatik, real vaqtga yaqin olinadi (API kaliti yoki webhook; javob ko'rinishi va shabloni qat'iy emas). Batafsil — «Integratsiya» bo'limi.
 
@@ -320,7 +322,7 @@ Kurs koordinatori va super-admin uchun kompyuter brauzerida ishlaydigan to'liq b
 **Kirish — parolsiz, bot orqali.** Botda «💻 Kompyuter versiyasi» tugmasini bosing yoki `/kompyuter` buyrug'ini yuboring (Telegram ichidagi ilovada — kurs holati sahifasi pastidagi «Kompyuter versiyasi» kartasi). Bot **10 daqiqa** amal qiladigan, **bir marta** ishlatiladigan havola yuboradi; uni kompyuterda (Telegram Desktop yoki web.telegram.org) bosing va ochilgan sahifada «Kirish» ni bosing. Seans **12 soat** davom etadi; umumiy kompyuterda ishlagandan so'ng chap pastdagi «Chiqish» tugmasini bosing.
 
 **Kurs koordinatori uchun:**
-- **Kurs holati** — asosiy ko'rsatkichlar (davomat muammosi, akademik qarz, 3+ masalali, kontrakt va trimestr qarzi — har biri ro'yxatga olib boradi), e'tibor talab qiladigan talabalar, yangi xabarlar, bog'lanish so'rovlari va bir tugmali hisobot;
+- **Kurs holati** — asosiy ko'rsatkichlar (davomat muammosi, akademik qarz, 3+ masalali, kontrakt va trimestr qarzi — har biri ro'yxatga olib boradi), ijtimoiy toifalar kartalari (nogironlik, ijtimoiy himoya, chin yetim, mehribonlik uyi), e'tibor talab qiladigan talabalar, yangi xabarlar, bog'lanish so'rovlari va bir tugmali hisobot;
 - **Talabalar** — butun kurs bitta jadvalda: davomat foizi va sababsiz darslar, chora, akademik qarz, GPA, kontrakt, trimestr, masalalar soni; istalgan ustun bo'yicha saralash, filtrlar (muammoli, davomat, akademik, kontrakt, trimestr), guruh va qidiruv (familiya, ism, guruh yoki HEMIS ID; «/» tugmasi — qidiruvga o'tish). Qatorni bossangiz — yon panelda talaba kartasi: masalalar, chegaralar zinapoyasi, akademik qarzlar, to'lovlar, dinamika va ota-onalar (har biriga «Yozish»);
 - **Xabarlar** — suhbatlar ro'yxati va suhbat yonma-yon; ota-ona rus yoki ingliz tilida bo'lsa, javobni qaysi tilda yozish ko'rsatiladi; Ctrl+Enter — yuborish;
 - **So'rovlar** — telefon raqami bazada topilmagan ota-onalarning farzandni bog'lash so'rovlari: ota-ona yozgan ma'lumot so'ralgan talaba bilan yonma-yon; tasdiqlash yoki rad etish (ota-onaga o'z tilida xabar boradi);
@@ -328,7 +330,7 @@ Kurs koordinatori va super-admin uchun kompyuter brauzerida ishlaydigan to'liq b
 - **E'lon yuborish** — butun kursga yoki tanlangan guruhlarga; o'ng tomonda ota-ona har uch tilda aynan nimani ko'rishi ko'rsatiladi (`---ru` / `---en` qismi yozilmagan bo'lsa — bu haqda ogohlantiriladi);
 - **Ma'lumot va hisobot** — Excel fayllarni sichqoncha bilan tashlab yuklash (bir nechtasini birga, turini bot o'zi aniqlaydi, «jim» rejim bilan), hisobotni Excel yoki PDF qilib kompyuterga yuklab olish yoki Telegram chatiga yuborish.
 
-**Super-admin uchun** (yuqoridagilarga qo'shimcha): «Talabalar» sahifasida **barcha kurslar talabalari bitta jadvalda** (kurs ustuni bilan; har bir kursga alohida kirish ham qoladi); **Barcha kurslar** — universitet bo'yicha jami ko'rsatkichlar va kurslar kesimidagi jadval («Kursga kirish» — o'sha kursning paneliga o'tish; yon menyudagi «Joriy kurs» ro'yxati ham shu vazifani bajaradi); **Kurslar va koordinatorlar** — yangi kurs yaratish, nomini o'zgartirish, kurs koordinatorini Telegram ID bo'yicha tayinlash (u bot orqali darhol xabardor qilinadi) va olib tashlash — botni qayta ishga tushirmasdan; **Tizim** — juftlik vaqtlari, oxirgi zaxira nusxa, «Hozir zaxira nusxa olish» (shifrlangan arxiv Telegram chatingizga keladi) va xatolar jurnali. Import shablonlarini o'zgartirish hozircha botda («📑 Shablonlar»).
+**Super-admin uchun** (yuqoridagilarga qo'shimcha): «Talabalar» sahifasida **barcha kurslar talabalari bitta jadvalda** (kurs ustuni bilan; har bir kursga alohida kirish ham qoladi); **Barcha kurslar** — universitet bo'yicha jami ko'rsatkichlar, **«Chora ko'rilganlar (barcha kurslar)»** kartasi (o'quv yilida chora ko'rilgan talabalar: dekan ogohlantirishi, hayfsan, boshqa; asosi — davomat, ichki tartib, trimestr; ota-onaga xatlar, takroriy va chora kutilayotganlar) va **«Ijtimoiy toifalar (barcha kurslar)»** kartasi, kurslar kesimidagi jadval («Chora» ustuni bilan) («Kursga kirish» — o'sha kursning paneliga o'tish; yon menyudagi «Joriy kurs» ro'yxati ham shu vazifani bajaradi); **Kurslar va koordinatorlar** — yangi kurs yaratish, nomini o'zgartirish, kurs koordinatorini Telegram ID bo'yicha tayinlash (u bot orqali darhol xabardor qilinadi) va olib tashlash — botni qayta ishga tushirmasdan; **Tizim** — juftlik vaqtlari, oxirgi zaxira nusxa, «Hozir zaxira nusxa olish» (shifrlangan arxiv Telegram chatingizga keladi) va xatolar jurnali. Import shablonlarini o'zgartirish hozircha botda («📑 Shablonlar»).
 
 **Xavfsizlik.** Seans imzolangan cookie'da saqlanadi (HttpOnly — sahifadagi skriptlar uni o'qiy olmaydi; HTTPS'da Secure; SameSite=Lax); har bir API so'rovi maxsus sarlavha bilan keladi — begona sayt sizning brauzeringiz nomidan so'rov yubora olmaydi. Havola faqat kurs koordinatori va super-admin uchun beriladi; huquq har bir so'rovda qayta tekshiriladi — super-admin koordinatorni olib tashlasa, uning ochiq seansi darhol kuchini yo'qotadi. Kurs koordinatori faqat o'z kursini, super-admin barcha kurslarni ko'radi.
 
@@ -395,6 +397,7 @@ Talabalar, davomat va baholar uchun **HEMIS eksport fayllarini o'zgartirmasdan y
 8. **Akademik qarzdorlar (HEMIS ro'yxati)** — HEMIS'dagi «Akadem qarzdorlar» hisoboti (`12_akademik_qarzdorlar`), o'zgartirmasdan: T/R, To'liq ismi, Semestr, Fanlar, Kredit, Kurs, Guruh, Mutaxassislik, O'quv yili. Har bir qator — talabaning **bitta** qarzdor fani: talaba ro'yxatda necha marta (necha xil fan bilan) kelsa, shuncha qarzdor fan hisoblanadi; bir fan bir semestrda ikki marta yozilgan bo'lsa — bir marta. Faylda HEMIS ID bo'lmagani uchun talaba F.I.Sh. bo'yicha topiladi (katta harflar, «O'G'LI»/«QIZI» va «XXX» kabi yashirilgan qismlar hisobga olinadi); ro'yxat o'tgan yilniki bo'lib, talaba keyin boshqa guruhga o'tgan bo'lsa ham topiladi. Bazada topilmagan talabalar (joriy kontingentda yo'q — chetlashtirilgan, akademik ta'tilda yoki boshqa fakultetga o'tgan) import hisobotida ismi bilan ko'rsatiladi. Yangi fayl faqat undagi guruhlarning ro'yxatini almashtiradi: ro'yxatdan chiqqan fan — «yopilgan», yangisi — «yangi qarz»; ikkalasi haqida ham ota-onaga xabar boradi. Ota-ona ilovada «Akademik qarz: N ta fan» kartasini ko'radi, bossa — fanlar nomi, semestri va krediti bilan ro'yxat; kurs koordinatori — talabalar jadvalida («Akademik qarz» filtri) va talaba kartasida. **Akademik qarz faqat shu ro'yxatdan olinadi** — baholardagi «2» (0–59 ball) qarz hisoblanmaydi, chunki u keyin qayta o'qishda yopilgan bo'lishi mumkin.
 9. **GPA (HEMIS)** — HEMIS «Performance GPA» (GPA ballar) hisoboti (`13_gpa_hemis`), o'zgartirmasdan: Talaba, Talaba ID, Ta'lim turi, Guruh, Kurs, Fan / Kredit, GPA, Qarz, GPA usuli, O'zgartirilgan. Talaba «Talaba ID» (HEMIS ID) bo'yicha, bo'lmasa F.I.Sh. va guruh bo'yicha topiladi. **Ota-onaga, koordinatorga va hisobotlarda GPA faqat shu fayldan ko'rsatiladi** (baholardan hisoblanmaydi); fayl yuklanmaguncha GPA «—». Har yuklash alohida saqlanadi: yangi qiymat joriy GPA bo'ladi, avvalgisi tarixda qoladi va dinamikada «GPA: 3,20 → 3,45» ko'rinadi; fayl «Yuklangan fayllar» dan o'chirilsa — oldingi qiymat qaytadi. Import natijasida: nechta talaba, o'rtacha GPA va 2,6 dan past GPA li talabalar soni.
 10. **Manzillar (ijarada yashash)** (ixtiyoriy, istalgan paytda; `14_manzillar`) — talabalar hozir yashayotgan manzillari: №, Talabaning F.I.Sh., Guruh, Kurs, Ijarada yashash manzili, Telefon raqami (HEMIS ID ustuni shart emas — bo'lsa, talaba shu bo'yicha topiladi). Talaba F.I.Sh. (+ guruh, kurs) bo'yicha topiladi, «o'g'li / qizi» yozilmagan bo'lsa ham. Sarlavhada «ijara» bo'lsa, talaba «Ijara xonadonida» yashaydi deb belgilanadi; manzil o'zgarsa, xaritadagi eski nuqta olib tashlanadi (yangi manzil bo'yicha qayta aniqlanadi); manzili «-» yoki bo'sh qatorga tegilmaydi. Telefon — talabaning o'z raqami sifatida qo'shiladi (eskilari o'chirilmaydi; talabalar boti shu raqam bilan taniydi). Bu — **hozirgi (ijara) manzil**: talaba kartasidagi «Ijara manzili», ijara tashriflari va «Tashriflar → Yashash joylari» xaritasi uchun. Ota-onaga xatdagi **doimiy manzil** (kontingent faylidan yoki «Chora ko'rish» da qo'lda) alohida saqlanadi va bu fayl uni o'zgartirmaydi. Fayl turi avtomatik aniqlanadi.
+11. **Ijtimoiy toifalar** (ixtiyoriy, istalgan paytda; `15_ijtimoiy_toifalar`) — №, Talabaning F.I.Sh., Guruh, Kurs, **Toifa**, Nogironlik guruhi, Izoh. «Toifa» katagiga oddiy so'z bilan yoziladi: «Temir daftar», «Ayollar daftari», «Xotin-qizlar reestri», «Ijtimoiy himoya reestri», «Nogironligi bor» (guruhi — «II guruh» shu katakda yoki alohida ustunda), «Chin yetim», «Mehribonlik uyi»; bir katakda bir nechtasi ham bo'ladi (vergul bilan). Boshqa ko'rinishlar ham tanilinadi: har bir toifa alohida ustunda («Nogironligi», «Temir daftar», «Chin yetim» … — katakda «ha», «+» yoki izoh), yoki ro'yxat bitta toifaga — toifa jadval ustidagi sarlavhada yoki fayl nomida («Temir daftar ro'yxati.xlsx»). Talaba HEMIS ID yoki F.I.Sh. (+ guruh) bo'yicha topiladi; tanilmagan toifa va topilmagan talabalar hisobotda ko'rsatiladi. Fayl mavjud toifalarni o'chirmaydi — faqat qo'shadi (qayta yuklash takrorlamaydi).
 
 Ustun nomlari o'zbek (lotin/kirill) yoki rus tilida bo'lishi mumkin, sarlavha birinchi 15 qatordan avtomatik topiladi, «NAMUNA» deb boshlangan qatorlar o'tkazib yuboriladi. Xatoli qatorlar import natijasida raqami bilan ko'rsatiladi.
 
@@ -686,6 +689,15 @@ holati: «o'zi yozildi», «xabar yetdi», «botda» yoki «ulanmagan» (+ shaxs
 ulanmaganlar ro'yxati koordinatorga havolalari bilan keladi; talaba havolani keyinroq ochsa, o'tmagan tadbir haqidagi
 xabar unga darhol keladi. Yo'l ma'lumoti («Qanday boriladi») — faqat ijara tashrifida.
 
+**Ishtirokchilar ro'yxati — Word jadval.** Tadbir yoki madaniy tashrifning ro'yxatga olishi yopilganda — koordinator
+«Ro'yxatni yopish» ni bosganda, joylar to'lganda yoki tadbir boshlanganda (yakuniy ro'yxat) — ishtirokchilar jadvali
+Word (.docx) faylda kurs koordinatoriga botda o'zi keladi: universitet nomi, tadbir nomi, sana va vaqt, joyi, kurs
+koordinatori, jami soni; jadvalda №, F.I.Sh., guruh, kurs, telefon, qanday qo'shilgani («o'zi yozildi» / «koordinator»)
+va **imzo** ustuni; pastida koordinator imzosi va tuzilgan vaqti. A4, Times New Roman, sarlavha qatori har sahifada
+takrorlanadi. Ro'yxat o'zgarmagan bo'lsa, fayl qayta yuborilmaydi. Panelda ham — «Ishtirokchilar» (ijara tashrifida —
+«Talabalar») bo'limidagi **«Word»** tugmasi bilan istalgan paytda yuklab olinadi; ijara tashrifida jadvalda ijara
+manzili va talabaning javobi bo'ladi.
+
 **Talabani botga ulash.** Talaba ota-ona menyusiga kirmaydi — tashrif va tadbir xabarlarini **talabalar botida**
 oladi («Ikki bot» bo'limi; u sozlanmagan bo'lsa — asosiy botda). Talaba botga o'z telefon raqami bilan o'zi ulanadi yoki: talabaning
 **shaxsiy havolasi** (talaba kartasi yoki reja oynasidagi «Havola» — `t.me/<bot>?start=v_...`; ochsa, javob kutayotgan
@@ -716,6 +728,32 @@ ilova sifatida qo'shiladi. Fayl talabaning hujjati sifatida saqlanadi (talaba ka
 
 Ma'lumot kurs bazasida (`visit_*` jadvallari), fayllar — `data/<kurs>/tashrif/` (zaxira nusxaga kiradi), manzillar
 joyi keshi — `data/tashrif/geo.db`. Sozlamalar: `.env.example` dagi «Tashriflar» bo'limi.
+
+## Ijtimoiy toifalar
+
+Kurs koordinatori (va super-admin) talabalarning ijtimoiy toifasini yuritadi:
+
+| Toifa | Kichik toifa |
+|---|---|
+| Nogironligi bor | I, II, III guruh (yoki ko'rsatilmagan) |
+| Ijtimoiy himoyaga muhtoj | ijtimoiy himoya reestri, xotin-qizlar reestri, ayollar daftari, temir daftar, yoshlar daftari, boshqa |
+| Chin yetim | — |
+| Mehribonlik uyi tarbiyalanuvchisi | — |
+
+- **«Kurs holati»** (kompyuter versiyasi) — har bir toifa alohida kartada: nechta talaba, kichik toifalar bo'yicha soni
+  va kurs talabalariga ulushi. Kartani bossangiz — yon panelda ro'yxat (guruhlar bo'yicha, kichik toifa filtri, izoh,
+  qanday kiritilgani — fayldan yoki qo'lda va sanasi); talabani bossangiz — uning kartasi; «×» — toifani olib tashlash.
+- **Qo'lda belgilash** — «Toifa belgilash» (yoki ro'yxatdagi «Talaba qo'shish»): toifa, kichik toifa va izoh (asos
+  hujjat) tanlanadi, talabalar qidiruv orqali alohida yoki «Butun guruhni qo'shish» bilan birdan qo'shiladi. Bir talabada
+  bir nechta toifa bo'lishi mumkin (masalan, chin yetim va mehribonlik uyi); nogironlik — bitta yozuv, guruhi o'zgarsa
+  almashtiriladi (avvalgi izoh saqlanadi).
+- **Talaba kartasi** — «Ijtimoiy toifa» bo'limi: toifalari, «Belgilash» va olib tashlash.
+- **Fayl bilan** — «🤝 Ijtimoiy toifalar» importi (`15_ijtimoiy_toifalar` shabloni; «Ma'lumotlarni yuklash» bo'limining
+  11-bandi).
+- **«Barcha kurslar»** (super-admin, dekan) — barcha kurslar bo'yicha umumiy karta.
+
+Kurs koordinatori faqat o'z guruhlari talabalarini ko'radi va belgilaydi. Ma'lumot kurs bazasida (`student_categories`)
+saqlanadi va ota-onaga ko'rsatilmaydi; talaba bazadan o'chirilsa, toifalari ham o'chadi.
 
 ## Kurs koordinatori paneli va ma'lumotlarni tekshirish
 
@@ -974,6 +1012,9 @@ docxfill.py       — Word (.docx) shablonlarini to'ldirish ({{KALIT}} belgilar,
 visits.py         — tashriflar: rejalar, holatlar, talaba javoblari, tadbir ishtirokchilari, eslatmalar, dalolatnoma,
                     yashash joylari, hisobot
 visitsapi.py      — «Tashriflar» bo'limi API si (boshqaruv paneli)
+docxtable.py      — jadvalli Word hujjat (tadbir ishtirokchilari ro'yxati): A4, sarlavha qatori har sahifada
+socialcat.py      — ijtimoiy toifalar: nogironlik, ijtimoiy himoya (reestr, daftarlar), chin yetim, mehribonlik uyi
+socialapi.py      — ijtimoiy toifalar API si (kurs holati kartalari, ro'yxat, qo'lda belgilash, talaba kartasi)
 handlers/visits.py — tashrif va tadbir bot oqimlari: talaba havolasi, javoblari, e'londa ro'yxatdan o'tish, talabalar
                     boti menyusi (/start, telefon bilan ulanish, «Tadbirlarim»); koordinator: /yol (turgan joydan yo'l)
 tashrif/          — «Qanday boriladi»: manzilni xaritadan topish, bekatlar, metro, yo'nalish (tashrif-py dan), tuman
@@ -992,7 +1033,8 @@ live.py           — real vaqt voqealari (Server-Sent Events): bildirishnoma, x
 docstore.py       — rasmiy hujjatlar ombori va ilovada ko'rish (PDF sahifalari — rasm)
 handlers/appgate.py — ilova rejimida ota-onaning botdagi matnlari va eski tugmalari — ilovaga yo'naltiriladi
 webapp/           — ilovaning o'zi: index.html, app.js, app.css; kompyuter versiyasi: desk.html, desk.js, desk.css,
-                    tashrif.js («Tashriflar»: kalendar, xarita, dalolatnoma va imzo, Word); vendor/leaflet — xarita;
+                    tashrif.js («Tashriflar»: kalendar, xarita, dalolatnoma va imzo, Word), social.js (ijtimoiy
+                    toifalar: kartalar, ro'yxat, qo'lda belgilash); vendor/leaflet — xarita;
                     shriftlar (Golos Text, PT Serif)
 ilova_sinov.bat   — Windows: ilovani vaqtincha HTTPS orqali sinash (ilova_sinov.ps1 ni ishga tushiradi)
 ilova_sinov.sh    — Linux/macOS: xuddi shu (Cloudflare Quick Tunnel + bot)

@@ -170,6 +170,16 @@ async def api_visit_act_delete(request):
 
 
 @staff_route
+async def api_visit_list_docx(request):
+    """Rejaga biriktirilgan talabalar ro'yxati — Word jadval (har doim joriy holat)."""
+    p = await _plan(request, int(request.match_info["pid"]))
+    if not p or not p["students"]:
+        return bad("not_found", 404)
+    blob, name = V.participants_docx(p)
+    return _file_resp(name, blob)
+
+
+@staff_route
 async def api_visit_act_docx(request):
     """POST — panelda yasalgan Word faylni saqlash; GET — yuklab olish."""
     aid = int(request.match_info["aid"])
@@ -349,6 +359,7 @@ def setup(r) -> None:
     r.add_post("/api/staff/visits/{pid:\\d+}/{act:[a-z]+}", api_visit_action)
     r.add_delete("/api/staff/visits/acts/{aid:\\d+}", api_visit_act_delete)
     r.add_route("*", "/api/staff/visits/acts/{aid:\\d+}/docx", api_visit_act_docx)
+    r.add_get("/api/staff/visits/{pid:\\d+}/list.docx", api_visit_list_docx)
     r.add_get("/api/staff/visits/photos/{fid:\\d+}", api_visit_photo)
     r.add_delete("/api/staff/visits/photos/{fid:\\d+}", api_visit_photo)
     r.add_get("/api/staff/visits/student/{sid:\\d+}", api_visit_student)

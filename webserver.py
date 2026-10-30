@@ -38,7 +38,7 @@ async def security_headers(request: web.Request, handler):
 def _version() -> str:
     """Ilova fayllari versiyasi (o'zgartirilgan vaqtlari bo'yicha): yangi kod o'rnatilganda o'zgaradi."""
     import hashlib
-    stamp = "|".join(f"{f}:{(STATIC / f).stat().st_mtime_ns}" for f in ("app.js", "app.css", "desk.js", "desk.css", "tashrif.js", "tg.js")
+    stamp = "|".join(f"{f}:{(STATIC / f).stat().st_mtime_ns}" for f in ("app.js", "app.css", "desk.js", "desk.css", "tashrif.js", "social.js", "tg.js")
                      if (STATIC / f).exists())
     return hashlib.sha1(stamp.encode()).hexdigest()[:10]
 
@@ -50,7 +50,7 @@ def _html(name: str) -> web.Response:
     """HTML sahifa — skript va uslublar versiya bilan (?v=…): Telegram eski nusxani keshdan olmaydi, ilovani
     qo'lda yangilash shart emas."""
     html = (STATIC / name).read_text(encoding="utf-8")
-    for f in ("app.css", "app.js", "desk.css", "desk.js", "tashrif.js", "fonts.css", "tg.js"):
+    for f in ("app.css", "app.js", "desk.css", "desk.js", "tashrif.js", "social.js", "fonts.css", "tg.js"):
         html = html.replace(f"static/{f}\"", f"static/{f}?v={APP_VERSION}\"")
     return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
 
