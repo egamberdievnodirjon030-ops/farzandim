@@ -3,6 +3,7 @@
   • Talaba shaxsiy havolani ochadi (t.me/<bot>?start=v_<kurs>_<kod>) — Telegram hisobi bog'lanadi, javob kutayotgan
     tashriflar darhol keladi. Ota-onasini o'z raqami bilan tasdiqlagan talaba ham avtomatik taniladi.
   • Tashrif xabaridagi tugmalar: ✅ tasdiqlayman, 🕒 boshqa vaqt (yoziladi: «22.10 14:00»), ❌ bu manzilda yashamayman.
+  • Tadbir va madaniy tashrif ishtirokchilariga — faqat ma'lumot va eslatma (tugmasiz, visits.py).
   • Barcha talabalar tasdiqlagach, reja o'zi aktual bo'ladi. Koordinator: talaba taklif qilgan vaqtni qabul qiladi,
     javob bermaganlar bo'lsa — rejani shundayligicha tasdiqlaydi; /yol — turgan joyidan (GPS) yaqin tashriflar
     manziliga qaysi avtobus yoki metro boradi (joylashuv saqlanmaydi).
@@ -53,12 +54,14 @@ async def open_invite(message: Message, state: FSMContext) -> None:
         return
     await message.answer(f"✅ <b>{html.escape(st['full_name'])}</b>, siz botga ulandingiz.\n\nKurs koordinatoringiz ijara "
                          "xonadoningizga tashrif rejalashtirsa, xabar shu yerga keladi — tasdiqlaysiz yoki o'zingizga qulay "
-                         "vaqtni taklif qilasiz.", reply_markup=ReplyKeyboardRemove())
+                         "vaqtni taklif qilasiz. Sizni tadbir yoki madaniy tashrifga belgilasa — nomi, joyi va vaqti, "
+                         "oldidan esa eslatma keladi.", reply_markup=ReplyKeyboardRemove())
     with _course(key):
         for p in pending:
             row = next((s for s in p["students"] if s["student_id"] == st["id"]), {})
             msg = await message.answer(V.student_text(p, row), reply_markup=V.student_kb(p["id"], st["id"]))
             await V._remember(p["id"], "talaba", msg, st["id"])
+        await V.catch_up(message.bot, st["id"])  # belgilangan, hali o'tmagan tadbirlar
 
 
 async def _student_ok(cb: CallbackQuery, sid: int) -> bool:

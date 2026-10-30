@@ -41,6 +41,8 @@ class Sozlama:
         self.sinov = _bool("TASHRIF_SINOV", False)                  # sinovda fon oqimlari ishga tushmaydi
         self.javob_soat = _int("STUDENT_REPLY_HOURS", 24)           # talaba javobi uchun muddat
         self.eslatma_soat = _int("REMINDER_HOURS_BEFORE", 3)        # tashrifdan necha soat oldin eslatma
+        h = _int("REMINDER_EVE_HOUR", 18)                          # tadbir oldidan kuni: soat nechadan eslatma
+        self.ertaga_soat = h if 0 <= h <= 23 else None              # (-1 — o'chirilgan)
 
     @property
     def malumot_papkasi(self) -> Path:

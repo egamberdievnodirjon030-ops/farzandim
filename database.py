@@ -246,6 +246,7 @@ CREATE TABLE IF NOT EXISTS visit_plans (
     status           TEXT NOT NULL,
     student_deadline TEXT,                      -- talaba javobi muddati (ISO)
     sent_at          TEXT, completed_at TEXT, result TEXT, problem TEXT, cancel_reason TEXT, reminded_at TEXT,
+    eve_reminded_at  TEXT,                      -- tadbir / madaniy tashrif: oldingi kungi eslatma
     created_at       TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_visit_plans_date ON visit_plans(visit_date, status);
@@ -692,7 +693,8 @@ class Database:
                        ("disc_cases", (("amount", "REAL"), ("as_of", "TEXT"), ("basis", "TEXT"), ("basis_at", "TEXT"),
                                        ("letter_no", "TEXT"), ("letter_date", "TEXT"), ("letter_at", "TEXT"))),
                        ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT"), ("send_note", "TEXT"),
-                                       ("doc_number", "TEXT"), ("doc_date", "TEXT")))):
+                                       ("doc_number", "TEXT"), ("doc_date", "TEXT"))),
+                       ("visit_plans", (("eve_reminded_at", "TEXT"),))):
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 have = {r[1] for r in await cur.fetchall()}
             for col, ddl in add:

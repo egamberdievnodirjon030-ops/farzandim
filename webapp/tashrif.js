@@ -45,15 +45,20 @@ const EV_T = {
   yaratildi: 'Reja tuzildi', tahrirlandi: 'Tahrirlandi', yuborildi: 'Yuborildi', talaba_tasdiqladi: 'Talaba tasdiqladi',
   talaba_vaqt_taklif_qildi: 'Talaba boshqa vaqt taklif qildi', talaba_rad_etdi: 'Talaba: bu manzilda yashamayman',
   vaqti_ozgartirildi: 'Vaqti o‘zgartirildi', tasdiqlandi: 'Tasdiqlandi — reja aktual', tasdiqlandi_javobsiz: 'Shundayligicha tasdiqlandi (javobsizlar bilan)',
-  bajarildi: 'O‘tkazildi', bekor_qilindi: 'Bekor qilindi', dalolatnoma: 'Dalolatnoma tuzildi'
+  bajarildi: 'O‘tkazildi', bekor_qilindi: 'Bekor qilindi', dalolatnoma: 'Dalolatnoma tuzildi',
+  ishtirokchilar_ozgartirildi: 'Ishtirokchilar o‘zgartirildi'
 };
+const EVT = ['tadbir', 'madaniy_tashrif'];            // ishtirokchi talabalar belgilanadi — botda ma'lumot va eslatma
+const withStu = t => t === 'ijara_tashrifi' || EVT.includes(t);
 const WHO_T = { koordinator: 'koordinator', talaba: 'talaba', tizim: 'tizim' };
 const VERR = {
   past: 'Sanasi o‘tib ketgan rejani yuborib bo‘lmaydi', no_students: 'Ijara tashrifiga kamida bitta talaba biriktiring',
   no_title: 'Reja nomini yozing', bad_time: 'Vaqt noto‘g‘ri: tugash vaqti boshlanishidan keyin bo‘lsin', bad_date: 'Sana noto‘g‘ri',
   early: 'Tashrif vaqti hali kelmagan', no_reason: 'Bekor qilish sababini yozing',
-  not_all: 'Hali barcha talabalar tasdiqlamagan', forbidden: 'Bu amal sizga ruxsat etilmagan', bad_location: 'Joylashuvni tushunmadim'
+  not_all: 'Hali barcha talabalar tasdiqlamagan', forbidden: 'Bu amal sizga ruxsat etilmagan', bad_location: 'Joylashuvni tushunmadim',
+  bad_type: 'Bu reja turida bu amal yo‘q'
 };
+const delivTxt = d => !d ? '' : ` · botda xabar: ${d.sent} ta${d.missed ? `, ulanmagan: ${d.missed} ta (koordinatorga havolalar yuborildi)` : ''}`;
 const verr = e => (e && e.data && e.data.message) || VERR[e && e.message] || 'Bajarilmadi';
 
 /* ---------------------------------------------------------------- kichik yordamchilar */
@@ -131,7 +136,8 @@ function bindPlanCards(root) {
 /* ---------------------------------------------------------------- rejalar: hafta va ro'yxat */
 function planCard(p, compact = false) {
   const a = p.answers || {}, vt = VT[p.type] || {};
-  const who = p.type === 'ijara_tashrifi' ? `<span class="pc-st">${ic('users')} ${a.total || 0} talaba${p.status === 'talaba_tasdigida' ? ` · ✅ ${a.tasdiqladi || 0}/${a.total || 0}` : ''}</span>` : (p.place ? `<span class="pc-st">${ic('pin')} ${esc(p.place)}</span>` : '');
+  const who = p.type === 'ijara_tashrifi' ? `<span class="pc-st">${ic('users')} ${a.total || 0} talaba${p.status === 'talaba_tasdigida' ? ` · ✅ ${a.tasdiqladi || 0}/${a.total || 0}` : ''}</span>`
+    : (p.place ? `<span class="pc-st">${ic('pin')} ${esc(p.place)}</span>` : '') + (a.total ? `<span class="pc-st">${ic('users')} ${a.total} ishtirokchi</span>` : '');
   return `<a href="#" class="pcard ${vt.c || ''} st-${p.status}" data-vp="${p.id}" title="${esc(p.title)}">
     <span class="pc-t">${esc(p.start_time)}–${esc(p.end_time)}${compact ? '' : ' · ' + esc(vt.s || '')}</span>
     <b>${esc(p.title)}</b>${who}${vChip(p.status)}${p.acts_n ? `<span class="chip ok">${ic('file')} ${p.acts_n}</span>` : ''}</a>`;
@@ -181,9 +187,10 @@ function bindPlans(d, st) {
 async function vAct(pid, act, body = {}, okMsg = 'Saqlandi', reopen = false) {
   try {
     const r = await api(`/api/staff/visits/${pid}/${act}`, { method: 'POST', json: body });
-    toast(okMsg + (r.delivery && r.delivery.missed ? ` · botga ulanmagan: ${r.delivery.missed} ta (koordinatorga havolalar yuborildi)` : ''));
-    if (reopen && $('#drawer.on')) openPlan(pid); else closeDrawer();
-    if (location.hash.startsWith('#/tashrif')) route();
+    toast(okMsg + delivTxt(r.delivery));
+    const keep = reopen && $('#drawer.on');
+    if (location.hash.startsWith('#/tashrif')) route();   // route() oynani yopadi — shuning uchun undan keyin ochamiz
+    if (keep) openPlan(pid); else closeDrawer();
     return r;
   } catch (e) { toast(verr(e), true); return null; }
 }
@@ -197,7 +204,7 @@ async function openPlan(pid) {
   let p;
   try { p = (await api(`/api/staff/visits/${pid}`)).item; } catch (e) { $('#dbody').innerHTML = emptyBox('alert', 'Rejani ochib bo‘lmadi'); return; }
   $('#drawer header b').textContent = p.title;
-  const own = p.can_manage, ij = p.type === 'ijara_tashrifi';
+  const own = p.can_manage, ij = p.type === 'ijara_tashrifi', ev = EVT.includes(p.type);
   const steps = ij ? [['qoralama', 'Qoralama'], ['talaba_tasdigida', 'Talabalar tasdig‘i'], ['tasdiqlangan', 'Tasdiqlangan'], ['bajarildi', 'O‘tkazildi']]
     : [['qoralama', 'Qoralama'], ['tasdiqlangan', 'Aktual'], ['bajarildi', 'O‘tkazildi']];
   const cur = steps.findIndex(([k]) => k === p.status);
@@ -213,6 +220,15 @@ async function openPlan(pid) {
         ${own && p.status === 'talaba_tasdigida' ? `<button class="btn sm ghost" data-vans="${s.student_id}">${ic('edit')} Javobni belgilash</button>` : ''}
         <span class="grow"></span><button class="btn sm ghost" data-vroute1="${s.student_id}">${ic('route')} Yo‘l</button>
         <button class="btn sm ghost" data-vstu="${s.student_id}" title="Talaba kartasi">${ic('users')}</button></div></li>`;
+  const partRow = s => `<li class="vst"><div class="vst-h"><span class="t"><b>${esc(s.full_name)}</b></span>
+      <span class="wrapc">${s.notified_at ? `<span class="chip ok" title="Botda xabar yetkazildi: ${esc(when(s.notified_at))}">${ic('check')} xabar yetdi</span>`
+        : s.linked ? `<span class="chip ok" title="Reja aktual bo‘lganda xabar botda keladi">${ic('telegram')} botda</span>`
+        : `<span class="chip warn" title="Talaba botga ulanmagan — shaxsiy havolani yuboring">${ic('telegram')} ulanmagan</span><button class="btn sm ghost" data-vinv="${s.student_id}">${ic('link')} Havola</button>`}
+        <button class="btn sm ghost" data-vstu="${s.student_id}" title="Talaba kartasi" aria-label="Talaba kartasi">${ic('users')}</button></span></div></li>`;
+  const partGroups = () => { const by = {}; S_.forEach(s => (by[s.group_name || '—'] = by[s.group_name || '—'] || []).push(s));
+    return Object.entries(by).sort(([a], [b]) => a.localeCompare(b, 'uz')).map(([g, l]) => `<div class="chs-sub" style="margin-top:8px">${esc(g)} · ${l.length} ta</div><ul class="vsts compact">${l.map(partRow).join('')}</ul>`).join(''); };
+  const ended = new Date(`${p.visit_date}T${p.end_time}`) < new Date();
+  const canPart = own && ev && (p.status === 'qoralama' || (p.status === 'tasdiqlangan' && !ended));
   const acts = p.acts || [];
   const actRow = a => { const d = a.data || {};
     return `<li><span class="t">${ic('file')}<span><b>${esc(d.fio || 'Talaba tanlanmagan')}</b>${a.category ? ` <span class="zchip z-${a.category}">${esc(ZONE_C[a.category][1])} hudud</span>` : ''}
@@ -243,6 +259,10 @@ async function openPlan(pid) {
         <button class="btn sm" data-vroute>${ic('route')} Qanday boriladi</button></h4>
       <ul class="vsts">${S_.map(studRow).join('')}</ul>
       <p class="hint" style="margin:8px 0 0">Talaba botda ✅ tasdiqlaydi, 🕒 boshqa vaqt taklif qiladi yoki ❌ «bu manzilda yashamayman» deydi. Tasdiqlashi bilan sizga shu manzilga qanday borilishi keladi (talabaga — yo‘q).</p></div>` : ''}
+    ${ev ? `<div class="box"><h4 class="h4row"><span>Ishtirokchilar — ${S_.length} ta${S_.length ? ` <span class="sub-l" style="display:inline">· botda ${S_.filter(s => s.linked).length} · xabar yetgan ${S_.filter(s => s.notified_at).length}</span>` : ''}</span>
+        ${canPart ? `<button class="btn sm" data-vpart>${ic('users')} ${S_.length ? 'O‘zgartirish' : 'Talabalarni belgilash'}</button>` : ''}</h4>
+      ${S_.length ? partGroups() : '<span class="dash">Ishtirokchi talabalar belgilanmagan.</span>'}
+      <p class="hint" style="margin:8px 0 0">Reja aktual bo‘lishi bilan botga ulangan ishtirokchilarga nomi, sanasi, vaqti va joyi yuboriladi; oldingi kuni kechqurun va boshlanishidan oldin eslatma boradi, vaqt o‘zgarsa yoki bekor qilinsa — ham. Ulanmagan talabaga shaxsiy havolani yuboring: ochishi bilan xabar keladi.</p></div>` : ''}
     ${ij && ['tasdiqlangan', 'bajarildi'].includes(p.status) ? `<div class="box"><h4>Dalolatnomalar — ${acts.length} ta</h4>
       ${acts.length ? `<ul class="list chs-files">${acts.map(actRow).join('')}</ul>` : `<div class="note ${p.status === 'bajarildi' ? 'warn' : ''}">${ic(p.status === 'bajarildi' ? 'alert' : 'info')}<span>Har bir talaba uchun dalolatnoma to‘ldiriladi (16 band, imzolar) — Word fayli bitta betda, qog‘oz namunadagidek chiqadi. 14-band (xonadon toifasi) «Yashash joylari» xaritasiga tushadi.</span></div>`}
       ${canAct ? `<div style="margin-top:10px"><button class="btn sm primary" data-vanew>${ic('plus')} Dalolatnoma</button></div>` : ''}</div>` : ''}
@@ -255,12 +275,15 @@ async function openPlan(pid) {
   $$('[data-vdo]', B).forEach(b => b.addEventListener('click', async () => {
     const act = b.dataset.vdo;
     if (act === 'send' && ij && !await confirmDlg('Talabalarga yuborish', `${S_.length} ta talabaga botda tashrif so‘rovi yuboriladi. Hammasi tasdiqlagach, reja o‘zi aktual bo‘ladi.`, 'Yuborish')) return;
+    if (act === 'send' && ev && S_.length && !await confirmDlg('Aktual qilish', `Reja aktual bo‘ladi va ${S_.length} ta ishtirokchiga botda ${esc(VT[p.type].t.toLowerCase())} haqida xabar yuboriladi: nomi, sanasi, vaqti va joyi.`, 'Aktual qilish')) return;
     b.disabled = true; await vAct(pid, act, {}, ij ? 'Yuborildi' : 'Aktual qilindi', true); b.disabled = false; }));
   $('[data-vedit]', B)?.addEventListener('click', () => planEditor(p));
+  $('[data-vpart]', B)?.addEventListener('click', () => editParticipants(p));
   $('[data-vforce]', B)?.addEventListener('click', async () => {
     if (await confirmDlg('Shundayligicha tasdiqlash', 'Javob bermagan talabalar «javob bermadi» deb belgilanadi va reja aktual bo‘ladi. Tasdiqlagan talabalarga yakuniy xabar ketadi.', 'Tasdiqlash')) vAct(pid, 'confirm', {}, 'Tasdiqlandi', true); });
   $('[data-vtime]', B)?.addEventListener('click', async () => {
-    const f = await formDlg('Vaqtni o‘zgartirish', `<p>Vaqt o‘zgarsa, barcha tasdiqlar bekor bo‘ladi va so‘rov qaytadan yuboriladi (talaba 14:00 ga rozi bo‘lgan edi, boshqa vaqtga emas).</p>
+    const f = await formDlg('Vaqtni o‘zgartirish', `<p>${ij ? 'Vaqt o‘zgarsa, barcha tasdiqlar bekor bo‘ladi va so‘rov qaytadan yuboriladi (talaba 14:00 ga rozi bo‘lgan edi, boshqa vaqtga emas).'
+      : ev && S_.length ? 'Ishtirokchilarga yangi vaqt botda yuboriladi; eslatmalar yangi vaqtga ko‘ra boradi.' : 'Reja yangi vaqtga ko‘chiriladi.'}</p>
       <div class="cols2"><label class="field"><span>Sana</span><input class="input" type="date" name="visit_date" value="${esc(p.visit_date)}" required></label><span></span>
       <label class="field"><span>Boshlanishi</span><input class="input" type="time" name="start_time" value="${esc(p.start_time)}" required></label>
       <label class="field"><span>Tugashi</span><input class="input" type="time" name="end_time" value="${esc(p.end_time)}" required></label></div>
@@ -319,49 +342,104 @@ async function copyInvite(sid) {
   } catch (e) { toast('Havolani olib bo‘lmadi', true); }
 }
 
+/* ---------------------------------------------------------------- talaba tanlash (reja muharriri, ishtirokchilar) */
+const stuOf = s => ({ id: s.student_id, name: s.full_name, group: s.group_name || '', address: s.address, linked: s.linked });
+/* sel — tanlanganlar (Map id → talaba); mode() — 'ijara' (manzil bo'yicha, bittalab) yoki 'event' (guruh bilan) */
+function stuPicker(sel, mode) {
+  let all = null, loading = false;
+  const q = el('input', { class: 'input', type: 'search', oninput: () => paintRes() });
+  const groups = el('div', { class: 'vgrp' }), res = el('div', { class: 'vpick-res' }), chosen = el('div', { class: 'vpick-box' });
+  const changed = () => { paintRes(); paintSel(); };
+  const tgChip = s => s.linked ? `<span class="chip ok" title="Botga ulangan — xabar o‘ziga boradi">${ic('telegram')}</span>` : '';
+  const paintRes = () => {
+    const ev = mode() === 'event', t = q.value.trim().toLowerCase();
+    q.placeholder = ev ? 'F.I.Sh. yoki guruh bo‘yicha qidirish' : 'F.I.Sh., guruh yoki manzil bo‘yicha qidirish';
+    groups.hidden = !ev || !all;
+    if (!all) return;
+    if (ev) {
+      const by = {}; all.forEach(s => (by[s.group || '—'] = by[s.group || '—'] || []).push(s));
+      fillKids(groups, el('span', { class: 'sub-l', text: 'Butun guruhni qo‘shish:' }), ...Object.entries(by).sort(([a], [b]) => a.localeCompare(b, 'uz')).map(([g, l]) => {
+        const left = l.filter(s => !sel.has(s.id));
+        return el('button', { type: 'button', class: 'btn sm' + (left.length ? '' : ' ghost'), disabled: !left.length,
+          title: left.length ? `${left.length} ta talaba qo‘shiladi` : 'Guruhning hammasi tanlangan',
+          onclick: () => { left.forEach(s => sel.set(s.id, s)); changed(); }, html: `${left.length ? ic('plus') : ic('check')} ${esc(g)} <small>${l.length}</small>` });
+      }));
+    }
+    const list = all.filter(s => !sel.has(s.id) && (!t || s.name.toLowerCase().includes(t) || s.group.toLowerCase().includes(t) || (!ev && (s.address || '').toLowerCase().includes(t))))
+      .sort(ev ? (a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name) : (a, b) => (b.living === 'ijara') - (a.living === 'ijara') || a.name.localeCompare(b.name))
+      .slice(0, t ? 40 : 12);
+    fillKids(res, ...list.map(s => el('button', { type: 'button', class: 'vpick', onclick: () => { sel.set(s.id, s); changed(); } },
+      el('span', { class: 't', html: `<b>${esc(s.name)}</b><small>${esc(s.group)}${ev ? '' : s.address ? ' · ' + esc(s.address) : ' · manzil yo‘q'}</small>` }),
+      el('span', { class: 'b', html: ev ? tgChip(s) : `${s.living && s.living !== 'ijara' ? `<span class="chip muted">${esc(LIVING_T[s.living] || s.living)}</span>` : ''}${s.located ? '<span class="chip ok">joyi aniq</span>' : ''}${tgChip(s)}` }),
+      el('span', { html: ic('plus') }))), list.length ? null : el('span', { class: 'dash', text: 'Topilmadi' }));
+  };
+  const paintSel = () => {
+    const L = [...sel.values()];
+    if (mode() !== 'event') {
+      fillKids(chosen, el('ul', { class: 'vpick-sel' }, L.map(s => el('li', {},
+        el('span', { html: `<b>${esc(s.name)}</b> <small>${esc(s.group || '')}${s.address ? ' · ' + esc(s.address) : ''}</small>` }),
+        el('button', { type: 'button', class: 'btn sm ghost', 'aria-label': 'Olib tashlash', onclick: () => { sel.delete(s.id); changed(); }, html: ic('x') }))),
+        L.length ? null : el('li', { class: 'dash', text: 'Talaba tanlanmagan' })));
+      return;
+    }
+    if (!L.length) { fillKids(chosen, el('span', { class: 'dash', text: 'Ishtirokchi tanlanmagan — guruh tugmasi yoki qidiruv orqali qo‘shing' })); return; }
+    const by = {}; L.forEach(s => (by[s.group || '—'] = by[s.group || '—'] || []).push(s));
+    fillKids(chosen, el('div', { class: 'vsel-h' }, el('b', { text: `Tanlangan: ${L.length} ta` }),
+      el('span', { class: 'sub-l', text: `botga ulangan: ${L.filter(s => s.linked).length} ta` }), el('span', { class: 'grow' }),
+      el('button', { type: 'button', class: 'btn sm ghost', onclick: () => { sel.clear(); changed(); } }, 'Hammasini olib tashlash')),
+    Object.entries(by).sort(([a], [b]) => a.localeCompare(b, 'uz')).map(([g, l]) => el('div', { class: 'vsel-g' },
+      el('div', { class: 'vsel-gh' }, el('b', { text: g }), el('small', { text: `${l.length} ta` }), el('span', { class: 'grow' }),
+        el('button', { type: 'button', class: 'btn sm ghost', onclick: () => { l.forEach(s => sel.delete(s.id)); changed(); } }, 'Guruhni olib tashlash')),
+      el('div', { class: 'vsel-chips' }, l.sort((a, b) => a.name.localeCompare(b.name)).map(s => el('span', { class: 'vchipx' + (s.linked ? ' on' : ''), title: s.linked ? 'Botga ulangan' : 'Botga ulanmagan' },
+        shortName(s.name), el('button', { type: 'button', 'aria-label': 'Olib tashlash', onclick: () => { sel.delete(s.id); changed(); }, html: ic('x') })))))));
+  };
+  const load = () => {
+    if (all || loading) return;
+    loading = true;
+    api('/api/staff/visits/students').then(r => {
+      all = r.items;
+      for (const s of all) if (sel.has(s.id)) sel.set(s.id, { ...sel.get(s.id), linked: s.linked });
+      changed();
+    }).catch(() => { res.textContent = 'Ro‘yxatni yuklab bo‘lmadi'; }).finally(() => { loading = false; });
+  };
+  return { groups, q, res, chosen, load, repaint: changed };
+}
+
 /* ---------------------------------------------------------------- reja tuzish / tahrirlash */
+const TYPE_HINT = { ijara_tashrifi: 'talabalar tasdiqlaydi', tadbir: 'ishtirokchilarga botda xabar', madaniy_tashrif: 'ishtirokchilarga botda xabar', koordinatorlik_soati: 'yuborilishi bilan aktual' };
+const TITLE_PH = { ijara_tashrifi: 'Masalan: Ijara xonadonlariga tashrif — XM-21', tadbir: 'Masalan: Mustaqillik bayrami konserti', madaniy_tashrif: 'Masalan: Temuriylar tarixi muzeyiga sayohat', koordinatorlik_soati: 'Masalan: Koordinatorlik soati — XM-21' };
 async function planEditor(p, preset = {}) {
   const isNew = !p;
   const v = p ? { ...p } : { type: 'ijara_tashrifi', title: '', visit_date: preset.visit_date || isoD(addDays(new Date(), 1)), start_time: '14:00', end_time: '16:00', place: '', note: '' };
-  const sel = new Map((p ? p.students : []).map(s => [s.student_id, { id: s.student_id, name: s.full_name, group: s.group_name, address: s.address }]));
-  let all = null;
+  const sel = new Map((p ? p.students : []).map(s => [s.student_id, stuOf(s)]));
   const dl = el('dialog', { class: 'vdlg' });
   const typeSeg = el('div', { class: 'vtypes' }, Object.entries(VT).map(([k, t]) => el('label', { class: 'vtype ' + t.c },
     el('input', { type: 'radio', name: 'type', value: k, checked: v.type === k, disabled: !isNew, onchange: () => { v.type = k; paint(); } }),
-    el('span', { html: `${ic(t.icon)}<b>${esc(t.s)}</b><small>${esc(k === 'ijara_tashrifi' ? 'talabalar tasdiqlaydi' : 'yuborilishi bilan aktual')}</small>` }))));
+    el('span', { html: `${ic(t.icon)}<b>${esc(t.s)}</b><small>${esc(TYPE_HINT[k] || '')}</small>` }))));
   const inp = (name, type = 'text', attrs = {}) => el('input', { class: 'input', type, name, value: v[name] || '', oninput: e => { v[name] = e.target.value; }, ...attrs });
-  const q = el('input', { class: 'input', type: 'search', placeholder: 'F.I.Sh., guruh yoki manzil bo‘yicha qidirish', oninput: () => paintRes() });
-  const res = el('div', { class: 'vpick-res' }), chosen = el('ul', { class: 'vpick-sel' });
-  const stuBox = el('div', { class: 'field' }, el('span', { text: 'Talabalar (ijara manzili talaba kartasidan olinadi)' }), q, res, chosen);
-  const placeBox = el('label', { class: 'field' }, el('span', { text: 'Joy' }), inp('place', 'text', { placeholder: 'Masalan: Milliy teatr, akt zali' }));
+  const pk = stuPicker(sel, () => v.type === 'ijara_tashrifi' ? 'ijara' : 'event');
+  const stuLbl = el('span'), stuNote = el('p', { class: 'hint', style: 'margin:0' });
+  const stuBox = el('div', { class: 'field' }, stuLbl, stuNote, pk.groups, pk.q, pk.res, pk.chosen);
+  const placeBox = el('label', { class: 'field' }, el('span', { text: 'Joyi' }), inp('place', 'text', { placeholder: 'Masalan: Milliy teatr, universitet akt zali' }));
   const err = el('div', { class: 'note bordo', hidden: true });
-  const paintRes = () => {
-    if (!all) return;
-    const t = q.value.trim().toLowerCase();
-    const list = all.filter(s => !sel.has(s.id) && (!t || s.name.toLowerCase().includes(t) || s.group.toLowerCase().includes(t) || (s.address || '').toLowerCase().includes(t)))
-      .sort((a, b) => (b.living === 'ijara') - (a.living === 'ijara') || a.name.localeCompare(b.name)).slice(0, t ? 30 : 12);
-    fillKids(res, ...list.map(s => el('button', { type: 'button', class: 'vpick', onclick: () => { sel.set(s.id, s); paintRes(); paintSel(); } },
-      el('span', { class: 't', html: `<b>${esc(s.name)}</b><small>${esc(s.group)}${s.address ? ' · ' + esc(s.address) : ' · manzil yo‘q'}</small>` }),
-      el('span', { class: 'b', html: `${s.living && s.living !== 'ijara' ? `<span class="chip muted">${esc(LIVING_T[s.living] || s.living)}</span>` : ''}${s.located ? '<span class="chip ok">joyi aniq</span>' : ''}${s.linked ? `<span class="chip ok">${ic('telegram')}</span>` : ''}` }),
-      el('span', { html: ic('plus') }))), list.length ? null : el('span', { class: 'dash', text: 'Topilmadi' }));
-  };
-  const paintSel = () => fillKids(chosen, ...[...sel.values()].map(s => el('li', {},
-    el('span', { html: `<b>${esc(s.name)}</b> <small>${esc(s.group || '')}${s.address ? ' · ' + esc(s.address) : ''}</small>` }),
-    el('button', { type: 'button', class: 'btn sm ghost', 'aria-label': 'Olib tashlash', onclick: () => { sel.delete(s.id); paintRes(); paintSel(); }, html: ic('x') }))),
-  sel.size ? null : el('li', { class: 'dash', text: 'Talaba tanlanmagan' }));
+  const titleIn = inp('title', 'text', { required: true });
   const paint = () => {
     const ij = v.type === 'ijara_tashrifi';
-    stuBox.hidden = !ij; placeBox.hidden = ij;
-    if (ij && !all) api('/api/staff/visits/students').then(r => { all = r.items; paintRes(); }).catch(() => { res.textContent = 'Ro‘yxatni yuklab bo‘lmadi'; });
+    stuBox.hidden = !withStu(v.type); placeBox.hidden = ij;
+    stuLbl.textContent = ij ? 'Talabalar (ijara manzili talaba kartasidan olinadi)' : 'Ishtirokchi talabalar (ixtiyoriy)';
+    stuNote.textContent = ij ? '' : 'Reja aktual bo‘lishi bilan botga ulangan ishtirokchilarga nomi, sanasi, vaqti va joyi yuboriladi; oldingi kuni kechqurun va boshlanishidan oldin eslatma boradi.';
+    stuNote.hidden = ij;
+    titleIn.placeholder = TITLE_PH[v.type] || '';
+    if (withStu(v.type)) pk.load();
+    pk.repaint();
   };
-  const titleIn = inp('title', 'text', { placeholder: 'Masalan: Ijara xonadonlariga tashrif — XM-21', required: true });
   const submit = async send => {
     err.hidden = true;
     if (!v.title.trim()) {
       v.title = v.type === 'ijara_tashrifi' ? `Ijara xonadonlariga tashrif${sel.size ? ' — ' + [...new Set([...sel.values()].map(s => s.group).filter(Boolean))].join(', ') : ''}` : VT[v.type].t;
     }
     const body = { type: v.type, title: v.title, visit_date: v.visit_date, start_time: v.start_time, end_time: v.end_time, place: v.place, note: v.note,
-      student_ids: v.type === 'ijara_tashrifi' ? [...sel.keys()] : undefined };
+      student_ids: withStu(v.type) ? [...sel.keys()] : undefined };
     try {
       let r;
       if (isNew) r = await api('/api/staff/visits', { method: 'POST', json: { ...body, send } });
@@ -369,7 +447,7 @@ async function planEditor(p, preset = {}) {
         if (send) r = await api(`/api/staff/visits/${p.id}/send`, { method: 'POST' }); }
       dl.close(); dl.remove();
       if (r.send_error) toast('Qoralama saqlandi, lekin yuborilmadi: ' + (r.send_error.message || VERR[r.send_error.error] || r.send_error.error), true);
-      else toast(send ? 'Saqlandi va yuborildi' + (r.delivery && r.delivery.missed ? ` · botga ulanmagan: ${r.delivery.missed} ta` : '') : 'Qoralama saqlandi');
+      else toast(send ? 'Saqlandi va yuborildi' + delivTxt(r.delivery) : 'Qoralama saqlandi');
       S.tash = S.tash || {}; S.tash.mon = isoD(mondayOf(parseDate(body.visit_date + 'T00:00')));
       if (location.hash.startsWith('#/tashrif')) route(); else location.hash = '#/tashrif';
       openPlan(r.item.id);
@@ -393,7 +471,27 @@ async function planEditor(p, preset = {}) {
       el('button', { class: 'btn primary', type: 'button', onclick: () => submit(true) }, 'Saqlash va yuborish'))));
   document.body.append(dl);
   dl.addEventListener('close', () => dl.remove());
-  paint(); paintSel();
+  paint();
+  dl.showModal();
+}
+
+/* aktual tadbir / madaniy tashrifning ishtirokchilari — yangi qo'shilganlarga botda darhol xabar */
+function editParticipants(p) {
+  const sel = new Map(p.students.map(s => [s.student_id, stuOf(s)]));
+  const pk = stuPicker(sel, () => 'event');
+  const dl = el('dialog', { class: 'vdlg' });
+  const save = el('button', { class: 'btn primary', type: 'button', onclick: async () => {
+    save.disabled = true;
+    const r = await vAct(p.id, 'students', { student_ids: [...sel.keys()] }, 'Ishtirokchilar saqlandi', true);
+    if (r) dl.close(); else save.disabled = false; } }, 'Saqlash');
+  dl.append(el('form', { method: 'dialog', class: 'wide', onsubmit: e => e.preventDefault() },
+    el('h3', { text: 'Ishtirokchilar' }), el('p', { class: 'hint', style: 'margin-top:-6px', text: `${p.title} · ${pWhen(p)}` }),
+    p.status === 'tasdiqlangan' ? el('div', { class: 'note' }, el('span', { html: ic('info') }), el('span', { text: 'Reja aktual: yangi qo‘shilgan talabalarga botda darhol xabar boradi, ro‘yxatdan chiqarilganlarga (xabar olgan bo‘lsa) bu haqda yoziladi.' })) : null,
+    el('div', { class: 'field' }, pk.groups, pk.q, pk.res, pk.chosen),
+    el('div', { class: 'row' }, el('button', { class: 'btn', type: 'button', onclick: () => dl.close() }, 'Bekor qilish'), save)));
+  document.body.append(dl);
+  dl.addEventListener('close', () => dl.remove());
+  pk.load(); pk.repaint();
   dl.showModal();
 }
 

@@ -18,6 +18,10 @@ Talaba tashrifni botda tasdiqlaydi (✅), boshqa vaqt taklif qiladi (🕒) yoki 
 Talaba tasdiqlashi bilan kurs koordinatoriga shu manzilga qanday borilishi (bekat, avtobus, metro) keladi — yo'l
 ma'lumoti faqat koordinatorga, talabaga hech qachon. Barcha talabalar tasdiqlagach, reja o'zi aktual bo'ladi.
 Tashrifdan keyin dalolatnoma (16 band, imzolar) to'ldiriladi; uning 14-bandi (xonadon toifasi) dashboard'ga tushadi.
+
+Tadbir va madaniy tashrifga koordinator ishtirokchi talabalarni belgilaydi (bittalab yoki butun guruh). Reja aktual
+bo'lishi bilan ularga botda nomi, sanasi, vaqti va joyi keladi (javob so'ralmaydi); oldingi kuni kechqurun va
+boshlanishidan bir necha soat oldin eslatma boradi; vaqt o'zgarsa yoki bekor qilinsa — xabar beriladi.
 """
 from __future__ import annotations
 
@@ -41,6 +45,8 @@ log = logging.getLogger(__name__)
 TURLAR = {"ijara_tashrifi": "Ijara xonadoniga tashrif", "madaniy_tashrif": "Madaniy tashrif", "tadbir": "Tadbir",
           "koordinatorlik_soati": "Koordinatorlik soati"}
 IJARA, KOORD_SOAT = "ijara_tashrifi", "koordinatorlik_soati"
+MADANIY, TADBIR = "madaniy_tashrif", "tadbir"
+ISHTIROK = (MADANIY, TADBIR)  # ishtirokchi talabalar belgilanadi — botda ma'lumot va eslatma (javob so'ralmaydi)
 QORALAMA, TALABA, TASDIQLANGAN = "qoralama", "talaba_tasdigida", "tasdiqlangan"
 BAJARILDI, BEKOR = "bajarildi", "bekor_qilingan"
 HOLATLAR = {QORALAMA: "Qoralama", TALABA: "Talaba tasdig'i kutilmoqda", TASDIQLANGAN: "Tasdiqlangan",
@@ -95,6 +101,11 @@ def allowed(status: str, kind: str, action: str, who: str) -> str:
     if action == "vaqt":
         return status if status == QORALAMA else after_send(kind)
     return dst
+
+
+def with_students(kind: str) -> bool:
+    """Rejaga talabalar biriktiriladimi: ijara tashrifi (javob beradi) yoki tadbir / madaniy tashrif (ishtirokchi)."""
+    return kind == IJARA or kind in ISHTIROK
 
 
 def is_actual(status: str) -> bool:
@@ -346,14 +357,15 @@ def _check(d: dict) -> None:
         raise VisitError("bad_time", "Tugash vaqti boshlanishidan keyin bo'lishi kerak")
 
 
-async def _attach(pid: int, sids: list[int], scope: set[str] | None) -> int:
+async def _attach(pid: int, sids: list[int], scope: set[str] | None, address: bool = True) -> int:
+    """Talabalarni rejaga biriktirish (ko'rinish doirasidagilar). Ijara manzili — faqat ijara tashrifiga."""
     n = 0
     for sid in dict.fromkeys(int(x) for x in sids or []):
         st = await db.get_student(sid)
         if not st or (scope is not None and st.get("group_key") not in scope):
             continue
         await db.conn.execute("INSERT OR IGNORE INTO visit_students (plan_id, student_id, address, response) VALUES (?, ?, ?, ?)",
-                              (pid, sid, (st.get("address") or "").strip() or None, KUTILMOQDA))
+                              (pid, sid, ((st.get("address") or "").strip() or None) if address else None, KUTILMOQDA))
         n += 1
     await db.conn.commit()
     return n
@@ -374,6 +386,8 @@ async def create(d: dict, uid: int, scope: set[str] | None = None) -> dict:
         if not await _attach(pid, d["student_ids"], scope):
             await db.execute("DELETE FROM visit_plans WHERE id = ?", (pid,))
             raise VisitError("no_students", "Talabalar topilmadi")
+    elif d["type"] in ISHTIROK and d.get("student_ids"):
+        await _attach(pid, d["student_ids"], scope, address=False)
     await _log(pid, "koordinator", "yaratildi", uid, name, to=QORALAMA)
     _wake_geo()
     return await get(pid)
@@ -392,9 +406,11 @@ async def update(pid: int, d: dict, uid: int, scope: set[str] | None = None) -> 
                      (str(nxt["title"]).strip()[:200], nxt["visit_date"], nxt["start_time"], nxt["end_time"],
                       (nxt.get("place") or "").strip()[:300] or None, (nxt.get("note") or "").strip()[:1000] or None,
                       now_iso(), pid))
-    if p["type"] == IJARA and d.get("student_ids") is not None:
+    if with_students(p["type"]) and d.get("student_ids") is not None:
+        if p["type"] == IJARA and not d["student_ids"]:
+            raise VisitError("no_students", "Ijara tashrifiga kamida bitta talaba biriktiriladi")
         await db.execute("DELETE FROM visit_students WHERE plan_id = ?", (pid,))
-        if not await _attach(pid, d["student_ids"], scope):
+        if not await _attach(pid, d["student_ids"], scope, address=p["type"] == IJARA) and p["type"] == IJARA:
             raise VisitError("no_students", "Ijara tashrifiga kamida bitta talaba biriktiriladi")
     await _log(pid, "koordinator", "tahrirlandi", uid, await staff_name(uid))
     _wake_geo()
@@ -408,6 +424,38 @@ async def delete(pid: int, uid: int) -> None:
     for f in await db.fetchall("SELECT path FROM visit_photos WHERE plan_id = ?", (pid,)):
         _unlink(f["path"])
     await db.execute("DELETE FROM visit_plans WHERE id = ?", (pid,))
+
+
+async def set_participants(bot, pid: int, uid: int, sids: list[int], scope: set[str] | None = None) -> dict:
+    """Tadbir / madaniy tashrif ishtirokchilari — reja aktual bo'lgandan keyin ham o'zgaradi: yangi qo'shilganlarga
+    botda darhol ma'lumot, ro'yxatdan chiqarilganlarga (xabar olgan bo'lsa) — bildirish."""
+    p = await _own(pid, uid)
+    if p["type"] not in ISHTIROK:
+        raise VisitError("bad_type", "Ishtirokchilar faqat tadbir va madaniy tashrifga belgilanadi")
+    if p["status"] not in (QORALAMA, TASDIQLANGAN):
+        raise VisitError("state", f"«{HOLATLAR[p['status']]}» holatidagi rejada ishtirokchilar o'zgartirilmaydi")
+    if p["status"] == TASDIQLANGAN and passed(p["visit_date"], p["end_time"]):
+        raise VisitError("past", "Tadbir o'tib ketgan — ishtirokchilar ro'yxati o'zgartirilmaydi")
+    want = list(dict.fromkeys(int(x) for x in sids or []))
+    old = {s["student_id"]: s for s in p["students"]}
+    gone = [s for k, s in old.items() if k not in want]
+    if gone:
+        await db.execute(f"DELETE FROM visit_students WHERE plan_id = ? AND student_id IN ({','.join('?' * len(gone))})",
+                         (pid, *(s["student_id"] for s in gone)))
+    added = await _attach(pid, [x for x in want if x not in old], scope, address=False)
+    if added or gone:
+        await _log(pid, "koordinator", "ishtirokchilar_ozgartirildi", uid, await staff_name(uid),
+                   detail=f"qo'shildi: {added}, chiqarildi: {len(gone)}; jami {len(old) - len(gone) + added} ta")
+    p = await get(pid)
+    if not added and not gone:
+        return p
+    if p["status"] == TASDIQLANGAN and p.get("sent_at"):
+        p["delivery"] = await _inform(bot, p, [s for s in p["students"] if s["student_id"] not in old])
+        for s in gone:
+            if s.get("tg_id") and s.get("notified_at"):
+                await _send(bot, s["tg_id"], event_text(p, f"<b>ℹ️ Siz {_nom(p).lower()} ishtirokchilari ro'yxatidan "
+                                                           "chiqarildingiz</b>", short=True))
+    return p
 
 
 async def _own(pid: int, uid: int | None) -> dict:
@@ -445,6 +493,8 @@ async def send(bot, pid: int, uid: int) -> dict:
     p = await get(pid)
     if nxt == TALABA:
         p["delivery"] = await _notify_students(bot, p)
+    elif p["type"] in ISHTIROK and p["students"]:
+        p["delivery"] = await _inform(bot, p, p["students"])
     return p
 
 
@@ -527,7 +577,7 @@ async def change_time(bot, pid: int, uid: int, d: str | None = None, start: str 
     if passed(new["visit_date"], new["end_time"]):
         raise VisitError("past", "Yangi vaqt o'tmishda bo'lmasligi kerak")
     await db.execute("""UPDATE visit_plans SET visit_date = ?, start_time = ?, end_time = ?, status = ?, student_deadline = ?,
-                        reminded_at = NULL, updated_at = ? WHERE id = ?""",
+                        reminded_at = NULL, eve_reminded_at = NULL, updated_at = ? WHERE id = ?""",
                      (new["visit_date"], new["start_time"], new["end_time"], nxt, _deadline(new), now_iso(), pid))
     if nxt == TALABA:
         await db.execute("""UPDATE visit_students SET response = ?, proposed_date = NULL, proposed_time = NULL,
@@ -539,9 +589,10 @@ async def change_time(bot, pid: int, uid: int, d: str | None = None, start: str 
     p = await get(pid)
     if nxt == TALABA:
         p["delivery"] = await _notify_students(bot, p, again=True)
-    elif p.get("sent_at"):  # aktual reja (tadbir va h.k.) — talabalar bo'lsa, yangi vaqt haqida
+    elif p.get("sent_at") and p["type"] in ISHTIROK:  # aktual tadbir — ishtirokchilarga yangi vaqt
+        text = event_text(p, f"<b>🔄 {_nom(p)} vaqti o'zgartirildi</b>", "Yangi vaqtni yozib qo'ying — oldidan eslatma boradi.")
         for s in p["students"]:
-            await _send(bot, s.get("tg_id"), f"<b>🔄 Tashrif vaqti o'zgartirildi</b>\n\n<b>Yangi vaqt:</b> {esc(p['when'])}")
+            await _send(bot, s.get("tg_id"), text)
     return p
 
 
@@ -583,9 +634,11 @@ async def cancel(bot, pid: int, uid: int, reason: str) -> dict:
         await _collapse(bot, pid, k)
     p = await get(pid)
     if p.get("sent_at"):
+        text = event_text(p, f"<b>❌ {_nom(p)} bekor qilindi</b>", f"<b>Sabab:</b> {esc(reason)}", short=True) \
+            if p["type"] in ISHTIROK else f"<b>❌ Tashrif bekor qilindi</b>\n\n{esc(p['when'])}\n<b>Sabab:</b> {esc(reason)}"
         for s in p["students"]:
             if s.get("tg_id"):
-                await _send(bot, s["tg_id"], f"<b>❌ Tashrif bekor qilindi</b>\n\n{esc(p['when'])}\n<b>Sabab:</b> {esc(reason)}")
+                await _send(bot, s["tg_id"], text)
     return p
 
 
@@ -637,6 +690,22 @@ async def open_for_student(sid: int) -> list[dict]:
         """SELECT p.* FROM visit_plans p JOIN visit_students vs ON vs.plan_id = p.id
            WHERE vs.student_id = ? AND p.status = ? AND vs.response IN (?, ?) ORDER BY p.visit_date""",
         (sid, TALABA, KUTILMOQDA, VAQT_TAKLIF))
+
+
+async def catch_up(bot, sid: int) -> int:
+    """Talaba botga endi ulandi: u belgilangan, hali o'tmagan aktual tadbir va madaniy tashriflar haqida xabar
+    (reja yuborilganda xabar yetmagan bo'lsa)."""
+    rows = await db.fetchall(
+        f"""SELECT p.id FROM visit_plans p JOIN visit_students vs ON vs.plan_id = p.id
+            WHERE vs.student_id = ? AND vs.notified_at IS NULL AND p.status = ? AND p.sent_at IS NOT NULL
+            AND p.type IN ({','.join('?' * len(ISHTIROK))}) AND p.visit_date >= ? ORDER BY p.visit_date, p.start_time""",
+        (sid, TASDIQLANGAN, *ISHTIROK, today().isoformat()))
+    n = 0
+    for r in rows:
+        p = await get(r["id"], full=False)
+        if p and not passed(p["visit_date"], p["end_time"]):
+            n += (await _inform(bot, p, [s for s in p["students"] if s["student_id"] == sid], quiet=True))["sent"]
+    return n
 
 
 # ---------------------------------------------------------------- bot xabarlari
@@ -720,15 +789,85 @@ async def _notify_students(bot, p: dict, again: bool = False) -> dict:
         if msg is not None:
             sent += 1
             await _remember(p["id"], "talaba", msg, s["student_id"])
-            await db.execute("UPDATE visit_students SET notified_at = ? WHERE plan_id = ? AND student_id = ?",
-                             (now_iso(), p["id"], s["student_id"]))
+            await _notified(p["id"], s["student_id"])
         else:
             missed.append(s)
-    if missed and bot is not None:
-        lines = [f"• {esc(s['full_name'])} — {await invite_url(bot, s['student_id'])}" for s in missed]
-        await _to_coordinator(bot, p, f"<b>⚠️ Botga ulanmagan talabalar</b>\n\n{esc(p['title'])} — {esc(p['when'])}\n\n"
-                                      "Quyidagilarga xabar yetmadi. Shaxsiy havolani talabaga yuboring (u ochsa, tashrif "
-                                      "so'rovi darhol keladi) yoki javobini o'zingiz panelda belgilang:\n\n" + "\n".join(lines))
+    await _report_missed(bot, p, missed, "Shaxsiy havolani talabaga yuboring (u ochsa, tashrif so'rovi darhol keladi) "
+                                         "yoki javobini o'zingiz panelda belgilang:")
+    return {"sent": sent, "missed": len(missed), "missed_names": [s["full_name"] for s in missed]}
+
+
+async def _notified(pid: int, sid: int) -> None:
+    await db.execute("UPDATE visit_students SET notified_at = ? WHERE plan_id = ? AND student_id = ?", (now_iso(), pid, sid))
+
+
+async def _report_missed(bot, p: dict, missed: list[dict], how: str) -> None:
+    """Botga ulanmagan talabalar — koordinatorga, shaxsiy havolalari bilan."""
+    if not missed or bot is None:
+        return
+    lines = [f"• {esc(s['full_name'])} — {await invite_url(bot, s['student_id'])}" for s in missed]
+    text = (f"<b>⚠️ Botga ulanmagan talabalar — {len(missed)} ta</b>\n\n{esc(p['title'])} — {esc(p['when'])}\n\n"
+            f"Quyidagilarga xabar yetmadi. {how}\n")
+    for line in lines:  # butun guruhlar belgilanganda ro'yxat uzun — Telegram chegarasidan (4096) oshmasin
+        if len(text) + len(line) > 3800:
+            await _to_coordinator(bot, p, text)
+            text = "<b>⚠️ Botga ulanmagan talabalar (davomi)</b>\n"
+        text += "\n" + line
+    await _to_coordinator(bot, p, text)
+
+
+# ---------------------------------------------------------------- tadbir va madaniy tashrif ishtirokchilari
+def _nom(p: dict) -> str:
+    return TURLAR.get(p["type"], "Tadbir")
+
+
+def _kun(d: str) -> str:
+    """«bugun», «ertaga» yoki sana (eslatma sarlavhasi uchun)."""
+    t = today()
+    if d == t.isoformat():
+        return "bugun"
+    if d == (t + timedelta(days=1)).isoformat():
+        return "ertaga"
+    return when({"visit_date": d, "start_time": ""})
+
+
+def event_text(p: dict, head: str, tail: str = "", short: bool = False) -> str:
+    """Ishtirokchiga xabar: nomi, sanasi va vaqti, joyi (+ koordinator va izoh)."""
+    lines = [head, "", f"<b>{esc(_nom(p))}:</b> {esc(p['title'])}", f"<b>Sana va vaqt:</b> {esc(when(p))}"]
+    if p.get("place"):
+        lines.append(f"<b>Joyi:</b> {esc(p['place'])}")
+    if not short:
+        lines.append(f"<b>Kurs koordinatori:</b> {esc(p.get('coordinator_name') or '')}")
+        if p.get("note"):
+            lines.append(f"<b>Izoh:</b> {esc(p['note'])}")
+    if tail:
+        lines += ["", tail]
+    return "\n".join(lines)
+
+
+def invite_text(p: dict) -> str:
+    from tashrif.sozlama import sozlama
+    icon = "🎭" if p["type"] == MADANIY else "🎉"
+    return event_text(p, f"<b>{icon} Siz {_nom(p).lower()} ishtirokchilari ro'yxatiga kiritildingiz</b>",
+                      "Belgilangan vaqtda yetib keling. " + ("Oldingi kuni va boshlanishidan oldin eslatma yuboriladi."
+                                                             if sozlama.ertaga_soat is not None else
+                                                             "Boshlanishidan oldin eslatma yuboriladi."))
+
+
+async def _inform(bot, p: dict, rows: list[dict], quiet: bool = False) -> dict:
+    """Ishtirokchilarga botda ma'lumot (javob so'ralmaydi); ulanmaganlari — koordinatorga havolalar bilan."""
+    sent, missed = 0, []
+    text = invite_text(p)
+    for s in rows:
+        msg = await _send(bot, s.get("tg_id"), text) if s.get("tg_id") else None
+        if msg is not None:
+            sent += 1
+            await _notified(p["id"], s["student_id"])
+        else:
+            missed.append(s)
+    if not quiet:
+        await _report_missed(bot, p, missed, f"Shaxsiy havolani talabaga yuboring — ochsa, botga ulanadi va "
+                                             f"{_nom(p).lower()} haqidagi xabar darhol keladi:")
     return {"sent": sent, "missed": len(missed), "missed_names": [s["full_name"] for s in missed]}
 
 
@@ -757,10 +896,11 @@ async def _notify_answer(bot, p: dict, s: dict, resp: str) -> None:
 
 # ---------------------------------------------------------------- eslatmalar (fon vazifasi)
 async def reminders(bot) -> dict:
-    """Joriy kurs: javob muddati o'tgan talabalarga eslatma (koordinatorga «shundayligicha tasdiqlash» tugmasi) va tashrifdan
-    REMINDER_HOURS_BEFORE soat oldin talabalar va koordinatorga eslatma (+ yo'l). Har biri bir marta."""
+    """Joriy kurs: javob muddati o'tgan talabalarga eslatma (koordinatorga «shundayligicha tasdiqlash» tugmasi); tadbir va
+    madaniy tashrif ishtirokchilariga oldingi kuni kechqurun (REMINDER_EVE_HOUR dan) eslatma; tashrifdan
+    REMINDER_HOURS_BEFORE soat oldin talabalar va koordinatorga eslatma (+ ijara manziliga yo'l). Har biri bir marta."""
     from tashrif.sozlama import sozlama
-    out = {"answer": 0, "visit": 0}
+    out = {"answer": 0, "visit": 0, "eve": 0}
     ts = now()
     for r in await db.fetchall("SELECT id, student_deadline FROM visit_plans WHERE status = ? AND student_deadline IS NOT NULL",
                                (TALABA,)):
@@ -787,6 +927,18 @@ async def reminders(bot) -> dict:
                                     _kb([[("✅ Shundayligicha tasdiqlash", cb("force", p["id"]))]]))
         await _remember(p["id"], "uzatish", msg)
         out["answer"] += len(quiet)
+    eve = sozlama.ertaga_soat
+    if eve is not None and ts.hour >= eve:  # ertangi tadbirlar — kechqurun bir marta
+        tom = (ts.date() + timedelta(days=1)).isoformat()
+        for r in await db.fetchall(
+                f"""SELECT id FROM visit_plans WHERE status = ? AND visit_date = ? AND eve_reminded_at IS NULL
+                    AND type IN ({','.join('?' * len(ISHTIROK))})""", (TASDIQLANGAN, tom, *ISHTIROK)):
+            await db.execute("UPDATE visit_plans SET eve_reminded_at = ? WHERE id = ?", (now_iso(), r["id"]))
+            p = await get(r["id"], full=False)
+            text = event_text(p, f"<b>⏰ Eslatma: ertaga — {_nom(p).lower()}</b>", "Vaqtida yetib kelishni rejalashtiring.")
+            for s in p["students"]:
+                if s.get("tg_id") and not _fresh(s.get("notified_at"), ts, 3):
+                    out["eve"] += bool(await _send(bot, s["tg_id"], text))
     edge = ts + timedelta(hours=sozlama.eslatma_soat)
     for r in await db.fetchall("SELECT id, visit_date, start_time FROM visit_plans WHERE status = ? AND reminded_at IS NULL",
                                (TASDIQLANGAN,)):
@@ -795,17 +947,33 @@ async def reminders(bot) -> dict:
             continue
         await db.execute("UPDATE visit_plans SET reminded_at = ? WHERE id = ?", (now_iso(), r["id"]))
         p = await get(r["id"], full=False)
+        kun = _kun(p["visit_date"])
         for s in p["students"]:
-            if s.get("tg_id") and s["response"] != RAD_ETDI:
-                await _send(bot, s["tg_id"], f"<b>⏰ Eslatma: bugun tashrif bor</b>\n\n<b>Vaqt:</b> {p['start_time']}–"
+            if not s.get("tg_id") or s["response"] == RAD_ETDI:
+                continue
+            if p["type"] in ISHTIROK:
+                if not _fresh(s.get("notified_at"), ts, 1):  # xabar hozirgina borgan bo'lsa — takrorlanmaydi
+                    await _send(bot, s["tg_id"], event_text(p, f"<b>⏰ Eslatma: {kun} — {_nom(p).lower()}</b>",
+                                                            "Kechikmasdan yetib keling.", short=True))
+            else:
+                await _send(bot, s["tg_id"], f"<b>⏰ Eslatma: {kun} tashrif bor</b>\n\n<b>Vaqt:</b> {p['start_time']}–"
                                              f"{p['end_time']}\n" + (f"<b>Manzil:</b> {esc(s['address'])}\n" if s.get("address") else "")
                             + f"<b>Kurs koordinatori:</b> {esc(p.get('coordinator_name') or '')}")
-        await _to_coordinator(bot, p, f"<b>⏰ Bugungi tashrif</b>\n\n{esc(p['title'])}\n{esc(p['when'])}"
+        await _to_coordinator(bot, p, f"<b>⏰ {kun.capitalize() if kun in ('bugun', 'ertaga') else 'Yaqinlashayotgan'}: "
+                                      f"{esc(_nom(p).lower())}</b>\n\n{esc(p['title'])}\n{esc(p['when'])}"
                                       + (f"\nTalabalar: {p['answers']['total']} ta" if p["students"] else ""))
         if p["type"] == IJARA:
             await send_route(bot, p["coordinator_id"], p, [s for s in p["students"] if s["response"] != RAD_ETDI])
         out["visit"] += 1
     return out
+
+
+def _fresh(iso: str | None, ts: datetime, hours: float) -> bool:
+    """Xabar oxirgi `hours` soat ichida yuborilganmi (eslatma takrorlanmasin)."""
+    try:
+        return bool(iso) and ts - datetime.fromisoformat(iso) < timedelta(hours=hours)
+    except ValueError:
+        return False
 
 
 async def loop(bot) -> None:
@@ -816,8 +984,9 @@ async def loop(bot) -> None:
             try:
                 with use_course(key):
                     n = await reminders(bot)
-                if n["answer"] or n["visit"]:
-                    log.info("[%s] Tashrif eslatmalari: javob %s, tashrif %s", key, n["answer"], n["visit"])
+                if n["answer"] or n["visit"] or n["eve"]:
+                    log.info("[%s] Tashrif eslatmalari: javob %s, tashrif %s, ertangi tadbir %s", key, n["answer"],
+                             n["visit"], n["eve"])
             except Exception:  # noqa: BLE001  (sikl to'xtab qolmasligi kerak)
                 log.exception("Tashrif eslatmalari (%s)", key)
         await asyncio.sleep(300)
@@ -1329,7 +1498,8 @@ async def report(uid: int | None, frm: str, to: str) -> dict:
 
 # ---------------------------------------------------------------- talabalar ro'yxati (reja tuzish uchun)
 async def pick_students(scope: set[str] | None, q: str = "") -> list[dict]:
-    """Ijara tashrifiga talaba tanlash: manzili, yashash turi, joyi va botga ulanganmi."""
+    """Rejaga talaba tanlash (ijara tashrifi, tadbir, madaniy tashrif): guruhi, manzili, yashash turi, joyi va botga
+    ulanganmi."""
     from utils import normalize_text
     rows = await db.fetchall(
         """SELECT s.id, s.full_name, s.name_norm, s.group_name, s.group_key, s.hemis_id, s.address, s.living, s.zone,

@@ -22,7 +22,7 @@ Telegram bot ota-onalarga farzandining qaysi kunlarda, qaysi fanlardan darsga qa
 
 **Kompyuter versiyasi:** kurs koordinatori va super-admin uchun brauzerdagi boshqaruv paneli — butun kurs bitta jadvalda (saralash, filtrlar), xabarlar va suhbat yonma-yon, so'rovlar, e'lon (uch tildagi ko'rinishi bilan), fayllarni sudrab yuklash, hisobotni yuklab olish; super-admin — barcha kurslar, kurslar va koordinatorlar, zaxira nusxa va xatolar jurnali. Kirish — botdagi «💻 Kompyuter versiyasi» tugmasi (parolsiz). Batafsil — «Kompyuter versiyasi» bo'limi.
 
-**Tashriflar:** ijara xonadonlariga tashrif, madaniy tashrif, tadbir va koordinatorlik soati rejalari — talaba botda tasdiqlaydi yoki boshqa vaqt taklif qiladi, koordinatorga manzilga qanday borilishi (bekat, avtobus, metro), talabalar yashash joylari xaritasi, dalolatnoma (telefonda imzo, bir betli Word) va hisobot (batafsil — «Tashriflar» bo'limida).
+**Tashriflar:** ijara xonadonlariga tashrif, madaniy tashrif, tadbir va koordinatorlik soati rejalari — talaba botda tasdiqlaydi yoki boshqa vaqt taklif qiladi, tadbir va madaniy tashrifga belgilangan talabalarga botda nomi, joyi, vaqti va eslatma boradi, koordinatorga manzilga qanday borilishi (bekat, avtobus, metro), talabalar yashash joylari xaritasi, dalolatnoma (telefonda imzo, bir betli Word) va hisobot (batafsil — «Tashriflar» bo'limida).
 
 **Universitet tizimi bilan integratsiya:** davomat va dars jadvali «Manage» tizimidan avtomatik, real vaqtga yaqin olinadi (API kaliti yoki webhook; javob ko'rinishi va shabloni qat'iy emas). Batafsil — «Integratsiya» bo'limi.
 
@@ -620,7 +620,21 @@ qoralama ─┬─ ijara tashrifi ─► talabalar tasdig'i (botda) ─┬─►
 - Tashrifdan `REMINDER_HOURS_BEFORE` (3) soat oldin talabalar va koordinatorga eslatma (har biri bir marta).
 - Har bir harakat jurnalga yoziladi (kim, qachon, nima); hisobotga faqat tasdiqlangan va o'tkazilgan rejalar kiradi.
 
-**Talabani botga ulash.** Talaba ota-ona menyusiga kirmaydi — faqat tashrif xabarlarini oladi. Ikki yo'l: talabaning
+**Tadbir va madaniy tashrif ishtirokchilari.** Reja tuzishda ishtirokchi talabalar belgilanadi (ixtiyoriy): qidiruv
+orqali bittalab yoki «Butun guruhni qo'shish» tugmasi bilan. Tanlanganlar guruhlab ko'rinadi, botga ulanganlari soni
+bilan. Talabadan javob so'ralmaydi — botga faqat ma'lumot va eslatma boradi:
+
+- reja aktual bo'lishi bilan: 🎉 tadbir / 🎭 madaniy tashrif — **nomi, sanasi va vaqti, joyi**, kurs koordinatori, izoh;
+- oldingi kuni kechqurun (`REMINDER_EVE_HOUR`, standart 18:00 dan) — «⏰ Eslatma: ertaga»;
+- boshlanishidan `REMINDER_HOURS_BEFORE` soat oldin — «⏰ Eslatma: bugun» (joyi bilan);
+- vaqt o'zgarsa — yangi vaqt, bekor qilinsa — sababi bilan.
+
+Xabar hozirgina borgan talabaga eslatma takrorlanmaydi. Aktual rejada ham ishtirokchilar o'zgaradi (reja oynasi →
+«Ishtirokchilar» → «O'zgartirish»): yangi qo'shilganlarga darhol xabar boradi, ro'yxatdan chiqarilganlarga — bildirish.
+Reja oynasida har bir ishtirokchining holati: «xabar yetdi», «botda» yoki «ulanmagan» (+ shaxsiy havola). Botga
+ulanmaganlar ro'yxati koordinatorga havolalari bilan keladi; talaba havolani keyinroq ochsa, o'tmagan tadbir haqidagi
+xabar unga darhol keladi. Yo'l ma'lumoti («Qanday boriladi») — faqat ijara tashrifida.
+**Talabani botga ulash.** Talaba ota-ona menyusiga kirmaydi — faqat tashrif va tadbir xabarlarini oladi. Ikki yo'l: talabaning
 **shaxsiy havolasi** (talaba kartasi yoki reja oynasidagi «Havola» — `t.me/<bot>?start=v_...`; ochsa, javob kutayotgan
 tashriflar darhol keladi) yoki ota-onasini **o'z raqami bilan tasdiqlagan** talaba avtomatik taniladi. Botga ulanmagan
 talabalar bo'lsa, rejani yuborganda koordinatorga ularning havolalari ro'yxati keladi.
@@ -899,7 +913,8 @@ guard.py          — talabalarni aniqlash (raqam va Telegram guruhlar bo'yicha)
 redact.py         — rasmiy hujjatlarda boshqa talabalar ma'lumotlarini qora rang bilan yopish
 discipline.py     — chora ko'rish: chegaraga yetganlar, farmoyish/buyruqlar, hujjatlar, tarix, signal
 docxfill.py       — Word (.docx) shablonlarini to'ldirish ({{KALIT}} belgilar, jadval satrlari)
-visits.py         — tashriflar: rejalar, holatlar, talaba javoblari, eslatmalar, dalolatnoma, yashash joylari, hisobot
+visits.py         — tashriflar: rejalar, holatlar, talaba javoblari, tadbir ishtirokchilari, eslatmalar, dalolatnoma,
+                    yashash joylari, hisobot
 visitsapi.py      — «Tashriflar» bo'limi API si (boshqaruv paneli)
 handlers/visits.py — tashrif bot oqimlari: talaba havolasi va javoblari, /yol (turgan joydan yo'l)
 tashrif/          — «Qanday boriladi»: manzilni xaritadan topish, bekatlar, metro, yo'nalish (tashrif-py dan), tuman

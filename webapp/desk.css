@@ -831,6 +831,23 @@ dialog.vdlg.vroute[open] { display: flex; flex-direction: column; }
 .vpick-sel { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .vpick-sel li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 6px 10px; border-radius: 9px; background: var(--navy-50); font-size: 13.5px; }
 .vpick-sel li small { color: var(--muted); }
+/* tadbir ishtirokchilari: guruh tugmalari va tanlanganlar (guruhlab) */
+.vgrp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 2px; }
+.vgrp .sub-l { margin-right: 2px; }
+.vgrp .btn small { color: var(--faint); font-weight: 600; margin-left: 2px; }
+.vpick-box { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.vsel-h, .vsel-gh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vsel-h .grow, .vsel-gh .grow { flex: 1; }
+.vsel-g { border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; }
+.vsel-gh small { color: var(--muted); }
+.vsel-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.vchipx { display: inline-flex; align-items: center; gap: 2px; height: 26px; padding: 0 2px 0 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-2); font-size: 12.5px; }
+.vchipx.on { background: var(--navy-50); border-color: transparent; }
+.vchipx button { border: 0; background: transparent; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: var(--muted); padding: 0; }
+.vchipx button:hover { background: var(--line-2); color: var(--ink); }
+.vchipx button svg.i { width: 12px; height: 12px; }
+.vsts.compact .vst { padding: 6px 0; }
+.vsts.compact .vst-h { align-items: center; }
 /* «Qanday boriladi» */
 .rtbar { display: flex; align-items: center; gap: 8px; padding: 10px 18px; flex-wrap: wrap; }
 .rtbar .me { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
