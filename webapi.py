@@ -759,13 +759,14 @@ def _row(x: dict) -> dict:
             "action": absence.action_for(x["level"]) if x["flags"]["att"] else None,
             "debts": [d["subject"] for d in x["debts"]], "gpa": _gpa(x["gpa"]),
             "kontrakt": (x["pays"]["kontrakt"] or {}).get("debt") if x["flags"]["kontrakt"] else None,
-            "trimestr": (x["pays"]["trimestr"] or {}).get("debt") if x["flags"]["trimestr"] else None}
+            "trimestr": (x["pays"]["trimestr"] or {}).get("debt") if x["flags"]["trimestr"] else None,
+            "handled": x.get("handled")}  # davomat chegarasi bo'yicha chora ko'rilgan (asl nusxasi bilan) — muammoli emas
 
 
 @staff_route
 async def api_staff_panel(request):
     students = scope_students(await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name"))
-    sts = await status.all_statuses(students)
+    sts = await status.staff_statuses(students)
     linked = {r["student_id"] for r in await db.fetchall(
         "SELECT DISTINCT ps.student_id FROM parent_students ps JOIN parents p ON p.tg_id = ps.parent_id WHERE p.active = 1")}
     rows = [_row(x) for x in sts]
@@ -779,7 +780,7 @@ async def api_staff_panel(request):
                "gpa": sum(1 for r in rows if r["flags"]["gpa"]), "gpa_min": GPA_MIN,
                "kontrakt": {"count": len(k), "sum": sum(r["kontrakt"] for r in k)},
                "trimestr": {"count": len(t), "sum": sum(r["trimestr"] for r in t)},
-               "multi": sum(1 for r in rows if r["problems"] >= 3),
+               "multi": sum(1 for r in rows if r["problems"] >= 3), "handled": sum(1 for r in rows if r["handled"]),
                "unread": sum(i["unread"] for i in inbox), "link_requests": pending,
                "top": sorted([r for r in rows if r["problems"]], key=lambda r: (-r["problems"], r["name"]))[:30],
                "updated": await _last_update(), "scope": scope_label(request["user"]["id"]),
@@ -792,7 +793,7 @@ async def _student_rows(q: str = "", limit: int = 3000) -> list[dict]:
     if q:
         students = [s for s in students if q in (s.get("name_norm") or "") or q == normalize_text(s.get("hemis_id") or "")
                     or name_score(q, s.get("name_norm") or "") >= 0.8]
-    return await _with_measures([_row(x) for x in await status.all_statuses(students[:max(400, limit)])])
+    return await _with_measures([_row(x) for x in await status.staff_statuses(students[:max(400, limit)])])
 
 
 async def _with_measures(rows: list[dict]) -> list[dict]:
@@ -816,10 +817,12 @@ async def api_staff_students(request):
         limit = max(1, min(int(request.query.get("limit", 200)), 3000))
     except ValueError:
         limit = 200
-    sts = await status.all_statuses(students[:max(400, limit)])
+    sts = await status.staff_statuses(students[:max(400, limit)])
     rows = await _with_measures([_row(x) for x in sts])
     if flt in ("att", "acad", "gpa", "kontrakt", "trimestr"):
         rows = [r for r in rows if r["flags"][flt]]
+    elif flt == "chora":  # rasman chora ko'rilganlar
+        rows = [r for r in rows if r["measures"]]
     elif flt == "prob":
         rows = sorted([r for r in rows if r["problems"]], key=lambda r: -r["problems"])
     return ok({"items": rows[:limit], "total": len(rows)})
@@ -837,6 +840,12 @@ async def api_staff_student(request):
     data["subjects"] = await _subject_rows("s.id = ?", [st["id"]])
     import discipline
     data["measures"] = await discipline.student_measures(st["id"])
+    a = data.get("attendance") or {}
+    h = (await discipline.confirmed_att({st["id"]})).get(st["id"])
+    if h and a.get("level", -1) >= 0 and h["level"] >= a["level"]:  # chora ko'rilgan — davomat chegarasi «masala» emas
+        icon = absence.level_icon(a["level"]) + " "  # chegara qatori va davomat bo'yicha chora qatori («Ko'rilgan choralar»da bor)
+        data["issues"] = [i for i in data["issues"] if not i.startswith(icon) and not (i.startswith("📄 ") and i.endswith("— davomat"))]
+        data["handled"] = h
     return ok(data)
 
 

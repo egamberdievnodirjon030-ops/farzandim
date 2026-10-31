@@ -78,6 +78,24 @@ async def student_status(st: dict) -> dict:
                  await db.academic_debts_for(st["id"]), await db.gpa_for(st["id"]))
 
 
+async def mark_handled(sts: list[dict]) -> list[dict]:
+    """Xodimlar ro'yxatlari (kurs holati, «Talabalar», hisobotlar) uchun: davomat chegarasi bo'yicha chora rasman
+    ko'rilgan va imzolangan asl nusxasi yuklangan talaba muammoli hisoblanmaydi — flags.att o'chiriladi, x["handled"] da
+    chora. Keyingi chegaradan oshsa (masalan, ogohlantirishdan keyin hayfsan chegarasi) — yana muammoli."""
+    import discipline
+    done = await discipline.confirmed_att({x["student"]["id"] for x in sts if x["flags"]["att"]})
+    for x in sts:
+        h = done.get(x["student"]["id"])
+        if x["flags"]["att"] and h and h["level"] >= x["level"]:
+            x["handled"] = h
+            x["flags"] = {**x["flags"], "att": False}
+    return sts
+
+
+async def staff_statuses(students: list[dict]) -> list[dict]:
+    return await mark_handled(await all_statuses(students))
+
+
 async def all_statuses(students: list[dict]) -> list[dict]:
     since = semester_start().isoformat()
     t = today()

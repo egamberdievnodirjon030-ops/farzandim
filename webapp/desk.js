@@ -398,7 +398,9 @@ async function pPanel() {
     ${kpi({ href: '#/students', icon: 'users', c: 'people', label: 'Talabalar', value: num(d.total, 0), unit: 'ta',
       sub: `${ic('link')} ota-onasi ulangan: <b>${d.linked}</b> · ${cover}%`, meter: cover })}
     ${kpi({ href: '#/students?f=att', icon: 'calx', c: 'att', label: 'Davomat muammosi', value: d.att, unit: 'ta', state: probState(d.att),
-      sub: d.att ? `chegaraga yetganlar · ${share(d.att)}` : 'chegaraga yetgan talaba yo‘q' })}
+      title: d.handled ? `Chora ko‘rilgan (imzolangan asl nusxasi bilan) ${d.handled} ta talaba bu yerda hisoblanmaydi — ular «Chora ko‘rilganlar»da` : '',
+      sub: (d.att ? `<span class="ln">chegaraga yetgan, chora kutilmoqda · ${share(d.att)}</span>` : '<span class="ln">chora kutayotgan talaba yo‘q</span>')
+        + (d.handled ? `<span class="ln">${ic('shield')} chora ko‘rilgan: <b>${d.handled}</b> ta</span>` : '') })}
     ${ch ? kpi({ href: '#/chora?tab=hist', icon: 'shield', c: 'risk', label: 'Chora ko‘rilganlar', value: ch.kpi.students, unit: 'ta',
       state: ch.new ? 'bad' : 'ok', title: `O‘quv yilida jami ${ch.kpi.total} ta chora`,
       sub: `<span class="ln">ogohlantirish: <b>${ch.kpi.ogohlantirish}</b> · hayfsan: <b>${ch.kpi.hayfsan}</b></span>${ch.new ? `<span class="ln">chora kutilmoqda: <b>${ch.new}</b> ta</span>` : ''}` }) : ''}
@@ -479,12 +481,13 @@ function issueChips(r) {
   if (r.flags.gpa) out.push(`<span class="chip bordo" title="Kursdan kursga o‘tmaydi">${ic('cap')}GPA ${gpaFmt(r.gpa)}</span>`);
   if (r.flags.kontrakt) out.push(`<span class="chip warn" title="Kontrakt qarzi: ${money(r.kontrakt)}">${ic('dollar')}${mlnPlain(r.kontrakt)} so‘m</span>`);
   if (r.flags.trimestr) out.push(`<span class="chip warn" title="Trimestr qarzi: ${money(r.trimestr)}">${ic('receipt')}${mlnPlain(r.trimestr)} so‘m</span>`);
+  if (r.handled) out.push(`<span class="chip ok" title="Davomat bo‘yicha chora ko‘rilgan, imzolangan asl nusxasi yuklangan: ${esc(r.handled.title)}${r.handled.number ? ' № ' + esc(r.handled.number) : ''}">${ic('shield')}chora ko‘rilgan</span>`);
   return out.join('') || '<span class="dash">—</span>';
 }
 
 /* ================================================================ talabalar */
 const FILTERS = [['', 'Hammasi', 'users'], ['prob', 'Muammoli', 'flame'], ['att', 'Davomat', 'calx'], ['acad', 'Akademik qarz', 'bookx'],
-  ['gpa', 'GPA past', 'cap'], ['kontrakt', 'Kontrakt', 'dollar'], ['trimestr', 'Trimestr', 'receipt']];
+  ['gpa', 'GPA past', 'cap'], ['kontrakt', 'Kontrakt', 'dollar'], ['trimestr', 'Trimestr', 'receipt'], ['chora', 'Chora ko‘rilgan', 'shield']];
 const COL_IC = {};  // ustun sarlavhalarida belgi yo'q — jadval ekranga sig'sin (belgilar kataklarda)
 const COLS = [['name', 'Talaba'], ['group', 'Guruh'], ['percent', 'Davomat'], ['action', 'Chora'],
   ['debts', 'Akademik qarz'], ['gpa', 'GPA', 'r'], ['kontrakt', 'Kontrakt', 'r'], ['trimestr', 'Trimestr', 'r'], ['problems', 'Masala', 'r']];
@@ -495,7 +498,7 @@ async function loadStudents(force = false) {
   S.stu = { rows: d.items }; S.stuCourse = S.course;
   return S.stu;
 }
-function matchFilter(r, f) { return !f || (f === 'prob' ? r.problems > 0 : r.flags[f]); }
+function matchFilter(r, f) { return !f || (f === 'prob' ? r.problems > 0 : f === 'chora' ? (r.measures || []).length > 0 : r.flags[f]); }
 async function loadAllStudents(force = false) {
   if (!force && S.stuAll) return S.stuAll;
   const d = await api('/api/super/students');
@@ -603,7 +606,8 @@ async function openStudent(id, course = null) {
       <dl><dt>Guruh</dt><dd>${esc(c.group)}</dd><dt>Kurs</dt><dd>${esc(c.year ? c.year + '-kurs' : '—')}</dd><dt>Fakultet</dt><dd>${esc(c.faculty || '—')}</dd></dl>
       <div class="tags">${c.hemis_id ? `<span>HEMIS ${esc(c.hemis_id)}</span>` : ''}${c.payment_form ? `<span>${esc(c.payment_form)}</span>` : ''}</div></div>
     ${d.issues && d.issues.length ? `<div class="note bordo">${ic('alert')}<span><b>${d.issues.length} ta masala:</b><br>${d.issues.map(safeHtml).join('<br>')}</span></div>`
-      : `<div class="note ok">${ic('ok')}<span>Hammasi joyida — davomat, baholar va to‘lovlar bo‘yicha masala yo‘q.</span></div>`}
+      : d.handled ? '' : `<div class="note ok">${ic('ok')}<span>Hammasi joyida — davomat, baholar va to‘lovlar bo‘yicha masala yo‘q.</span></div>`}
+    ${d.handled ? `<div class="note ok">${ic('shield')}<span><b>Davomat bo‘yicha chora ko‘rilgan:</b> ${esc(d.handled.title)}${d.handled.number ? ' № ' + esc(d.handled.number) : ''}${d.handled.date ? ', ' + dmy(d.handled.date) : ''} — imzolangan asl nusxasi yuklangan. Talaba muammolilar ro‘yxatida emas, «Chora ko‘rilganlar»da (keyingi chegaradan oshsa — yana muammoli).</span></div>` : ''}
     <div class="mini">
       <div><div class="k">Davomat</div><div class="v">${a && a.percent != null ? a.percent + '%' : '—'}</div><div class="s">${a ? 'sababsiz: ' + pairs(a.counted_hours) : 'ma’lumot yo‘q'}</div></div>
       <div><div class="k">GPA${d.gpa_low ? ` <span class="chip bordo" style="height:20px">${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi</span>` : ''}</div><div class="v">${d.gpa != null ? gpaFmt(d.gpa) : '—'}<small style="font-size:14px;color:var(--muted)"> / 5</small></div><div class="s">${d.academic.count ? d.academic.count + ' ta akademik qarz' : 'akademik qarz yo‘q'}</div></div>

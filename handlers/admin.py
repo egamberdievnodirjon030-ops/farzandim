@@ -2198,7 +2198,7 @@ async def _panel_students(f: str) -> list[dict]:
 
 
 async def _panel_text(f: str) -> str:
-    sts = await status.all_statuses(await _panel_students(f))
+    sts = await status.staff_statuses(await _panel_students(f))
     who = esc(scope_label(current_user.get()))
     if not sts:
         return "Talabalar topilmadi" + (f" ({esc(f)})" if f else "") + ".\n" + who
@@ -2210,6 +2210,7 @@ async def _panel_text(f: str) -> str:
     cnt = {k: sum(1 for x in sts if x["flags"][k]) for k in FLAG_ICON}
     total = {k: sum(x["pays"][k]["debt"] for x in sts if x["flags"][k]) for k in ("kontrakt", "trimestr")}
     many = sum(1 for x in sts if sum(x["flags"].values()) >= 3)
+    handled = sum(1 for x in sts if x.get("handled"))
     ts = await last_update(*UPDATE_KEYS["all"])
     return "\n".join([
         f"📊 <b>Kurs holati</b>{' — ' + esc(f) if f else ''}", who, "",
@@ -2220,7 +2221,8 @@ async def _panel_text(f: str) -> str:
         f"🎓 GPA {fmt_limit(GPA_MIN)} dan past (kursdan kursga o'tmaydi): <b>{cnt['gpa']}</b>",
         f"💰 Kontrakt qarzdorlar: <b>{cnt['kontrakt']}</b>" + (f" (jami {fmt_money(total['kontrakt'])})" if cnt["kontrakt"] else ""),
         f"💳 Trimestr qarzdorlar: <b>{cnt['trimestr']}</b>" + (f" (jami {fmt_money(total['trimestr'])})" if cnt["trimestr"] else ""),
-        f"🚫 Davomat muammosi borlar: <b>{cnt['att']}</b> ({fmt_pairs(absence.LEVELS[0])} va undan ko'p, {absence.COUNTED_LABEL})",
+        f"🚫 Davomat muammosi borlar: <b>{cnt['att']}</b> ({fmt_pairs(absence.LEVELS[0])} va undan ko'p, {absence.COUNTED_LABEL})"
+        + (f"\n✅ Chora ko'rilgan (asl nusxasi bilan, muammolilar ro'yxatidan chiqqan): <b>{handled}</b>" if handled else ""),
         f"🔴 3+ muammoli talabalar: <b>{many}</b>",
     ] + await _dynamics_lines(f) + ([f"\n🕐 Oxirgi yangilanish: {fmt_dt(ts)}"] if ts else []) + ["\nRo'yxatni ochish uchun tugmani bosing 👇"])
 
@@ -2255,7 +2257,7 @@ async def cb_panel(cb: CallbackQuery, callback_data: PanelCb) -> None:
         except TelegramBadRequest:
             pass
         return
-    sts = await status.all_statuses(await _panel_students(f))
+    sts = await status.staff_statuses(await _panel_students(f))
     if v == "prob":
         items = sorted((x for x in sts if any(x["flags"].values())),
                        key=lambda x: (-sum(x["flags"].values()), x["student"]["full_name"]))

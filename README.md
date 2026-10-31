@@ -582,6 +582,17 @@ Kompyuter versiyasida (boshqaruv paneli) **«Chora ko'rish»** bo'limi: davomat 
 2. **Dekan farmoyishi / universitet buyrug'i** — 1-bosqich asosida: hujjatdagi «Asos:» qatori avtomatik yoziladi (masalan, «kurs koordinatori N.Egamberdiyevning 2026-yil 22-oktabrdagi bildirishnomasi», «talabalarning tushuntirish xatlari, … dalolatnoma»; hayfsanda — avvalgi «dekanning … 17-sonli farmoyishi» ham). Dekan imzolagach **«Imzolangan farmoyishni (buyruqni) yuklash (PDF)»** — fayl, raqami va sanasi bitta oynada; yuklanishi bilan chora rasman ko'rilgan hisoblanadi va **ota-onasi botga ulangan talabalarga hujjat darhol yuboriladi** (har biriga faqat o'z farzandi — boshqalar yopilgan; ulanmaganlarniki saqlanadi). Imzolangan PDF siz (faqat raqam va sana bilan) farmoyish/buyruq chiqarilmaydi; 1-bosqichsiz ham.
 3. **Ota-onaga xat** — imzolangan farmoyish/buyruq (PDF) yuklangach ochiladi; farmoyish/buyruq raqami va sanasi bilan («…17-sonli farmoyishi bilan “Ogohlantirish” e'lon qilindi»), har bir talabaga alohida. «Xatlar yuborildi» — har bir xatning chiquvchi raqami va sanasi (xatga yoziladi); ota-onalarga bot orqali xabar va (yuklangan bo'lsa) imzolangan xat PDF nusxasi shu paytda boradi.
 
+**Chora ko'rilgan talaba — muammolilar ro'yxatidan chiqadi.** Davomat chegarasi bo'yicha chora (dekan ogohlantirishi,
+hayfsan) chiqarilib, **imzolangan asl nusxasi (PDF) yuklangan** bo'lsa, talaba endi «muammoli» hisoblanmaydi: «Kurs
+holati»dagi «Davomat muammosi», «E'tibor talab qiladigan talabalar», «3+ masalali», «Talabalar» → «Muammoli» va
+«Davomat» filtrlari, hisobot (Excel/PDF), «Barcha kurslar» va botdagi «Kurs holati»dan chiqadi va **«Chora
+ko'rilganlar»**da bo'ladi (kurs holati kartasi; «Talabalar» → **«Chora ko'rilgan»** filtri; «Davomat muammosi» kartasida
+«chora ko'rilgan: N ta»). Talaba kartasida — «Davomat bo'yicha chora ko'rilgan: … № …» izohi. Boshqa muammolari (akademik
+qarz, GPA, kontrakt, trimestr) bo'lsa — ular bo'yicha ro'yxatda qoladi («chora ko'rilgan» belgisi bilan). Keyingi chegaradan
+oshsa (ogohlantirishdan keyin hayfsan chegarasi) yoki asl nusxa o'chirilsa — yana muammoli; o'tgan semestrdagi chora
+joriy semestr chegarasiga hisoblanmaydi. Farmoyish/buyruq chiqmaydigan chegaralar (birinchisi — dekan nomiga tushuntirish xati,
+oxirgisi — talabalar safidan chetlatish) muammoli bo'lib qoladi. Ota-ona ilovasi o'zgarmaydi.
+
 Bosqich «Hujjatlar» yorlig'idagi kartada, «Chegaraga yetganlar» ro'yxatida («1-bosqich: asos kutilmoqda» va h.k.), talabaning hujjatlari oynasida va «Chora ko'rilganlar»da (ota-onaga xat yuborilgan/yuborilmagan) ko'rinadi.
 
 Chegaralar `ABSENCE_WARN_LEVELS` dagi 2- va 3-qiymat (36, 54). Soatlar Manage'dan (yoki HEMIS statistikasi / kunlik davomatdan), trimestr qarzi — oxirgi «Trimestr qarzdorligi» hisobotidan olinadi.

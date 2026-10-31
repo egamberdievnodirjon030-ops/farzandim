@@ -1329,6 +1329,35 @@ async def bulk_measures() -> dict[int, list[dict]]:
     return out
 
 
+async def confirmed_att(sids: set[int] | None = None) -> dict[int, dict]:
+    """Davomat chegarasi bo'yicha shu semestrda rasman ko'rilgan va imzolangan asl nusxasi (PDF) yuklangan choralar:
+    talaba → eng yuqori chora (daraja — absence.LEVELS tartibi: ogohlantirish 0, hayfsan 1). Bunday talaba chegarasi
+    shu darajadan oshmaguncha «muammoli» emas — «Chora ko'rilganlar»da (status.mark_handled)."""
+    rows = await db.fetchall(
+        """SELECT c.id, c.student_id, c.measure, c.order_id, o.number, o.date FROM disc_cases c
+           JOIN disc_orders o ON o.id = c.order_id
+           WHERE c.status = 'issued' AND o.status = 'issued' AND c.ground = 'davomat' AND c.measure IN ('ogohlantirish', 'hayfsan')
+             AND COALESCE(o.date, substr(c.created_at, 1, 10)) >= ?""", (semester_start().isoformat(),))
+    rows = [r for r in rows if sids is None or r["student_id"] in sids]
+    if not rows:
+        return {}
+    signed_o, signed_c = set(), set()
+    for f in await db.fetchall("SELECT order_id, case_id, kind, name FROM disc_files WHERE lower(name) LIKE '%.pdf'"):
+        if f["order_id"] and not f["case_id"] and f["kind"] in ORIGINAL_ORDER:
+            signed_o.add(f["order_id"])
+        elif f["case_id"] and f["kind"] == "imzolangan":  # talabaning o'z ko'chirmasi
+            signed_c.add(f["case_id"])
+    out: dict[int, dict] = {}
+    for r in rows:
+        if r["order_id"] not in signed_o and r["id"] not in signed_c:
+            continue
+        lvl = MEASURES[r["measure"]]["level"]
+        if r["student_id"] not in out or lvl > out[r["student_id"]]["level"]:
+            out[r["student_id"]] = {"level": lvl, "measure": r["measure"], "title": MEASURES[r["measure"]]["title"],
+                                    "number": r["number"], "date": r["date"]}
+    return out
+
+
 CASE_STATES = {"asked": "Sababi so‘ralgan", "excused": "Sababli deb topilgan", "removed": "Ro‘yxatdan o‘chirilgan",
                "draft": "Hujjat tayyorlanmoqda", "issued": "Chiqarilgan", "cancelled": "Bekor qilingan"}
 

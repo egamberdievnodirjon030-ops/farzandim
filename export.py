@@ -35,7 +35,7 @@ async def collect(f: str = "") -> dict:
         course = parse_course(f) if ("kurs" in f.lower() or f.strip().isdigit()) else None
         gk = group_key(f)
         students = [s for s in students if (course and s["course"] == course) or (not course and s["group_key"] == gk)]
-    sts = await status.all_statuses(students)
+    sts = await status.staff_statuses(students)  # chora ko'rilganlar (asl nusxasi bilan) — muammoli emas
     linked = {r["student_id"] for r in await db.fetchall(
         """SELECT DISTINCT ps.student_id FROM parent_students ps JOIN parents p ON p.tg_id = ps.parent_id
            WHERE p.active = 1""")}
