@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS disc_orders (
     deadline    TEXT,                       -- xat: qarzni to'lash muddati
     basis_kind  TEXT,                       -- 1-bosqich: 'bildirishnoma' — kurs koordinatori bildirishnomasi dekanga topshirilgan
     basis_date  TEXT, basis_number TEXT,    -- bildirishnoma sanasi va (kiruvchi) raqami
+    retro       INTEGER,                    -- avval imzolangan chora qayd etildi (1-bosqich hujjatlarisiz)
     archived_at TEXT,                       -- yakunlangach «Hujjatlar» dan tozalangan (tarixda qoladi)
     created_at  TEXT NOT NULL, created_by INTEGER,
     issued_at   TEXT, issued_by INTEGER
@@ -736,7 +737,7 @@ class Database:
             await self.conn.execute("UPDATE students SET rent_address = address WHERE living = 'ijara' "
                                     "AND TRIM(COALESCE(address, '')) <> ''")
         for t, add in (("disc_orders", (("deadline", "TEXT"), ("basis_kind", "TEXT"), ("basis_date", "TEXT"), ("basis_number", "TEXT"),
-                                        ("archived_at", "TEXT"))),
+                                        ("archived_at", "TEXT"), ("retro", "INTEGER"))),
                        ("disc_cases", (("amount", "REAL"), ("as_of", "TEXT"), ("basis", "TEXT"), ("basis_at", "TEXT"),
                                        ("letter_no", "TEXT"), ("letter_date", "TEXT"), ("letter_at", "TEXT"))),
                        ("disc_files", (("sent_doc_id", "INTEGER"), ("sent_at", "TEXT"), ("send_note", "TEXT"),

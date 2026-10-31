@@ -749,8 +749,16 @@ function autoMsg(a, kind, o) {
   return '';
 }
 const fileTone = f => (f.sent_at ? 'ok' : f.send_note ? 'warn' : 'muted');
+const CH_ERR = { no_basis: 'Avval 1-bosqich: imzolangan bildirishnoma (PDF) yoki tushuntirish xatlari', no_signed: 'Avval imzolangan nusxa (PDF) yuklansin',
+  not_pdf: 'Imzolangan nusxa PDF bo‘lsin', no_number: 'Raqami va sanasini kiriting', too_big: 'Fayl juda katta (20 MB gacha)' };
 /* dalolatnomaning o'z raqami (arxivda qidirish uchun); bekor qilinsa — null (yuklanmaydi) */
 async function askDocNo(kind) {
+  if (kind === 'bildirishnoma') {
+    const v = await formDlg('Imzolangan bildirishnoma', `<p>Kurs koordinatori bildirishnomasi — 1-bosqich asosi. Sanasi farmoyish/buyruqdagi «Asos:» qatoriga yoziladi; yuklangach dekan bosqichiga o‘tiladi.</p><div class="cols2">
+      <label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${todayIso()}" required></label>
+      <label class="field"><span>Kiruvchi raqami (bo‘lsa)</span><input class="input" name="number" placeholder="Masalan: 45"></label></div>`, 'Yuklash');
+    return v ? { number: v.get('number') || '', date: v.get('date') || '' } : null;
+  }
   if (kind !== 'dalolatnoma') return {};
   const v = await formDlg('Dalolatnoma — raqam va sana', `<p>Asl nusxa arxivda shu raqam bo‘yicha topiladi (raqami bo‘lmasa — bo‘sh qoldiring).</p><div class="cols2">
     <label class="field"><span>Raqami</span><input class="input" name="number" placeholder="Masalan: 3"></label>
@@ -952,7 +960,8 @@ function stagedCard(o) {
   const docT = o.measure === 'hayfsan' ? 'Hayfsan — universitet buyrug‘i' : o.measure === 'ogohlantirish' ? 'Dekan ogohlantirishi — dekan farmoyishi' : `${M.t} — qaror`;
   const fchips = list => list.map(f => `<span class="chip ${fileTone(f)}" title="${esc(f.send_note || (ORIG.includes(f.kind) ? 'Chora chiqarilgach ota-onalarga avtomatik yuboriladi' : ''))}">${ic(f.sent_at ? 'send' : 'file')}<a href="#" data-file="${f.id}">${esc(FKIND[f.kind] || f.kind)}: ${esc(f.name)}</a><button data-fdel="${f.id}" aria-label="O‘chirish">${ic('x')}</button></span>`).join('');
   const common = kinds => o.files.filter(f => !f.case_id && kinds.includes(f.kind));
-  const upl = (kind, label) => `<label class="btn sm ghost">${ic('upload')} ${label}<input type="file" data-upk="${kind}" hidden multiple></label>`;
+  const upl = (kind, label, cls = 'ghost', pdf = false) => `<label class="btn sm ${cls}">${ic('upload')} ${label}<input type="file" data-upk="${kind}" ${pdf ? 'accept=".pdf,application/pdf"' : ''} hidden multiple></label>`;
+  const OD = S.order, unsignedCase = id => (B.unsigned || []).includes(id);
   const head = (n, title, chip) => `<div class="st-h"><span class="st-n">${st(n) === 'done' ? ic('check') : n}</span><b>${title}</b>${chip}</div>`;
   const stChip = cancelled ? '<span class="chip muted">Bekor qilingan</span>' : cur === 4 ? `<span class="chip ok">${ic('check')} Yakunlangan</span>`
     : `<span class="chip warn">${cur}-bosqich: ${STG[cur]}</span>`;
@@ -961,31 +970,37 @@ function stagedCard(o) {
         : issued ? '<span class="chip muted">qayd etilmagan</span>' : `<span class="chip warn">kutilmoqda${B.students ? ` · ${B.students} / ${B.total}` : ''}</span>`)}
     <div class="st-b"><div class="opt"><div class="opt-h"><b>A. Kurs koordinatori bildirishnomasi</b> — dekan nomiga, barcha talabalar uchun</div>
         <div class="wrapc">${has('bildirishnoma') ? `<button class="btn sm" data-doc="bildirishnoma">${ic('download')} Bildirishnoma (Word)</button>` : ''}
-          ${B.bildirishnoma ? `<span class="chip ok">${ic('check')} Dekanga topshirilgan${B.number ? ' · № ' + esc(B.number) : ''}${B.date ? ' · ' + dmy(B.date) : ''}</span>
-              ${draft ? `<button class="btn sm ghost" data-bclear title="Bekor qilish">${ic('refresh')}</button>` : ''}`
-            : draft ? `<button class="btn sm primary" data-bset>${ic('check')} Dekanga topshirildi</button>` : ''}
-          ${fchips(common(['bildirishnoma']))}${upl('bildirishnoma', 'Imzolangan nusxa')}</div></div>
+          ${B.bildirishnoma ? `<span class="chip ok">${ic('check')} Imzolangan nusxa yuklangan${B.number ? ' · № ' + esc(B.number) : ''}${B.date ? ' · ' + dmy(B.date) : ''}</span>`
+            : draft ? upl('bildirishnoma', 'Imzolangan bildirishnomani yuklash (PDF)', 'primary', true) : ''}
+          ${fchips(common(['bildirishnoma']))}</div>
+        ${!B.bildirishnoma && draft ? '<p class="hint" style="margin:6px 0 0">Bildirishnoma imzolangach PDF nusxasini yuklang — shundan keyin dekan bosqichiga (farmoyish / buyruq) o‘tiladi.</p>' : ''}</div>
       <div class="opt-or"><span>yoki</span></div>
       <div class="opt"><div class="opt-h"><b>B. Talabalarning tushuntirish xatlari</b> — har bir talabadan; yozishdan bosh tortsa — dalolatnoma</div>
         <ul class="ord-st">${o.cases.map(c => `<li><span><b class="click" data-chs="${c.student_id}">${esc(c.full_name)}</b> <span class="sub-l">${esc(c.group_name || '')}${c.hours != null ? ' · ' + pairs(c.hours) : ''}${c.note ? ' · ' + esc(c.note) : ''}</span>
-            ${c.basis === 'tushuntirish' ? `<span class="chip ok">${ic('check')} tushuntirish xati</span>` : c.basis === 'dalolatnoma' ? '<span class="chip warn">yozmadi — dalolatnoma</span>' : '<span class="chip muted">tushuntirish xati kutilmoqda</span>'}</span>
-          <span class="nowrap">${c.basis ? (draft ? `<button class="btn sm ghost" data-cb="${c.id}" data-v="" title="Bekor qilish">${ic('refresh')}</button>` : '')
-            : `<label class="btn sm ghost" title="Tushuntirish xatini yuklash (PDF yoki rasm)">${ic('upload')} Yuklash<input type="file" data-cup="${c.id}" accept=".pdf,image/*,.doc,.docx" hidden></label>
-              <button class="btn sm ghost" data-cb="${c.id}" data-v="tushuntirish" title="Tushuntirish xati qog‘ozda olindi">${ic('check')} Olindi</button>
-              <button class="btn sm ghost" data-cb="${c.id}" data-v="dalolatnoma" title="Yozishdan bosh tortdi — dalolatnoma tuziladi">Yozmadi</button>`}
+            ${c.basis === 'tushuntirish' && !unsignedCase(c.id) ? `<span class="chip ok">${ic('check')} tushuntirish xati yuklangan</span>`
+              : c.basis === 'tushuntirish' ? '<span class="chip warn">tushuntirish xati yuklanmagan</span>'
+              : c.basis === 'dalolatnoma' ? `<span class="chip ${unsignedCase(c.id) ? 'warn' : 'ok'}">yozmadi — dalolatnoma${unsignedCase(c.id) ? ' (imzolangani yuklanmagan)' : ''}</span>` : '<span class="chip muted">tushuntirish xati kutilmoqda</span>'}</span>
+          <span class="nowrap">${c.basis && !(c.basis === 'tushuntirish' && unsignedCase(c.id)) ? (draft ? `<button class="btn sm ghost" data-cb="${c.id}" data-v="" title="Bekor qilish">${ic('refresh')}</button>` : '')
+            : `<label class="btn sm ghost" title="Talabaning tushuntirish xati (skan: PDF yoki rasm)">${ic('upload')} Yuklash<input type="file" data-cup="${c.id}" accept=".pdf,image/*" hidden></label>
+              ${c.basis ? '' : `<button class="btn sm ghost" data-cb="${c.id}" data-v="dalolatnoma" title="Yozishdan bosh tortdi — dalolatnoma tuziladi">Yozmadi</button>`}`}
             <button class="btn sm ghost" data-chs="${c.student_id}" title="Talabaning hujjatlari">${ic('folder')}${c.files_n ? ` ${c.files_n}` : ''}</button>
             ${draft ? `<button class="btn sm ghost" data-dcase="${c.id}" title="Hujjatdan chiqarish">${ic('x')}</button>` : ''}</span></li>`).join('')}</ul>
         ${B.dalolatnoma && has('dalolatnoma') ? `<div class="wrapc"><button class="btn sm" data-doc="dalolatnoma">${ic('download')} Dalolatnoma (Word) — yozmaganlar</button>
-          ${fchips(common(['dalolatnoma']))}${upl('dalolatnoma', 'Imzolangan dalolatnoma')}</div>` : ''}</div></div></li>`;
-  const s2 = `<li class="step ${st(2)}">${head(2, docT, issued ? `<span class="chip ok">${o.number ? '№ ' + esc(o.number) + ' · ' : ''}${dmy(o.date)}</span>`
-      : cur < 2 ? '<span class="chip muted">1-bosqichdan keyin</span>' : '<span class="chip warn">imzolanishi kutilmoqda</span>')}
-    <div class="st-b">${cur < 2 && !issued ? `<p class="hint">Avval 1-bosqich: bildirishnoma dekanga topshirilsin yoki har bir talabaning tushuntirish xati (yozmasa — dalolatnoma) bo‘lsin. Shundan keyin ${main ? main.title.toLowerCase() : 'hujjat'} shu asosda tayyorlanadi.</p>`
+          ${fchips(common(['dalolatnoma']))}${B.dalolatnoma_pdf ? '' : upl('dalolatnoma', 'Imzolangan dalolatnomani yuklash (PDF)', 'primary', true)}</div>` : ''}</div></div></li>`;
+  const sigLbl = o.measure === 'hayfsan' ? 'buyruqni' : o.measure === 'ogohlantirish' ? 'farmoyishni' : 'qarorni';
+  const s2 = `<li class="step ${st(2)}">${head(2, docT, issued && OD.signed ? `<span class="chip ok">${o.number ? '№ ' + esc(o.number) + ' · ' : ''}${dmy(o.date)}</span>`
+      : issued ? `<span class="chip warn">${o.number ? '№ ' + esc(o.number) + ' · ' : ''}imzolangan nusxasi yuklanmagan</span>`
+      : cur < 2 ? '<span class="chip muted">1-bosqichdan keyin</span>' : '<span class="chip warn">imzolangan nusxasi kutilmoqda</span>')}
+    <div class="st-b">${cur < 2 && !issued ? `<p class="hint">Avval 1-bosqich: imzolangan bildirishnoma (PDF) yuklansin yoki har bir talabaning tushuntirish xati (yozmasa — imzolangan dalolatnoma) yuklansin. Shundan keyin ${main ? main.title.toLowerCase() : 'hujjat'} shu asosda tayyorlanadi.</p>`
       : `<p class="hint">Asos: <i>${esc(o.basis_text || '')}</i></p>
       <div class="wrapc">${main ? `<button class="btn sm" data-doc="${main.kind}">${ic('download')} ${main.title} (Word)</button>` : ''}
-        ${draft ? `<button class="btn sm primary" data-issue>${ic('check')} Imzolandi — raqam va sanani kiritish</button>` : issued ? `<button class="btn sm ghost" data-issue>${ic('edit')} Raqam va sana</button>` : ''}
-        ${fchips(common(['imzolangan', 'farmoyish', 'buyruq']))}${issued ? upl('imzolangan', 'Imzolangan nusxa') : ''}</div>`}</div></li>`;
-  const s3 = `<li class="step ${st(3)}">${head(3, 'Ota-onaga xat', issued ? `<span class="chip ${L.done ? 'ok' : 'warn'}">${L.sent} / ${L.total} yuborilgan</span>` : '<span class="chip muted">2-bosqichdan keyin</span>')}
-    <div class="st-b">${!issued ? `<p class="hint">Xatda ${o.measure === 'hayfsan' ? 'buyruq' : 'farmoyish'} raqami va sanasi bo‘ladi — shuning uchun avval 2-bosqich.</p>`
+        ${draft ? `<button class="btn sm primary" data-sign>${ic('upload')} Imzolangan ${sigLbl} yuklash (PDF)</button>`
+          : issued && !OD.signed ? `<button class="btn sm primary" data-sign>${ic('upload')} Imzolangan nusxani yuklash (PDF)</button>` : ''}
+        ${issued ? `<button class="btn sm ghost" data-issue>${ic('edit')} Raqam va sana</button>` : ''}
+        ${fchips(common(['imzolangan', 'farmoyish', 'buyruq']))}${issued && OD.signed ? upl('imzolangan', 'Yana nusxa') : ''}</div>
+      ${draft ? '<p class="hint" style="margin:6px 0 0">Dekan imzolagach PDF nusxasini raqami va sanasi bilan yuklang — chora rasman ko‘rilgan hisoblanadi, ota-onasi botga ulangan talabalarga hujjat darhol yuboriladi (har biriga faqat o‘z farzandi, boshqalari yopilgan), keyin ota-onaga xat bosqichi ochiladi.</p>' : ''}`}</div></li>`;
+  const s3 = `<li class="step ${st(3)}">${head(3, 'Ota-onaga xat', OD.done ? `<span class="chip ${L.done ? 'ok' : 'warn'}">${L.sent} / ${L.total} yuborilgan</span>` : '<span class="chip muted">2-bosqichdan keyin</span>')}
+    <div class="st-b">${!OD.done ? `<p class="hint">Xatda ${o.measure === 'hayfsan' ? 'buyruq' : 'farmoyish'} raqami va sanasi bo‘ladi — shuning uchun avval 2-bosqich: imzolangan ${o.measure === 'hayfsan' ? 'buyruq' : 'farmoyish'} (PDF) yuklansin.</p>`
       : `<ul class="ord-st">${o.cases.map(c => `<li><span><b class="click" data-chs="${c.student_id}">${esc(c.full_name)}</b>
             ${c.letter_date ? `<span class="chip ok">${ic('check')} ${c.letter_no ? '№ ' + esc(c.letter_no) + ' · ' : ''}${dmy(c.letter_date)}</span>` : '<span class="chip muted">yuborilmagan</span>'}
             ${!c.address ? `<button class="chip warn" data-caddr="${c.student_id}" title="Xat uchun yashash manzili">${ic('edit')} manzil yo‘q</button>` : ''}</span>
@@ -1045,7 +1060,7 @@ function choraDocs(d) {
           : `<button class="btn sm ghost" data-arch="${o.id}" title="«Hujjatlar»dan olish (tarixda qoladi)">${ic('check')} Tozalash</button>`}
         <button class="btn sm ghost danger-t" data-odel2="${o.id}" title="Butunlay o‘chirish">${ic('x')} O‘chirish</button></span></li>
       ${open ? `<li class="ord-open">${orderCard(o)}</li>` : ''}`; };
-  return `<p class="hint scope">${ic('info')}<span>Chora tartib bilan ko‘riladi: <b>1. Asos</b> — talabaning tushuntirish xati (yozmasa — dalolatnoma) yoki kurs koordinatori bildirishnomasi → <b>2. Dekan farmoyishi / universitet buyrug‘i</b> (shu asosda; imzolangach raqami va sanasi) → <b>3. Ota-onaga xat</b> (farmoyish/buyruq raqami bilan). Imzolangan asl nusxa (PDF) yuklanganda ota-onalarga avtomatik yuboriladi — har biriga faqat o‘z farzandi, boshqalari qora rang bilan yopiladi.</span></p>
+  return `<p class="hint scope">${ic('info')}<span>Chora tartib bilan ko‘riladi: <b>1. Asos</b> — kurs koordinatori bildirishnomasi yoki talabaning tushuntirish xati (yozmasa — dalolatnoma): <b>imzolangan nusxasi (PDF) yuklangach</b> → <b>2. Dekan farmoyishi / universitet buyrug‘i</b>: <b>imzolangan PDF raqami va sanasi bilan yuklangach</b> chora rasman ko‘rilgan hisoblanadi va ota-onasi botga ulangan talabalarga darhol yuboriladi (har biriga faqat o‘z farzandi, boshqalari qora rang bilan yopiladi) → <b>3. Ota-onaga xat</b> (farmoyish/buyruq raqami bilan).</span></p>
     ${act.length ? act.map(orderCard).join('') : emptyBox('file', 'Jarayondagi hujjat yo‘q', '«Chegaraga yetganlar» bo‘limida talabalarni tanlab, «Hujjatlarni tayyorlash» ni bosing.')}
     ${fin.length ? `<section class="sec ord-done"><header>${H('check', `Yakunlanganlar — ${fin.length} ta`, 'att')}<button class="btn sm" data-archall>${ic('check')} Barchasini tozalash</button></header>
       <p class="hint" style="margin:0 20px">Tozalangan chora bu yerdan olinadi, lekin «Chora ko‘rilganlar»da hujjatlari bilan qoladi. «O‘chirish» — butunlay (tarix va statistikadan ham).</p>
@@ -1087,27 +1102,36 @@ function bindChoraDocs(d) {
     });
     const upload = async (url, kind, files) => {
       if (!files.length) return;
+      if (['bildirishnoma', 'dalolatnoma'].includes(kind) && files.some(f => !/\.pdf$/i.test(f.name))) { toast('Imzolangan nusxa PDF bo‘lsin', true); return; }
       const meta = await askDocNo(kind); if (!meta) return;
-      const fd = new FormData(); fd.append('kind', kind); files.forEach(f => fd.append('file', f, f.name));
-      Object.entries(meta).forEach(([k, v]) => fd.append(k, v));
-      try { const r = await api(url, { method: 'POST', body: fd }); toast('Yuklandi' + autoMsg(r.auto, kind, o)); route(); }
-      catch (err) { toast(err.message === 'too_big' ? 'Fayl juda katta (20 MB gacha)' : 'Yuklanmadi', true); }
+      const fd = new FormData(); fd.append('kind', kind);
+      Object.entries(meta).forEach(([k, v]) => fd.append(k, v));  // raqam va sana — fayldan oldin (server shu tartibda o'qiydi)
+      files.forEach(f => fd.append('file', f, f.name));
+      try { const r = await api(url, { method: 'POST', body: fd });
+        const now = r.order && r.order.stages, was = o.stages.current;
+        toast((now && now.current > was && was === 1 ? '1-bosqich yakunlandi — dekan bosqichiga o‘tildi' : 'Yuklandi') + autoMsg(r.auto, kind, o)); route(); }
+      catch (err) { toast(CH_ERR[err.message] || 'Yuklanmadi', true); }
     };
     card.querySelectorAll('[data-upk]').forEach(i => i.addEventListener('change', e => upload(`${base}/files`, i.dataset.upk, [...e.target.files])));
     card.querySelectorAll('[data-cup]').forEach(i => i.addEventListener('change', e => upload(`/api/staff/discipline/cases/${i.dataset.cup}/files`, 'tushuntirish', [...e.target.files])));
     card.querySelectorAll('[data-cb]').forEach(b => b.addEventListener('click', async () => {
       try { await api(`/api/staff/discipline/cases/${b.dataset.cb}/basis`, { method: 'POST', json: { basis: b.dataset.v || null } }); route(); }
       catch (e) { toast('Saqlanmadi', true); } }));
-    card.querySelector('[data-bset]')?.addEventListener('click', async () => {
-      const v = await formDlg('Bildirishnoma dekanga topshirildi', `<p>Kurs koordinatori bildirishnomasi — barcha ${o.cases.length} ta talaba uchun asos. Farmoyish/buyruqdagi «Asos:» qatoriga sanasi bilan yoziladi.</p>
-        <div class="cols2"><label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${todayIso()}" required></label>
-        <label class="field"><span>Kiruvchi raqami (bo‘lsa)</span><input class="input" name="number" placeholder="Masalan: 45"></label></div>
-        <p class="hint">Imzolangan nusxani «Imzolangan nusxa» tugmasi orqali yuklab qo‘ying.</p>`, 'Saqlash');
+    card.querySelector('[data-sign]')?.addEventListener('click', async () => {
+      const first = o.status !== 'issued', doc = MEAS[o.measure] ? MEAS[o.measure].doc : 'Hujjat';
+      const v = await formDlg(`Imzolangan ${String(doc).toLowerCase()} (PDF)`, `<label class="field"><span>Imzolangan nusxa — PDF</span><input class="input" type="file" name="file" accept=".pdf,application/pdf" required></label>
+        <div class="cols2"><label class="field"><span>Raqami</span><input class="input" name="number" value="${esc(o.number || '')}" placeholder="Masalan: 17 yoki 215" required></label>
+        <label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${esc(o.date || todayIso())}" required></label></div>
+        <p class="hint">${first ? 'Yuklanishi bilan chora rasman ko‘rilgan hisoblanadi; ota-onasi botga ulangan talabalarga hujjat darhol yuboriladi (har biriga faqat o‘z farzandi — boshqalar yopilgan). Keyin — ota-onaga xat bosqichi.' : 'Ota-onasi botga ulangan talabalarga darhol yuboriladi.'}</p>`, 'Yuklash');
       if (!v) return;
-      try { await api(`${base}/basis`, { method: 'POST', json: { date: v.get('date'), number: v.get('number') } }); toast('1-bosqich yakunlandi'); route(); }
-      catch (e) { toast('Saqlanmadi', true); } });
-    card.querySelector('[data-bclear]')?.addEventListener('click', async () => {
-      await api(`${base}/basis`, { method: 'POST', json: { kind: null } }); route(); });
+      const f = v.get('file');
+      if (!f || !f.name || !/\.pdf$/i.test(f.name)) { toast('PDF fayl tanlang', true); return; }
+      const fd = new FormData(); fd.append('kind', 'imzolangan'); fd.append('number', v.get('number')); fd.append('date', v.get('date'));
+      if (first) fd.append('issue', '1');
+      fd.append('file', f, f.name);
+      try { const r = await api(`${base}/files`, { method: 'POST', body: fd });
+        toast((r.issued ? '2-bosqich yakunlandi — chora rasman ko‘rildi' : 'Yuklandi') + autoMsg(r.auto, 'imzolangan', r.order || o)); route(); }
+      catch (e) { toast(CH_ERR[e.message] || 'Yuklanmadi', true); } });
     card.querySelector('[data-letters]')?.addEventListener('click', async () => {
       const v = await formDlg('Ota-onaga xatlar — yuborildi', `<p>Belgilangan talabalarning ota-onasiga xat yuborilgan deb qayd etiladi; chiquvchi raqami xatga yoziladi.</p>
         <label class="field"><span>Yuborilgan sana</span><input class="input" type="date" name="date" value="${todayIso()}" required></label>
@@ -1120,7 +1144,7 @@ function bindChoraDocs(d) {
       if (!items.length) { toast('Talaba belgilanmagan', true); return; }
       try { const r = await api(`${base}/letters`, { method: 'POST', json: { date: v.get('date'), items, notify: v.get('notify') === 'on', send_pdf: v.get('pdf') === 'on' } });
         toast(`Qayd etildi: ${r.marked}${r.notified ? ` · ota-onalarga xabar: ${r.notified}` : ''}${r.pdf ? ` · PDF: ${r.pdf}` : ''}`); route(); }
-      catch (e) { toast('Saqlanmadi', true); } });
+      catch (e) { toast(CH_ERR[e.message] || 'Saqlanmadi', true); } });
     card.querySelectorAll('[data-cxat]').forEach(b => b.addEventListener('click', async () => {
       b.disabled = true; try { await download(`${base}/doc/xat?case=${b.dataset.cxat}`); } catch (e) { toast('Yuklab bo‘lmadi', true); } b.disabled = false; }));
     card.querySelectorAll('[data-caddr]').forEach(b => b.addEventListener('click', async e => {
@@ -1146,7 +1170,7 @@ function bindChoraDocs(d) {
       if (!v) return;
       try { const r = await api(`${base}/issue`, { method: 'POST', json: { number: v.get('number'), date: v.get('date'), notify: v.get('notify') === 'on' } });
         toast(first ? (isXat ? `Yuborildi${r.notified ? ` · ota-onalarga ${r.notified} ta xabar` : ''}` : '2-bosqich yakunlandi — endi ota-onaga xat') : 'Saqlandi'); route(); }
-      catch (e) { toast(e.message === 'no_basis' ? 'Avval 1-bosqich: tushuntirish xati yoki bildirishnoma' : 'Saqlanmadi', true); }
+      catch (e) { toast(CH_ERR[e.message] || 'Saqlanmadi', true); }
     });
   });
 }
@@ -1162,9 +1186,11 @@ async function choraTartib(d) {
     <label class="field"><span>Buzilgan qoida (hujjatga shu matn yoziladi)</span><input class="input" name="rule" list="rules" required placeholder="“Odob-axloq Kodeksi”ning … moddasi (…)">
       <datalist id="rules">${d.rules.map(r => `<option value="${esc(r)}">`).join('')}</datalist></label>
     <div class="field"><span>Talabalar va holat tafsiloti</span><ul id="tsel" class="ord-st"><li class="dash">Talaba tanlanmagan</li></ul></div>
-    <p class="hint">Jarayon: 1. tushuntirish xati yoki bildirishnoma → 2. farmoyish/buyruq → 3. ota-onaga xat («Hujjatlar» yorlig‘ida bosqichma-bosqich).</p>
-    <label class="cbxl"><input type="checkbox" id="tdone"> Farmoyish/buyruq allaqachon imzolangan (raqami va sanasi bor)</label>
-    <div class="cols2" id="tiss" hidden><label class="field"><span>Raqami</span><input class="input" name="number"></label>
+    <p class="hint">Jarayon: 1. tushuntirish xati yoki bildirishnoma (imzolangan PDF) → 2. farmoyish/buyruq (imzolangan PDF) → 3. ota-onaga xat («Hujjatlar» yorlig‘ida bosqichma-bosqich).</p>
+    <label class="cbxl"><input type="checkbox" id="tdone"> Farmoyish/buyruq allaqachon imzolangan (raqami, sanasi va PDF nusxasi bor)</label>
+    <div class="cols2" id="tiss" hidden><label class="field cbxl-full" style="grid-column:1 / -1"><span>Imzolangan farmoyish / buyruq — PDF (ota-onasi botga ulanganlarga darhol yuboriladi)</span>
+        <input class="input" type="file" name="sigfile" accept=".pdf,application/pdf"></label>
+      <label class="field"><span>Raqami</span><input class="input" name="number"></label>
       <label class="field"><span>Sanasi</span><input class="input" type="date" name="date" value="${todayIso()}"></label>
       <label class="field"><span>Asos (1-bosqich)</span><select class="select" name="basis"><option value="tushuntirish">Talabaning tushuntirish xati</option>
         <option value="bildirishnoma">Kurs koordinatori bildirishnomasi</option></select></label></div>
@@ -1187,9 +1213,24 @@ async function choraTartib(d) {
     const f = new FormData(dl.querySelector('form'));
     if (!sel.size) { toast('Talaba tanlang', true); return; }
     const body = { measure: f.get('measure'), ground: 'tartib', rule: f.get('rule'), items: [...sel.values()].map(x => ({ sid: x.id, note: x.note })) };
-    if ($('#tdone').checked) body.issue = { number: f.get('number'), date: f.get('date') || todayIso(), basis: f.get('basis') };
-    try { await api('/api/staff/discipline/orders', { method: 'POST', json: body }); S.chora.tab = 'docs'; toast('Saqlandi'); route(); }
-    catch (e) { toast(e.message === 'no_rule' ? 'Buzilgan qoidani yozing' : 'Saqlanmadi', true); }
+    const done = $('#tdone').checked, sig = f.get('sigfile');
+    if (done && f.get('measure') !== 'xat') {
+      if (!sig || !sig.name || !/\.pdf$/i.test(sig.name)) { toast('Imzolangan farmoyish/buyruqning PDF nusxasini tanlang', true); return; }
+      if (!f.get('number')) { toast('Farmoyish/buyruq raqamini kiriting', true); return; }
+      body.issue = { basis: f.get('basis') };
+    }
+    let r;
+    try { r = await api('/api/staff/discipline/orders', { method: 'POST', json: body }); }
+    catch (e) { toast(e.message === 'no_rule' ? 'Buzilgan qoidani yozing' : 'Saqlanmadi', true); return; }
+    S.chora.tab = 'docs';
+    if (body.issue) {
+      const fd = new FormData(); fd.append('kind', 'imzolangan'); fd.append('number', f.get('number')); fd.append('date', f.get('date') || todayIso());
+      fd.append('issue', '1'); fd.append('file', sig, sig.name);
+      try { const u = await api(`/api/staff/discipline/orders/${r.id}/files`, { method: 'POST', body: fd });
+        toast('Saqlandi — chora rasman ko‘rilgan' + autoMsg(u.auto, 'imzolangan', u.order)); }
+      catch (e) { toast('Chora saqlandi, lekin PDF yuklanmadi: ' + (CH_ERR[e.message] || 'xato') + ' — «Hujjatlar»da qayta yuklang', true); }
+    } else toast('Saqlandi');
+    route();
   };
 }
 function choraBars(dyn) {

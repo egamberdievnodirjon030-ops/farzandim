@@ -456,27 +456,42 @@ async def create_order(measure: str, ground: str, items: list[dict], rule: str =
 STAGES = {1: "Asos: tushuntirish xati yoki bildirishnoma", 2: "Farmoyish / buyruq", 3: "Ota-onaga xat", 4: "Yakunlangan"}
 
 
+def is_pdf(f: dict) -> bool:
+    return (f.get("name") or "").lower().endswith(".pdf")
+
+
 def _stages(o: dict) -> dict:
-    """Chora jarayoni bosqichlari: 1 — asos (talabaning tushuntirish xati / dalolatnoma yoki kurs koordinatori
-    bildirishnomasi), 2 — dekan farmoyishi / universitet buyrug'i (imzolangan, raqam va sana), 3 — ota-onaga xat.
+    """Chora jarayoni bosqichlari — har biri imzolangan hujjat (PDF) yuklangach yakunlanadi:
+      1 — asos: kurs koordinatori bildirishnomasining imzolangan nusxasi (PDF) yoki har bir talabaning yuklangan
+          tushuntirish xati (yozmasa — imzolangan dalolatnoma, PDF);
+      2 — dekan farmoyishi / universitet buyrug'i: imzolangan nusxasi (PDF) raqam va sana bilan yuklangach chiqarilgan
+          hisoblanadi (ulangan ota-onalarga — darhol, boshqa talabalar yopilgan);
+      3 — ota-onaga xat (farmoyish/buyruq raqami bilan).
     Faqat xat (trimestr va h.k.) — bitta bosqich."""
     cases, issued = o["cases"], o["status"] == "issued"
+    files = o.get("files") or []
     n = len(cases)
     sent = sum(1 for c in cases if c.get("letter_date"))
     if o["measure"] == "xat":
         return {"letters_only": True, "current": 0 if o["status"] == "cancelled" else 4 if issued else 3,
                 "letters": {"done": issued, "sent": sent, "total": n}}
-    with_basis = sum(1 for c in cases if c.get("basis"))
-    by_note = o.get("basis_kind") == "bildirishnoma"
-    b_done = by_note or (n > 0 and with_basis == n)
-    l_done = issued and n > 0 and sent == n
-    current = 0 if o["status"] == "cancelled" else 1 if not (b_done or issued) else 2 if not issued else 3 if not l_done else 4
+    note_pdf = [f for f in files if not f.get("case_id") and f["kind"] == "bildirishnoma" and is_pdf(f)]
+    dal_pdf = any(f["kind"] == "dalolatnoma" and is_pdf(f) for f in files)
+    expl = {f["case_id"] for f in files if f.get("case_id") and f["kind"] == "tushuntirish"}
+    documented = [c for c in cases if (c.get("basis") == "tushuntirish" and c["id"] in expl)
+                  or (c.get("basis") == "dalolatnoma" and dal_pdf)]
+    b_done = bool(note_pdf) or (n > 0 and len(documented) == n) or bool(o.get("retro"))
+    signed = [f for f in files if not f.get("case_id") and f["kind"] in ORIGINAL_ORDER and is_pdf(f)]
+    o_done = issued and (bool(signed) or sent > 0)  # sent > 0 — bu tartibdan oldin xati yuborilgan choralar
+    l_done = o_done and n > 0 and sent == n
+    current = 0 if o["status"] == "cancelled" else 1 if not (b_done or issued) else 2 if not o_done else 3 if not l_done else 4
     return {"letters_only": False, "current": current,
-            "basis": {"done": b_done or issued, "recorded": b_done, "bildirishnoma": by_note, "date": o.get("basis_date"),
-                      "number": o.get("basis_number"), "students": with_basis, "total": n,
+            "basis": {"done": b_done or issued, "recorded": b_done, "bildirishnoma": bool(note_pdf), "date": o.get("basis_date"),
+                      "number": o.get("basis_number"), "students": len(documented), "total": n, "retro": bool(o.get("retro")),
                       "tushuntirish": sum(1 for c in cases if c.get("basis") == "tushuntirish"),
-                      "dalolatnoma": sum(1 for c in cases if c.get("basis") == "dalolatnoma")},
-            "order": {"done": issued, "number": o.get("number"), "date": o.get("date")},
+                      "dalolatnoma": sum(1 for c in cases if c.get("basis") == "dalolatnoma"),
+                      "dalolatnoma_pdf": dal_pdf, "unsigned": [c["id"] for c in cases if c.get("basis") and c not in documented]},
+            "order": {"done": o_done, "issued": issued, "signed": bool(signed), "number": o.get("number"), "date": o.get("date")},
             "letters": {"done": l_done, "sent": sent, "total": n}}
 
 
@@ -579,6 +594,8 @@ async def issue_order(bot, oid: int, number: str, d: str, notify: bool = False, 
     first = o["status"] != "issued"
     if first and o["measure"] != "xat" and not o["stages"]["basis"]["done"]:
         return {"ok": False, "error": "no_basis"}
+    if first and o["measure"] != "xat" and not o["stages"]["order"]["signed"]:
+        return {"ok": False, "error": "no_signed"}  # avval imzolangan farmoyish/buyruq (PDF) yuklanadi
     now = now_iso()
     number = (number or "").strip()[:40] or None
     await db.execute("UPDATE disc_orders SET number = ?, date = ?, status = 'issued', issued_at = COALESCE(issued_at, ?), "
@@ -620,13 +637,17 @@ async def archive_done(scope: set[str] | None = ...) -> dict:
     return {"ok": True, "archived": n}
 
 
-async def set_basis(oid: int, kind: str | None, d: str | None = None, number: str = "") -> dict:
-    """1-bosqich: kurs koordinatori bildirishnomasi dekanga topshirildi (sana, raqam) yoki bekor qilish (kind=None)."""
+async def set_basis(oid: int, kind: str | None, d: str | None = None, number: str = "", force: bool = False) -> dict:
+    """1-bosqich: kurs koordinatori bildirishnomasi (sana, raqam) yoki bekor qilish (kind=None). Bildirishnoma — faqat
+    imzolangan nusxasi (PDF) yuklangan bo'lsa (yuklanganda o'zi qayd etiladi); force — avval imzolangan chorani qayd
+    etish."""
     o = await db.fetchone("SELECT * FROM disc_orders WHERE id = ?", (oid,))
     if not o:
         return {"ok": False, "error": "not_found"}
     if kind not in ("bildirishnoma", None):
         return {"ok": False, "error": "bad_kind"}
+    if kind and not force and not await _signed_note(oid):
+        return {"ok": False, "error": "no_signed"}
     if kind:
         try:
             d = date.fromisoformat(d).isoformat() if d else today().isoformat()
@@ -634,6 +655,22 @@ async def set_basis(oid: int, kind: str | None, d: str | None = None, number: st
             return {"ok": False, "error": "bad_date"}
     await db.execute("UPDATE disc_orders SET basis_kind = ?, basis_date = ?, basis_number = ? WHERE id = ?",
                      (kind, d if kind else None, (number or "").strip()[:40] or None if kind else None, oid))
+    return {"ok": True}
+
+
+async def _signed_note(oid: int) -> bool:
+    return any(is_pdf(f) for f in await db.fetchall(
+        "SELECT name FROM disc_files WHERE order_id = ? AND case_id IS NULL AND kind = 'bildirishnoma'", (oid,)))
+
+
+async def set_retro(oid: int, basis: str) -> dict:
+    """Avval imzolangan chora (masalan, ichki tartib bo'yicha qo'lda qo'shilgan): 1-bosqich hujjatlarisiz qayd etiladi —
+    2-bosqich imzolangan farmoyish/buyruq (PDF) yuklangach chiqariladi."""
+    await db.execute("UPDATE disc_orders SET retro = 1 WHERE id = ?", (oid,))
+    if basis == "bildirishnoma":
+        return await set_basis(oid, "bildirishnoma", None, force=True)
+    for c in await db.fetchall("SELECT id FROM disc_cases WHERE order_id = ?", (oid,)):
+        await set_case_basis(c["id"], "tushuntirish")
     return {"ok": True}
 
 
@@ -659,6 +696,8 @@ async def mark_letters(bot, oid: int, items: list[dict], d: str, notify: bool = 
         return {"ok": False, "error": "letter_order"}
     if o["status"] != "issued":
         return {"ok": False, "error": "not_issued"}
+    if not o["stages"]["order"]["done"]:
+        return {"ok": False, "error": "no_signed"}  # xat — imzolangan farmoyish/buyruq (PDF) yuklangach
     try:
         d = date.fromisoformat(d).isoformat()
     except (TypeError, ValueError):
@@ -1013,6 +1052,10 @@ async def add_file(oid: int | None, case_id: int | None, kind: str, name: str, d
     if case_id and kind in ("tushuntirish", "dalolatnoma"):  # 1-bosqich: talabaning asosi
         await db.execute("UPDATE disc_cases SET basis = COALESCE(basis, ?), basis_at = COALESCE(basis_at, ?) WHERE id = ?",
                          (kind, now_iso(), case_id))
+    if oid and kind == "bildirishnoma" and name.lower().endswith(".pdf"):  # 1-bosqich: imzolangan bildirishnoma — asos
+        await db.execute("UPDATE disc_orders SET basis_kind = 'bildirishnoma', basis_date = COALESCE(?, basis_date, ?), "
+                         "basis_number = COALESCE(?, basis_number) WHERE id = ?",
+                         (_clean_date(doc_date), today().isoformat(), _clean_no(number), oid))
     return {"ok": True, "id": fid}
 
 
@@ -1155,6 +1198,9 @@ async def delete_file(fid: int) -> dict:
         return {"ok": False, "error": "not_found"}
     _unlink(f["path"])
     await db.execute("DELETE FROM disc_files WHERE id = ?", (fid,))
+    if f["order_id"] and f["kind"] == "bildirishnoma" and not await _signed_note(f["order_id"]):  # 1-bosqich qaytadi
+        await db.execute("UPDATE disc_orders SET basis_kind = NULL, basis_date = NULL, basis_number = NULL "
+                         "WHERE id = ? AND status = 'draft' AND retro IS NULL", (f["order_id"],))
     return {"ok": True}
 
 

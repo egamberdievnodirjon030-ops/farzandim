@@ -1486,16 +1486,9 @@ async def api_disc_order_new(request):
                                str(body.get("deadline") or "") or None)
     if not res["ok"]:
         return bad(res["error"])
-    if body.get("issue"):  # allaqachon imzolangan (ichki tartib bo'yicha qo'lda qo'shish): asosi bilan birga
-        iss = body["issue"]
-        d = str(iss.get("date") or today().isoformat())
-        if iss.get("basis") == "bildirishnoma":
-            await D.set_basis(res["id"], "bildirishnoma", d)
-        else:
-            for c in (await D.order(res["id"]))["cases"]:
-                await D.set_case_basis(c["id"], "tushuntirish")
-        await D.issue_order(request.app["bot"], res["id"], str(iss.get("number") or ""), d, bool(iss.get("notify")),
-                            request["user"]["id"])
+    if body.get("issue"):  # allaqachon imzolangan (ichki tartib bo'yicha qo'lda qo'shish): 1-bosqichsiz qayd etiladi;
+        # chiqarilgan hisoblanishi uchun imzolangan farmoyish/buyruq (PDF) raqami va sanasi bilan yuklanadi (…/files, issue=1)
+        await D.set_retro(res["id"], str(body["issue"].get("basis") or "tushuntirish"))
     return ok({**res, "order": await D.order(res["id"])})
 
 
@@ -1651,16 +1644,27 @@ async def api_disc_upload(request):
     o = await _disc_order_visible(oid)
     if not o:
         return bad("not_found", 404)
-    kind, case_id, saved, meta = "boshqa", None, [], {}
+    kind, case_id, saved, meta, issue = "boshqa", None, [], {}, False
     async for part in await request.multipart():
         if part.name == "kind":
             kind = (await part.text()).strip()
         elif part.name in ("number", "date"):
             meta[part.name] = (await part.text()).strip()
+        elif part.name == "issue":  # 2-bosqich: imzolangan farmoyish/buyruq — raqami va sanasi bilan chiqarish
+            issue = (await part.text()).strip() in ("1", "true", "on")
         elif part.name == "case_id":
             v = (await part.text()).strip()
             case_id = int(v) if v.isdigit() and any(c["id"] == int(v) for c in o["cases"]) else None
         elif part.name == "file" and part.filename:
+            if issue:  # fayl saqlanishidan oldin: chiqarish mumkinmi
+                if case_id or kind not in D.ORIGINAL_ORDER or o["measure"] == "xat":
+                    return bad("bad_kind")
+                if not part.filename.lower().endswith(".pdf"):
+                    return bad("not_pdf")
+                if o["status"] == "draft" and not o["stages"]["basis"]["done"]:
+                    return bad("no_basis")
+                if not meta.get("number") or not meta.get("date"):
+                    return bad("no_number")
             data = bytes(await part.read(decode=False))
             res = await D.add_file(None if case_id else oid, case_id, kind, part.filename, data, request["user"]["id"],
                                    meta.get("number"), meta.get("date"))
@@ -1669,9 +1673,14 @@ async def api_disc_upload(request):
             saved.append(res["id"])
     if not saved:
         return bad("empty")
+    if issue and o["status"] == "draft":  # chiqarildi — imzolangan nusxa ulangan ota-onalarga darhol (issue_order ichida)
+        res = await D.issue_order(request.app["bot"], oid, meta["number"], meta["date"], False, request["user"]["id"])
+        if not res["ok"]:
+            return bad(res["error"])
+        return ok({"ok": True, "files": saved, "auto": res.get("auto"), "issued": True, "order": await D.order(oid)})
     # asl nusxa (imzolangan) — chora chiqarilgan bo'lsa, ota-onalarga darhol (boshqa talabalar yopilgan)
     auto = await D.send_originals(request.app["bot"], oid, saved, request["user"]["id"])
-    return ok({"ok": True, "files": saved, "auto": auto})
+    return ok({"ok": True, "files": saved, "auto": auto, "order": await D.order(oid)})
 
 
 async def _disc_file_visible(fid: int) -> bool:
