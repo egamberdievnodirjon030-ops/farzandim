@@ -419,6 +419,13 @@ cp .env.example .env        # Windows: copy .env.example .env
 
 Bot faqat dastur ishlab turganda javob beradi. Doimiy ishlashi uchun uni server (VPS) ga joylashtiring (pastda).
 
+
+### Yangilash (qayta o'rnatmasdan, Windows)
+
+Kod GitHub'dan ZIP qilib yuklab olingan papkada: botni to'xtating va **`yangilash.bat`** ni ikki marta bosing — eng yangi
+kod yuklab olinib, shu papkaga ustidan ko'chiriladi, kutubxonalar tekshiriladi. **`.env`** (tokenlar, sozlamalar), **`data\`**
+(bazalar, Manage sozlamasi, yuklangan fayllar), `venv\` va `logs\` o'zgarmaydi. So'ng botni odatdagidek qayta ishga
+tushiring; Telegram ichidagi ilova va kompyuter versiyasi yangi versiyani o'zi oladi.
 ## Sinab ko'rish (namunaviy ma'lumotlar)
 
 ```bash
