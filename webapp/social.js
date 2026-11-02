@@ -22,7 +22,7 @@ const SOC = {
   chin_yetim: { icon: 'user1', c: 'msg', hint: 'ota-onasining ikkalasi ham yo‘q' },
   mehribonlik: { icon: 'homeh', c: 'att', hint: 'mehribonlik uyi tarbiyalanuvchisi' }
 };
-const SOC_SRC = { fayl: 'fayldan', qolda: 'qo‘lda' };
+const SOC_SRC = { fayl: 'fayldan', qolda: 'qo‘lda', talaba: 'talaba o‘zi kiritgan' };
 const SOC_ERR = { bad_category: 'Toifani tanlang', bad_sub: 'Kichik toifa noto‘g‘ri', no_students: 'Kamida bitta talabani tanlang', bad_student: 'Talaba noto‘g‘ri' };
 const socErr = e => (e && e.data && e.data.message) || SOC_ERR[e && e.message] || 'Bajarilmadi';
 
@@ -191,7 +191,8 @@ async function loadStudentSocial(sid, course) {
   box.innerHTML = `<h4 class="h4row"><span>Ijtimoiy toifa</span><button class="btn sm ghost" data-soc-one>${ic('plus')} Belgilash</button></h4>
     ${d.items.length ? `<ul class="soc-list">${d.items.map(r => { const m = SOC[r.category] || {}; return `<li>
       <span class="h-ic sm c-${m.c}" aria-hidden="true">${ic(m.icon || 'users')}</span>
-      <div class="t"><b>${esc(r.label)}</b><span>${r.note ? esc(r.note) + ' · ' : ''}${SOC_SRC[r.source] || ''}${r.set_at ? ', ' + dmy(r.set_at) : ''}</span></div>
+      <div class="t"><b>${esc(r.label)}</b><span>${r.note ? esc(r.note) + ' · ' : ''}${SOC_SRC[r.source] || ''}${r.set_at ? ', ' + dmy(r.set_at) : ''}${r.pending ? ' · <em style="color:var(--warn);font-style:normal">tekshirilmagan</em>' : ''}</span></div>
+      ${r.pending ? `<button class="btn sm primary" data-soc-ok="${sid}" data-cat="${r.category}" data-sub="${esc(r.sub)}" title="Talaba kiritgan toifani tasdiqlash">${ic('check')} Tasdiqlash</button>` : ''}
       <button class="btn sm ghost" data-soc-del="${sid}" data-cat="${r.category}" data-sub="${esc(r.sub)}" data-one="1" title="Olib tashlash" aria-label="Olib tashlash">${ic('x')}</button></li>`; }).join('')}</ul>`
       : '<span class="dash">Belgilanmagan (nogironlik, ijtimoiy himoya, chin yetim, mehribonlik uyi)</span>'}`;
   $('[data-soc-one]', box).addEventListener('click', () => socialAssignDlg('', { id: sid, name: $('#drawer header b').textContent }, course));
@@ -199,6 +200,14 @@ async function loadStudentSocial(sid, course) {
 }
 
 document.addEventListener('click', async e => {
+  const ok = e.target.closest('[data-soc-ok]');
+  if (ok) {
+    e.preventDefault(); e.stopPropagation();
+    const sid = Number(ok.dataset.socOk), course = $('#stu-social')?.dataset.course || null;
+    try { await api('/api/staff/social/confirm', { method: 'POST', course, json: { student_id: sid, category: ok.dataset.cat, sub: ok.dataset.sub } }); toast('Tasdiqlandi');
+      loadStudentSocial(sid, course); } catch (err) { toast(socErr(err), true); }
+    return;
+  }
   const card = e.target.closest('a[data-soc]');
   if (card) { e.preventDefault(); openSocial(card.dataset.soc); return; }
   const add = e.target.closest('[data-soc-add]');

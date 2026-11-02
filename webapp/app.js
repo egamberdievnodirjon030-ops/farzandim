@@ -167,7 +167,20 @@ if (STUDENT) {  // talaba ilovasi: «farzand» o'rniga — talabaning o'zi; tala
     measures_note: 'Rasman e’lon qilingan choralar (dekan farmoyishi, buyruq, ota-onaga xat). Hujjatlarning nusxasi — «Hujjatlar» bo‘limida.',
     letter_sent: 'ota-onaga xat yuborilgan', s_unlinked_t: 'Siz hali talabalar botiga ulanmagansiz',
     s_unlinked_sub: 'Talabalar botini oching va /start bosing — telefon raqamingiz orqali hisobingiz topiladi. So‘ng ilova shu yerda ochiladi.',
-    s_open_bot: 'Talabalar botini ochish', blocked: 'Bu ilova talabalar uchun.' });
+    s_open_bot: 'Talabalar botini ochish', blocked: 'Bu ilova talabalar uchun.',
+    home_t: 'Yashash joyim', home_ask_t: 'Avval yashash joyingizni kiriting', home_ask_sub: 'Kurs koordinatoringiz tashriflar va zarur hollarda siz bilan bog‘lanish uchun qayerda yashashingizni bilishi kerak. Bu bir daqiqa oladi.',
+    home_banner: 'Yashash joyingiz kiritilmagan', home_banner_sub: 'Kiritish — 1 daqiqa', living_q: 'Hozir qayerda yashaysiz?',
+    addr_l: 'Manzil', addr_ph: 'Tuman, ko‘cha (mavze), uy, xonadon — masalan: Uchtepa tumani, 14-kvartal, 2-uy, 63-xonadon', req: 'majburiy', opt: 'ixtiyoriy',
+    point_l: 'Xaritadagi joyi', point_none: 'Ko‘rsatilmagan', point_ph: 'yoki koordinata / xarita havolasi (Yandex, Google, 2GIS)',
+    my_loc: 'Turgan joyim', map_pick: 'Xaritadan tanlash', map_hint: 'Xonadoningiz joyiga bosing yoki belgini suring', map_ok: 'Tanlash', map_cancel: 'Bekor qilish',
+    loc_wait: 'Joylashuv aniqlanmoqda…', loc_fail: 'Joylashuvni aniqlab bo‘lmadi — xaritadan tanlang', save_home: 'Saqlash', later: 'Keyinroq',
+    home_saved: 'Saqlandi — kurs koordinatoringiz ko‘radi', home_locked: 'Bu ma’lumotni kurs koordinatori kiritgan. O‘zgargan bo‘lsa — unga murojaat qiling.',
+    home_mine: 'Siz kiritgansiz: {t}. Ko‘chib o‘tsangiz — yangilang.',
+    soc_t: 'Ijtimoiy toifam', soc_ask_t: 'Ijtimoiy toifangizni belgilang', soc_ask_sub: 'Nogironlik, ijtimoiy himoya reestri yoki daftarlar, chin yetim yoki mehribonlik uyi — shulardan biriga kirsangiz belgilang. Kirmasangiz — «Hech biriga kirmayman».',
+    soc_banner: 'Ijtimoiy toifa so‘rovi', soc_q: 'Qaysi toifaga kirasiz?', soc_none: 'Hech biriga kirmayman', soc_note: 'Asos hujjat (ixtiyoriy)',
+    soc_note_ph: 'Masalan: ma’lumotnoma № 123, 12.09.2026', soc_priv: 'Bu ma’lumot faqat kurs koordinatoringiz va dekanatga ko‘rinadi; koordinator tekshiradi.',
+    soc_locked: 'Kurs koordinatori belgilagan', soc_pending: 'koordinator tekshiradi', soc_checked: 'tasdiqlangan', soc_pick: 'Toifani tanlang yoki «Hech biriga kirmayman»ni belgilang',
+    soc_saved: 'Saqlandi — kurs koordinatoringiz tekshiradi', soc_group: 'Guruhi', soc_lists: 'Qaysi ro‘yxatda' });
   Object.assign(T.ru, { sec_act: 'Активность', portal: 'Портал студента', my_children: 'Моя страница', choose_child: 'Выберите курс',
     events: 'Мероприятия и визиты', events_nav: 'События', measures: 'Взыскания', mine_events: 'Мои мероприятия и визиты',
     open_events: 'Открыта регистрация', no_events: 'В ближайшие дни мероприятий нет', no_open: 'Открытых объявлений пока нет',
@@ -180,7 +193,20 @@ if (STUDENT) {  // talaba ilovasi: «farzand» o'rniga — talabaning o'zi; tala
     measures_note: 'Официально объявленные меры (распоряжение декана, приказ, письмо родителям). Копии документов — в разделе «Документы».',
     letter_sent: 'родителям отправлено письмо', s_unlinked_t: 'Вы ещё не подключены к боту для студентов',
     s_unlinked_sub: 'Откройте бот для студентов и нажмите /start — аккаунт найдётся по номеру телефона. Затем приложение откроется здесь.',
-    s_open_bot: 'Открыть бот для студентов', blocked: 'Это приложение для студентов.' });
+    s_open_bot: 'Открыть бот для студентов', blocked: 'Это приложение для студентов.',
+    home_t: 'Место проживания', home_ask_t: 'Сначала укажите, где вы живёте', home_ask_sub: 'Координатору курса нужно знать, где вы проживаете, — для визитов и связи с вами при необходимости. Это займёт минуту.',
+    home_banner: 'Место проживания не указано', home_banner_sub: 'Заполнить — 1 минута', living_q: 'Где вы сейчас живёте?',
+    addr_l: 'Адрес', addr_ph: 'Район, улица (массив), дом, квартира', req: 'обязательно', opt: 'необязательно',
+    point_l: 'Точка на карте', point_none: 'Не указана', point_ph: 'или координаты / ссылка на карту (Яндекс, Google, 2GIS)',
+    my_loc: 'Моё местоположение', map_pick: 'Выбрать на карте', map_hint: 'Нажмите на место вашей квартиры или перетащите метку', map_ok: 'Выбрать', map_cancel: 'Отмена',
+    loc_wait: 'Определяем местоположение…', loc_fail: 'Не удалось определить — выберите на карте', save_home: 'Сохранить', later: 'Позже',
+    home_saved: 'Сохранено — координатор курса увидит', home_locked: 'Эти данные внёс координатор курса. Если они изменились — обратитесь к нему.',
+    home_mine: 'Указано вами: {t}. Если переехали — обновите.',
+    soc_t: 'Социальная категория', soc_ask_t: 'Укажите социальную категорию', soc_ask_sub: 'Инвалидность, реестр социальной защиты или «тетради», круглый сирота или воспитанник детдома — отметьте, если относитесь. Если нет — «Не отношусь ни к одной».',
+    soc_banner: 'Вопрос о социальной категории', soc_q: 'К какой категории вы относитесь?', soc_none: 'Не отношусь ни к одной', soc_note: 'Подтверждающий документ (необязательно)',
+    soc_note_ph: 'Например: справка № 123, 12.09.2026', soc_priv: 'Эти данные видят только координатор курса и деканат; координатор проверит.',
+    soc_locked: 'Отмечено координатором', soc_pending: 'на проверке', soc_checked: 'подтверждено', soc_pick: 'Выберите категорию или «Не отношусь ни к одной»',
+    soc_saved: 'Сохранено — координатор проверит', soc_group: 'Группа', soc_lists: 'В каком реестре' });
   Object.assign(T.en, { sec_act: 'Activity', portal: 'Student portal', my_children: 'My page', choose_child: 'Choose a course',
     events: 'Events and visits', events_nav: 'Events', measures: 'Disciplinary', mine_events: 'My events and visits',
     open_events: 'Registration open', no_events: 'No events in the coming days', no_open: 'No open announcements yet',
@@ -193,7 +219,20 @@ if (STUDENT) {  // talaba ilovasi: «farzand» o'rniga — talabaning o'zi; tala
     measures_note: 'Officially announced measures (dean’s order, university order, letter to parents). Document copies are in «Documents».',
     letter_sent: 'letter sent to parents', s_unlinked_t: 'You are not connected to the student bot yet',
     s_unlinked_sub: 'Open the student bot and press /start — your account is found by phone number. Then the app opens here.',
-    s_open_bot: 'Open the student bot', blocked: 'This app is for students.' });
+    s_open_bot: 'Open the student bot', blocked: 'This app is for students.',
+    home_t: 'Where I live', home_ask_t: 'First, tell us where you live', home_ask_sub: 'Your course coordinator needs to know where you live — for home visits and to reach you if needed. It takes a minute.',
+    home_banner: 'Your address is missing', home_banner_sub: 'Takes 1 minute', living_q: 'Where do you live now?',
+    addr_l: 'Address', addr_ph: 'District, street, building, flat', req: 'required', opt: 'optional',
+    point_l: 'Location on the map', point_none: 'Not set', point_ph: 'or coordinates / map link (Yandex, Google, 2GIS)',
+    my_loc: 'My location', map_pick: 'Pick on map', map_hint: 'Tap your flat’s location or drag the pin', map_ok: 'Choose', map_cancel: 'Cancel',
+    loc_wait: 'Detecting location…', loc_fail: 'Could not detect — pick on the map', save_home: 'Save', later: 'Later',
+    home_saved: 'Saved — your coordinator will see it', home_locked: 'Your coordinator entered this. If it changed, contact them.',
+    home_mine: 'Entered by you: {t}. Update it if you move.',
+    soc_t: 'Social category', soc_ask_t: 'Mark your social category', soc_ask_sub: 'Disability, social protection registers, full orphan or orphanage graduate — mark it if it applies. If not — «None of these».',
+    soc_banner: 'Social category question', soc_q: 'Which category applies to you?', soc_none: 'None of these', soc_note: 'Supporting document (optional)',
+    soc_note_ph: 'E.g.: certificate No 123, 12.09.2026', soc_priv: 'Only your course coordinator and the dean’s office see this; the coordinator will verify it.',
+    soc_locked: 'Set by the coordinator', soc_pending: 'under review', soc_checked: 'verified', soc_pick: 'Choose a category or «None of these»',
+    soc_saved: 'Saved — your coordinator will verify it', soc_group: 'Group', soc_lists: 'Which register' });
 }
 const MONTHS = {
   uz: ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'],
@@ -299,6 +338,8 @@ const P = {
   send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z', users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
   upload: 'M12 16V4M7 9l5-5 5 5M4 20h16', search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3', panel: 'M4 13h6V4H4zM14 20h6v-9h-6zM14 4v4h6V4zM4 20h6v-4H4z',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  heart: 'M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z',
+  pin: 'M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
 };
 /* bo'lim sarlavhalari belgisi: kalit — tarjima kaliti yoki o'zbekcha sarlavha */
@@ -406,7 +447,7 @@ function deskSide() {
       ${item('#/', 'home', t('home'))}${item('#/schedule', 'cal', t('schedule'))}${item('#/attendance', 'att', t('attendance'))}${item('#/grades', 'grade', t('grades'))}
       ${item('#/finance', 'wallet', t('finance'))}${item('#/trends', 'trend', t('trends'))}${item('#/documents', 'file', t('documents'))}
       <h6>${t('sec_act')}</h6>
-      ${item('#/events', 'mega', t('events'), S.evOpen)}${item('#/measures', 'alert', t('measures'))}${item('#/notifications', 'bell', t('notifications'), u.notifications)}
+      ${item('#/home', 'pin', t('home_t'), S.child && S.child.home_needed ? '!' : 0)}${item('#/social', 'heart', t('soc_t'), S.child && S.child.social_needed ? '!' : 0)}${item('#/events', 'mega', t('events'), S.evOpen)}${item('#/measures', 'alert', t('measures'))}${item('#/notifications', 'bell', t('notifications'), u.notifications)}
       <h6>${t('sec_uni')}</h6>${item('#/regulations', 'book', t('regs'))}
     </nav>` : `<nav class="dk-nav">
       <h6>${t('sec_study')}</h6>
@@ -934,8 +975,15 @@ async function viewTrends() {
 }
 
 /* ================================================================ talaba ilovasi: tadbirlar, choralar, ulanish */
+function homeBanner() {
+  if (!S.child) return '';
+  if (S.child.home_needed) return `<a class="survey-cta" href="#/home"><span class="ic-badge">${ic('pin')}</span>
+    <div class="body"><small>${t('home_banner_sub')}</small><b>${t('home_banner')}</b></div><span class="go">${t('save_home')}</span></a>`;
+  return S.child.social_needed ? `<a class="survey-cta" href="#/social"><span class="ic-badge">${ic('heart')}</span>
+    <div class="body"><small>${t('home_banner_sub')}</small><b>${t('soc_banner')}</b></div><span class="go">${t('answer_now')}</span></a>` : '';
+}
 function studentLinks() {
-  return `<div class="quick s3"><a href="#/events">${ic('mega')}<span>${t('events_nav')}</span>${S.evOpen ? `<span class="dot">${S.evOpen}</span>` : ''}</a>
+  return homeBanner() + `<div class="quick s3"><a href="#/events">${ic('mega')}<span>${t('events_nav')}</span>${S.evOpen ? `<span class="dot">${S.evOpen}</span>` : ''}</a>
     <a href="#/measures">${ic('alert')}<span>${t('measures')}</span></a><a href="#/documents">${ic('file')}<span>${t('documents')}</span></a></div>`;
 }
 const EV_IC = { ijara_tashrifi: ['home', 'gpa'], madaniy_tashrif: ['globe', 'money'], tadbir: ['mega', 'att'], koordinatorlik_soati: ['users', 'acad'] };
@@ -978,6 +1026,173 @@ async function viewMeasures() {
       : `<div class="verdict ok">${ic('ok')}<div><b>${t('no_measures')}</b><p>${t('no_measures_sub')}</p></div></div>`}
     <a class="btn ghost block" href="#/documents" style="margin-top:16px">${ic('file')}${t('documents')}</a>` });
 }
+/* yashash joyi: talaba o'zi kiritadi (toifa — yashil / qizil — faqat koordinatorda) */
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'static/vendor/leaflet/leaflet.css'; document.head.append(css);
+    const sc = document.createElement('script'); sc.src = 'static/vendor/leaflet/leaflet.js'; sc.onload = res; sc.onerror = rej; document.head.append(sc);
+  });
+}
+async function mapPick(start) {
+  try { await loadLeaflet(); } catch (e) { toast(t('error')); return null; }
+  return new Promise(res => {
+    const ov = document.createElement('div'); ov.className = 'mapov';
+    ov.innerHTML = `<div class="mapbox"><div class="maph"><b>${t('map_pick')}</b><span class="muted small">${t('map_hint')}</span></div><div id="pmap"></div>
+      <div class="mapf"><button class="btn ghost" data-mx>${t('map_cancel')}</button><button class="btn" data-mok>${t('map_ok')}</button></div></div>`;
+    document.body.append(ov);
+    const c0 = start || [41.3111, 69.2797];
+    const map = L.map('pmap', { attributionControl: true }).setView(c0, start ? 16 : 12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    const mk = L.marker(c0, { draggable: true, icon: L.divIcon({ className: 'pmk', html: '<i></i>', iconSize: [28, 28], iconAnchor: [14, 28] }) }).addTo(map);
+    map.on('click', e => mk.setLatLng(e.latlng));
+    const done = v => { map.remove(); ov.remove(); res(v); };
+    ov.querySelector('[data-mx]').onclick = () => done(null);
+    ov.querySelector('[data-mok]').onclick = () => { const p = mk.getLatLng(); done([p.lat, p.lng]); };
+  });
+}
+function myLocation() {
+  return new Promise((res, rej) => {
+    const browser = () => {
+      if (!navigator.geolocation) return rej(new Error('nogeo'));
+      navigator.geolocation.getCurrentPosition(p => res([p.coords.latitude, p.coords.longitude]), rej, { enableHighAccuracy: true, timeout: 15000 });
+    };
+    const lm = tg && tg.LocationManager;  // Telegram 8.0+: ilova ichida joylashuv
+    if (lm && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0')) {
+      try {
+        lm.init(() => { if (!lm.isLocationAvailable) return browser(); lm.getLocation(d => (d ? res([d.latitude, d.longitude]) : rej(new Error('denied')))); });
+        return;
+      } catch (_) { /* brauzer usuli */ }
+    }
+    browser();
+  });
+}
+const ptText = v => { const m = String(v || '').match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/); return m ? `${Number(m[1]).toFixed(5)}, ${Number(m[2]).toFixed(5)}` : ''; };
+async function viewHomeForm(first) {
+  const c = S.child;
+  page({ title: t('home_t'), sub: c.short, active: '', noNav: first, body: loading() });
+  let d;
+  try { d = await api(childPath(c, 'home')); } catch (e) { return page({ title: t('home_t'), active: '', noNav: first, body: errorBox() }); }
+  c.home_needed = !d.filled;
+  if (!d.editable) {
+    return page({ title: t('home_t'), sub: c.short, active: '', body: `<h2 class="screen-title">${t('home_t')}</h2>
+      <div class="list"><div class="row" style="cursor:default"><div class="ic">${ic('home')}</div><div class="body"><div class="t">${esc(d.titles[d.living] || '—')}</div><div class="d">${t('living_q')}</div></div></div>
+        ${d.address ? `<div class="row" style="cursor:default"><div class="ic">${ic('pin')}</div><div class="body"><div class="t">${esc(d.address)}</div><div class="d">${t('addr_l')}</div></div></div>` : ''}
+        <div class="row" style="cursor:default"><div class="ic">${ic('globe')}</div><div class="body"><div class="t num">${d.lat != null ? ptText(`${d.lat}, ${d.lon}`) : t('point_none')}</div><div class="d">${t('point_l')}</div></div></div></div>
+      <p class="muted small" style="margin-top:12px">${t('home_locked')}</p>` });
+  }
+  const loc0 = d.lat != null ? `${d.lat}, ${d.lon}` : '';
+  page({ title: t('home_t'), sub: c.short, active: '', noNav: first, body: `
+    ${first ? `<div class="verdict warn">${ic('pin')}<div><b>${t('home_ask_t')}</b><p>${t('home_ask_sub')}</p></div></div>` : `<h2 class="screen-title">${t('home_t')}</h2>`}
+    <form class="card hform" data-act="home-save" novalidate>
+      <div class="hf-h">${t('living_q')}</div>
+      <div class="hopts">${Object.entries(d.titles).map(([k, v]) => `<label class="hopt"><input type="radio" name="living" value="${k}" ${d.living === k ? 'checked' : ''}><span>${esc(v)}</span></label>`).join('')}</div>
+      <label class="field"><span>${t('addr_l')} <small class="hreq" data-r="addr"></small></span><textarea class="input" name="address" rows="2" placeholder="${esc(t('addr_ph'))}">${esc(d.address)}</textarea></label>
+      <div class="field"><span>${t('point_l')} <small class="hreq" data-r="pt"></small></span>
+        <div class="hpt" id="hpt">${ic('pin')}<b class="num">${loc0 ? ptText(loc0) : t('point_none')}</b></div>
+        <div class="hbtns"><button type="button" class="btn ghost" data-hgeo>${ic('pin')}${t('my_loc')}</button><button type="button" class="btn ghost" data-hmap>${ic('globe')}${t('map_pick')}</button></div>
+        <input class="input" name="location" value="${esc(loc0)}" placeholder="${esc(t('point_ph'))}" autocomplete="off"></div>
+      <button class="btn block" type="submit">${t('save_home')}</button>
+      ${first ? `<button type="button" class="btn ghost block" data-hlater style="margin-top:8px">${t('later')}</button>` : ''}
+      ${d.by === 'talaba' && d.at ? `<p class="muted small" style="margin:12px 0 0">${t('home_mine', { t: when(d.at) })}</p>` : ''}
+    </form>` });
+  const f = document.querySelector('form[data-act="home-save"]'), inp = f.querySelector('[name=location]');
+  const paint = () => {
+    const lv = (f.querySelector('[name=living]:checked') || {}).value || '';
+    f.querySelector('[data-r=addr]').textContent = `(${d.need_address.includes(lv) ? t('req') : t('opt')})`;
+    f.querySelector('[data-r=pt]').textContent = `(${d.need_point.includes(lv) ? t('req') : t('opt')})`;
+    document.getElementById('hpt').innerHTML = `${ic('pin')}<b class="num">${ptText(inp.value) || (inp.value ? esc(inp.value.slice(0, 40)) : t('point_none'))}</b>`;
+  };
+  paint();
+  f.addEventListener('change', paint); inp.addEventListener('input', paint);
+  f.querySelector('[data-hgeo]').onclick = async e => {
+    const b = e.currentTarget; b.disabled = true; toast(t('loc_wait'));
+    try { const p = await myLocation(); inp.value = `${p[0].toFixed(6)}, ${p[1].toFixed(6)}`; paint(); haptic('light'); }
+    catch (_) { toast(t('loc_fail')); }
+    b.disabled = false;
+  };
+  f.querySelector('[data-hmap]').onclick = async () => {
+    const m = ptText(inp.value).split(', ').map(Number);
+    const p = await mapPick(m.length === 2 && !isNaN(m[0]) ? m : null);
+    if (p) { inp.value = `${p[0].toFixed(6)}, ${p[1].toFixed(6)}`; paint(); }
+  };
+  const later = f.querySelector('[data-hlater]');
+  if (later) later.onclick = () => { S.homeSkip = true; location.hash = '#/'; route(); };
+  f.addEventListener('submit', async e => {
+    e.preventDefault(); e.stopImmediatePropagation();
+    const fd = new FormData(f), btn = f.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      const r = await api(childPath(c, 'home'), { json: { living: fd.get('living') || '', address: fd.get('address') || '', location: fd.get('location') || '' } });
+      c.home_needed = !r.filled; haptic('success'); toast(t('home_saved'));
+      if (location.hash === '#/' || location.hash === '' || first) { location.hash = '#/'; route(); } else location.hash = '#/';
+    } catch (err) { toast((err.data && err.data.message) || t('error')); btn.disabled = false; }
+  }, true);
+}
+async function viewSocialForm(first) {
+  const c = S.child;
+  page({ title: t('soc_t'), sub: c.short, active: '', noNav: first, body: loading() });
+  let d;
+  try { d = await api(childPath(c, 'social')); } catch (e) { return page({ title: t('soc_t'), active: '', noNav: first, body: errorBox() }); }
+  c.social_needed = d.needed;
+  const locked = d.items.filter(x => !x.mine), mine = d.items.filter(x => x.mine);
+  const lockedCats = new Set(locked.map(x => x.category));
+  const subs = (k, m) => {
+    const ks = Object.entries(m.subs);
+    if (!ks.length) return '';
+    if (k === 'nogironlik') {
+      const cur = (mine.find(x => x.category === k) || {}).sub || '';
+      return `<div class="socsub"><span>${t('soc_group')}</span><div class="seg">${ks.map(([s, l]) => `<button type="button" data-g="${s}" aria-pressed="${cur === s}">${esc(l)}</button>`).join('')}</div></div>`;
+    }
+    return `<div class="socsub"><span>${t('soc_lists')}</span><div class="socchips">${ks.map(([s, l]) => `<label class="gchip"><input type="checkbox" name="sub_${k}" value="${s}"
+      ${mine.some(x => x.category === k && x.sub === s) ? 'checked' : ''} ${locked.some(x => x.category === k && x.sub === s) ? 'checked disabled' : ''}><span>${esc(l)}</span></label>`).join('')}</div></div>`;
+  };
+  const note0 = (mine.find(x => x.note) || {}).note || '';
+  page({ title: t('soc_t'), sub: c.short, active: '', noNav: first, body: `
+    ${first ? `<div class="verdict warn">${ic('heart')}<div><b>${t('soc_ask_t')}</b><p>${t('soc_ask_sub')}</p></div></div>` : `<h2 class="screen-title">${t('soc_t')}</h2>`}
+    ${d.items.length ? `<div class="list" style="margin-top:12px">${d.items.map(x => `<div class="row" style="cursor:default"><div class="ic">${ic('heart')}</div><div class="body"><div class="t">${esc(x.label)}</div>
+      <div class="d">${x.mine ? (x.pending ? t('soc_pending') : t('soc_checked')) : t('soc_locked')}${x.note ? ' · ' + esc(x.note) : ''}</div></div></div>`).join('')}</div>` : ''}
+    <form class="card hform" data-act="soc-save" novalidate>
+      <div class="hf-h">${t('soc_q')}</div>
+      ${Object.entries(d.meta).map(([k, m]) => { const on = mine.some(x => x.category === k) || lockedCats.has(k); const lk = lockedCats.has(k) && (k !== 'ijtimoiy');
+        return `<div class="socq${on ? ' on' : ''}" data-k="${k}"><label class="hopt"><input type="checkbox" name="cat" value="${k}" ${on ? 'checked' : ''} ${lk ? 'disabled' : ''}><span>${esc(m.title)}</span></label>${lk ? '' : subs(k, m)}</div>`; }).join('')}
+      <label class="hopt hnone"><input type="checkbox" name="none" ${d.answered && !d.items.length ? 'checked' : ''}><span>${t('soc_none')}</span></label>
+      <label class="field"><span>${t('soc_note')}</span><input class="input" name="note" value="${esc(note0)}" placeholder="${esc(t('soc_note_ph'))}"></label>
+      <p class="muted small" style="margin:0">${t('soc_priv')}</p>
+      <button class="btn block" type="submit">${t('save_home')}</button>
+      ${first ? `<button type="button" class="btn ghost block" data-slater>${t('later')}</button>` : ''}
+    </form>` });
+  const f = document.querySelector('form[data-act="soc-save"]');
+  const none = f.querySelector('[name=none]');
+  f.addEventListener('change', e => {
+    if (e.target === none && none.checked) f.querySelectorAll('[name=cat]:not(:disabled)').forEach(x => { x.checked = false; });
+    if (e.target.name === 'cat' && e.target.checked) none.checked = false;
+    f.querySelectorAll('.socq').forEach(q => q.classList.toggle('on', q.querySelector('[name=cat]').checked));
+  });
+  f.querySelectorAll('[data-g]').forEach(b => b.addEventListener('click', () => {
+    b.parentElement.querySelectorAll('[data-g]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); }));
+  const later = f.querySelector('[data-slater]');
+  if (later) later.onclick = () => { S.socialSkip = true; location.hash = '#/'; route(); };
+  f.addEventListener('submit', async e => {
+    e.preventDefault(); e.stopImmediatePropagation();
+    const note = f.querySelector('[name=note]').value.trim(), items = [];
+    f.querySelectorAll('[name=cat]:checked:not(:disabled)').forEach(x => {
+      const k = x.value;
+      if (k === 'nogironlik') { const g = f.querySelector('.socq[data-k="nogironlik"] [aria-pressed="true"]'); items.push({ category: k, sub: g ? g.dataset.g : '', note }); }
+      else if (k === 'ijtimoiy') {
+        const ss = [...f.querySelectorAll('[name=sub_ijtimoiy]:checked:not(:disabled)')].map(y => y.value);
+        (ss.length ? ss : (locked.some(y => y.category === k) ? [] : ['boshqa'])).forEach(s2 => items.push({ category: k, sub: s2, note }));
+      } else items.push({ category: k, sub: '', note });
+    });
+    if (!items.length && !none.checked && !locked.length) { toast(t('soc_pick')); return; }
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    try {
+      const r = await api(childPath(c, 'social'), { json: items.length ? { items } : { none: true } });
+      c.social_needed = r.needed; haptic('success'); toast(t('soc_saved'));
+      if (first) { location.hash = '#/'; route(); } else location.hash = '#/';
+    } catch (err) { toast((err.data && err.data.message) || t('error')); btn.disabled = false; }
+  }, true);
+}
 function viewStudentLink() {
   $app.innerHTML = `<main class="no-nav"><div class="empty">${ic('users')}<b>${t('s_unlinked_t')}</b>${esc(t('s_unlinked_sub'))}
     ${S.me.bot ? `<p style="margin-top:16px"><button class="btn" id="openBot">${t('s_open_bot')}</button></p>` : ''}</div></main>`;
@@ -1005,7 +1220,7 @@ document.addEventListener('click', async e => {
 
 /* ================================================================ menyu, sozlamalar, ma'lumot */
 function viewMenu() {
-  const items = STUDENT ? [['#/events', 'mega', t('events')], ['#/measures', 'alert', t('measures')], ['#/finance', 'wallet', t('finance')],
+  const items = STUDENT ? [['#/home', 'pin', t('home_t')], ['#/social', 'heart', t('soc_t')], ['#/events', 'mega', t('events')], ['#/measures', 'alert', t('measures')], ['#/finance', 'wallet', t('finance')],
     ['#/documents', 'file', t('documents')], ['#/trends', 'trend', t('trends')], ['#/regulations', 'book', t('regs')], ['#/settings', 'gear', t('settings')]] : [['#/surveys', 'poll', t('surveys')], ['#/regulations', 'book', t('regs')],
     ['#/finance', 'wallet', t('finance')], ['#/documents', 'file', t('documents')], ['#/trends', 'trend', t('trends')],
     ['#/news', 'mega', t('news')], ['#/info', 'info', t('info')], ['#/settings', 'gear', t('settings')]];
@@ -1898,6 +2113,8 @@ async function route() {
     location.replace('#' + (GO_ROUTE[parts[1]] || '/notifications'));
     return;
   }
+  if (STUDENT && S.child && S.child.home_needed && !S.homeSkip && parts[0] !== 'home') return viewHomeForm(true);
+  if (STUDENT && S.child && !S.child.home_needed && S.child.social_needed && !S.socialSkip && !['home', 'social'].includes(parts[0])) return viewSocialForm(true);
   if (parts[0] === 'chat' && parts[2]) pickChild(`${decodeURIComponent(parts[1])}/${parts[2]}`);
   switch (parts[0]) {
     case 'doc': return viewDoc(parts[1]);
@@ -1907,6 +2124,8 @@ async function route() {
     case 'grades': return viewGrades();
     case 'chat': return STUDENT ? viewHome() : viewChat();
     case 'events': return STUDENT ? viewEvents() : viewHome();
+    case 'home': return STUDENT ? viewHomeForm(false) : viewHome();
+    case 'social': return STUDENT ? viewSocialForm(false) : viewHome();
     case 'measures': return STUDENT ? viewMeasures() : viewHome();
     case 'notifications': return viewNotifications();
     case 'news': return viewNews();

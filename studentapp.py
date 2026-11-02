@@ -68,9 +68,94 @@ def self_route(handler):
             st = await db.get_student(sid)
             if not st:
                 return bad("not_found", 404)
+            from datetime import timedelta
+            from utils import now, now_iso
+            # ilovadagi har bir amal — «botda faol» (5 daqiqada bir marta yoziladi)
+            await db.execute("UPDATE student_accounts SET seen_at = ?, blocked_at = NULL WHERE tg_id = ? AND student_id = ? "
+                             "AND (seen_at IS NULL OR seen_at < ?)", (now_iso(), request["user"]["id"], sid,
+                                                                      (now() - timedelta(minutes=5)).isoformat(timespec="seconds")))
             request["student"], request["course"], request["self"] = st, key, True
             return await handler(request)
     return wrapped
+
+
+# ---------------------------------------------------------------- yashash joyi (talaba o'zi kiritadi)
+NEED_ADDRESS = ("ijara", "qarindosh")  # manzil shart
+NEED_POINT = ("ijara",)  # xaritadagi joy shart (tashrif va yo'l uchun)
+
+
+def home_state(st: dict) -> dict:
+    """Talabaning yashash joyi: to'ldirilganmi va talaba o'zi o'zgartira oladimi. Xonadon toifasi (yashil / sariq /
+    qizil) talabaga ko'rsatilmaydi va u tomonidan o'zgartirilmaydi — faqat kurs koordinatori."""
+    living = st.get("living") or ("ijara" if (st.get("rent_address") or "").strip() else None)
+    address = (st.get("rent_address") or "").strip()
+    has_point = st.get("lat") is not None
+    filled = bool(living) and (living not in NEED_ADDRESS or bool(address)) and (living not in NEED_POINT or has_point)
+    started = bool(st.get("living") or address or has_point)
+    # koordinator kiritgan yoki fayldan kelgan ma'lumot — talaba o'zgartirmaydi; bo'sh yoki o'zi kiritgan — o'zgartiradi
+    editable = (st.get("home_by") == "talaba") or not started
+    return {"living": living, "address": address, "lat": st.get("lat"), "lon": st.get("lon"), "filled": filled,
+            "editable": editable, "by": st.get("home_by"), "at": st.get("home_at"),
+            "need_address": list(NEED_ADDRESS), "need_point": list(NEED_POINT)}
+
+
+@self_route
+async def api_home(request):
+    import visits as V
+    from webapi import ok
+    st = request["student"]
+    if request.method == "POST":
+        cur = home_state(st)
+        if not cur["editable"]:
+            return web.json_response({"error": "locked", "message": tr("Yashash joyingizni kurs koordinatori kiritgan — "
+                                                                       "o'zgargan bo'lsa, unga murojaat qiling.")}, status=403)
+        body = await request.json()
+        living = str(body.get("living") or "")
+        address = str(body.get("address") or "").strip()
+        location = str(body.get("location") or "").strip()
+        if living not in V.LIVING:
+            return web.json_response({"error": "bad_living", "message": tr("Qayerda yashashingizni tanlang")}, status=400)
+        if living in NEED_ADDRESS and len(address) < 8:
+            return web.json_response({"error": "no_address", "message": tr("Manzilni to'liq yozing: tuman, ko'cha (mavze), uy, "
+                                                                           "xonadon")}, status=400)
+        if living in NEED_POINT and not location:
+            return web.json_response({"error": "no_point", "message": tr("Xaritadagi joyni ko'rsating: «Turgan joyim» yoki "
+                                                                         "«Xaritadan tanlash»")}, status=400)
+        d = {"living": living, "address": address, "location": location}  # bo'sh joy — olib tashlanadi
+        try:  # toifa (zone) — talabadan qabul qilinmaydi
+            await V.set_home(st["id"], d, by="talaba")
+        except V.VisitError as e:
+            return web.json_response({"error": e.code, "message": e.message}, status=400)
+        st = await db.get_student(st["id"])
+    return ok({**home_state(st), "titles": {k: tr(v) for k, v in V.LIVING.items()}})
+
+
+# ---------------------------------------------------------------- ijtimoiy toifa (talaba o'zi belgilaydi)
+async def social_needed(st: dict) -> bool:
+    """Toifasi yo'q va hali javob bermagan — ilovada (yashash joyidan keyin) so'raladi."""
+    if st.get("social_at"):
+        return False
+    return not await db.fetchone("SELECT 1 FROM student_categories WHERE student_id = ?", (st["id"],))
+
+
+@self_route
+async def api_social(request):
+    import socialcat as SC
+    from webapi import ok
+    st = request["student"]
+    if request.method == "POST":
+        body = await request.json()
+        items = [] if body.get("none") else [x for x in body.get("items") or [] if isinstance(x, dict)]
+        try:
+            await SC.student_set(st["id"], items)
+        except SC.SocialError as e:
+            return web.json_response({"error": e.code, "message": tr(e.message)}, status=400)
+        st = await db.get_student(st["id"])
+    rows = await SC.of_student(st["id"])
+    return ok({"items": [{"category": r["category"], "sub": r["sub"], "label": tr(r["label"]), "note": r["note"] or "",
+                          "mine": r["source"] == "talaba", "pending": r["pending"]} for r in rows],
+               "meta": {k: {"title": tr(c["title"]), "subs": {a: tr(b) for a, b in c["subs"].items()}} for k, c in SC.CATS.items()},
+               "answered": bool(st.get("social_at")), "needed": await social_needed(st)})
 
 
 # ---------------------------------------------------------------- shaxs
@@ -78,9 +163,14 @@ async def api_me(request):
     from webapi import child_card, ok
     uid = request["user"]["id"]
     cards, unread = [], 0
+    import studentnotify
+    await studentnotify.mark_seen(uid)  # talaba ilovani ochdi — «botda faol»
     for key, st in await my_students(uid):
         with use_course(None if key == "_" else key):
-            cards.append(await child_card(st, key))
+            card = await child_card(st, key)
+            card["home_needed"] = not home_state(st)["filled"]  # ilova ochilganda — avval yashash joyi so'raladi
+            card["social_needed"] = await social_needed(st)  # so'ng — ijtimoiy toifa
+            cards.append(card)
             unread += (await db.fetchone("SELECT COUNT(*) n FROM student_notices WHERE student_id = ? AND read_at IS NULL",
                                          (st["id"],)))["n"]
     import loc
@@ -258,6 +348,10 @@ def setup(r) -> None:
         r.add_get(f"{base}/{tail}", self_route(h.inner))
     r.add_post(base + "/documents/{did:\\d+}/send", api_document_send)
     r.add_get(base + "/measures", api_measures)
+    r.add_get(base + "/home", api_home)
+    r.add_post(base + "/home", api_home)
+    r.add_get(base + "/social", api_social)
+    r.add_post(base + "/social", api_social)
     r.add_get(base + "/events", api_events)
     r.add_post(base + "/events/{pid:\\d+}", api_event_action)
 

@@ -744,6 +744,8 @@ async function loadStudentHome(sid, course) {
       <span>Xonadon toifasi</span><b class="wrapc" style="justify-content:flex-end">${z ? `<span class="zchip z-${d.zone}">${esc(z[1])} hudud</span>` : '<span class="dash">baholanmagan</span>'}
         ${d.zone_from === 'act' ? '<span class="sub-l" style="display:inline">dalolatnomadan</span>' : `<select class="select sm" data-hzone><option value="">— qo‘lda —</option>${Object.entries(ZONE_C).map(([k, v]) => `<option value="${k}" ${d.zone === k ? 'selected' : ''}>${v[1]}</option>`).join('')}</select>`}</b>
       <span>Bot (tashrif xabarlari)</span><b>${d.account.linked ? `<span class="chip ok">${ic('telegram')} ulangan${d.account.via === 'tasdiq' ? ' (ota-onani tasdiqlagan)' : ''}</span>` : `<button class="btn sm ghost" data-hinv>${ic('link')} Shaxsiy havola</button>`}</b></div>
+    ${d.home_by === 'talaba' ? `<div class="note ${d.home_checked ? 'ok' : 'warn'}" style="margin:10px 0 0">${ic('user1')}<span><b>Talaba o‘zi kiritgan</b>${d.home_at ? ` · ${esc(when(d.home_at))}` : ''} — talaba ilovasi orqali${d.home_checked ? ', <b>tekshirilgan</b>' : ''}. ${d.home_checked ? '' : 'Tekshirib tasdiqlang va xonadon toifasini (yashil / sariq / qizil) belgilang. '}Siz tahrir qilsangiz, talaba endi o‘zgartira olmaydi.</span>
+      ${d.home_checked ? '' : `<button class="btn sm primary" data-hcheck style="margin-left:auto;align-self:center">${ic('check')} Tasdiqlash</button>`}</div>` : ''}
     ${d.near ? `<p class="hint" style="margin:8px 0 0">${ic('pin')} ${esc(d.near)}</p>` : ''}
     <div class="wrapc" style="margin-top:10px"><button class="btn sm" data-hroute ${d.address || d.lat != null ? '' : 'disabled'}>${ic('route')} Qanday boriladi</button>
       <button class="btn sm ghost" data-hnew>${ic('plus')} Tashrif rejalash</button></div>
@@ -753,6 +755,7 @@ async function loadStudentHome(sid, course) {
   const save = async body => { try { await api(`/api/staff/visits/student/${sid}`, { method: 'POST', json: body, course }); toast('Saqlandi'); loadStudentHome(sid, course); } catch (e) { toast(verr(e), true); } };
   $('[data-hliv]', box).addEventListener('change', e => save({ living: e.target.value }));
   $('[data-hzone]', box)?.addEventListener('change', e => save({ zone: e.target.value }));
+  $('[data-hcheck]', box)?.addEventListener('click', () => save({ checked: true }));
   $('[data-haddr]', box).addEventListener('click', async () => {
     const f = await formDlg('Ijara manzili', `<p>Tuman, ko‘cha (mavze), uy, xonadon — masalan: «Uchtepa tumani, 14-kvartal, 2-uy, 63-xonadon». Bu — talaba hozir yashayotgan (ijara) manzili: tashriflar va xarita uchun. Ota-onaga xatdagi doimiy manzil (kontingentdan) bundan alohida va o‘zgarmaydi.</p>
       <label class="field"><span>Manzil</span><input class="input" name="address" value="${esc(d.address)}"></label>`, 'Saqlash');

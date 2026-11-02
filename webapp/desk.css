@@ -1115,7 +1115,7 @@ select.dchip { padding-right: 34px; cursor: pointer; appearance: none; backgroun
   background-position: calc(100% - 18px) 18px, calc(100% - 13px) 18px; background-size: 5px 5px; background-repeat: no-repeat; }
 .dboard { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; align-items: start; }
 .dash-main, .dash-side { display: grid; gap: 20px; min-width: 0; }
-.dash-side { position: sticky; top: calc(var(--top-h) + 16px); }
+.dash-side { position: static; }  /* uzun ustun — sticky bo‘lsa pastki kartalar ko‘rinmay qoladi */
 .kpi5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
 .drow { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; }
 .drow.eq { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1317,3 +1317,12 @@ tr.muted-row td:last-child { opacity: 1; }
 .gb.navy { background: var(--blue-50); color: var(--blue); }
 .gb.warn { background: color-mix(in srgb, var(--amber) 16%, var(--surface)); color: color-mix(in srgb, var(--amber) 85%, var(--ink)); }
 .gb.bordo { background: color-mix(in srgb, var(--red) 13%, var(--surface)); color: var(--red); }
+
+/* talabalar boti: ulanganlar soni (Talabalar jadvali ustida) */
+.botline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -4px 0 14px; padding: 10px 14px; border-radius: 12px;
+  background: var(--blue-50); color: var(--ink); font-size: 13.5px; }
+.botline svg.i { width: 17px; height: 17px; color: var(--blue); }
+.botline span { flex: 1; min-width: 240px; }
+.botline a { color: var(--blue); font-weight: 600; font-size: 13px; }
+.botbar { height: 8px; border-radius: 6px; background: var(--line-2); overflow: hidden; }
+.botbar i { display: block; height: 100%; border-radius: 6px; background: var(--blue); }

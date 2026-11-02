@@ -231,6 +231,13 @@ bitta botda ishlaydi (oldingidek), jurnalda sababi yoziladi.
 Ulangan talaba `/start` bossa — kimligi, javob kutayotgan tashriflari va ochiq e'lonlar qayta keladi; «📅 Tadbirlarim» —
 yaqin tashrif va tadbirlari hamda ro'yxatdan o'tish mumkin bo'lgan e'lonlar.
 
+**Kim botga ulangan — panelda.** «Talabalar» jadvalida **«Bot»** ustuni (ulangan / faol / bloklagan / yo'q; ustiga olib
+borilsa — qanday ulangani va oxirgi faollik) va filtr (botga ulangan, oxirgi 7 kunda faol, botni bloklagan, ulanmagan);
+jadval ustida — «Talabalar botiga ulangan: N / jami (%) · faol · bloklagan» va ro'yxatga havolalar. Bosh sahifada —
+«Talabalar boti» kartasi; dekanda — barcha kurslar bo'yicha va kurslar jadvalidagi «Botda» ustuni. «Faol» — oxirgi 7 kunda
+botda xabar yoki tugma bosgan yoki ilovani ochgan; «bloklagan» — talabaga xabar yetmadi (bot bloklangan), talaba qaytsa —
+o'zi olinadi.
+
 **Bitta botdan ikki botga o'tish.** Eski havolalar (ota-onalar botidagi `?start=t_...`, `?start=v_...`) va eski
 xabarlardagi talaba tugmalari endi talabalar botiga yo'naltiradi («... da ochish» tugmasi, shu havolaning o'zi bilan).
 Avval ulangan talabalarning hisobi saqlanadi (Telegram ID bir xil), lekin Telegram bot talabaga birinchi bo'lib yoza
@@ -254,6 +261,20 @@ ma'lumot — **talabaning o'zi haqida**:
 - **Choralar** — rasman ko'rilgan choralar (dekan ogohlantirishi, hayfsan, ota-onaga xat: raqami, sanasi, asosi);
 - **Bildirishnomalar** — talabaga yuborilgan chora xabarlari va rasmiy hujjatlar (bot orqali kelgani — shu yerda ham);
 - **Ichki nizomlar**, sozlamalar (til, mavzu).
+
+**Talaba o'zi kiritadi — yashash joyi va ijtimoiy toifa.** Ilova ochilganda, agar kiritilmagan bo'lsa, **birinchi navbatda**
+so'raladi (keyin bosh sahifada eslatma turadi; «Keyinroq» — keyingi ochilishda yana so'raladi):
+- **Yashash joyi** — qayerda yashaydi (ijara xonadoni, TTJ, o'z uyi, qarindoshiniki), manzil (ijara va qarindoshda — majburiy)
+  va xaritadagi joy (ijarada — majburiy): «Turgan joyim» (telefon joylashuvi) yoki «Xaritadan tanlash», yoki koordinata /
+  xarita havolasi. **Xonadon toifasi (yashil / sariq / qizil) talabaga ko'rinmaydi va faqat koordinator belgilaydi.**
+  Ma'lumot koordinator kiritgan yoki fayldan kelgan bo'lsa — talaba faqat ko'radi; o'zi kiritganini ko'chib o'tganda yangilaydi.
+- **Ijtimoiy toifa** — nogironlik (guruhi bilan), ijtimoiy himoya (qaysi reestr yoki daftar), chin yetim, mehribonlik uyi —
+  yoki «Hech biriga kirmayman»; asos hujjat (ixtiyoriy). Koordinator yoki fayl bilan belgilangan toifani talaba o'zgartira olmaydi.
+
+Kurs koordinatorida: talaba kartasida «Talaba o'zi kiritgan · sana» va **«Tasdiqlash»** tugmasi; boshqaruv panelida yangi
+**«Talabalar kiritgan»** sahifasi (menyuda tekshirilmaganlar soni bilan) — yashash joylari va toifalar ro'yxati, tasdiqlash
+yoki olib tashlash; bosh sahifa vazifasi va bildirishnomalarda ham. Xonadon toifasini qo'yish ham tekshiruv hisoblanadi;
+koordinator yashash joyini tahrir qilsa, talaba endi o'zgartira olmaydi. Dekanda — kurslar bo'yicha vazifa.
 
 **Kirish va xavfsizlik.** Ilova Telegram imzosi bilan ochiladi (talabalar botining tokeni bilan tekshiriladi; alohida bot
 sozlanmagan bo'lsa — asosiy bot). Talaba kimligi — botga ulangan hisobi (shaxsiy havola, telefon raqami yoki ota-onani
@@ -856,6 +877,13 @@ Hisobot bo'limlari: umumiy ko'rsatkichlar; muammoli talabalar (muammolar soni, s
 
 **Excel:** har bir bo'lim — alohida varaq, sarlavha qatori qotirilgan, filtr qo'yilgan, chop etishga moslangan (albom holatida, bir sahifa eniga). Jami summalar va «Umumiy» varaqdagi sonlar **formulalar** bilan hisoblanadi — jadval tahrirlansa ham to'g'ri qoladi. **PDF:** albom holatidagi A4, jadvallar, sahifa raqamlari; o'zbek va kirill harflari uchun DejaVu shrifti (matplotlib bilan birga keladi — serverga alohida o'rnatish shart emas). Ko'p kursli rejimda hisobot faqat koordinatorning o'z kursi bo'yicha.
 
+
+**Alohida ro'yxatlar.** Hisobotda (Excel — alohida varaqlar, PDF — alohida bo'limlar; «Bo'lim» tanlovida bittasini ham
+yuklab olish mumkin): **«Yashash joylari»** — barcha talabalar: yashash joyi, manzil, xaritadagi joy, xonadon toifasi, kim
+kiritgan (talaba o'zi / koordinator), sana va koordinator tekshirganmi (kiritmaganlar — oxirida); **«Ijtimoiy toifalar»** —
+toifa, kichik toifa, izoh, manba (fayldan / qo'lda / talaba o'zi kiritgan) va tekshirilganmi; **«Talabalar boti»** — kim
+ulangan, holati (faol / ulangan / bloklagan / ulanmagan), qanday ulangan, sana, oxirgi faollik va ota-onasi botdami.
+«Umumiy» varaqda — yashash joyi kiritilganlar, ijtimoiy toifadagilar va botga ulanganlar soni.
 ## Kurs koordinatori buyruqlari
 
 | Buyruq | Vazifasi |
@@ -1099,7 +1127,9 @@ socialapi.py      — ijtimoiy toifalar API si (kurs holati kartalari, ro'yxat, 
 dashboard.py      — bosh sahifa qismlari: bugungi vazifalar, yaqin tadbir va tashriflar, integratsiyalar holati, guruhlar kesimi
 receipts.py       — to'lov cheki / kvitansiyasi: qarzni yopish (qisman), bekor qilish, arxiv
 studentnotify.py  — talabaning o'ziga: chora xabarlari va rasmiy hujjatlar (talabalar boti, ilovadagi tarix)
-studentapp.py     — talaba ilovasi API si (/api/s/…): talabalar boti imzosi, faqat o'zi, tadbirlarga yozilish, bildirishnomalar
+studentapp.py     — talaba ilovasi API si (/api/s/…): talabalar boti imzosi, faqat o'zi, tadbirlarga yozilish, bildirishnomalar,
+                    yashash joyi va ijtimoiy toifani talaba o'zi kiritishi
+selfdata.py       — «Talabalar kiritgan» (koordinator tekshiruvi) va talabalar botiga ulanish holati
 paymentsapi.py    — «To'lovlar» bo'limi API si (qarzdorlar, chek yuklash va bekor qilish, faylni ochish)
 handlers/visits.py — tashrif va tadbir bot oqimlari: talaba havolasi, javoblari, e'londa ro'yxatdan o'tish, talabalar
                     boti menyusi (/start, telefon bilan ulanish, «Tadbirlarim»); koordinator: /yol (turgan joydan yo'l)

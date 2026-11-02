@@ -138,6 +138,18 @@ function integStrip(list) {
 }
 const MIX = [['att', 'Davomat', '#2F6BED', 'att'], ['acad', 'Akademik qarz', '#8B5CF6', 'acad'], ['gpa', 'Past GPA', '#D9861C', 'gpa'],
   ['kontrakt', 'Kontrakt qarzi', '#1E9E5A', 'kontrakt'], ['trimestr', 'Trimestr qarzi', '#0EA5E9', 'trimestr']];
+/* talabalar boti: ulanganlar, oxirgi 7 kunda faollar, bloklaganlar, ulanmaganlar — ro'yxatga havola bilan */
+function botCard(b, all = false) {
+  if (!b) return '';
+  const q = all ? 'all=1&' : '', pct = b.total ? Math.round(100 * b.linked / b.total) : 0;
+  return card('telegram', 'blue', 'Talabalar boti', `<div class="cb" style="padding-bottom:6px"><div class="botbar" title="${pct}% ulangan"><i style="width:${pct}%"></i></div>
+      <p class="hint" style="margin:8px 0 0">${pct}% talaba botga ulangan — xabar, chora va hujjatlar o‘ziga boradi</p></div>${kvl([
+    { k: 'Botga ulangan', s: `${b.total} ta talabadan`, v: `${b.linked}`, href: `#/students?${q}bot=on` },
+    { k: 'Faol (oxirgi 7 kun)', s: 'botda yoki ilovada bo‘lgan', v: b.active, href: `#/students?${q}bot=active` },
+    ...(b.blocked ? [{ k: 'Botni bloklagan', s: 'xabar yetmayapti', v: b.blocked, c: 'var(--red)', href: `#/students?${q}bot=blocked` }] : []),
+    { k: 'Ulanmagan', s: 'bot havolasini yuboring', v: b.total - b.linked, c: b.total - b.linked ? 'var(--amber)' : '', href: `#/students?${q}bot=off` }])}`,
+    more(`#/students?${q}bot=on`, 'Ro‘yxat'));
+}
 const discBars = k => hbars([{ t: 'Dekan ogohlantirishi', v: k.ogohlantirish || 0, c: 'blue', href: '#/chora?tab=hist&hm=ogohlantirish' },
   { t: 'Hayfsan', v: k.hayfsan || 0, c: 'violet', href: '#/chora?tab=hist&hm=hayfsan' },
   { t: 'Boshqa (ichki tartib)', v: k.boshqa || 0, c: 'amber', href: '#/chora?tab=hist&hm=boshqa' },
@@ -194,7 +206,7 @@ async function pPanel(parts, q) {
       <div class="drow">${dynCard('hdyn', tabs, st.tab)}${mixCard}</div>
       <div class="drow">${grpCard}${discCard}</div>
       ${topCard}</div>
-      <aside class="dash-side">${taskCard(home && home.tasks)}${eventsCard(home && home.events)}${finCard}</aside></div>
+      <aside class="dash-side">${taskCard(home && home.tasks)}${eventsCard(home && home.events)}${botCard(d.bot)}${finCard}</aside></div>
       ${home ? `<div style="margin-top:20px">${integStrip(home.integrations)}</div>` : ''}
       <p class="foot">${ic('clock')} Ma’lumotlar oxirgi marta yangilangan: ${d.updated ? when(d.updated) : 'hali yuklanmagan'}.</p>`);
     bindDyn('hdyn', tabs, st, paint);
@@ -229,11 +241,12 @@ async function pSuperOverview() {
   const mix = { att: sum(c => c.att), acad: sum(c => c.acad), gpa: sum(c => c.gpa), kontrakt: sum(c => c.kontrakt.count), trimestr: sum(c => c.trimestr.count) };
   const mixCard = card('pie', 'red', `Muammolar tarkibi <small>(${prob} ta talaba)</small>`, `<div class="cb">${donut(MIX.map(([k, l, c, f]) => ({ label: l, value: mix[k] || 0, color: c, href: `#/students?all=1&f=${f}` })), prob, 'talaba')}</div>`);
   const coursesCard = card('layers', 'blue', 'Kurslar kesimida holat', C.length ? `<div style="overflow:auto"><table class="dtbl"><thead><tr><th>Kurs</th><th class="r">Talabalar</th><th class="r">Muammoli</th>
-      <th class="r">Davomat</th><th class="r">Chora</th><th class="r">Qarzdor</th><th></th></tr></thead><tbody>
+      <th class="r">Davomat</th><th class="r">Chora</th><th class="r">Qarzdor</th><th class="r" title="Talabalar botiga ulangan">Botda</th><th></th></tr></thead><tbody>
       ${C.map(c => `<tr class="click" data-crs="${esc(c.key)}" title="Kursga o‘tish"><td><b class="nowrap">${esc(c.title)}</b><div class="sub-l">${c.admins.length ? esc(c.admins.map(a => a.label).join(', ')) : `<span style="color:var(--amber)">koordinator yo‘q</span>`}</div></td>
         <td class="r">${num(c.total, 0)}</td><td class="r">${probPill(c.prob)}</td><td class="r">${attPill(c.avg_att)}</td>
         <td class="r nowrap">${c.disc ? (c.disc.pending ? `<span class="pill red" title="Chora kutilmoqda">+${c.disc.pending}</span>` : c.disc.students) : '—'}</td>
-        <td class="r">${c.kontrakt.count + c.trimestr.count || '<span class="dash">0</span>'}</td><td class="r">${ic('chevr')}</td></tr>`).join('')}</tbody></table></div>`
+        <td class="r">${c.kontrakt.count + c.trimestr.count || '<span class="dash">0</span>'}</td>
+        <td class="r nowrap" title="${c.bot ? `Faol: ${c.bot.active}, bloklagan: ${c.bot.blocked}` : ''}">${c.bot ? `${c.bot.linked}<small class="sub-l" style="display:inline"> / ${c.bot.total}</small>` : '—'}</td><td class="r">${ic('chevr')}</td></tr>`).join('')}</tbody></table></div>`
     : emptyBox('building', 'Hali kurs yo‘q', '', `<a class="btn primary" href="#/super/courses">${ic('plus')} Kurs yaratish</a>`), more('#/super/courses', 'Boshqarish'));
   const discCard = card('shield', 'violet', 'Intizomiy choralar', `<div class="cb"><p class="hint" style="margin:-4px 0 10px">O‘quv yili boshidan, barcha kurslar</p>${discBars(disc)}
     </div>${kvl([{ k: 'Chora kutilmoqda', s: 'chegaraga yetgan talabalar', v: disc.pending, c: disc.pending ? 'var(--red)' : '' },
@@ -250,7 +263,7 @@ async function pSuperOverview() {
     view(`${filters}<div class="dboard"><div class="dash-main">${kpis}
       <div class="drow">${dynCard('sdyn', tabs, st.tab)}${mixCard}</div>
       <div class="drow">${coursesCard}${discCard}</div></div>
-      <aside class="dash-side">${taskCard(d.tasks)}${eventsCard(d.events, true)}${sysCard}</aside></div>
+      <aside class="dash-side">${taskCard(d.tasks)}${eventsCard(d.events, true)}${botCard(C.reduce((a, c) => c.bot ? { total: a.total + c.bot.total, linked: a.linked + c.bot.linked, active: a.active + c.bot.active, blocked: a.blocked + c.bot.blocked } : a, { total: 0, linked: 0, active: 0, blocked: 0 }), true)}${sysCard}</aside></div>
       <div style="margin-top:20px">${integStrip(d.integrations)}</div>`);
     bindDyn('sdyn', tabs, st, paint);
     $$('[data-crs]').forEach(b => b.addEventListener('click', () => { switchCourse(b.dataset.crs); location.hash = '#/panel'; }));
@@ -383,4 +396,45 @@ async function viewReceipt(rid) {
     const url = URL.createObjectURL(await r.blob()); if (w) w.location = url; else location.href = url;
     setTimeout(() => URL.revokeObjectURL(url), 120000); }
   catch (e) { if (w) w.close(); toast('Ochib bo‘lmadi', true); }
+}
+
+/* ================================================================ talabalar kiritgan ma'lumotlar (talaba ilovasi) */
+const LIV_T = { ijara: 'Ijara xonadonida', ttj: 'Talabalar turar joyida', uy: 'O‘z uyida', qarindosh: 'Qarindoshinikida' };
+async function pSelfData() {
+  document.title = 'Talabalar kiritgan — Boshqaruv paneli';
+  const st = S.selfd = S.selfd || { all: false };
+  view(head('Talabalar kiritgan', courseSub()) + skel(60) + skel(300));
+  let d;
+  try { d = await api(`/api/staff/selfdata${st.all ? '?all=1' : ''}`); } catch (e) { view(head('Talabalar kiritgan', courseSub()) + emptyBox('alert', 'Yuklab bo‘lmadi')); return; }
+  if (!st.all) { S.badges.selfdata = d.pending; paintBadges(); }
+  const stat = x => x.pending ? '<span class="pill amber">tekshirilmagan</span>' : '<span class="pill green">tekshirilgan</span>';
+  const who = x => `<td class="name click" data-student="${x.id}"><b>${esc(x.name)}</b><span>${esc(x.group)}${x.hemis_id ? ' · HEMIS ' + esc(x.hemis_id) : ''}</span></td>`;
+  const homes = d.homes.length ? `<table class="tbl"><thead><tr><th>Talaba</th><th>Yashash joyi</th><th>Manzil</th><th>Xaritada</th><th>Kiritilgan</th><th>Holat</th><th></th></tr></thead><tbody>
+    ${d.homes.map(x => `<tr>${who(x)}<td class="nowrap">${esc(LIV_T[x.living] || '—')}</td><td style="white-space:normal;min-width:200px">${x.address ? esc(x.address) : '<span class="dash">—</span>'}</td>
+      <td class="nowrap">${x.lat != null ? `<a href="https://www.openstreetmap.org/?mlat=${x.lat}&mlon=${x.lon}#map=17/${x.lat}/${x.lon}" target="_blank" rel="noopener">${ic('pin')} ${Number(x.lat).toFixed(4)}, ${Number(x.lon).toFixed(4)}</a>` : '<span class="dash">—</span>'}</td>
+      <td class="nowrap">${x.at ? esc(when(x.at)) : ''}</td><td>${stat(x)}</td>
+      <td class="r nowrap">${x.pending ? `<button class="btn sm primary" data-hok="${x.id}">${ic('check')} Tasdiqlash</button>` : ''}<button class="btn sm ghost" data-student="${x.id}">Kartani ochish</button></td></tr>`).join('')}</tbody></table>`
+    : emptyBox('home', st.all ? 'Talabalar hali yashash joyini kiritmagan' : 'Tekshirilmagan yashash joyi yo‘q', 'Talaba ilovasida talaba o‘z yashash joyini kiritsa — shu yerda chiqadi.');
+  const social = d.social.length ? `<table class="tbl"><thead><tr><th>Talaba</th><th>Toifa</th><th>Izoh, asos hujjat</th><th>Kiritilgan</th><th>Holat</th><th></th></tr></thead><tbody>
+    ${d.social.map(x => `<tr>${who(x)}<td><b>${esc(x.label)}</b></td><td style="white-space:normal">${x.note ? esc(x.note) : '<span class="dash">—</span>'}</td>
+      <td class="nowrap">${x.at ? esc(when(x.at)) : ''}</td><td>${stat(x)}</td>
+      <td class="r nowrap">${x.pending ? `<button class="btn sm primary" data-sok="${x.id}" data-cat="${esc(x.category)}" data-sub="${esc(x.sub)}">${ic('check')} Tasdiqlash</button>` : ''}
+        <button class="btn sm ghost" data-sdel="${x.id}" data-cat="${esc(x.category)}" data-sub="${esc(x.sub)}" data-name="${esc(x.name)}" title="Toifani olib tashlash">${ic('x')}</button></td></tr>`).join('')}</tbody></table>`
+    : emptyBox('heart', st.all ? 'Talabalar hali toifa kiritmagan' : 'Tekshirilmagan ijtimoiy toifa yo‘q', 'Talaba ilovasida talaba o‘z ijtimoiy toifasini belgilasa — shu yerda chiqadi.');
+  view(head('Talabalar kiritgan', courseSub(), `<a class="btn" href="#/students?bot=on">${ic('telegram')} Botga ulanganlar</a>`) + `
+    <div class="note" style="margin-bottom:16px">${ic('info')}<span>Talabalar <b>talaba ilovasida</b> o‘zi kiritgan yashash joyi va ijtimoiy toifa. Tekshiring va tasdiqlang (xato bo‘lsa — talaba kartasida tuzating yoki toifani olib tashlang).
+      Xonadon toifasi (yashil / sariq / qizil) — faqat siz belgilaysiz. Siz tahrir qilgan yashash joyini talaba endi o‘zgartira olmaydi.</span></div>
+    <div class="toolbar"><div class="seg" id="sdseg"><button data-a="0" class="${st.all ? '' : 'on'}">Tekshirilmagan<span class="n">${st.all ? '' : d.pending}</span></button><button data-a="1" class="${st.all ? 'on' : ''}">Hammasi</button></div></div>
+    <section class="sec"><header>${H('home', `Yashash joylari — ${d.homes.length} ta`, 'att')}</header><div class="tbl-wrap">${homes}</div></section>
+    <section class="sec" style="margin-top:20px"><header>${H('heart', `Ijtimoiy toifalar — ${d.social.length} ta`, 'acad')}</header><div class="tbl-wrap">${social}</div></section>`);
+  $('#sdseg').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; st.all = b.dataset.a === '1'; pSelfData(); });
+  $('#app').querySelectorAll('[data-hok]').forEach(b => b.addEventListener('click', async e => { e.stopPropagation();
+    try { await api(`/api/staff/selfdata/home/${b.dataset.hok}/check`, { method: 'POST' }); toast('Tasdiqlandi'); pSelfData(); } catch (_) { toast('Bajarilmadi', true); } }));
+  $('#app').querySelectorAll('[data-sok]').forEach(b => b.addEventListener('click', async e => { e.stopPropagation();
+    try { await api('/api/staff/social/confirm', { method: 'POST', json: { student_id: Number(b.dataset.sok), category: b.dataset.cat, sub: b.dataset.sub } }); toast('Tasdiqlandi'); pSelfData(); }
+    catch (_) { toast('Bajarilmadi', true); } }));
+  $('#app').querySelectorAll('[data-sdel]').forEach(b => b.addEventListener('click', async e => { e.stopPropagation();
+    if (!await confirmDlg('Toifani olib tashlaysizmi?', `${esc(b.dataset.name)} — talaba kiritgan toifa olib tashlanadi.`, 'Olib tashlash', true)) return;
+    try { await api('/api/staff/social/remove', { method: 'POST', json: { student_id: Number(b.dataset.sdel), category: b.dataset.cat, sub: b.dataset.sub } }); toast('Olib tashlandi'); pSelfData(); }
+    catch (_) { toast('Bajarilmadi', true); } }));
 }

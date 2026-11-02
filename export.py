@@ -1,7 +1,8 @@
 """Kurs koordinatori uchun hisobot eksporti: Excel va PDF (dekanat yig'ilishi, rahbariyatga taqdim etish).
 
 Bo'limlar: umumiy ko'rsatkichlar, muammoli talabalar, davomati past (chegaraga yetgan) talabalar, akademik qarzdorlar,
-kontrakt va trimestr qarzdorlari. Excel'da har bir bo'lim — alohida varaq; jami summalar va «Umumiy» varaqdagi sonlar
+kontrakt va trimestr qarzdorlari; ro'yxatlar — yashash joylari, ijtimoiy toifalar (talaba o'zi kiritgani ham, tekshirilgan-
+tekshirilmagani bilan) va talabalar boti (kim ulangan, qanday, oxirgi faollik). Excel'da har bir bo'lim — alohida varaq; jami summalar va «Umumiy» varaqdagi sonlar
 formulalar bilan hisoblanadi (jadval tahrirlansa ham to'g'ri qoladi). PDF — bitta hujjat, jadvallar bilan.
 """
 from __future__ import annotations
@@ -24,7 +25,13 @@ SECTIONS = {
     "gpa": "GPA past talabalar",
     "kontrakt": "Kontrakt qarzdorlari",
     "trimestr": "Trimestr qarzdorlari",
+    "homes": "Yashash joylari",
+    "social": "Ijtimoiy toifalar",
+    "bot": "Talabalar boti",
 }
+LISTS = ("homes", "social", "bot")  # barcha talabalar bo'yicha ro'yxatlar (muammo emas)
+_SRC = {"talaba": "talaba o'zi (ilova)", "koordinator": "kurs koordinatori"}
+_VIA = {"havola": "shaxsiy havola", "telefon": "telefon raqami", "tasdiq": "ota-onani tasdiqlab"}
 
 
 # ---------------------------------------------------------------- ma'lumotlar
@@ -79,12 +86,61 @@ async def collect(f: str = "") -> dict:
                        "percent": x["pays"][kind].get("percent"), "debt": x["pays"][kind]["debt"],
                        "as_of": x["pays"][kind]["as_of"]}
                       for x in sorted((x for x in sts if x["flags"][kind]), key=lambda x: -x["pays"][kind]["debt"])]
+    await _lists(data, [x["student"] for x in sts], base)
     return data
+
+
+async def _lists(data: dict, students: list[dict], base) -> None:
+    """Yashash joylari, ijtimoiy toifalar va talabalar boti — har biri alohida ro'yxat (talaba o'zi kiritgani ham)."""
+    import selfdata
+    import socialcat as SC
+    import visits as V
+    ids = {s["id"] for s in students}
+    acts = {}
+    for a in await db.fetchall("SELECT student_id, category FROM visit_acts WHERE category IS NOT NULL ORDER BY id"):
+        acts[a["student_id"]] = a["category"]  # oxirgi dalolatnoma toifasi
+    homes = []
+    for s in students:
+        living = s.get("living") or ("ijara" if (s.get("rent_address") or "").strip() else None)
+        checked = bool(s.get("home_checked_at") and s.get("home_at") and s["home_checked_at"] >= s["home_at"])
+        homes.append({**base({"student": s}), "living": V.LIVING.get(living or "", "") or "kiritilmagan",
+                      "address": s.get("rent_address") or "",
+                      "point": f"{s['lat']:.6f}, {s['lon']:.6f}" if s.get("lat") is not None else "",
+                      "zone": V.ZONES.get(acts.get(s["id"]) or s.get("zone") or "", ""),
+                      "by": _SRC.get(s.get("home_by") or "", "fayl / oldin kiritilgan" if living else ""),
+                      "at": fmt_date((s.get("home_at") or "")[:10], False) if s.get("home_at") else "",
+                      "checked": ("ha" if checked else "yo'q") if s.get("home_by") == "talaba" else ""})
+    data["homes"] = sorted(homes, key=lambda r: (r["living"] == "kiritilmagan", r["group"], r["name"]))
+    by_id = {s["id"]: s for s in students}
+    social = []
+    for r in await db.fetchall("SELECT * FROM student_categories ORDER BY category, sub"):
+        if r["student_id"] not in ids:
+            continue
+        s = by_id[r["student_id"]]
+        c = SC.CATS.get(r["category"], {})
+        social.append({**base({"student": s}), "category": c.get("title", r["category"]),
+                       "sub": c.get("subs", {}).get(r["sub"], ""), "note": r["note"] or "",
+                       "source": SC.SOURCES.get(r["source"], r["source"]),
+                       "checked": ("ha" if r.get("checked_at") else "yo'q") if r["source"] == "talaba" else "",
+                       "at": fmt_date((r["set_at"] or "")[:10], False) if r.get("set_at") else ""})
+    data["social"] = sorted(social, key=lambda r: (r["category"], r["group"], r["name"]))
+    bots = await selfdata.bot_map()
+    rows = []
+    for s in students:
+        i = selfdata.bot_info(bots.get(s["id"]))
+        rows.append({**base({"student": s}), "on": i["on"],
+                     "state": ("bloklagan" if i.get("blocked") else "faol" if i.get("active") else "ulangan") if i["on"] else "ulanmagan",
+                     "via": _VIA.get(i.get("via") or "", i.get("via") or ""),
+                     "linked_at": fmt_date((i.get("linked_at") or "")[:10], False) if i.get("linked_at") else "",
+                     "seen_at": fmt_dt(i["seen_at"]) if i.get("seen_at") else ""})
+    data["bot"] = sorted(rows, key=lambda r: (not r["on"], r["group"], r["name"]))
+    data["bot_linked"] = sum(1 for r in rows if r["on"])
 
 
 def file_name(data: dict, ext: str, only: str | None = None) -> str:
     part = {"prob": "muammoli", "att": "davomat", "acad": "akademik", "gpa": "gpa", "kontrakt": "kontrakt",
-            "trimestr": "trimestr"}.get(only, "kurs_holati")
+            "trimestr": "trimestr", "homes": "yashash_joylari", "social": "ijtimoiy_toifalar",
+            "bot": "talabalar_boti"}.get(only, "kurs_holati")
     course = (current_course() or "kurs").replace("/", "_")
     tail = f"_{group_key(data['meta']['filter'])}" if data["meta"]["filter"] else ""
     return f"{part}_{course}{tail}_{now().strftime('%Y-%m-%d')}.{ext}"
@@ -198,6 +254,23 @@ def build_xlsx(data: dict, only: str | None = None) -> bytes:
                    for i, r in enumerate(data[kind], 1)],
                   {5: money, 6: money, 7: "0%", 8: money}, totals=(8,))
 
+    if "homes" in want:
+        sheet("homes", [("№", 5), ("F.I.Sh.", 34), ("Guruh", 11), ("HEMIS ID", 15), ("Yashash joyi", 20),
+                        ("Manzil (ijara / qarindosh)", 40), ("Xaritadagi joyi", 22), ("Xonadon toifasi", 12),
+                        ("Kim kiritgan", 18), ("Sana", 11), ("Koordinator tekshirgan", 12)],
+              [[i, r["name"], r["group"], r["hemis"], r["living"], r["address"], r["point"], r["zone"], r["by"], r["at"],
+                r["checked"]] for i, r in enumerate(data["homes"], 1)])
+    if "social" in want:
+        sheet("social", [("№", 5), ("F.I.Sh.", 34), ("Guruh", 11), ("HEMIS ID", 15), ("Toifa", 26), ("Kichik toifa", 22),
+                         ("Izoh, asos hujjat", 30), ("Manba", 18), ("Koordinator tekshirgan", 12), ("Sana", 11)],
+              [[i, r["name"], r["group"], r["hemis"], r["category"], r["sub"], r["note"], r["source"], r["checked"], r["at"]]
+               for i, r in enumerate(data["social"], 1)])
+    if "bot" in want:
+        sheet("bot", [("№", 5), ("F.I.Sh.", 34), ("Guruh", 11), ("HEMIS ID", 15), ("Talabalar botida", 12), ("Holat", 12),
+                      ("Qanday ulangan", 18), ("Ulangan sana", 12), ("Oxirgi faollik", 16), ("Ota-ona botda", 10)],
+              [[i, r["name"], r["group"], r["hemis"], "ha" if r["on"] else "yo'q", r["state"], r["via"], r["linked_at"],
+                r["seen_at"], "ha" if r["linked"] else "yo'q"] for i, r in enumerate(data["bot"], 1)])
+
     if not only:  # «Umumiy» varaq — ko'rsatkichlar boshqa varaqlardan formulalar bilan
         ws = wb.create_sheet("Umumiy", 0)
         ws["A1"] = "Kurs holati — hisobot"
@@ -222,6 +295,10 @@ def build_xlsx(data: dict, only: str | None = None) -> bytes:
              f"Umumiy GPA {fmt_limit(GPA_MIN)} dan past — kursdan kursga o'tmaydi (yaxlitlanmaydi)"),
             ("Kontrakt qarzdorlari", f"=COUNTA({ref('kontrakt', 'B')})", f"=SUM({ref('kontrakt', 'H')})", "Oxirgi buxgalteriya hisoboti"),
             ("Trimestr qarzdorlari", f"=COUNTA({ref('trimestr', 'B')})", f"=SUM({ref('trimestr', 'H')})", "Oxirgi buxgalteriya hisoboti"),
+            ("Yashash joyi kiritilgan", f"=COUNTIF({ref('homes', 'E')},\"<>kiritilmagan\")", None, "«Yashash joylari» varag'idan"),
+            ("Ijtimoiy toifadagi talabalar", len({r["hemis"] or r["name"] for r in data["social"]}), None,
+             "«Ijtimoiy toifalar» varag'idan (bir talabada bir nechta toifa bo'lishi mumkin)"),
+            ("Talabalar botiga ulangan", f"=COUNTIF({ref('bot', 'E')},\"ha\")", None, "«Talabalar boti» varag'idan"),
         ]
         for j, (t, w) in enumerate((("Ko'rsatkich", 40), ("Talabalar", 12), ("Summa", 18), ("Izoh", 48)), start=1):
             c = ws.cell(row=5, column=j, value=t)
@@ -235,8 +312,8 @@ def build_xlsx(data: dict, only: str | None = None) -> bytes:
                 c.font = Font(name=F, size=10, color="595959" if j == 4 else "000000")
                 c.border = border
             ws.cell(row=i, column=3).number_format = money
-        ws.cell(row=16, column=1, value="Ota-onasi ulangan talabalar ulushi").font = Font(name=F, size=10)
-        c = ws.cell(row=16, column=2, value="=IF(B6=0,0,B7/B6)")
+        ws.cell(row=19, column=1, value="Ota-onasi ulangan talabalar ulushi").font = Font(name=F, size=10)
+        c = ws.cell(row=19, column=2, value="=IF(B6=0,0,B7/B6)")
         c.number_format = "0%"
         c.font = Font(name=F, size=10)
     buf = io.BytesIO()
@@ -322,7 +399,11 @@ def build_pdf(data: dict, only: str | None = None) -> bytes:
                ["Akademik qarzdorlar", len(data["acad"]), ""],
                [f"GPA {fmt_limit(GPA_MIN)} dan past (kursdan kursga o'tmaydi)", len(data["gpa"]), ""],
                ["Kontrakt qarzdorlari", len(k), fmt_money(sum(r["debt"] for r in k))],
-               ["Trimestr qarzdorlari", len(t), fmt_money(sum(r["debt"] for r in t))]]
+               ["Trimestr qarzdorlari", len(t), fmt_money(sum(r["debt"] for r in t))],
+               ["Yashash joyi kiritilgan", sum(1 for r in data["homes"] if r["living"] != "kiritilmagan"), ""],
+               ["Ijtimoiy toifadagi talabalar", len({r["hemis"] or r["name"] for r in data["social"]}), ""],
+               ["Talabalar botiga ulangan", data["bot_linked"],
+                f"{round(100 * data['bot_linked'] / data['total'])}%" if data["total"] else ""]]
         story += [Paragraph("Umumiy ko'rsatkichlar", st_h), table(["Ko'rsatkich", "Talabalar", "Summa / ulush"], kpi, [120, 30, 50])]
     want = [only] if only else list(SECTIONS)
     specs = {
@@ -352,10 +433,24 @@ def build_pdf(data: dict, only: str | None = None) -> bytes:
                        lambda i, r, dl=dl: [i, r["name"], r["group"], money(r["contract"]), money(r["paid"]),
                                             pct(r["percent"]), money(r["debt"]), fmt_date(r["as_of"], False),
                                             fmt_date(dl, False) if dl else "—"])
+    specs["homes"] = (["№", "F.I.Sh.", "Guruh", "Yashash joyi", "Manzil", "Xaritadagi joyi", "Toifa", "Kim kiritgan", "Sana",
+                       "Tekshirilgan"], [8, 50, 20, 30, 62, 32, 16, 26, 20, 18],
+                      lambda i, r: [i, r["name"], r["group"], r["living"], r["address"], r["point"], r["zone"], r["by"], r["at"],
+                                    r["checked"]])
+    specs["social"] = (["№", "F.I.Sh.", "Guruh", "Toifa", "Kichik toifa", "Izoh", "Manba", "Tekshirilgan", "Sana"],
+                       [8, 52, 20, 44, 36, 50, 30, 18, 20],
+                       lambda i, r: [i, r["name"], r["group"], r["category"], r["sub"], r["note"], r["source"], r["checked"], r["at"]])
+    specs["bot"] = (["№", "F.I.Sh.", "Guruh", "HEMIS ID", "Botda", "Holat", "Qanday ulangan", "Ulangan", "Oxirgi faollik",
+                     "Ota-ona botda"], [8, 56, 20, 30, 16, 22, 32, 22, 30, 22],
+                    lambda i, r: [i, r["name"], r["group"], r["hemis"], "ha" if r["on"] else "yo'q", r["state"], r["via"],
+                                  r["linked_at"], r["seen_at"], "ha" if r["linked"] else "yo'q"])
     for key in want:
         headers, widths, fn = specs[key]
         rows = [fn(i, r) for i, r in enumerate(data[key], 1)]
-        story.append(Paragraph(f"{escape(SECTIONS[key])} — {len(rows)} ta", st_h))
+        cnt = (f"{data['bot_linked']} / {len(rows)} ta ulangan" if key == "bot" else f"{len(rows)} ta yozuv" if key == "social"
+               else f"{sum(1 for r in data['homes'] if r['living'] != 'kiritilmagan')} / {len(rows)} ta kiritilgan" if key == "homes"
+               else f"{len(rows)} ta")
+        story.append(Paragraph(f"{escape(SECTIONS[key])} — {cnt}", st_h))
         if key in ("kontrakt", "trimestr") and rows:
             rows.append(["", "Jami", "", "", "", "", money(sum(r["debt"] for r in data[key])), "", ""])
         story.append(table(headers, rows, widths) if rows else Paragraph("Ro'yxat bo'sh.", st_cell))

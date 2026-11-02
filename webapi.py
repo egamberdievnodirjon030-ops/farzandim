@@ -806,7 +806,9 @@ async def api_staff_panel(request):
     inbox = scope_students(await db.inbox(200))
     pending = len(await _pending_requests())
     import dashboard
+    import selfdata
     return ok({"course": course_title(request["course"]) if request["course"] != "_" else "",
+               "bot": await selfdata.bot_stats(students), "selfdata": await selfdata.pending_count(students),
                "total": len(rows), "linked": sum(1 for x in sts if x["student"]["id"] in linked),
                "att": sum(1 for r in rows if r["flags"]["att"]), "acad": sum(1 for r in rows if r["flags"]["acad"]),
                "gpa": sum(1 for r in rows if r["flags"]["gpa"]), "gpa_min": GPA_MIN,
@@ -842,11 +844,14 @@ async def _student_rows(q: str = "", limit: int = 3000) -> list[dict]:
 
 
 async def _with_measures(rows: list[dict]) -> list[dict]:
-    """«Chora» ustuni: talabaga rasman ko'rilgan choralar (chegaraga yetgani emas)."""
+    """«Chora» ustuni: talabaga rasman ko'rilgan choralar (chegaraga yetgani emas); «Bot» — talabalar botiga ulanish."""
     import discipline
+    import selfdata
     measures = await discipline.bulk_measures()
+    bots = await selfdata.bot_map()
     for r in rows:
         r["measures"] = measures.get(r["id"], [])
+        r["bot"] = selfdata.bot_info(bots.get(r["id"]))
     return rows
 
 
@@ -868,6 +873,8 @@ async def api_staff_students(request):
         rows = [r for r in rows if r["flags"][flt]]
     elif flt == "chora":  # rasman chora ko'rilganlar
         rows = [r for r in rows if r["measures"]]
+    elif flt in ("bot", "nobot"):  # talabalar botiga ulangan / ulanmagan
+        rows = [r for r in rows if r["bot"]["on"] == (flt == "bot")]
     elif flt == "prob":
         rows = sorted([r for r in rows if r["problems"]], key=lambda r: -r["problems"])
     return ok({"items": rows[:limit], "total": len(rows)})
@@ -1965,6 +1972,10 @@ async def api_super_overview(request):
             ev = await dashboard.events(None, limit=4)
             unread = sum(i["unread"] for i in await db.inbox(200))
             reqs = (await db.fetchone("SELECT COUNT(*) AS n FROM link_requests WHERE status = 'pending'"))["n"]
+            import selfdata
+            all_st = await db.fetchall("SELECT id, group_key FROM students")
+            bot = await selfdata.bot_stats(all_st)
+            selfd = await selfdata.pending_count(all_st)
         c = info.get(key, {})
         title = course_title(key) if key != "_" else "Kurs"
         events += [{**e, "course": key, "course_title": title} for e in ev]
@@ -1975,7 +1986,7 @@ async def api_super_overview(request):
                      "kontrakt": {"count": len(d["kontrakt"]), "sum": sum(r["debt"] for r in d["kontrakt"])},
                      "trimestr": {"count": len(d["trimestr"]), "sum": sum(r["debt"] for r in d["trimestr"])},
                      "parents": c.get("parents", 0), "disc": disc, "flow": flow, "social": social, "dynamics": dyn,
-                     "unread": unread, "requests": reqs})
+                     "unread": unread, "requests": reqs, "bot": bot, "selfdata": selfd})
     last = await central.get_meta("last_backup")
     errs = errors_since(24)
     T = dashboard._task
@@ -1987,6 +1998,8 @@ async def api_super_overview(request):
         T("no_coord", "Kurs koordinatori tayinlanmagan kurslar", sum(1 for r in rows if not r["admins"]), "#/super/courses", "", "bad"),
         T("inbox", "Javobsiz xabarlar (barcha kurslar)", sum(r["unread"] for r in rows), "#/super", ""),
         T("errors", "Tizim xatolari (24 soat)", errs, "#/super/system", "", "bad"),
+        T("selfdata", "Talabalar kiritgan ma'lumotlar (koordinator tekshiradi)", sum(r["selfdata"] for r in rows), "#/super",
+          "yashash joyi, ijtimoiy toifa", "info"),
     ]
     return ok({"courses": rows, "coordinators": sum(len(r["admins"]) for r in rows), "last_backup": last,
                "errors_24h": errs, "tasks": tasks, "semester": _semester_label(),
@@ -2326,6 +2339,8 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/me", api_me)
     import studentapp  # talaba ilovasi: /api/s/…
     studentapp.setup(r)
+    import selfdata  # talabalar kiritgan ma'lumotlar, talabalar boti
+    selfdata.setup(r)
     base = "/api/c/{course}/{sid:\\d+}"
     r.add_get(base + "/overview", api_overview)
     r.add_get(base + "/attendance", api_attendance)

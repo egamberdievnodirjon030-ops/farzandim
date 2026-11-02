@@ -261,7 +261,7 @@ async def api_visit_student(request):
         return bad("not_found", 404)
     if request.method == "POST":
         try:
-            res = await V.set_home(st["id"], await _body(request))
+            res = await V.set_home(st["id"], await _body(request), by="koordinator")
         except V.VisitError as e:
             return _err(e)
     else:

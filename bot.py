@@ -55,12 +55,23 @@ def build_dispatcher(separate: bool = False) -> Dispatcher:
     return dp
 
 
+async def _student_seen(handler, event, data):
+    """Talabalar botida har bir xabar / tugma — talabaning oxirgi faolligi (panelda «botda faol»)."""
+    u = getattr(event, "from_user", None)
+    if u is not None:
+        import studentnotify
+        await studentnotify.mark_seen(u.id)
+    return await handler(event, data)
+
+
 def build_student_dispatcher() -> Dispatcher:
     """Talabalar boti: ota-onani tasdiqlash, shaxsiy havola, tashrif javoblari, e'londa ro'yxatdan o'tish, /start
     (telefon bilan ulanish) va «Tadbirlarim». Ota-ona menyusi va bloklash yo'q."""
     dp = Dispatcher(storage=MemoryStorage())
     dp.message.outer_middleware(LangMiddleware())
     dp.callback_query.outer_middleware(LangMiddleware())
+    dp.message.outer_middleware(_student_seen)
+    dp.callback_query.outer_middleware(_student_seen)
     dp.include_routers(studentconfirm.router, visits_h.router, visits_h.home_router)
     dp.errors.register(on_error)
     return dp

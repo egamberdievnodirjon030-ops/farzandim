@@ -766,7 +766,10 @@ class Database:
             await self.conn.execute("ALTER TABLE students ADD COLUMN address TEXT")
         # tashrif moduli: xaritadagi aniq nuqta, yashash joyi turi (ijara | ttj | uy | qarindosh), ijara xonadoni
         # toifasi (yashil | sariq | qizil — dalolatnoma bo'lmasa, qo'lda) va botga ulash uchun shaxsiy kod
-        for col, ddl in (("lat", "REAL"), ("lon", "REAL"), ("living", "TEXT"), ("zone", "TEXT"), ("visit_code", "TEXT")):
+        for col, ddl in (("lat", "REAL"), ("lon", "REAL"), ("living", "TEXT"), ("zone", "TEXT"), ("visit_code", "TEXT"),
+                         ("home_by", "TEXT"), ("home_at", "TEXT"), ("home_checked_at", "TEXT"), ("social_at", "TEXT")):
+            # yashash joyini kim kiritgan (talaba | koordinator), koordinator tekshirgan vaqt; social_at — talaba ijtimoiy
+            # toifa savoliga javob bergan vaqt (toifasi bo'lmasa ham — qayta so'ralmaydi)
             if col not in cols:
                 await self.conn.execute(f"ALTER TABLE students ADD COLUMN {col} {ddl}")
         # hozirgi (ijara) manzili — tashriflar va xarita uchun; doimiy manzil (address) — ota-onaga xat uchun, alohida.
@@ -785,7 +788,11 @@ class Database:
                                         ("audience", "TEXT"), ("capacity", "INTEGER"), ("reg_closed_at", "TEXT"),
                                         ("list_sig", "TEXT"))),
                        ("visit_students", (("source", "TEXT NOT NULL DEFAULT 'koordinator'"), ("registered_at", "TEXT"),
-                                           ("conflict", "TEXT")))):
+                                           ("conflict", "TEXT"))),
+                       # talabalar boti: oxirgi faollik va botni bloklagani (xabar yetmadi)
+                       ("student_accounts", (("seen_at", "TEXT"), ("blocked_at", "TEXT"))),
+                       # talaba o'zi kiritgan toifa — koordinator tekshirgani
+                       ("student_categories", (("checked_at", "TEXT"), ("checked_by", "INTEGER")))):
             async with self.conn.execute(f"PRAGMA table_info({t})") as cur:
                 have = {r[1] for r in await cur.fetchall()}
             for col, ddl in add:

@@ -2309,7 +2309,8 @@ async def cmd_report(message: Message, command: CommandObject) -> None:
     await message.answer(
         _course_line() + "📥 <b>Kurs holati hisoboti</b>" + (f" — {esc(f)}" if f else "") + "\n\n"
         "Umumiy ko'rsatkichlar, muammoli talabalar, davomati past talabalar, akademik qarzdorlar, kontrakt va "
-        "trimestr qarzdorlari. Formatni tanlang:", reply_markup=export_kb("all", f))
+        "trimestr qarzdorlari; alohida ro'yxatlar — yashash joylari, ijtimoiy toifalar, talabalar boti. "
+        "Formatni tanlang:", reply_markup=export_kb("all", f))
 
 
 @router.callback_query(ExpCb.filter())

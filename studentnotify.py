@@ -18,6 +18,26 @@ from utils import esc, now_iso
 log = logging.getLogger(__name__)
 
 
+async def mark_seen(tg_id: int) -> None:
+    """Talaba botda yoki ilovada faol — oxirgi faollik yoziladi, «bloklagan» belgisi olinadi (barcha kurslarda)."""
+    ts = now_iso()
+    for key in db.keys():
+        try:
+            await db.for_course(key).execute("UPDATE student_accounts SET seen_at = ?, blocked_at = NULL WHERE tg_id = ?", (ts, tg_id))
+        except Exception:  # noqa: BLE001  (faollik belgisi — asosiy ishni to'xtatmasin)
+            log.exception("seen_at (%s)", key)
+
+
+async def mark_blocked(tg_id: int) -> None:
+    """Xabar yetmadi (talaba botni bloklagan yoki o'chirgan) — panelda «bloklagan» ko'rinadi."""
+    for key in db.keys():
+        try:
+            await db.for_course(key).execute("UPDATE student_accounts SET blocked_at = ? WHERE tg_id = ? AND blocked_at IS NULL",
+                                             (now_iso(), tg_id))
+        except Exception:  # noqa: BLE001
+            log.exception("blocked_at (%s)", key)
+
+
 async def chat_of(sid: int) -> int | None:
     """Talabaning Telegram chati (botga ulangan bo'lsa)."""
     r = await db.fetchone("SELECT tg_id FROM student_accounts WHERE student_id = ?", (sid,))
@@ -59,6 +79,8 @@ async def send_text(bot, sid: int, build, kind: str = "chora", route: str = "/")
         return True
     except (TelegramForbiddenError, TelegramBadRequest) as e:
         log.warning("Talabaga xabar yuborilmadi (%s): %s", sid, e)
+        if isinstance(e, TelegramForbiddenError):
+            await mark_blocked(chat)
     except Exception:  # noqa: BLE001  (tarmoq — ota-onaga yuborish to'xtamasin)
         log.exception("Talabaga xabar yuborilmadi (%s)", sid)
     return False
@@ -111,6 +133,8 @@ async def send_document(bot, did: int, st: dict) -> bool:
         return True
     except (TelegramForbiddenError, TelegramBadRequest) as e:
         log.warning("Talabaga hujjat yuborilmadi (%s): %s", st["id"], e)
+        if isinstance(e, TelegramForbiddenError):
+            await mark_blocked(chat)
     except Exception:  # noqa: BLE001
         log.exception("Talabaga hujjat yuborilmadi (%s)", st["id"])
     return False

@@ -747,3 +747,40 @@ html[data-theme="dark"] .c-money2 { --c: #F7A56A; --cb: rgba(247,165,106,.13); }
 .g0 { background: var(--paper); color: var(--muted); }
 .gupd { display: flex; align-items: center; gap: 6px; margin: 10px 2px 0; }
 .gupd svg { width: 15px; height: 15px; flex: none; }
+
+/* ---------------------------------------------------------------- talaba: yashash joyi shakli, xaritadan tanlash */
+.hform { display: grid; gap: 14px; margin-top: 14px; }
+.hf-h { font-weight: 700; font-size: 16px; }
+.hopts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hopt { position: relative; display: flex; align-items: center; min-height: 52px; padding: 10px 12px; border-radius: 14px; border: 1.5px solid var(--line);
+  background: var(--surface); font-weight: 600; font-size: 14px; cursor: pointer; line-height: 1.25; }
+.hopt input { position: absolute; opacity: 0; pointer-events: none; }
+.hopt:has(input:checked) { border-color: var(--accent); background: var(--tint-navy); color: var(--accent); }
+.hform .field { display: grid; gap: 6px; }
+.hform .field > span { font-size: 13px; font-weight: 600; color: var(--muted); }
+.hform textarea.input { min-height: 64px; resize: vertical; font: inherit; }
+.hreq { font-weight: 500; }
+.hpt { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--paper); }
+.hpt svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+.hbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hbtns .btn svg { width: 18px; height: 18px; }
+.mapov { position: fixed; inset: 0; z-index: 90; background: rgba(5, 14, 32, .55); display: grid; place-items: center; padding: 12px; }
+.mapbox { width: min(720px, 100%); height: min(640px, 92vh); background: var(--surface); border-radius: 18px; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; }
+.maph { padding: 12px 14px; display: grid; gap: 2px; }
+#pmap { min-height: 0; }
+.mapf { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 12px; }
+.pmk i { display: block; width: 28px; height: 28px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #C0392B; border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35); }
+/* talaba: ijtimoiy toifa shakli */
+.socq { display: grid; gap: 8px; }
+.socq .hopt:has(input:disabled) { opacity: .75; }
+.socsub { display: none; gap: 6px; padding: 2px 4px 6px 14px; border-left: 2px solid var(--line); margin-left: 8px; }
+.socq.on .socsub { display: grid; }
+.socsub > span { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.socsub .seg { display: grid; grid-template-columns: repeat(3, 1fr); }
+.socchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.gchip { position: relative; display: inline-flex; padding: 7px 11px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface);
+  font-size: 13px; font-weight: 600; cursor: pointer; }
+.gchip input { position: absolute; opacity: 0; pointer-events: none; }
+.gchip:has(input:checked) { border-color: var(--accent); background: var(--tint-navy); color: var(--accent); }
+.hnone { border-style: dashed; }

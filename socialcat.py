@@ -22,7 +22,7 @@ CATS: dict[str, dict] = {
     "chin_yetim": {"title": "Chin yetim", "short": "Chin yetim", "subs": {}},
     "mehribonlik": {"title": "Mehribonlik uyi tarbiyalanuvchisi", "short": "Mehribonlik uyi", "subs": {}},
 }
-SOURCES = {"fayl": "fayldan", "qolda": "qo'lda"}
+SOURCES = {"fayl": "fayldan", "qolda": "qo'lda", "talaba": "talaba o'zi kiritgan"}
 
 
 class SocialError(Exception):
@@ -120,13 +120,15 @@ async def listing(scope: set[str] | None, cat: str) -> list[dict]:
     rows = await db.fetchall(
         """SELECT sc.*, s.full_name, s.group_name, s.group_key, s.course, s.hemis_id FROM student_categories sc
            JOIN students s ON s.id = sc.student_id WHERE sc.category = ? ORDER BY s.group_name, s.full_name, sc.sub""", (cat,))
-    return [{**r, "label": label(r["category"], r["sub"]), "sub_title": CATS[cat]["subs"].get(r["sub"], "")}
+    return [{**r, "label": label(r["category"], r["sub"]), "sub_title": CATS[cat]["subs"].get(r["sub"], ""),
+             "pending": r["source"] == "talaba" and not r.get("checked_at")}
             for r in rows if scope is None or (r["group_key"] or "") in scope]
 
 
 async def of_student(sid: int) -> list[dict]:
     rows = await db.fetchall("SELECT * FROM student_categories WHERE student_id = ? ORDER BY category, sub", (sid,))
-    return [{**r, "label": label(r["category"], r["sub"])} for r in rows]
+    return [{**r, "label": label(r["category"], r["sub"]), "pending": r["source"] == "talaba" and not r.get("checked_at")}
+            for r in rows]
 
 
 # ---------------------------------------------------------------- yozish
@@ -154,9 +156,12 @@ async def add(sid: int, cat: str, sub: str = "", note: str = "", source: str = "
             await db.execute("DELETE FROM student_categories WHERE student_id = ? AND category = ?", (sid, cat))
         elif old:
             sub = old["sub"]
-    old = await db.fetchone("SELECT 1 FROM student_categories WHERE student_id = ? AND category = ? AND sub = ?",
+    old = await db.fetchone("SELECT source FROM student_categories WHERE student_id = ? AND category = ? AND sub = ?",
                             (sid, cat, sub))
     if old:
+        if old["source"] == "talaba" and source != "talaba":  # koordinator ham belgiladi — talaba kiritgani tasdiqlandi
+            await db.execute("UPDATE student_categories SET checked_at = ?, checked_by = ? WHERE student_id = ? AND category = ? "
+                             "AND sub = ?", (now_iso(), uid, sid, cat, sub))
         if note:
             await db.execute("UPDATE student_categories SET note = ? WHERE student_id = ? AND category = ? AND sub = ?",
                              (note, sid, cat, sub))
@@ -170,5 +175,50 @@ async def add(sid: int, cat: str, sub: str = "", note: str = "", source: str = "
 async def remove(sid: int, cat: str, sub: str = "") -> bool:
     cur = await db.conn.execute("DELETE FROM student_categories WHERE student_id = ? AND category = ? AND sub = ?",
                                 (sid, cat, sub or ""))
+    await db.conn.commit()
+    return cur.rowcount > 0
+
+
+# ---------------------------------------------------------------- talaba o'zi kiritadi (talaba ilovasi)
+async def student_set(sid: int, items: list[dict]) -> dict:
+    """Talaba o'z toifalarini belgilaydi: faqat o'zi kiritgan yozuvlar almashtiriladi; kurs koordinatori yoki fayl bilan
+    berilgani o'zgarmaydi (o'sha toifa — talaba uchun yopiq). items: [{category, sub, note}] (bo'sh — «hech biriga
+    kirmayman»). Qaytaradi: {added, removed}."""
+    rows = await db.fetchall("SELECT * FROM student_categories WHERE student_id = ?", (sid,))
+    locked = {r["category"] for r in rows if r["source"] != "talaba"}
+    want: dict[tuple, str] = {}
+    for it in items or []:
+        cat = str(it.get("category") or "")
+        sub = _check(cat, str(it.get("sub") or ""))
+        if cat in locked and (cat == "nogironlik" or any(r["category"] == cat and r["sub"] == sub for r in rows)):
+            continue
+        want[(cat, sub)] = (str(it.get("note") or "").strip()[:300])
+    mine = {(r["category"], r["sub"]): r for r in rows if r["source"] == "talaba"}
+    removed = 0
+    for k in set(mine) - set(want):
+        await db.execute("DELETE FROM student_categories WHERE student_id = ? AND category = ? AND sub = ? AND source = 'talaba'",
+                         (sid, *k))
+        removed += 1
+    added = 0
+    for (cat, sub), note in want.items():
+        if (cat, sub) in mine:
+            if (mine[(cat, sub)]["note"] or "") != note:  # izoh o'zgardi — qayta tekshiriladi
+                await db.execute("UPDATE student_categories SET note = ?, set_at = ?, checked_at = NULL WHERE student_id = ? "
+                                 "AND category = ? AND sub = ?", (note or None, now_iso(), sid, cat, sub))
+            continue
+        if cat == "nogironlik":  # bitta yozuv: talabaning eski guruhi almashtiriladi
+            await db.execute("DELETE FROM student_categories WHERE student_id = ? AND category = 'nogironlik' AND source = 'talaba'",
+                             (sid,))
+        await db.execute("INSERT OR IGNORE INTO student_categories (student_id, category, sub, note, source, set_by, set_at) "
+                         "VALUES (?, ?, ?, ?, 'talaba', NULL, ?)", (sid, cat, sub, note or None, now_iso()))
+        added += 1
+    await db.execute("UPDATE students SET social_at = ? WHERE id = ?", (now_iso(), sid))
+    return {"added": added, "removed": removed}
+
+
+async def confirm(sid: int, cat: str, sub: str, uid: int | None) -> bool:
+    """Kurs koordinatori talaba kiritgan toifani tekshirdi (tasdiqladi)."""
+    cur = await db.conn.execute("UPDATE student_categories SET checked_at = ?, checked_by = ? WHERE student_id = ? AND category = ? "
+                                "AND sub = ? AND source = 'talaba'", (now_iso(), uid, sid, cat, sub or ""))
     await db.conn.commit()
     return cur.rowcount > 0

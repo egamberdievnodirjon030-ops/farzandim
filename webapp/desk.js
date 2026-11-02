@@ -60,6 +60,7 @@ const P = {
   ok: '<path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="m22 4-10 10-3-3"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
   db: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.7-4 3-9 3s-9-1.3-9-3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/>',
+  user1: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20.5a7 7 0 0 1 14 0"/>',
   telegram: '<path d="m22 3-9.5 17.5-2.8-7.7L2 10.2z"/><path d="M22 3 9.7 12.8"/>',
   // ko'rsatkichlar: har bir ma'lumot turi — o'z belgisi
   dollar: '<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/>',
@@ -205,7 +206,7 @@ const emptyBox = (icon, title, text = '', action = '') =>
   `<div class="empty">${ic(icon)}<b>${esc(title)}</b>${text ? `<div>${text}</div>` : ''}${action ? `<div style="margin-top:14px">${action}</div>` : ''}</div>`;
 const skel = (h = 120, n = 1) => Array.from({ length: n }, () => `<div class="skel" style="height:${h}px;margin-bottom:16px"></div>`).join('');
 const main = () => $('#main');
-const PAGE_IC = { 'Kurs holati': 'grid', 'Bosh sahifa': 'grid', 'Talabalar': 'users', 'Jadval va fanlar': 'cal', 'Davomat va jadval': 'cal', 'Chora ko‘rish': 'shield', 'Intizomiy choralar': 'shield',
+const PAGE_IC = { 'Talabalar kiritgan': 'user1', 'Kurs holati': 'grid', 'Bosh sahifa': 'grid', 'Talabalar': 'users', 'Jadval va fanlar': 'cal', 'Davomat va jadval': 'cal', 'Chora ko‘rish': 'shield', 'Intizomiy choralar': 'shield',
   'Akademik natijalar': 'cap', 'To‘lovlar': 'wallet', 'Ijtimoiy toifalar': 'heart', 'Hisobot va ma’lumot': 'bars', 'Tizim va integratsiyalar': 'gear', 'Xabarlar': 'chat', 'Bog‘lanish so‘rovlari': 'req', 'So‘rovlar': 'req',
   'E’lon yuborish': 'mega', 'Rasmiy hujjat yuborish': 'file', 'So‘rovnomalar': 'poll', 'So‘rovnoma': 'poll', 'Yangi so‘rovnoma': 'poll',
   'Hisobot va ma’lumot': 'upload', 'Barcha kurslar': 'chart', 'Kurslar va koordinatorlar': 'building', 'Ichki nizomlar': 'book',
@@ -312,7 +313,7 @@ document.addEventListener('click', async e => {
 const NAV_COURSE = [
   ['Asosiy', [['#/panel', 'grid', 'Bosh sahifa'], ['#/students', 'users', 'Talabalar'], ['#/subjects', 'cal', 'Davomat va jadval'], ['#/academic', 'cap', 'Akademik natijalar']]],
   ['Ish jarayonlari', [['#/chora', 'shield', 'Intizomiy choralar', 'chora'], ['#/tashrif', 'home', 'Tashrif va tadbirlar', 'tashrif'], ['#/social', 'heart', 'Ijtimoiy toifalar'], ['#/payments', 'wallet', 'To‘lovlar']]],
-  ['Aloqa', [['#/inbox', 'chat', 'Xabarlar', 'unread'], ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar']]],
+  ['Aloqa', [['#/inbox', 'chat', 'Xabarlar', 'unread'], ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/selfdata', 'user1', 'Talabalar kiritgan', 'selfdata'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar']]],
   ['Ma’lumot', [['#/files', 'bars', 'Hisobot va ma’lumot']]]];
 const NAV_SUPER = [['#/super', 'grid', 'Bosh sahifa'], ['#/super/courses', 'building', 'Kurslar va koordinatorlar'], ['#/super/regs', 'book', 'Ichki nizomlar'], ['#/super/system', 'gear', 'Tizim va integratsiyalar']];
 const roleName = () => (S.me.role === 'super' ? 'Dekanat (super-admin)' : 'Kurs koordinatori');
@@ -403,7 +404,8 @@ function bindTopbar() {
     if (!m.hidden) { m.hidden = true; return; } closeMenus(menu); fill(m); m.hidden = false; });
   toggle('#bell', '#bellMenu', m => {
     const B = S.badges, rows = [['#/inbox', 'chat', 'c-blue', 'Javobsiz xabarlar', 'ota-onalar yozgan', B.unread], ['#/requests', 'req', 'c-violet', 'Bog‘lanish so‘rovlari', 'farzandni bog‘lash', B.requests],
-      ['#/chora', 'shield', 'c-red', 'Chora kutilmoqda', 'chegaraga yetganlar', B.chora], ['#/tashrif', 'home', 'c-amber', 'Tashriflar', 'dalolatnoma yoki javob kutilmoqda', B.tashrif]];
+      ['#/chora', 'shield', 'c-red', 'Chora kutilmoqda', 'chegaraga yetganlar', B.chora], ['#/tashrif', 'home', 'c-amber', 'Tashriflar', 'dalolatnoma yoki javob kutilmoqda', B.tashrif],
+      ['#/selfdata', 'user1', 'c-green', 'Talabalar kiritgan', 'yashash joyi, ijtimoiy toifa — tekshiring', B.selfdata]];
     const any = rows.some(r => r[5]);
     m.innerHTML = `<h6>Bildirishnomalar${S.me.role === 'super' ? ` · ${esc(S.me.staff.title || '')}` : ''}</h6>${rows.map(([h, icn, c, t, sub, n]) => `<a href="${h}" class="${c}"><span class="mi-ic">${ic(icn)}</span>
       <span class="mi-t"><b>${t}</b><span>${sub}</span></span>${n ? `<span class="mi-n">${n > 99 ? '99+' : n}</span>` : `<span class="mi-ok">${ic('check')}</span>`}</a>`).join('')}
@@ -453,8 +455,10 @@ function paintBadges() {
 }
 async function refreshBadges() {
   try {
-    const [ib, rq, ch, vt] = await Promise.all([api('/api/staff/inbox'), api('/api/staff/requests'),
-      api('/api/staff/discipline/badge').catch(() => ({ new: 0 })), api('/api/staff/visits/badge').catch(() => null)]);
+    const [ib, rq, ch, vt, sd] = await Promise.all([api('/api/staff/inbox'), api('/api/staff/requests'),
+      api('/api/staff/discipline/badge').catch(() => ({ new: 0 })), api('/api/staff/visits/badge').catch(() => null),
+      api('/api/staff/selfdata').catch(() => null)]);
+    S.badges.selfdata = sd ? sd.pending : 0;
     S.badges.unread = ib.items.reduce((s, i) => s + (i.unread || 0), 0);
     S.badges.requests = rq.items.length;
     S.badges.chora = ch.new || 0;
@@ -473,7 +477,8 @@ async function route() {
   if (!parts.length) { location.replace(sup ? '#/super' : '#/panel'); return; }
   markNav();
   const pages = { panel: pPanel, students: pStudents, subjects: pSubjects, chora: pChora, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles, surveys: pSurveys,
-    tashrif: typeof pTashrif === 'function' ? pTashrif : pPanel, academic: pAcademic, payments: pPayments, social: typeof pSocial === 'function' ? pSocial : pPanel };
+    tashrif: typeof pTashrif === 'function' ? pTashrif : pPanel, academic: pAcademic, payments: pPayments, social: typeof pSocial === 'function' ? pSocial : pPanel,
+    selfdata: typeof pSelfData === 'function' ? pSelfData : pPanel };
   try {
     if (parts[0] === 'super') {
       if (!sup) { location.replace('#/panel'); return; }
@@ -540,7 +545,19 @@ const FILTERS = [['', 'Hammasi', 'users'], ['prob', 'Muammoli', 'flame'], ['att'
   ['gpa', 'GPA past', 'cap'], ['kontrakt', 'Kontrakt', 'dollar'], ['trimestr', 'Trimestr', 'receipt'], ['chora', 'Chora ko‘rilgan', 'shield']];
 const COL_IC = {};  // ustun sarlavhalarida belgi yo'q — jadval ekranga sig'sin (belgilar kataklarda)
 const COLS = [['name', 'Talaba'], ['group', 'Guruh'], ['percent', 'Davomat'], ['action', 'Chora'],
-  ['debts', 'Akademik qarz'], ['gpa', 'GPA', 'r'], ['kontrakt', 'Kontrakt', 'r'], ['trimestr', 'Trimestr', 'r'], ['problems', 'Masala', 'r']];
+  ['debts', 'Akademik qarz'], ['gpa', 'GPA', 'r'], ['kontrakt', 'Kontrakt', 'r'], ['trimestr', 'Trimestr', 'r'], ['bot', 'Bot'], ['problems', 'Masala', 'r']];
+/* talabalar boti: ulangan (faol — oxirgi 7 kunda botda yoki ilovada), bloklagan, ulanmagan */
+const BOT_F = [['', 'Bot: hammasi'], ['on', 'Botga ulangan'], ['active', 'Botda faol (7 kun)'], ['blocked', 'Botni bloklagan'], ['off', 'Botga ulanmagan']];
+const botMatch = (r, b) => { const x = r.bot || {}; return !b || (b === 'on' ? x.on : b === 'off' ? !x.on : b === 'active' ? x.active : b === 'blocked' ? x.blocked : true); };
+const botRank = r => { const x = r.bot || {}; return !x.on ? 0 : x.blocked ? 1 : x.active ? 3 : 2; };
+const VIA_T = { havola: 'shaxsiy havola orqali', telefon: 'telefon raqami orqali', tasdiq: 'ota-onani tasdiqlab' };
+function botCell(r) {
+  const x = r.bot || {};
+  if (!x.on) return '<span class="chip muted" title="Talabalar botiga ulanmagan">yo‘q</span>';
+  const t = `Ulangan: ${x.linked_at ? dmy(x.linked_at) : '—'}${x.via ? ', ' + (VIA_T[x.via] || x.via) : ''}${x.seen_at ? '\nOxirgi faollik: ' + when(x.seen_at) : ''}`;
+  return x.blocked ? `<span class="chip bordo" title="${esc(t)}\nXabar yetmadi — botni bloklagan">bloklagan</span>`
+    : `<span class="chip ${x.active ? 'ok' : ''}" title="${esc(t)}">${ic('telegram')}${x.active ? 'faol' : 'ulangan'}</span>${x.seen_at ? `<div class="sub-l">${esc(when(x.seen_at))}</div>` : ''}`;
+}
 const norm = s => String(s || '').toLowerCase().replace(/[‘’ʻʼ'`]/g, '').replace(/\s+/g, ' ').trim();
 async function loadStudents(force = false) {
   if (!force && S.stu && S.stuCourse === S.course) return S.stu;
@@ -558,8 +575,9 @@ async function loadAllStudents(force = false) {
 async function pStudents(parts, q) {
   document.title = 'Talabalar — Boshqaruv paneli';
   const sup = S.me.role === 'super';
-  const st = S.stuState = S.stuState || { f: '', q: '', g: '', c: '', all: false, sort: 'problems', dir: -1 };
+  const st = S.stuState = S.stuState || { f: '', q: '', g: '', c: '', b: '', all: false, sort: 'problems', dir: -1 };
   if (q && q.has('f')) { st.f = q.get('f'); if (st.f === 'acad') { st.sort = 'debts'; st.dir = -1; } }
+  if (q && q.has('bot')) { st.b = { 1: 'on', 0: 'off' }[q.get('bot')] || q.get('bot'); st.f = ''; }
   if (q && q.has('q')) st.q = q.get('q');
   if (q && q.has('all')) st.all = q.get('all') === '1';
   if (!sup) st.all = false;
@@ -576,15 +594,17 @@ async function pStudents(parts, q) {
       <div class="seg" id="flt">${FILTERS.map(([k, l, i]) => `<button data-f="${k}" class="${st.f === k ? 'on' : ''}">${ic(i)}${l}<span class="n">${rows.filter(r => matchFilter(r, k)).length}</span></button>`).join('')}</div>
       ${st.all ? `<select class="select" id="crs" aria-label="Kurs"><option value="">Barcha kurslar</option>${courses.map(([k, t]) => `<option value="${esc(k)}" ${k === st.c ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}
       <select class="select" id="grp" aria-label="Guruh"><option value="">Barcha guruhlar</option>${groups.map(g => `<option ${g === st.g ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>
+      <select class="select" id="botf" aria-label="Talabalar boti">${BOT_F.map(([k, l]) => `<option value="${k}" ${k === (st.b || '') ? 'selected' : ''}>${l}${k ? ` (${rows.filter(r => botMatch(r, k)).length})` : ''}</option>`).join('')}</select>
       <span class="grow"></span><span class="count" id="cnt"></span>
     </div>
+    <div class="botline" id="botline"></div>
     <section class="sec"><div class="tbl-wrap" id="tw"></div></section>`);
   const draw = () => {
     const qq = norm(st.q);
-    let list = rows.filter(r => matchFilter(r, st.f) && (!st.g || r.group === st.g) && (!st.all || !st.c || r.course === st.c) &&
+    let list = rows.filter(r => matchFilter(r, st.f) && botMatch(r, st.b) && (!st.g || r.group === st.g) && (!st.all || !st.c || r.course === st.c) &&
       (!qq || norm(r.name).includes(qq) || norm(r.group).includes(qq) || norm(r.hemis_id) === qq));
     const key = st.sort, dir = st.dir;
-    const val = r => key === 'debts' ? r.debts.length : key === 'action' ? measRank(r) : r[key];
+    const val = r => key === 'debts' ? r.debts.length : key === 'action' ? measRank(r) : key === 'bot' ? botRank(r) : r[key];
     list = list.slice().sort((a, b) => {
       const x = val(a), y = val(b);
       if (x == null && y == null) return a.name.localeCompare(b.name);
@@ -593,6 +613,11 @@ async function pStudents(parts, q) {
       return c * dir || a.name.localeCompare(b.name);
     });
     $('#cnt').textContent = `${list.length} ta talaba`;
+    const scope = rows.filter(r => (!st.g || r.group === st.g) && (!st.all || !st.c || r.course === st.c));
+    const on = scope.filter(r => (r.bot || {}).on), act = on.filter(r => r.bot.active).length, bl = on.filter(r => r.bot.blocked).length;
+    $('#botline').innerHTML = `${ic('telegram')}<span>Talabalar botiga ulangan: <b>${on.length}</b> / ${scope.length} (${scope.length ? Math.round(100 * on.length / scope.length) : 0}%)
+      · oxirgi 7 kunda faol: <b>${act}</b>${bl ? ` · bloklagan: <b style="color:var(--bordo-600)">${bl}</b>` : ''}</span>
+      <a href="#" data-bq="on">Ulanganlar ro‘yxati</a><a href="#" data-bq="off">Ulanmaganlar</a>`;
     $('#tw').innerHTML = list.length ? `<table class="tbl"><thead><tr>${cols.map(([k, l, c]) =>
       `<th class="sort ${c || ''}" data-sort="${k}" aria-sort="${key === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'}">${COL_IC[k] ? `<span class="th-i">${ic(COL_IC[k])}</span>` : ''}${l}${key === k ? `<span class="arr">${dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('')}</tr></thead>
       <tbody>${list.map(r => stuRow(r, st.all)).join('')}</tbody></table>`
@@ -601,6 +626,8 @@ async function pStudents(parts, q) {
   draw();
   $('#q').addEventListener('input', e => { st.q = e.target.value; draw(); });
   $('#grp').addEventListener('change', e => { st.g = e.target.value; draw(); });
+  $('#botf').addEventListener('change', e => { st.b = e.target.value; draw(); });
+  $('#botline').addEventListener('click', e => { const a = e.target.closest('[data-bq]'); if (!a) return; e.preventDefault(); st.b = a.dataset.bq; $('#botf').value = st.b; draw(); });
   $('#crs')?.addEventListener('change', e => { st.c = e.target.value; st.g = ''; route(); });
   $('#scope')?.addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; st.all = b.dataset.s === '1'; st.c = ''; st.g = ''; route(); });
   $('#flt').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; st.f = b.dataset.f; if (st.f === 'acad') { st.sort = 'debts'; st.dir = -1; } $$('#flt button').forEach(x => x.classList.toggle('on', x === b)); draw(); });
@@ -630,6 +657,7 @@ function stuRow(r, all = false) {
     <td class="r">${r.gpa != null ? (r.flags.gpa ? `<span class="gpa-low" title="Kursdan kursga o‘tmaydi">${ic('alert')}${gpaFmt(r.gpa)}</span>` : gpaFmt(r.gpa)) : dash}</td>
     <td class="r nowrap">${r.kontrakt ? `<span class="money" title="Kontrakt qarzi: ${money(r.kontrakt)}">${ic('dollar')}${mlnPlain(r.kontrakt)}</span>` : dash}</td>
     <td class="r nowrap">${r.trimestr ? `<span class="money" title="Trimestr qarzi: ${money(r.trimestr)}">${ic('receipt')}${mlnPlain(r.trimestr)}</span>` : dash}</td>
+    <td class="nowrap">${botCell(r)}</td>
     <td class="r"><span class="cnt ${r.problems >= 3 ? 'bordo' : r.problems ? '' : 'zero'}">${r.problems || 0}</span></td></tr>`;
 }
 
@@ -1703,7 +1731,8 @@ const KINDS = [['auto', 'Turini bot aniqlasin'], ['students', 'Talabalar'], ['at
   ['schedule', 'Dars jadvali'], ['grades', 'Baholar'], ['enroll', 'Tanlov fanlari va 2-til: kim o‘qiydi'], ['elsched', 'Tanlov fanlari va 2-til: jadval'],
   ['debts', 'Kontrakt qarzdorligi'], ['debts_t', 'Trimestr qarzdorligi'], ['acad_debts', 'Akademik qarzdorlar (HEMIS ro‘yxati)'], ['phones', 'Talaba telefonlari'], ['addresses', 'Manzillar (ijarada yashash)'], ['categories', 'Ijtimoiy toifalar'], ['translations', 'Tarjimalar']];
 const SECTIONS_EXP = [['all', 'To‘liq hisobot'], ['prob', 'Muammoli talabalar'], ['att', 'Davomati past talabalar'], ['acad', 'Akademik qarzdorlar'],
-  ['kontrakt', 'Kontrakt qarzdorlari'], ['trimestr', 'Trimestr qarzdorlari']];
+  ['kontrakt', 'Kontrakt qarzdorlari'], ['trimestr', 'Trimestr qarzdorlari'], ['homes', 'Yashash joylari (ro‘yxat)'],
+  ['social', 'Ijtimoiy toifalar (ro‘yxat)'], ['bot', 'Talabalar boti (kim ulangan)']];
 async function pFiles() {
   document.title = 'Hisobot va ma’lumot — Boshqaruv paneli';
   view(head('Hisobot va ma’lumot', courseSub()) + `<div class="cols">

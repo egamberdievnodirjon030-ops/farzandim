@@ -332,6 +332,8 @@ async def student_visits(sid: int) -> dict:
     return {"living": st.get("living") or ("ijara" if (st.get("rent_address") or "").strip() else None),
             "zone": zone, "zone_from": "act" if acts and acts[0]["category"] else ("manual" if st.get("zone") else None),
             "address": st.get("rent_address") or "", "lat": st.get("lat"), "lon": st.get("lon"),
+            "home_by": st.get("home_by"), "home_at": st.get("home_at"),
+            "home_checked": bool(st.get("home_checked_at") and st.get("home_at") and st["home_checked_at"] >= st["home_at"]),
             "visits": rows, "acts": acts, "account": acc}
 
 
@@ -850,6 +852,9 @@ async def _send(bot, chat_id: int | None, text: str, kb=None):
         return msg
     except (TelegramForbiddenError, TelegramBadRequest) as e:
         log.warning("Tashrif xabari yuborilmadi %s: %s", chat_id, e)
+        if isinstance(e, TelegramForbiddenError):  # talaba botni bloklagan — panelda ko'rinadi
+            import studentnotify
+            await studentnotify.mark_blocked(chat_id)
     except Exception:  # noqa: BLE001  (tarmoq — reja holati baribir saqlangan)
         log.exception("Tashrif xabari yuborilmadi %s", chat_id)
     return None
@@ -1744,9 +1749,10 @@ def _num(v) -> float | None:
         return None
 
 
-async def set_home(sid: int, d: dict) -> dict:
+async def set_home(sid: int, d: dict, by: str | None = None) -> dict:
     """Talaba kartasi: yashash turi, xonadon toifasi (qo'lda), ijara manzili va xaritadagi nuqta.
-    Joylashuv koordinata, xarita havolasi (qisqa havola ham) yoki xaritadan tanlangan nuqta bo'lishi mumkin."""
+    Joylashuv koordinata, xarita havolasi (qisqa havola ham) yoki xaritadan tanlangan nuqta bo'lishi mumkin.
+    by — kim kiritdi (talaba | koordinator): yashash turi, manzil yoki joy o'zgarganda yoziladi (toifa — hisobga olinmaydi)."""
     st = await db.get_student(sid)
     if not st:
         raise VisitError("not_found", "Talaba topilmadi")
@@ -1773,6 +1779,10 @@ async def set_home(sid: int, d: dict) -> dict:
         if (lat is None) != (lon is None) or (lat is not None and not (-90 <= lat <= 90 and -180 <= lon <= 180)):
             raise VisitError("bad_location", "Koordinata noto'g'ri")
         sets["lat"], sets["lon"] = lat, lon
+    if by and set(sets) & {"living", "rent_address", "lat"}:
+        sets["home_by"], sets["home_at"] = by, now_iso()
+    if by == "koordinator" and (d.get("checked") or "zone" in sets):  # talaba kiritganini koordinator tekshirdi
+        sets["home_checked_at"] = now_iso()
     if sets:
         await db.execute(f"UPDATE students SET {', '.join(f'{k} = ?' for k in sets)} WHERE id = ?", (*sets.values(), sid))
     st = await db.get_student(sid)
