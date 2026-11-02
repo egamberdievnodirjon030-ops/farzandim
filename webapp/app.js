@@ -151,11 +151,9 @@ const t = (k, v = {}) => {
   for (const [a, b] of Object.entries(v)) s = s.replaceAll('{' + a + '}', b);
   return s;
 };
-Object.assign(T.uz, { no_total: 'umumiy ball hali yo‘q', grades_upd: 'Baholar oxirgi marta yuklangan: {t}', recent_grades: 'So‘nggi baholar',
-  controls_h: 'Nazoratlar' });
-Object.assign(T.ru, { no_total: 'итоговый балл пока не выставлен', grades_upd: 'Оценки последний раз загружены: {t}', recent_grades: 'Последние оценки',
-  controls_h: 'Контроль' });
-Object.assign(T.en, { no_total: 'no final score yet', grades_upd: 'Grades last uploaded: {t}', recent_grades: 'Latest grades', controls_h: 'Assessments' });
+Object.assign(T.uz, { no_total: 'baho hali qo‘yilmagan', grades_upd: 'Baholar oxirgi marta yuklangan: {t}' });
+Object.assign(T.ru, { no_total: 'оценка пока не выставлена', grades_upd: 'Оценки последний раз загружены: {t}' });
+Object.assign(T.en, { no_total: 'not graded yet', grades_upd: 'Grades last uploaded: {t}' });
 if (STUDENT) {  // talaba ilovasi: «farzand» o'rniga — talabaning o'zi; talabaga xos bo'limlar
   Object.assign(T.uz, { sec_act: 'Faoliyat', portal: 'Talaba portali', my_children: 'Mening sahifam', choose_child: 'Kursni tanlang',
     events: 'Tadbir va tashriflar', events_nav: 'Tadbirlar', measures: 'Choralar', mine_events: 'Mening tadbir va tashriflarim',
@@ -540,7 +538,7 @@ async function viewHome() {
       ${kpis}
       <div class="dk-grid home">
         <div class="dk-col">${parentDyn(o.dynamics)}</div>
-        <div class="dk-col">${lessons}${recentGrades(o.recent_grades)}${o.updated ? `<p class="muted small" style="text-align:center">${t('updated', { t: when(o.updated) })}</p>` : ''}</div>
+        <div class="dk-col">${lessons}${o.updated ? `<p class="muted small" style="text-align:center">${t('updated', { t: when(o.updated) })}</p>` : ''}</div>
       </div>` });
     animateRings();
     return;
@@ -552,7 +550,6 @@ async function viewHome() {
     ${parentDyn(o.dynamics)}
     <section class="section"><div class="section-head"><h2>${hi('today_lessons')}${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
       <div class="list">${o.today.length ? o.today.map(l => lessonRow(l)).join('') : `<div class="empty" style="padding:22px">${t('no_lessons_today')}</div>`}</div></section>
-    ${recentGrades(o.recent_grades)}
     ${tutor.name || tutor.phone ? `<section class="section"><div class="section-head"><h2>${hi('coordinator')}${t('coordinator')}</h2></div>
       <div class="card" style="display:flex;align-items:center;gap:12px"><div class="chat-head" style="padding:0;box-shadow:none;flex:1;background:none">
       <div class="av">${esc((tutor.name || '?').trim().charAt(0))}</div><div><b>${esc(tutor.name || '')}</b><div class="muted small">${esc(fmtPhone(tutor.phone))}</div></div></div>
@@ -693,27 +690,15 @@ function renderSchedule() {
 }
 
 /* ================================================================ baholar */
-/* yuklangan baholar: fan qatori — umumiy ball (100 ballik) va 5 baholik baho, ostida barcha nazoratlar (joriy, oraliq …) */
-const ctrlChip = x => `<span class="gctl" title="${esc(x.control)}${x.date ? ' · ' + esc(dateLabel(x.date, true)) : ''}">${esc(x.control)}
-  <b class="num">${x.score != null ? num(x.score) : '—'}${x.max ? `<small>/${num(x.max)}</small>` : ''}</b>${x.date ? `<i>${esc(dateLabel(x.date))}</i>` : ''}</span>`;
+/* yuklangan baholar: fan qatori — umumiy ball (100 ballik) va 5 baholik baho */
 function gradeRow(g) {
   const has = g.score != null;
   return `<div class="subject ${g.debt ? 'debt' : ''}"><div><div style="font-weight:600">${esc(g.subject)}</div>
     <div class="small muted num">${has ? `${num(g.score)} / 100` : t('no_total')}${g.credits ? ' · ' + num(g.credits) + ' ' + t('credits') : ''}${g.debt ? ' · <span style="color:var(--bordo-fg)">' + t('debt_subject') + '</span>' : ''}</div></div>
-    ${has ? `<div class="grade g${g.grade}">${g.grade}</div>` : '<div class="grade g0" title="' + esc(t('no_total')) + '">—</div>'}
-    ${g.items && g.items.length ? `<div class="gctls">${g.items.map(ctrlChip).join('')}</div>` : ''}
-    ${has ? `<div class="meter"><i style="width:${Math.min(100, g.score)}%"></i></div>` : ''}</div>`;
+    ${has ? `<div class="grade g${g.grade}">${g.grade}</div><div class="meter"><i style="width:${Math.min(100, g.score)}%"></i></div>` : `<div class="grade g0" title="${esc(t('no_total'))}">—</div>`}</div>`;
 }
 function gradesUpd(d) {
   return d.uploaded ? `<p class="muted small gupd">${ic('clock')}${t('grades_upd', { t: when(d.uploaded) })}</p>` : '';
-}
-function recentGrades(list) {
-  if (!list || !list.length) return '';
-  return `<section class="section"><div class="section-head"><h2>${hi('semN')}${t('recent_grades')}</h2><a href="#/grades">${t('grades')}</a></div>
-    <div class="list">${list.map(x => `<div class="row" style="cursor:default"><div class="ic">${ic('grade')}</div><div class="body"><div class="t">${esc(x.subject)}</div>
-      <div class="d">${esc(x.control)}${x.date ? ' · ' + esc(dateLabel(x.date)) : ''}</div></div>
-      ${x.grade ? `<span class="grade g${x.grade}" style="width:36px;height:36px;font-size:16px">${x.grade}</span>` : ''}
-      <b class="num" style="white-space:nowrap">${x.score != null ? num(x.score) : '—'}${x.max ? `<small class="muted">/${num(x.max)}</small>` : ''}</b></div>`).join('')}</div></section>`;
 }
 async function viewGrades() {
   const c = S.child;
@@ -733,9 +718,8 @@ async function viewGrades() {
       <div class="tile st-tile">${tk(t('grade_scale'), 'grade', 'people')}<div class="dk-scale">${[['90–100', 5], ['70–89', 4], ['60–69', 3], ['0–59', 2]].map(([r, g]) =>
         `<span><i class="grade g${g}">${g}</i><small class="num">${r}</small></span>`).join('')}</div></div></div>`;
     const sems = d.semesters.map(sm => `<section class="card"><div class="section-head" style="margin:0 0 4px"><h2>${hi('semN')}${t('semN', { n: sm.semester })}</h2>${sm.gpa != null ? `<span class="muted num">GPA ${gpaNum(sm.gpa)}</span>` : ''}</div>
-      <table class="dk-tbl"><thead><tr><th>${t('subj_h')}</th><th>${t('controls_h')}</th><th class="r">${t('credits_h')}</th><th style="width:26%">${t('score_h')}</th><th class="r">${t('grade_h')}</th></tr></thead><tbody>
+      <table class="dk-tbl"><thead><tr><th>${t('subj_h')}</th><th class="r">${t('credits_h')}</th><th style="width:38%">${t('score_h')}</th><th class="r">${t('grade_h')}</th></tr></thead><tbody>
       ${sm.subjects.map(g => `<tr class="${g.debt ? 'debt' : ''}"><td><b>${esc(g.subject)}</b>${g.debt ? `<div class="small" style="color:var(--bordo-fg)">${t('debt_subject')}</div>` : ''}</td>
-        <td>${g.items && g.items.length ? `<div class="gctls">${g.items.map(ctrlChip).join('')}</div>` : '<span class="muted">—</span>'}</td>
         <td class="r num">${g.credits ? num(g.credits) : '—'}</td>
         <td>${g.score != null ? `<div class="dk-bar"><i style="width:${Math.min(100, g.score)}%"></i></div><span class="num small">${num(g.score)} / 100</span>` : `<span class="muted small">${t('no_total')}</span>`}</td>
         <td class="r">${g.score != null ? `<span class="grade g${g.grade}">${g.grade}</span>` : '<span class="grade g0">—</span>'}</td></tr>`).join('')}</tbody></table></section>`).join('');
@@ -1343,7 +1327,7 @@ async function viewStaffStudent(sid) {
       ${payTile('kontrakt', o.pays.kontrakt)}${payTile('trimestr', o.pays.trimestr)}</div>
     ${o.academic.count ? `<section class="section"><div class="section-head"><h2>${hi('Akademik qarzdorlik')}Akademik qarzdorlik</h2><span class="muted small">${o.academic.count} ta fan</span></div>
       <div class="list">${o.academic.debts.map(debtRow).join('')}</div></section>` : ''}
-    ${o.grades && o.grades.semesters.length ? o.grades.semesters.map((sm, i) => `<section class="section"><div class="section-head"><h2>${hi('semN')}Baholar — ${esc(sm.semester || '—')}-semestr</h2>${i ? '' : `<span class="muted small">${o.grades.count} ta baho</span>`}</div>
+    ${o.grades && o.grades.semesters.length ? o.grades.semesters.map((sm, i) => `<section class="section"><div class="section-head"><h2>${hi('semN')}Baholar — ${esc(sm.semester || '—')}-semestr</h2>${i ? '' : `<span class="muted small">${o.grades.count} ta fan</span>`}</div>
       <div class="list">${sm.subjects.map(gradeRow).join('')}</div></section>`).join('') + gradesUpd(o.grades)
       : `<section class="section"><div class="section-head"><h2>${hi('semN')}Baholar</h2></div><div class="list">${empty('grade', 'Baholar hali yuklanmagan')}</div></section>`}
     ${o.subjects && o.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}Fanlar bo‘yicha davomat</h2></div>
