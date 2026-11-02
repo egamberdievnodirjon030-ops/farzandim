@@ -93,7 +93,12 @@ Talabaning **umumiy GPA** si (HEMIS «Performance GPA» fayli bo'yicha) `GPA_MIN
 «Kurs holati» (bot, ilova va kompyuter versiyasi) ostida ixcham **Dinamika**: har bir ko'rsatkichning hozirgi qiymati, oldingi davrga nisbatan o'zgarishi (▲/▼; yaxshilansa — yashil, yomonlashsa — bordo) va kichik grafik:
 - **Davomat, %** — kunlik davomat bo'lsa oxirgi 6 hafta bo'yicha; bo'lmasa HEMIS statistikasi yuklashlari orasidagi davrlar bo'yicha;
 - **Chegaraga yetganlar** — birinchi chegaradan oshgan talabalar soni (hafta yoki yuklash bo'yicha);
-- **Kontrakt / trimestr qarzi** — buxgalteriya hisobotlari sanalari bo'yicha jami qarz va qarzdorlar soni.
+- **Kontrakt / trimestr qarzi** — buxgalteriya hisobotlari sanalari bo'yicha jami qarz va qarzdorlar soni;
+- **Akademik qarzdorlar, GPA past, o'rtacha GPA** — har bir fayl yuklash / Manage sinxronidan keyin yoziladigan holat
+  nuqtalari bo'yicha (oldingi yuklashga nisbatan).
+
+Kunlik davomat ham, joriy semestrdagi HEMIS statistikasi ham bo'lmasa — davomat va chegaraga yetganlar ham holat
+nuqtalaridan olinadi (oldin bu holda faqat kontrakt ko'rinardi). Ma'lumoti yo'q ko'rsatkich yorlig'i ko'rsatilmaydi.
 
 Hisobot faqat bir guruh uchun yuklangan sanada boshqalarning oldingi holati olinadi. Koordinator dinamikani faqat o'z guruhlari bo'yicha ko'radi.
 

@@ -4,7 +4,9 @@ Har bir ko'rsatkich: oxirgi qiymat, oldingi davrga nisbatan o'zgarish va kichik 
   • Davomat, % — kunlik davomat bo'lsa haftalar bo'yicha (oxirgi 6 hafta), bo'lmasa HEMIS statistikasi yuklashlari
     orasidagi davrlar bo'yicha (har bir davrda qatnashilgan ulush);
   • Chegaraga yetganlar — semestr boshidan qoldirilgan soatlari birinchi chegaradan oshgan talabalar soni;
-  • Kontrakt va trimestr qarzi — buxgalteriya hisobotlari sanalari bo'yicha jami qarz.
+  • Kontrakt va trimestr qarzi — buxgalteriya hisobotlari sanalari bo'yicha jami qarz;
+  • Akademik qarzdorlar, GPA past, o'rtacha GPA — har bir yuklashdan keyingi holat nuqtalari (snapshots) bo'yicha.
+    Kunlik davomat ham, joriy semestrdagi HEMIS statistikasi ham bo'lmasa — davomat ham shu nuqtalardan.
 Talabaning ma'lumoti biror sanada yuklanmagan bo'lsa (masalan, hisobot faqat bir guruh uchun yuklangan), uning
 oldingi holati olinadi — qisman yuklash grafikni buzmaydi. scope — koordinatorning guruhlari (None — butun kurs).
 """
@@ -13,7 +15,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import absence
-from config import ABSENCE_COUNT_EXCUSED
+from config import ABSENCE_COUNT_EXCUSED, GPA_MIN
 from database import db
 from utils import fmt_money, fmt_num, fmt_pairs, semester_start, today, week_bounds
 
@@ -47,7 +49,7 @@ def _carry(rows: list[dict], key: str) -> list[tuple[str, dict]]:
 
 def _item(key: str, title: str, unit: str, points: list[dict], better: str, caption: str, note: str = "") -> dict:
     vals = [p["value"] for p in points]
-    delta = round(vals[-1] - vals[-2], 1) if len(vals) > 1 else None
+    delta = round(vals[-1] - vals[-2], 2 if unit == "gpa" else 1) if len(vals) > 1 else None
     return {"key": key, "title": title, "unit": unit, "points": points, "value": vals[-1] if vals else None,
             "delta": delta, "better": better, "caption": caption, "note": note}
 
@@ -147,14 +149,64 @@ async def _payments(scope) -> list[dict]:
     return out
 
 
+async def _snapshots(scope, with_att: bool) -> list[dict]:
+    """Har bir yuklashdan keyingi holat nuqtalari bo'yicha: akademik qarzdorlar, GPA past, o'rtacha GPA (va kerak bo'lsa —
+    davomat va chegaraga yetganlar). Har sana — o'sha kungi oxirgi holat; talabaning nuqtasi yo'q sanada oldingisi olinadi."""
+    S, p = _students_sql(scope)
+    metrics = ("acad", "gpa") + (("att_pct", "att_hours") if with_att else ())
+    rows = await db.fetchall(
+        f"""SELECT student_id, metric, value, substr(day, 1, 10) AS d FROM snapshots
+            WHERE student_id IN ({S}) AND metric IN ({','.join('?' * len(metrics))}) ORDER BY id""", p + metrics)
+    if not rows:
+        return []
+    by_day: dict[str, list[dict]] = {}
+    for r in rows:
+        by_day.setdefault(r["d"], []).append(r)
+    state: dict[str, dict[int, float]] = {m: {} for m in metrics}
+    series: dict[str, list[dict]] = {k: [] for k in ("acad", "gpa_low", "gpa_avg", "att", "limit")}
+    lvl = absence.LEVELS[0]
+    for d in sorted(by_day):
+        for r in by_day[d]:
+            state[r["metric"]][r["student_id"]] = r["value"]
+        lab = _label(date.fromisoformat(d))
+        if state["acad"]:
+            series["acad"].append({"label": lab, "value": sum(1 for v in state["acad"].values() if v > 0)})
+        g = list(state["gpa"].values())
+        if g:
+            series["gpa_low"].append({"label": lab, "value": sum(1 for v in g if v < GPA_MIN)})
+            series["gpa_avg"].append({"label": lab, "value": round(sum(g) / len(g), 2)})
+        if with_att and state["att_pct"]:
+            pc = list(state["att_pct"].values())
+            series["att"].append({"label": lab, "value": round(sum(pc) / len(pc), 1)})
+            series["limit"].append({"label": lab, "value": sum(1 for v in state["att_hours"].values() if v >= lvl)})
+    cap = "oldingi yuklashga nisbatan"
+    out = []
+    if with_att and series["att"]:
+        out += [_item("att", "Davomat", "%", series["att"][-POINTS:], "up", cap),
+                _item("limit", "Chegaraga yetganlar", "ta", series["limit"][-POINTS:], "down", cap, f"{fmt_pairs(lvl)} va undan ko'p")]
+    if series["acad"]:
+        out.append(_item("acad", "Akademik qarzdorlar", "ta", series["acad"][-POINTS:], "down", cap))
+    if series["gpa_low"]:
+        out.append(_item("gpa_low", "GPA past", "ta", series["gpa_low"][-POINTS:], "down", cap,
+                         f"{fmt_num(GPA_MIN)} dan past — kursdan o'tmaydi"))
+        out.append(_item("gpa_avg", "O'rtacha GPA", "gpa", series["gpa_avg"][-POINTS:], "up", cap))
+    return out
+
+
 async def course_dynamics(scope: set[str] | None) -> list[dict]:
-    return await _attendance(scope) + await _payments(scope)
+    """Davomat, chegaraga yetganlar, kontrakt, trimestr, akademik qarzdorlar, GPA past, o'rtacha GPA — ma'lumoti borlari."""
+    att = await _attendance(scope)
+    snap = await _snapshots(scope, with_att=not att)
+    head = att or [x for x in snap if x["key"] in ("att", "limit")]
+    rest = [x for x in snap if x["key"] not in ("att", "limit")]
+    return [x for x in head + await _payments(scope) + rest if x["points"]]
 
 
 def fmt_value(it: dict, v) -> str:
     if v is None:
         return "—"
-    return f"{fmt_num(v)}%" if it["unit"] == "%" else fmt_money(v) if it["unit"] == "so'm" else f"{fmt_num(v)} ta"
+    return (f"{fmt_num(v)}%" if it["unit"] == "%" else fmt_money(v) if it["unit"] == "so'm"
+            else f"{v:.2f}".replace(".", ",") if it["unit"] == "gpa" else f"{fmt_num(v)} ta")
 
 
 def text_lines(items: list[dict]) -> list[str]:

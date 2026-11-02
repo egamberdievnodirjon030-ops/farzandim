@@ -30,10 +30,11 @@ const lblKey = l => { const m = /^(\d{1,2})\.(\d{1,2})/.exec(l || ''); if (!m) r
 function niceStep(raw) { const p = 10 ** Math.floor(Math.log10(raw || 1)), f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
 function yFmt(v, unit) {
   if (unit === '%') return `${Math.round(v)}%`;
+  if (unit === 'gpa') return gpaFmt(v);
   if (unit === 'so\'m') { const [a, u] = moneyShort(v); return `${a} ${u.replace(' so‘m', '')}`; }
   return num(v, 0);
 }
-function valFmt(v, unit) { return unit === '%' ? fmtPct(v) : unit === 'so\'m' ? moneyShort(v).join(' ') : `${num(v, 0)} ta`; }
+function valFmt(v, unit) { return unit === '%' ? fmtPct(v) : unit === 'so\'m' ? moneyShort(v).join(' ') : unit === 'gpa' ? gpaFmt(v) : `${num(v, 0)} ta`; }
 /* series: [{name, color, points:[{label, value}]}] — chiziqli grafik, sichqoncha ustida qiymatlar */
 function drawLine(el, series, unit) {
   const labels = [...new Set(series.flatMap(s => s.points.map(p => p.label)))].sort((a, b) => lblKey(a) - lblKey(b));
@@ -76,6 +77,9 @@ function drawLine(el, series, unit) {
   });
   $('[data-hov]', el).addEventListener('mouseleave', () => { tip.hidden = true; hl.setAttribute('visibility', 'hidden'); });
 }
+/* dinamika yorliqlari (tartibi bilan); ma'lumoti yo'q ko'rsatkich ko'rsatilmaydi */
+const DYN_T = { att: 'Davomat', limit: 'Chegaraga yetganlar', acad: 'Akademik qarz', gpa_low: 'GPA past', gpa_avg: 'O‘rtacha GPA',
+  kontrakt: 'Kontrakt', trimestr: 'Trimestr' };
 /* dinamika kartasi: yorliqlar (ko'rsatkichlar), oxirgi qiymat va o'zgarish — sarlavha o'ngida */
 function dynCard(id, tabs, cur) {
   const t = tabs.find(x => x.key === cur) || tabs[0];
@@ -83,7 +87,7 @@ function dynCard(id, tabs, cur) {
   const leg = t && t.series.length > 1 ? `<div class="lc-leg">${t.series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}</div>` : '';
   let val = '';
   if (t && t.series.length === 1 && t.series[0].points.length) {
-    const p = t.series[0].points, v = p[p.length - 1].value, d = p.length > 1 ? Math.round((v - p[p.length - 2].value) * 10) / 10 : 0;
+    const k = t.unit === 'gpa' ? 100 : 10, p = t.series[0].points, v = p[p.length - 1].value, d = p.length > 1 ? Math.round((v - p[p.length - 2].value) * k) / k : 0;
     const good = (d > 0) === (t.better === 'up');
     val = `<span class="dyn-v" title="Oxirgi qiymat va oldingi davrga nisbatan o‘zgarish">${valFmt(v, t.unit)}${d ? ` <span class="${good ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${t.unit === '%' ? String(Math.abs(d)).replace('.', ',') + ' p.p.' : valFmt(Math.abs(d), t.unit)}</span>` : ''}</span>`;
   }
@@ -175,7 +179,7 @@ async function pPanel(parts, q) {
       sub: chk ? (ch.new ? `<span class="down">+${ch.new} ta kutilmoqda</span>` : `o‘quv yilida <b>${chk.total}</b> ta chora`) : 'ma’lumot yo‘q' })}
     ${kc({ href: '#/social', tone: 'violet', icon: 'heart', label: 'Ijtimoiy toifadagilar', value: sc ? num(sc.students, 0) : '—', sub: sc ? `<b>${fmtPct(pctOf(sc.students, T))}</b> talabalar` : '' })}
   </div>`;
-  const tabs = (d.dynamics || []).map(it => ({ key: it.key, title: { att: 'Davomat', limit: 'Chegaraga yetganlar', kontrakt: 'Kontrakt', trimestr: 'Trimestr' }[it.key] || it.title,
+  const tabs = (d.dynamics || []).filter(it => it.points && it.points.length).map(it => ({ key: it.key, title: DYN_T[it.key] || it.title,
     unit: it.unit, better: it.better, caption: `${it.title}${it.note ? ' · ' + it.note : ''} — ${it.caption}`, series: [{ name: it.title, color: SER_C[0], points: it.points }] }));
   const mix = d.mix || {};
   const mixCard = card('pie', 'red', `Muammolar tarkibi <small>(${prob} ta talaba)</small>`, `<div class="cb">${donut(MIX.map(([k, l, c, f]) => ({ label: l, value: mix[k] || 0, color: c, href: `#/students?f=${f}` })), prob, 'talaba')}</div>`);
@@ -234,7 +238,7 @@ async function pSuperOverview() {
     ${kc({ tone: 'amber', icon: 'shield', bg: 'gavel', label: 'Chora ko‘rilganlar', value: num(disc.students, 0), sub: disc.pending ? `<span class="down">+${disc.pending} ta kutilmoqda</span>` : `o‘quv yilida <b>${disc.total}</b> ta chora` })}
     ${kc({ tone: 'violet', icon: 'heart', label: 'Ijtimoiy toifadagilar', value: num(social, 0), sub: `<b>${fmtPct(pctOf(social, T))}</b> talabalar` })}
   </div>`;
-  const keys = [['att', 'Davomat'], ['limit', 'Chegaraga yetganlar'], ['kontrakt', 'Kontrakt'], ['trimestr', 'Trimestr']];
+  const keys = Object.entries(DYN_T);
   const tabs = keys.map(([k, t]) => { const series = C.map((c, i) => { const it = (c.dynamics || []).find(x => x.key === k);
       return it && it.points.length ? { name: c.title, color: SER_C[i % SER_C.length], points: it.points, unit: it.unit, better: it.better, cap: it.caption } : null; }).filter(Boolean);
     return series.length ? { key: k, title: t, unit: series[0].unit, better: series[0].better, caption: `Kurslar bo‘yicha — ${series[0].cap}`, series } : null; }).filter(Boolean);
