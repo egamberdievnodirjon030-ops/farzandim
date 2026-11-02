@@ -59,6 +59,11 @@ async def index(request: web.Request) -> web.Response:
     return _html("index.html")
 
 
+async def student_app(request: web.Request) -> web.Response:
+    """Talaba ilovasi (talabalar boti ichida) — ota-ona ilovasining o'zi, app.js «talaba rejimi»da (/api/s/…)."""
+    return _html("index.html")
+
+
 # ---------------------------------------------------------------- telefon ilovasi: PWA va yuklab olish sahifasi
 async def manifest(request: web.Request) -> web.Response:
     return web.json_response({
@@ -180,6 +185,7 @@ def create_app(bot: Bot) -> web.Application:
     app.router.add_get("/manifest.webmanifest", manifest)
     app.router.add_get("/ilova", download_page)
     app.router.add_get("/ilova/{name}", download_apk)
+    app.router.add_get("/talaba", student_app)
     app.router.add_get("/desk", desk)
     app.router.add_get("/desk/login", desk_login_page)
     app.router.add_post("/desk/login", desk_login)

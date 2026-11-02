@@ -727,3 +727,18 @@ html[data-theme="dark"] .c-money2 { --c: #F7A56A; --cb: rgba(247,165,106,.13); }
 .latt .lmiss.warn { background: var(--tint-warn); color: var(--warn); }
 .latt .lmiss.over { background: var(--bordo-500); color: #fff; }
 .subject .lim { grid-column: 1 / -1; }
+
+/* ---------------------------------------------------------------- talaba ilovasi: tadbirlar */
+.quick.s3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.quick.s3 a { flex-direction: column; align-items: flex-start; gap: 6px; }
+.quick.s3 .dot { position: absolute; top: 8px; right: 8px; margin: 0; }
+.ev-card { margin-top: 12px; display: grid; gap: 8px; }
+.ev-h { display: flex; align-items: flex-start; gap: 12px; }
+.ev-h .t-ic { flex: none; }
+.ev-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ev-t small { color: var(--muted); font-size: 12.5px; }
+.ev-t b { font-size: 16px; line-height: 1.3; }
+.ev-m { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+.ev-m svg { width: 16px; height: 16px; flex: none; }
+.ev-a { margin-top: 4px; }
+.ev-a .btn { width: 100%; }

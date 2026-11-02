@@ -7,6 +7,8 @@ const JIDU_MAIN = () => {
 const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData ? window.Telegram.WebApp : null;
 const DEV = new URLSearchParams(location.search).has('dev');
 const NATIVE = /JiduApp/.test(navigator.userAgent);  // Android/iOS ilovasi (Capacitor) foydalanuvchi agentiga qo'shadi
+// Talaba ilovasi (/talaba — talabalar boti ichida): xuddi shu ekranlar, ma'lumot — talabaning o'zi (/api/s/…)
+const STUDENT = /^\/talaba\/?$/.test(location.pathname);
 const store = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } },
   set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (_) { /* */ } } };
 const $app = document.getElementById('app');
@@ -149,6 +151,47 @@ const t = (k, v = {}) => {
   for (const [a, b] of Object.entries(v)) s = s.replaceAll('{' + a + '}', b);
   return s;
 };
+if (STUDENT) {  // talaba ilovasi: «farzand» o'rniga — talabaning o'zi; talabaga xos bo'limlar
+  Object.assign(T.uz, { sec_act: 'Faoliyat', portal: 'Talaba portali', my_children: 'Mening sahifam', choose_child: 'Kursni tanlang',
+    events: 'Tadbir va tashriflar', events_nav: 'Tadbirlar', measures: 'Choralar', mine_events: 'Mening tadbir va tashriflarim',
+    open_events: 'Ro‘yxatdan o‘tish mumkin', no_events: 'Yaqin kunlarda tadbir yoki tashrif yo‘q', no_open: 'Hozircha ochiq e’lon yo‘q',
+    reg: 'Ro‘yxatdan o‘tish', unreg: 'Ro‘yxatdan chiqish', registered: 'Ro‘yxatdan o‘tdingiz', unregistered: 'Ro‘yxatdan chiqdingiz',
+    unreg_q: 'Ro‘yxatdan chiqasizmi? Joyingiz boshqalarga beriladi.', conflict_t: 'Shu vaqtda sizda', reg_anyway_q: 'Baribir ro‘yxatdan o‘tasizmi?',
+    seats: '{n} / {c} joy', full: 'Joylar to‘ldi', reg_closed: 'Ro‘yxat yopilgan', confirm_visit: 'Tasdiqlayman', confirmed: 'Tasdiqlandi',
+    visit_other: 'Boshqa vaqt taklif qilish yoki rad etish — talabalar botidagi xabar orqali.',
+    r_kutilmoqda: 'javob kutilmoqda', r_tasdiqladi: 'tasdiqlangan', r_vaqt_taklif_qildi: 'boshqa vaqt taklif qilingan', r_rad_etdi: 'rad etilgan',
+    no_measures: 'Chora ko‘rilmagan', no_measures_sub: 'O‘quv yilida sizga nisbatan intizomiy chora ko‘rilmagan.',
+    measures_note: 'Rasman e’lon qilingan choralar (dekan farmoyishi, buyruq, ota-onaga xat). Hujjatlarning nusxasi — «Hujjatlar» bo‘limida.',
+    letter_sent: 'ota-onaga xat yuborilgan', s_unlinked_t: 'Siz hali talabalar botiga ulanmagansiz',
+    s_unlinked_sub: 'Talabalar botini oching va /start bosing — telefon raqamingiz orqali hisobingiz topiladi. So‘ng ilova shu yerda ochiladi.',
+    s_open_bot: 'Talabalar botini ochish', blocked: 'Bu ilova talabalar uchun.' });
+  Object.assign(T.ru, { sec_act: 'Активность', portal: 'Портал студента', my_children: 'Моя страница', choose_child: 'Выберите курс',
+    events: 'Мероприятия и визиты', events_nav: 'События', measures: 'Взыскания', mine_events: 'Мои мероприятия и визиты',
+    open_events: 'Открыта регистрация', no_events: 'В ближайшие дни мероприятий нет', no_open: 'Открытых объявлений пока нет',
+    reg: 'Зарегистрироваться', unreg: 'Отменить регистрацию', registered: 'Вы зарегистрированы', unregistered: 'Регистрация отменена',
+    unreg_q: 'Отменить регистрацию? Место освободится для других.', conflict_t: 'В это время у вас', reg_anyway_q: 'Всё равно зарегистрироваться?',
+    seats: '{n} / {c} мест', full: 'Мест нет', reg_closed: 'Регистрация закрыта', confirm_visit: 'Подтверждаю', confirmed: 'Подтверждено',
+    visit_other: 'Предложить другое время или отказаться — через сообщение в боте для студентов.',
+    r_kutilmoqda: 'ожидается ответ', r_tasdiqladi: 'подтверждено', r_vaqt_taklif_qildi: 'предложено другое время', r_rad_etdi: 'отказ',
+    no_measures: 'Взысканий нет', no_measures_sub: 'В этом учебном году дисциплинарных взысканий нет.',
+    measures_note: 'Официально объявленные меры (распоряжение декана, приказ, письмо родителям). Копии документов — в разделе «Документы».',
+    letter_sent: 'родителям отправлено письмо', s_unlinked_t: 'Вы ещё не подключены к боту для студентов',
+    s_unlinked_sub: 'Откройте бот для студентов и нажмите /start — аккаунт найдётся по номеру телефона. Затем приложение откроется здесь.',
+    s_open_bot: 'Открыть бот для студентов', blocked: 'Это приложение для студентов.' });
+  Object.assign(T.en, { sec_act: 'Activity', portal: 'Student portal', my_children: 'My page', choose_child: 'Choose a course',
+    events: 'Events and visits', events_nav: 'Events', measures: 'Disciplinary', mine_events: 'My events and visits',
+    open_events: 'Registration open', no_events: 'No events in the coming days', no_open: 'No open announcements yet',
+    reg: 'Register', unreg: 'Cancel registration', registered: 'You are registered', unregistered: 'Registration cancelled',
+    unreg_q: 'Cancel your registration? Your seat goes to others.', conflict_t: 'At this time you have', reg_anyway_q: 'Register anyway?',
+    seats: '{n} / {c} seats', full: 'Fully booked', reg_closed: 'Registration closed', confirm_visit: 'I confirm', confirmed: 'Confirmed',
+    visit_other: 'To suggest another time or decline — use the message in the student bot.',
+    r_kutilmoqda: 'awaiting reply', r_tasdiqladi: 'confirmed', r_vaqt_taklif_qildi: 'another time suggested', r_rad_etdi: 'declined',
+    no_measures: 'No disciplinary measures', no_measures_sub: 'No disciplinary measures this academic year.',
+    measures_note: 'Officially announced measures (dean’s order, university order, letter to parents). Document copies are in «Documents».',
+    letter_sent: 'letter sent to parents', s_unlinked_t: 'You are not connected to the student bot yet',
+    s_unlinked_sub: 'Open the student bot and press /start — your account is found by phone number. Then the app opens here.',
+    s_open_bot: 'Open the student bot', blocked: 'This app is for students.' });
+}
 const MONTHS = {
   uz: ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'],
   ru: ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'],
@@ -271,7 +314,14 @@ const tk = (label, icon, c) => `<span class="k"><span class="t-ic c-${c}" aria-h
 const ic = (name, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[name]}"/></svg>`;
 
 /* ================================================================ API */
+function studentPath(p) {  // talaba ilovasi: ota-onaga xos API lar o'rniga — /api/s/… (keraksizlari — null)
+  if (/^\/api\/(surveys|announcements|info)(\/|$)/.test(p)) return null;
+  if (p === '/api/me' || p === '/api/pulse' || /^\/api\/(notifications|settings)(\/|$)/.test(p)) return p.replace('/api/', '/api/s/');
+  if (p.startsWith('/api/c/')) return '/api/s/' + p.slice(7);
+  return p;
+}
 async function api(path, opts = {}) {
+  if (STUDENT) { const m = studentPath(path); if (m === null) return { pending: [], done: [], items: [], tutors: [], levels: [], grades: [], texts: [] }; path = m; }
   const headers = Object.assign({ 'X-Telegram-Init-Data': (tg && tg.initData) || '' }, opts.headers || {});
   if (DEV) headers['X-Dev-User'] = '1';
   if (!tg && store.get('appToken')) headers.Authorization = 'Bearer ' + store.get('appToken');
@@ -313,9 +363,10 @@ function nav(active) {
   const staff = S.me && (S.me.role === 'staff' || S.me.role === 'super');
   const items = staff
     ? [['#/staff', 'panel', 'Panel'], ['#/staff/students', 'users', 'Talabalar'], ['#/staff/inbox', 'chat', 'Xabarlar'], ['#/staff/announce', 'mega', 'E’lon'], ['#/staff/files', 'upload', 'Fayllar']]
+    : STUDENT ? [['#/', 'home', t('home')], ['#/schedule', 'cal', t('schedule')], ['#/attendance', 'att', t('nav_att')], ['#/grades', 'grade', t('grades')], ['#/events', 'mega', t('events_nav')]]
     : [['#/', 'home', t('home')], ['#/schedule', 'cal', t('schedule')], ['#/attendance', 'att', t('nav_att')], ['#/grades', 'grade', t('grades')], ['#/chat', 'chat', t('nav_msg')]];
   return `<nav class="nav" aria-label="Asosiy bo‘limlar">${items.map(([href, icon, label]) => {
-    const badge = (href === '#/chat' && unread.messages) || (href === '#/staff/inbox' && S.staffUnread) || 0;
+    const badge = (href === '#/chat' && unread.messages) || (href === '#/staff/inbox' && S.staffUnread) || (href === '#/events' && S.evOpen) || 0;
     return `<a href="${href}" ${href === active ? 'aria-current="page"' : ''}>${ic(icon)}<span>${esc(label)}</span>${badge ? `<span class="dot">${badge}</span>` : ''}</a>`;
   }).join('')}</nav>`;
 }
@@ -347,7 +398,14 @@ function deskSide() {
     <a class="dk-brand" href="#/"><img src="static/jidu-seal.webp" alt="" width="40" height="40"><span><b>JIDU</b><small>${t('portal')}</small></span></a>
     ${kids.length ? `<div class="dk-kids"><h6>${t('my_children')}</h6>${kids.map(k => `<button class="dk-kid${S.child === k ? ' on' : ''}" data-act="child" data-key="${k.course}/${k.id}" aria-pressed="${S.child === k}">
       <span class="av">${esc(k.initials)}</span><span class="nm"><b>${esc(k.short)}</b><small>${esc([k.group, k.year ? t('yearN', { n: k.year }) : ''].filter(Boolean).join(' · '))}</small></span></button>`).join('')}</div>` : ''}
-    <nav class="dk-nav">
+    ${STUDENT ? `<nav class="dk-nav">
+      <h6>${t('sec_study')}</h6>
+      ${item('#/', 'home', t('home'))}${item('#/schedule', 'cal', t('schedule'))}${item('#/attendance', 'att', t('attendance'))}${item('#/grades', 'grade', t('grades'))}
+      ${item('#/finance', 'wallet', t('finance'))}${item('#/trends', 'trend', t('trends'))}${item('#/documents', 'file', t('documents'))}
+      <h6>${t('sec_act')}</h6>
+      ${item('#/events', 'mega', t('events'), S.evOpen)}${item('#/measures', 'alert', t('measures'))}${item('#/notifications', 'bell', t('notifications'), u.notifications)}
+      <h6>${t('sec_uni')}</h6>${item('#/regulations', 'book', t('regs'))}
+    </nav>` : `<nav class="dk-nav">
       <h6>${t('sec_study')}</h6>
       ${item('#/', 'home', t('home'))}${item('#/schedule', 'cal', t('schedule'))}${item('#/attendance', 'att', t('attendance'))}${item('#/grades', 'grade', t('grades'))}
       ${item('#/finance', 'wallet', t('finance'))}${item('#/trends', 'trend', t('trends'))}${item('#/documents', 'file', t('documents'))}
@@ -355,7 +413,7 @@ function deskSide() {
       ${item('#/chat', 'chat', t('messages'), u.messages)}${item('#/notifications', 'bell', t('notifications'), u.notifications)}${item('#/news', 'mega', t('news'))}
       <h6>${t('sec_uni')}</h6>
       ${item('#/surveys', 'poll', t('surveys'), S.pendingSurveys)}${item('#/regulations', 'book', t('regs'))}${item('#/info', 'info', t('info'))}
-    </nav>
+    </nav>`}
     <div class="dk-me"><span class="av">${esc((S.me.user.name || '?').trim().charAt(0).toUpperCase())}</span>
       <span class="nm"><b>${esc(S.me.user.name || '')}</b><small>${t('portal')}</small></span>
       <a class="icon-btn" href="#/settings" title="${t('settings')}" aria-label="${t('settings')}">${ic('gear')}</a>
@@ -407,7 +465,7 @@ function verdict(o) {
   const n = o.issues.length;
   if (!n) return `<div class="verdict ok">${ic('ok')}<div><b>${t('ok_title')}</b><p>${t('ok_sub')}</p></div></div>`;
   const tone = (o.attendance && o.attendance.level >= 1) || o.academic.count ? 'bad' : 'warn';
-  const kind = s => /^📚/u.test(s) ? ['bookx', 'acad', '#/debts'] : /^💰/u.test(s) ? ['dollar', 'money', '#/finance']
+  const kind = s => /^📚/u.test(s) ? ['bookx', 'acad', '#/debts'] : /^(📄|✉️)/u.test(s) ? ['file', 'risk', STUDENT ? '#/measures' : '#/documents'] : /^💰/u.test(s) ? ['dollar', 'money', '#/finance']
     : /^💳/u.test(s) ? ['receipt', 'money2', '#/finance'] : /^🎓/u.test(s) ? ['grade', 'gpa', '#/grades'] : ['calx', 'att', '#/attendance'];
   const rows = o.issues.map(s => { const [i, c, h] = kind(s); return `<a class="issue" href="${h}"><span class="t-ic c-${c}" aria-hidden="true">${ic(i)}</span>
     <span class="tx">${esc(s.replace(/^[^\p{L}\p{N}]+/u, ''))}</span>${ic('chev', 'chev')}</a>`; }).join('');
@@ -465,14 +523,14 @@ async function viewHome() {
     const tutorCard = tutor.name || tutor.phone ? `<section class="card dk-tutor"><h3 class="dk-h3">${hi('coordinator')}${t('coordinator')}</h3>
       <div class="chat-head" style="padding:0;box-shadow:none;background:none"><div class="av">${esc((tutor.name || '?').trim().charAt(0))}</div>
       <div><b>${esc(tutor.name || '')}</b><div class="muted small">${esc(fmtPhone(tutor.phone))}</div></div></div>
-      <a class="btn block" href="#/chat" style="margin-top:14px">${ic('chat')}${t('write')}</a></section>` : '';
+      ${STUDENT ? '' : `<a class="btn block" href="#/chat" style="margin-top:14px">${ic('chat')}${t('write')}</a>`}</section>` : '';
     const lessons = `<section class="section"><div class="section-head"><h2>${hi('today_lessons')}${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
       <div class="list">${o.today.length ? o.today.map(l => lessonRow(l)).join('') : `<div class="empty" style="padding:22px">${t('no_lessons_today')}</div>`}</div></section>`;
     // 1-qator: talaba kartasi | holat va koordinator; 2-qator: ko'rsatkichlar; 3-qator: dinamika | bugungi darslar
     page({ title: t('home'), sub: `${c.name}${c.group ? ' · ' + c.group : ''}`, active: '#/', wide: true, body: `
       <div class="dk-grid home">
         <div class="dk-col">${idCard(c)}</div>
-        <div class="dk-col">${verdict(o)}${sv.pending.slice(0, 2).map(surveyCta).join('')}${tutorCard}</div>
+        <div class="dk-col">${verdict(o)}${STUDENT ? studentLinks() : ''}${sv.pending.slice(0, 2).map(surveyCta).join('')}${tutorCard}</div>
       </div>
       ${kpis}
       <div class="dk-grid home">
@@ -483,7 +541,7 @@ async function viewHome() {
     return;
   }
   // birinchi ekranda: talaba kartasi → javob kutayotgan so'rovnoma → so'rovnomalar va ichki nizomlar → holat
-  const body = switcher() + idCard(c) + sv.pending.slice(0, 2).map(surveyCta).join('') + quickLinks(sv.pending.length) + verdict(o) + `
+  const body = switcher() + idCard(c) + sv.pending.slice(0, 2).map(surveyCta).join('') + (STUDENT ? studentLinks() : quickLinks(sv.pending.length)) + verdict(o) + `
     <div class="grid2" style="margin-top:14px">${attTile}${gpaTile}${acadTile}${payTile('kontrakt', o.pays.kontrakt)}</div>
     ${o.pays.trimestr && o.pays.trimestr.state === 'debt' ? `<div style="margin-top:12px">${payTile('trimestr', o.pays.trimestr)}</div>` : ''}
     ${parentDyn(o.dynamics)}
@@ -493,7 +551,7 @@ async function viewHome() {
       <div class="card" style="display:flex;align-items:center;gap:12px"><div class="chat-head" style="padding:0;box-shadow:none;flex:1;background:none">
       <div class="av">${esc((tutor.name || '?').trim().charAt(0))}</div><div><b>${esc(tutor.name || '')}</b><div class="muted small">${esc(fmtPhone(tutor.phone))}</div></div></div>
       ${tutor.phone ? `<a class="icon-btn" style="background:var(--tint-navy);color:var(--accent)" href="tel:+${esc(tutor.phone)}" aria-label="${t('call_tutor')}">${ic('phone')}</a>` : ''}
-      <a class="btn" href="#/chat">${t('write')}</a></div></section>` : ''}
+      ${STUDENT ? '' : `<a class="btn" href="#/chat">${t('write')}</a>`}</div></section>` : ''}
     ${o.updated ? `<p class="muted small" style="text-align:center;margin-top:18px">${t('updated', { t: when(o.updated) })}</p>` : ''}`;
   page({ title: t('home'), sub: c.short, active: '#/', body });
   animateRings();
@@ -715,6 +773,7 @@ const NOTE_KIND = {
   news: { icon: 'mega', route: '/news', tone: 'navy' }, chat: { icon: 'chat', route: '/chat', tone: 'navy' },
   digest: { icon: 'cal', route: '/', tone: 'navy' }, link: { icon: 'users', route: '/', tone: 'ok' },
   survey: { icon: 'poll', route: '/surveys', tone: 'bordo' }, reg: { icon: 'book', route: '/regulations', tone: 'navy' },
+  warn: { icon: 'alert', route: '/measures', tone: 'bordo' },  // talaba: chora, ota-onaga xat
 };
 const GO_ROUTE = Object.fromEntries(Object.entries(NOTE_KIND).map(([k, v]) => [k, v.route]));
 const PICTO = /^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u;
@@ -863,9 +922,80 @@ async function viewTrends() {
     ${d.periods.length < 2 && !g.items.length && !ups.length && !sems.length ? `<div class="list">${empty('trend', t('no_trends'))}</div>` : ''}` });
 }
 
+/* ================================================================ talaba ilovasi: tadbirlar, choralar, ulanish */
+function studentLinks() {
+  return `<div class="quick s3"><a href="#/events">${ic('mega')}<span>${t('events_nav')}</span>${S.evOpen ? `<span class="dot">${S.evOpen}</span>` : ''}</a>
+    <a href="#/measures">${ic('alert')}<span>${t('measures')}</span></a><a href="#/documents">${ic('file')}<span>${t('documents')}</span></a></div>`;
+}
+const EV_IC = { ijara_tashrifi: ['home', 'gpa'], madaniy_tashrif: ['globe', 'money'], tadbir: ['mega', 'att'], koordinatorlik_soati: ['users', 'acad'] };
+function evCard(x, open) {
+  const [icn, c] = EV_IC[x.type] || ['cal', 'att'];
+  let acts = '';
+  if (open) acts = x.reg === 'open' ? `<button class="btn" data-act="ev" data-a="reg" data-id="${x.id}">${ic('ok')}${t('reg')}</button>`
+    : `<span class="pill bordo">${t(x.reg === 'full' ? 'full' : 'reg_closed')}</span>`;
+  else if (x.can_confirm) acts = `<button class="btn" data-act="ev" data-a="confirm" data-id="${x.id}">${ic('ok')}${t('confirm_visit')}</button><p class="muted small" style="margin:8px 0 0">${t('visit_other')}</p>`;
+  else if (x.source === 'bot' && (x.reg === 'open' || x.reg === 'full')) acts = `<button class="btn ghost" data-act="ev" data-a="unreg" data-id="${x.id}">${t('unreg')}</button>`;
+  const resp = !open && x.type === 'ijara_tashrifi' && x.response ? `<span class="pill ${x.response === 'tasdiqladi' ? 'ok' : x.response === 'rad_etdi' ? 'bordo' : 'warn'}">${t('r_' + x.response)}</span>` : '';
+  return `<article class="card ev-card"><div class="ev-h"><span class="t-ic c-${c}" aria-hidden="true">${ic(icn)}</span>
+      <div class="ev-t"><small>${esc(x.type_title)}</small><b>${esc(x.title)}</b></div>${resp}</div>
+    <div class="ev-m">${ic('clock')}<span>${esc(x.when)}</span></div>${x.place ? `<div class="ev-m">${ic('home')}<span>${esc(x.place)}</span></div>` : ''}
+    ${x.capacity ? `<div class="ev-m">${ic('users')}<span>${t('seats', { n: x.count, c: x.capacity })}</span></div>` : ''}
+    ${open && x.conflicts && x.conflicts.length ? `<div class="lim warn">${ic('alert')}<span>${t('conflict_t')}: ${x.conflicts.map(k => esc(`${k.time} ${k.title}`)).join('; ')}</span></div>` : ''}
+    ${acts ? `<div class="ev-a">${acts}</div>` : ''}</article>`;
+}
+async function viewEvents() {
+  const c = S.child;
+  page({ title: t('events'), sub: c.short, active: '#/events', body: switcher() + loading() });
+  let d;
+  try { d = await api(childPath(c, 'events')); } catch (e) { return page({ title: t('events'), active: '#/events', body: errorBox() }); }
+  S.evOpen = d.open.filter(x => x.reg === 'open').length;
+  page({ title: t('events'), sub: c.short, active: '#/events', body: `${switcher()}<h2 class="screen-title">${t('events')}</h2>
+    <section class="section"><div class="section-head"><h2><span class="h-ic c-att" aria-hidden="true">${ic('cal')}</span>${t('mine_events')}</h2></div>
+      ${d.mine.length ? d.mine.map(x => evCard(x, false)).join('') : `<div class="list">${empty('cal', t('no_events'))}</div>`}</section>
+    <section class="section"><div class="section-head"><h2><span class="h-ic c-gpa" aria-hidden="true">${ic('mega')}</span>${t('open_events')}</h2></div>
+      ${d.open.length ? d.open.map(x => evCard(x, true)).join('') : `<div class="list">${empty('mega', t('no_open'))}</div>`}</section>` });
+}
+async function viewMeasures() {
+  const c = S.child;
+  page({ title: t('measures'), sub: c.short, active: '', body: loading() });
+  let d;
+  try { d = await api(childPath(c, 'measures')); } catch (e) { return page({ title: t('measures'), active: '', body: errorBox() }); }
+  page({ title: t('measures'), sub: c.short, active: '', body: `<h2 class="screen-title">${t('measures')}</h2>
+    ${d.items.length ? `<div class="list">${d.items.map(m => `<div class="row" style="cursor:default"><div class="ic bordo">${ic(m.measure === 'xat' ? 'file' : 'alert')}</div>
+      <div class="body"><div class="t">${esc(m.title)}</div><div class="d">${esc(m.ground)}${m.number ? ' · № ' + esc(m.number) : ''}${m.date ? ' · ' + esc(dateLabel(m.date, true)) : ''}${m.letter ? ' · ' + t('letter_sent') : ''}</div></div></div>`).join('')}</div>
+      <p class="muted small" style="margin-top:12px">${t('measures_note')}</p>`
+      : `<div class="verdict ok">${ic('ok')}<div><b>${t('no_measures')}</b><p>${t('no_measures_sub')}</p></div></div>`}
+    <a class="btn ghost block" href="#/documents" style="margin-top:16px">${ic('file')}${t('documents')}</a>` });
+}
+function viewStudentLink() {
+  $app.innerHTML = `<main class="no-nav"><div class="empty">${ic('users')}<b>${t('s_unlinked_t')}</b>${esc(t('s_unlinked_sub'))}
+    ${S.me.bot ? `<p style="margin-top:16px"><button class="btn" id="openBot">${t('s_open_bot')}</button></p>` : ''}</div></main>`;
+  const b = document.getElementById('openBot');
+  if (b) b.onclick = () => openExternal(`https://t.me/${S.me.bot}?start`);
+}
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-act="ev"]');
+  if (!el || !STUDENT) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const a = el.dataset.a, path = childPath(S.child, `events/${el.dataset.id}`);
+  if (a === 'unreg' && !await confirmSafe(t('unreg_q'))) return;
+  el.disabled = true;
+  try {
+    let r = await api(path, { json: { action: a } });
+    if (r.conflicts) {
+      const what = r.conflicts.map(k => `${k.time} — ${k.title}`).join('\n');
+      if (!await confirmSafe(`${t('conflict_t')}:\n${what}\n\n${t('reg_anyway_q')}`)) { el.disabled = false; return; }
+      r = await api(path, { json: { action: a, force: true } });
+    }
+    haptic('medium'); toast(t(a === 'reg' ? 'registered' : a === 'unreg' ? 'unregistered' : 'confirmed'));
+  } catch (err) { toast((err.data && err.data.message) || t('error')); }
+  viewEvents();
+}, true);
+
 /* ================================================================ menyu, sozlamalar, ma'lumot */
 function viewMenu() {
-  const items = [['#/surveys', 'poll', t('surveys')], ['#/regulations', 'book', t('regs')],
+  const items = STUDENT ? [['#/events', 'mega', t('events')], ['#/measures', 'alert', t('measures')], ['#/finance', 'wallet', t('finance')],
+    ['#/documents', 'file', t('documents')], ['#/trends', 'trend', t('trends')], ['#/regulations', 'book', t('regs')], ['#/settings', 'gear', t('settings')]] : [['#/surveys', 'poll', t('surveys')], ['#/regulations', 'book', t('regs')],
     ['#/finance', 'wallet', t('finance')], ['#/documents', 'file', t('documents')], ['#/trends', 'trend', t('trends')],
     ['#/news', 'mega', t('news')], ['#/info', 'info', t('info')], ['#/settings', 'gear', t('settings')]];
   page({ title: t('menu'), active: '', body: `<h2 class="screen-title">${t('menu')}</h2><div class="list">${items.map(([h, i, l]) =>
@@ -881,8 +1011,8 @@ async function viewSettings() {
       `<button data-act="lang" data-lang="${k}" aria-pressed="${S.lang === k}">${l}</button>`).join('')}</div></section>
     <section class="section"><div class="section-head"><h2>${hi('theme')}${t('theme')}</h2></div><div class="seg">${['auto', 'light', 'dark'].map(k =>
       `<button data-act="theme-set" data-v="${k}" aria-pressed="${themePref() === k}">${t('th_' + k)}</button>`).join('')}</div></section>
-    <section class="section"><div class="section-head"><h2>${hi('flags')}${t('flags')}</h2></div><div class="list">${Object.entries(d.flags).map(([k, v]) =>
-      `<label class="row"><div class="body"><div class="t">${t(k)}</div></div><span class="switch"><input type="checkbox" data-act="flag" data-key="${k}" ${v ? 'checked' : ''}><i></i></span></label>`).join('')}</div></section>
+    ${Object.keys(d.flags).length ? `<section class="section"><div class="section-head"><h2>${hi('flags')}${t('flags')}</h2></div><div class="list">${Object.entries(d.flags).map(([k, v]) =>
+      `<label class="row"><div class="body"><div class="t">${t(k)}</div></div><span class="switch"><input type="checkbox" data-act="flag" data-key="${k}" ${v ? 'checked' : ''}><i></i></span></label>`).join('')}</div></section>` : ''}
     ${logoutBlock()}` });
 }
 function logoutBlock() {  // telefon ilovasi / brauzer: shu qurilmadan chiqish (Telegram ichida kerak emas)
@@ -1413,7 +1543,7 @@ function updateChrome() {
 /* ================================================================ real vaqt: bildirishnoma kelishi bilan */
 const LIVE = { ctrl: null, retry: 2000 };
 async function connectLive() {
-  if (LIVE.ctrl || !S.me || S.me.role === 'blocked') return;
+  if (STUDENT || LIVE.ctrl || !S.me || S.me.role === 'blocked') return;
   const ctrl = new AbortController(); LIVE.ctrl = ctrl;
   try {
     const headers = { 'X-Telegram-Init-Data': (tg && tg.initData) || '' };
@@ -1729,7 +1859,7 @@ async function route() {
   const params = new URLSearchParams(qs || '');
   const parts = path.split('/').filter(Boolean);
   const role = S.me.role;
-  if (tg && tg.BackButton) { (['', 'schedule', 'attendance', 'grades', 'staff'].includes(parts[0] || '') && parts.length <= 1) ? tg.BackButton.hide() : tg.BackButton.show(); }
+  if (tg && tg.BackButton) { (['', 'schedule', 'attendance', 'grades', 'staff', 'events'].includes(parts[0] || '') && parts.length <= 1) ? tg.BackButton.hide() : tg.BackButton.show(); }
   if (role === 'staff' || role === 'super') {
     if (parts[0] !== 'staff') return viewStaff();
     if (parts[1] === 'students') return viewStaffStudents(params);
@@ -1745,6 +1875,7 @@ async function route() {
     if (parts[1] === 'subjects') return viewStaffSubjects(params);
     return viewStaff();
   }
+  if (role === 'unlinked') return viewStudentLink();
   if (role === 'new') return viewWelcome();
   if (role === 'pending') return viewPending();
   if (role === 'blocked') { $app.innerHTML = `<main class="no-nav">${empty('alert', t('blocked'))}</main>`; return; }
@@ -1760,7 +1891,9 @@ async function route() {
     case 'schedule': return viewSchedule(params.get('week'));
     case 'attendance': return viewAttendance();
     case 'grades': return viewGrades();
-    case 'chat': return viewChat();
+    case 'chat': return STUDENT ? viewHome() : viewChat();
+    case 'events': return STUDENT ? viewEvents() : viewHome();
+    case 'measures': return STUDENT ? viewMeasures() : viewHome();
     case 'notifications': return viewNotifications();
     case 'news': return viewNews();
     case 'finance': return viewFinance();
@@ -2038,6 +2171,8 @@ async function boot(again) {
     const b = document.querySelector('[data-act="reload-boot"]'); if (b) b.onclick = () => boot();
     return;
   }
+  if (!STUDENT && S.me.role === 'new' && S.me.is_student) { location.replace('/talaba' + (DEV ? '?dev' : '') + location.hash); return; }
+  if (STUDENT && S.me.role === 'student') S.me.role = 'parent';  // ekranlar bir xil — ma'lumot talabaning o'zi
   S.lang = S.me.lang || 'uz';
   document.documentElement.lang = S.lang;
   if (deskWide() && (S.me.role === 'staff' || S.me.role === 'super')) { location.replace('/desk' + (DEV ? '?dev' : '')); return; }

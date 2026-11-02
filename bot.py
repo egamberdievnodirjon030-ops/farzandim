@@ -89,6 +89,13 @@ async def _student_bot() -> Bot | None:
                                     BotCommand(command="tadbirlar", description="Yaqin tashrif va tadbirlarim")])
     except Exception:  # noqa: BLE001  (buyruqlar menyusi — majburiy emas)
         logging.warning("Talabalar boti buyruqlari o'rnatilmadi")
+    try:  # chap pastdagi «📱 Ilova» — talaba ilovasi (WEBAPP_URL sozlangan bo'lsa)
+        import studentapp
+        mb = studentapp.menu_button()
+        if mb:
+            await sbot.set_chat_menu_button(menu_button=mb)
+    except Exception:  # noqa: BLE001
+        logging.warning("Talabalar boti menyu tugmasi (ilova) o'rnatilmadi")
     return sbot
 
 

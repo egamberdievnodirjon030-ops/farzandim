@@ -77,8 +77,15 @@ async def _greet(message: Message, found: list[tuple[str, dict]]) -> None:
                          "Shu yerga keladi:\n"
                          "• kurs koordinatori ijara xonadoningizga tashrif rejalashtirsa — tasdiqlaysiz yoki qulay vaqt "
                          "taklif qilasiz;\n• tadbir va madaniy tashriflar e'lonlari — «Ro'yxatdan o'tish» tugmasi bilan;\n"
-                         "• siz ishtirokchi bo'lgan tadbirlar haqida ma'lumot va eslatmalar.\n\n"
+                         "• siz ishtirokchi bo'lgan tadbirlar haqida ma'lumot va eslatmalar;\n"
+                         "• sizga nisbatan ko'rilgan choralar va rasmiy hujjatlar — ota-onangizga yuborilgan paytning o'zida.\n\n"
                          f"Yaqin tadbirlaringiz — «{MY_EVENTS}».", reply_markup=_menu_kb() or ReplyKeyboardRemove())
+    import studentapp
+    kb = studentapp.open_kb("/")
+    if kb:  # talaba ilovasi: davomat, jadval, baholar, to'lovlar, choralar, hujjatlar, tadbirlar
+        await message.answer("📱 <b>Talaba ilovasi</b> — davomatingiz, dars jadvalingiz, baholaringiz, to'lovlaringiz, "
+                             "choralar va hujjatlaringiz, tadbirlarga ro'yxatdan o'tish — bir joyda. Chap pastdagi "
+                             "«📱 Ilova» tugmasi bilan ham ochiladi.", reply_markup=kb)
     for key, st in found:
         with _course(key):
             await V.catch_up(message.bot, st["id"])

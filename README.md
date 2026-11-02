@@ -237,6 +237,30 @@ Avval ulangan talabalarning hisobi saqlanadi (Telegram ID bir xil), lekin Telegr
 olmaydi: talaba talabalar botini bir marta ochishi (`/start`) kerak — shunda unga yetmay qolgan tashrif so'rovlari va
 e'lonlar keladi. Shuning uchun talabalar botining havolasini guruhlarga tarqating.
 
+## Talaba ilovasi (talabalar boti bilan)
+
+Ota-onalar ilovasi kabi talabaning ham **o'z ilovasi** bor — talabalar boti ichida ochiladi (chap pastdagi **«📱 Ilova»**
+tugmasi, ulanish xabaridagi va har bir chora / hujjat xabaridagi «📱 Ilovada ochish»). Ko'rinishi ota-onalar ilovasi bilan
+bir xil (telefonda pastki menyu, kompyuter brauzerida yon menyu; kunduzgi / tungi mavzu; o'zbek, rus, ingliz tillari),
+ma'lumot — **talabaning o'zi haqida**:
+
+- **Asosiy** — talaba kartasi, e'tibor talab qiladigan masalalar (davomat chegarasi, past GPA, akademik qarz, chora,
+  fan bo'yicha chegara), davomat, GPA, akademik qarz, kontrakt va trimestr, bugungi darslar;
+- **Jadval, Davomat, Baholar, To'lovlar, Dinamika, Hujjatlar** — ota-onalar ilovasidagi bilan bir xil;
+- **Tadbir va tashriflar** — o'zi ishtirokchi bo'lgan tadbir, madaniy tashrif va ijara tashriflari; ijara tashrifini
+  **tasdiqlash**; guruhiga ochiq e'lonlarda **ro'yxatdan o'tish** va chiqish — tadbir vaqtida darsi (Manage'dagi shaxsiy
+  jadvali bo'yicha) yoki boshqa tadbiri bo'lsa, avval ko'rsatiladi va «baribir qo'shilasizmi?» so'raladi;
+- **Choralar** — rasman ko'rilgan choralar (dekan ogohlantirishi, hayfsan, ota-onaga xat: raqami, sanasi, asosi);
+- **Bildirishnomalar** — talabaga yuborilgan chora xabarlari va rasmiy hujjatlar (bot orqali kelgani — shu yerda ham);
+- **Ichki nizomlar**, sozlamalar (til, mavzu).
+
+**Kirish va xavfsizlik.** Ilova Telegram imzosi bilan ochiladi (talabalar botining tokeni bilan tekshiriladi; alohida bot
+sozlanmagan bo'lsa — asosiy bot). Talaba kimligi — botga ulangan hisobi (shaxsiy havola, telefon raqami yoki ota-onani
+tasdiqlash); har bir so'rovda tekshiriladi — talaba **faqat o'zini** ko'radi, boshqa talaba yoki ota-ona sahifalari
+ochilmaydi. Botga hali ulanmagan foydalanuvchiga «talabalar botini oching va /start bosing» ko'rsatiladi. Bitta botli
+rejimda talaba ota-onalar ilovasini ochsa — o'zi talaba ilovasiga o'tadi. Manzil: `WEBAPP_URL/talaba` (qo'shimcha sozlama
+yo'q — `WEBAPP_URL` yetarli).
+
 ## Talabalar ota-onalar botiga kira olmaydi
 
 Ota-onalar boti faqat ota-onalar uchun (talabalarniki — talabalar boti, yuqorida). Talaba o'z raqami bilan ro'yxatdan o'tib, «ota-ona» bo'lib olmasligi uchun ikki usul birga ishlaydi.
@@ -1073,6 +1097,7 @@ socialapi.py      — ijtimoiy toifalar API si (kurs holati kartalari, ro'yxat, 
 dashboard.py      — bosh sahifa qismlari: bugungi vazifalar, yaqin tadbir va tashriflar, integratsiyalar holati, guruhlar kesimi
 receipts.py       — to'lov cheki / kvitansiyasi: qarzni yopish (qisman), bekor qilish, arxiv
 studentnotify.py  — talabaning o'ziga: chora xabarlari va rasmiy hujjatlar (talabalar boti, ilovadagi tarix)
+studentapp.py     — talaba ilovasi API si (/api/s/…): talabalar boti imzosi, faqat o'zi, tadbirlarga yozilish, bildirishnomalar
 paymentsapi.py    — «To'lovlar» bo'limi API si (qarzdorlar, chek yuklash va bekor qilish, faylni ochish)
 handlers/visits.py — tashrif va tadbir bot oqimlari: talaba havolasi, javoblari, e'londa ro'yxatdan o'tish, talabalar
                     boti menyusi (/start, telefon bilan ulanish, «Tadbirlarim»); koordinator: /yol (turgan joydan yo'l)

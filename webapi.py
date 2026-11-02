@@ -35,7 +35,7 @@ import status
 import trends
 import course_trends
 from config import (ADMIN_COURSE, GPA_MIN, BOT_TOKEN, DATA_DIR, LOG_DIR, PAIR_TIMES, SUPERADMIN_IDS, UNIVERSITY_NAME,
-                    WEBAPP_AUTH_TTL, WEBAPP_DEV_USER, WEBAPP_URL)
+                    STUDENT_BOT_TOKEN, WEBAPP_AUTH_TTL, WEBAPP_DEV_USER, WEBAPP_URL)
 from database import db
 from family import all_children, ensure_parent_here, known_contact, parent_courses
 from i18n import tr, use_lang
@@ -85,7 +85,10 @@ async def _staff_name(uid: int) -> str:
 async def auth_middleware(request: web.Request, handler):
     if not request.path.startswith("/api/") or request.path.startswith(("/api/app/login", "/api/app/info", "/api/integration/")):
         return await handler(request)  # telefon ilovasining kirish so'rovi — hali seans yo'q
-    user = verify_init_data(request.headers.get("X-Telegram-Init-Data", ""))
+    init = request.headers.get("X-Telegram-Init-Data", "")
+    user = verify_init_data(init)
+    if user is None and init and STUDENT_BOT_TOKEN:  # talaba ilovasi — talabalar boti ichida ochilgan
+        user = verify_init_data(init, STUDENT_BOT_TOKEN)
     auth = request.headers.get("Authorization", "")
     if user is None and auth.startswith("Bearer "):
         # telefon ilovasi / brauzer: Telegram botda tasdiqlangan seans (appauth.py)
@@ -285,8 +288,12 @@ async def api_me(request: web.Request) -> web.Response:
         staff = {"course": key, "title": course_title(key) if key and key != "_" else "",
                  "groups": sorted(mine.values(), key=str.lower),  # koordinatorga biriktirilgan guruhlar (bo'sh — butun kurs)
                  "courses": [{"key": k, "title": course_title(k)} for k in course_keys()] if role == "super" else []}
+    is_student = False
+    if role == "new":  # bitta botli rejimda talaba asosiy botdagi ilovani ochdi — talaba ilovasiga yo'naltiriladi
+        import studentapp
+        is_student = bool(await studentapp.my_students(uid))
     return ok({"user": {"id": uid, "name": request["user"].get("first_name", "")}, "lang": request["lang"],
-               "role": role, "children": cards, "unread": {"messages": unread_msgs, "notifications": unread_notes},
+               "role": role, "children": cards, "is_student": is_student, "unread": {"messages": unread_msgs, "notifications": unread_notes},
                "university": loc.term(UNIVERSITY_NAME), "staff": staff,
                "bot": await _bot_username(request), "app_session": bool(request.get("app_session"))})
 
@@ -303,6 +310,7 @@ def child_route(handler):
                 return bad("forbidden", 403)
             request["student"], request["course"] = st, key
             return await handler(request)
+    wrapped.inner = handler  # talaba ilovasi (studentapp.self_route) shu ma'lumotni talabaning o'ziga beradi
     return wrapped
 
 
@@ -2303,6 +2311,8 @@ async def api_staff_import_delete(request):
 def setup_routes(app: web.Application) -> None:
     r = app.router
     r.add_get("/api/me", api_me)
+    import studentapp  # talaba ilovasi: /api/s/…
+    studentapp.setup(r)
     base = "/api/c/{course}/{sid:\\d+}"
     r.add_get(base + "/overview", api_overview)
     r.add_get(base + "/attendance", api_attendance)
