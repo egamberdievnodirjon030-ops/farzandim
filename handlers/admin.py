@@ -1993,6 +1993,8 @@ async def cb_doc_revoke(cb: CallbackQuery, callback_data: DocRevCb) -> None:
                 deleted += 1
             except (TelegramBadRequest, TelegramForbiddenError):
                 failed += 1
+        import studentnotify
+        deleted += await studentnotify.recall_document(cb.bot, d0["id"])  # talabaga yuborilgan nusxa ham
         await db.revoke_document(d0["id"], cb.from_user.id)
     note = (f"<b>🗑 Qaytarib olindi</b> — {esc(cb.from_user.full_name)}. Hujjat ota-onalar bo'limidan olib tashlandi"
             + (f" ({len(docs)} ta talaba)" if len(docs) > 1 else "")

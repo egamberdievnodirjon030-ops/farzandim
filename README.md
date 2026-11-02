@@ -625,6 +625,14 @@ Chegaralar `ABSENCE_WARN_LEVELS` dagi 2- va 3-qiymat (36, 54). Soatlar Manage'da
 
 **Asl nusxa — ota-onaga avtomatik.** Chora rasman ko'rilgan (farmoyish/buyruq chiqarilgan) bo'lsa, imzolangan asl nusxa (PDF) yuklanishi bilan ota-onalarga bot orqali yuboriladi va ilovadagi «📄 Hujjatlar» bo'limiga tushadi; oldin yuklangan bo'lsa — chora chiqarilganda. Butun farmoyish/buyruq — undagi har bir talabaning ota-onasiga, **har biri faqat o'z farzandini ko'radi**: boshqa talabalarning F.I.Sh., guruhi va shu qatordagi ma'lumotlari qora rang bilan yopiladi («Hujjat yuborish» bilan bir xil; nusxa rasmga aylantiriladi — yopilgan matn faylda qolmaydi; dekan, prorektor, koordinator ismlari ochiq qoladi). Talabaning o'z hujjati (imzolangan xat) — faqat uning ota-onasiga. Yopib bo'lmasa yuborilmaydi va sababi faylning yonida yoziladi: skan o'qilmadi va hujjatda bir necha talaba bor, talaba hujjatda topilmadi, ismdosh bor — bunday hujjatni «Hujjat yuborish» bo'limi orqali tekshirib yuboring. Tushuntirish xati, bildirishnoma, dalolatnoma va ma'lumotnomalar ota-onaga yuborilmaydi.
 
+**Talabaning o'ziga ham — ota-ona bilan bir vaqtda.** Chora haqidagi har bir xabar ota-onaga ketgan paytning o'zida **talabaning o'ziga** ham boradi — **talabalar boti** orqali (alohida bot sozlanmagan bo'lsa — asosiy bot), talaba tanlagan tilda va unga qaratilgan matnda: «Hurmatli …, sizga dekan farmoyishi bilan «Ogohlantirish» e'lon qilindi — sababsiz … dars qoldirganingiz uchun», hujjat raqami va sanasi, ota-onasiga xat yuborilgani. Shu bilan birga:
+- imzolangan asl nusxa (PDF; boshqa talabalar ma'lumotlari yopilgan) — talabaga ham (fayl sifatida);
+- 3-bosqich — ota-onaga ogohlantirish xati yuborilgani, trimestr qarzi bo'yicha xat (qarz, sana va to'lash muddati bilan) — talabaga ham;
+- ota-onasi botga ulanmagan talaba ham o'z xabarini oladi; talabaning o'zi botga ulanmagan bo'lsa — xabar uning **talaba ilovasidagi** bildirishnomalar va hujjatlar ro'yxatida saqlanadi;
+- natija xabarida (panel) ota-onalarga va talabalarga nechta yetkazilgani ko'rsatiladi; hujjat «🗑 Qaytarib olish» bilan qaytarilsa — talabaning chatidagi nusxa ham o'chiriladi.
+
+Talaba botga ulanishi — shaxsiy havola, telefon raqami yoki ota-onani tasdiqlash orqali (pastda — «Ikki bot»).
+
 **Ish tartibi.**
 1. **«Chegaraga yetganlar»** — dekan ogohlantirishi, hayfsan va «Trimestr qarzi — ota-onaga xat» ro'yxatlari. Davomat bo'yicha har bir talaba uchun:
    - **«So'rash»** — ota-onadan bot orqali qoldirish sababini so'raydi (javob «Xabarlar»da keladi);
@@ -1064,6 +1072,7 @@ socialcat.py      — ijtimoiy toifalar: nogironlik, ijtimoiy himoya (reestr, da
 socialapi.py      — ijtimoiy toifalar API si (kurs holati kartalari, ro'yxat, qo'lda belgilash, talaba kartasi)
 dashboard.py      — bosh sahifa qismlari: bugungi vazifalar, yaqin tadbir va tashriflar, integratsiyalar holati, guruhlar kesimi
 receipts.py       — to'lov cheki / kvitansiyasi: qarzni yopish (qisman), bekor qilish, arxiv
+studentnotify.py  — talabaning o'ziga: chora xabarlari va rasmiy hujjatlar (talabalar boti, ilovadagi tarix)
 paymentsapi.py    — «To'lovlar» bo'limi API si (qarzdorlar, chek yuklash va bekor qilish, faylni ochish)
 handlers/visits.py — tashrif va tadbir bot oqimlari: talaba havolasi, javoblari, e'londa ro'yxatdan o'tish, talabalar
                     boti menyusi (/start, telefon bilan ulanish, «Tadbirlarim»); koordinator: /yol (turgan joydan yo'l)

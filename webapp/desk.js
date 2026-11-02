@@ -1197,7 +1197,7 @@ function bindChoraDocs(d) {
       const items = o.cases.filter(c => v.get(`c${c.id}`) === 'on').map(c => ({ case_id: c.id, number: v.get(`n${c.id}`) || '' }));
       if (!items.length) { toast('Talaba belgilanmagan', true); return; }
       try { const r = await api(`${base}/letters`, { method: 'POST', json: { date: v.get('date'), items, notify: v.get('notify') === 'on', send_pdf: v.get('pdf') === 'on' } });
-        toast(`Qayd etildi: ${r.marked}${r.notified ? ` · ota-onalarga xabar: ${r.notified}` : ''}${r.pdf ? ` · PDF: ${r.pdf}` : ''}`); route(); }
+        toast(`Qayd etildi: ${r.marked}${r.notified ? ` · ota-onalarga xabar: ${r.notified}` : ''}${r.students ? ` · talabaning o‘ziga: ${r.students}` : ''}${r.pdf ? ` · PDF: ${r.pdf}` : ''}`); route(); }
       catch (e) { toast(CH_ERR[e.message] || 'Saqlanmadi', true); } });
     card.querySelectorAll('[data-cxat]').forEach(b => b.addEventListener('click', async () => {
       b.disabled = true; try { await download(`${base}/doc/xat?case=${b.dataset.cxat}`); } catch (e) { toast('Yuklab bo‘lmadi', true); } b.disabled = false; }));
@@ -1223,7 +1223,7 @@ function bindChoraDocs(d) {
           : 'Keyingi bosqich — ota-onaga xat: unda shu raqam va sana yoziladi. Imzolangan nusxani «Imzolangan nusxa» tugmasi orqali yuklang.'}</p>`, 'Saqlash');
       if (!v) return;
       try { const r = await api(`${base}/issue`, { method: 'POST', json: { number: v.get('number'), date: v.get('date'), notify: v.get('notify') === 'on' } });
-        toast(first ? (isXat ? `Yuborildi${r.notified ? ` · ota-onalarga ${r.notified} ta xabar` : ''}` : '2-bosqich yakunlandi — endi ota-onaga xat') : 'Saqlandi'); route(); }
+        toast(first ? (isXat ? `Yuborildi${r.notified ? ` · ota-onalarga ${r.notified} ta xabar` : ''}${r.students ? ` · talabalarga ${r.students} ta` : ''}` : `2-bosqich yakunlandi — endi ota-onaga xat${r.students ? ` · talabalarga xabar: ${r.students}` : ''}`) : 'Saqlandi'); route(); }
       catch (e) { toast(CH_ERR[e.message] || 'Saqlanmadi', true); }
     });
   });

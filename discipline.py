@@ -604,11 +604,11 @@ async def issue_order(bot, oid: int, number: str, d: str, notify: bool = False, 
     if o["measure"] == "xat":  # xatning o'zi — chiquvchi raqam va sana
         await db.execute("UPDATE disc_cases SET letter_no = ?, letter_date = ?, letter_at = COALESCE(letter_at, ?) "
                          "WHERE order_id = ?", (number, d, now, oid))
-    sent = 0
+    sent, cnt = 0, {"students": 0}
     if first and notify and bot is not None:
-        sent = await notify_parents(bot, oid)
+        sent = await notify_parents(bot, oid, counts=cnt)
     auto = await send_originals(bot, oid, user=user) if first else None  # imzolangan asl nusxa oldin yuklangan bo'lsa
-    return {"ok": True, "notified": sent, "auto": auto}
+    return {"ok": True, "notified": sent, "students": cnt["students"], "auto": auto}
 
 
 def done(o: dict) -> bool:
@@ -719,16 +719,17 @@ async def mark_letters(bot, oid: int, items: list[dict], d: str, notify: bool = 
     if not marked:
         return {"ok": False, "error": "no_students"}
     notified = pdfs = 0
+    cnt = {"students": 0}
     if bot is not None and fresh:
         if notify:
-            notified = await notify_parents(bot, oid, fresh)
+            notified = await notify_parents(bot, oid, fresh, counts=cnt)
         if send_pdf:
             for cid in fresh:
                 f = await db.fetchone("SELECT id FROM disc_files WHERE case_id = ? AND kind = 'xat' AND sent_at IS NULL "
                                       "AND lower(name) LIKE '%.pdf' ORDER BY id DESC LIMIT 1", (cid,))
                 if f and (await send_file(bot, f["id"], user)).get("ok"):
                     pdfs += 1
-    return {"ok": True, "marked": len(marked), "notified": notified, "pdf": pdfs}
+    return {"ok": True, "marked": len(marked), "notified": notified, "students": cnt["students"], "pdf": pdfs}
 
 
 async def cancel_order(oid: int) -> dict:
@@ -741,7 +742,9 @@ async def cancel_order(oid: int) -> dict:
     return {"ok": True}
 
 
-async def notify_parents(bot, oid: int, case_ids: set[int] | None = None) -> int:
+async def notify_parents(bot, oid: int, case_ids: set[int] | None = None, counts: dict | None = None) -> int:
+    """Ota-onalarga va talabaning o'ziga (bir vaqtda). Qaytaradi: ota-onalarga yetkazilgan xabarlar; counts['students'] —
+    talabalar botida yetkazilganlar."""
     from notifier import send_each
     from i18n import tr
     import loc
@@ -750,16 +753,21 @@ async def notify_parents(bot, oid: int, case_ids: set[int] | None = None) -> int
         return 0
     sent = 0
     doc = "Dekan farmoyishi" if o["measure"] == "ogohlantirish" else "Universitet buyrug'i" if o["measure"] == "hayfsan" else "Qaror"
+    counts = counts if counts is not None else {}
+    counts.setdefault("students", 0)
     if o["measure"] == "xat":
-        return await _notify_letter(bot, o)
+        return await _notify_letter(bot, o, counts)
     for c in o["cases"]:
         if case_ids is not None and c["id"] not in case_ids:
             continue
+        st = await db.get_student(c["student_id"])
+        if not st:
+            continue
+        counts["students"] += int(await _notify_student(bot, o, c, st, doc))  # talabaning o'ziga — ota-ona bilan bir vaqtda
         pids = [r["parent_id"] for r in await db.fetchall("SELECT parent_id FROM parent_students WHERE student_id = ?",
                                                           (c["student_id"],))]
         if not pids:
             continue
-        st = await db.get_student(c["student_id"])
 
         async def build(st=st, c=c) -> str:
             why = (tr("sababsiz {h} dars qoldirgani uchun", h=fmt_pairs(c["hours"] or 0)) if o["ground"] == "davomat"
@@ -775,18 +783,71 @@ async def notify_parents(bot, oid: int, case_ids: set[int] | None = None) -> int
     return sent
 
 
-async def _notify_letter(bot, o: dict) -> int:
+async def _notify_student(bot, o: dict, c: dict, st: dict, doc: str) -> bool:
+    """Chora talabaning o'ziga (talabalar boti, talaba ilovasi) — ota-onaga ketgan xabar bilan bir vaqtda."""
+    import studentnotify
+    from i18n import tr
+
+    def build() -> str:
+        why = (tr("sababsiz {h} dars qoldirganingiz uchun", h=fmt_pairs(c["hours"] or 0)) if o["ground"] == "davomat"
+               else tr("ichki tartib qoidalarini buzganingiz uchun"))
+        lines = [("⚠️ " if o["measure"] == "ogohlantirish" else "⛔ ") + "<b>" + tr(MEASURES[o["measure"]]["title"]) + "</b>", "",
+                 tr("Hurmatli {name} ({g}), sizga {doc} bilan «{m}» e'lon qilindi — {why}.", name=esc(st["full_name"]),
+                    g=esc(st.get("group_name") or ""), doc=tr(doc), m=tr(MEASURES[o["measure"]]["short"]), why=why)]
+        if o.get("number") or o.get("date"):
+            lines.append((f"№ {esc(o['number'])}" if o.get("number") else "") + (", " if o.get("number") and o.get("date") else "")
+                         + _dmy(o.get("date")))
+        if c.get("letter_date"):
+            lines += ["", "✉️ " + tr("Ota-onangizga bu haqda ogohlantirish xati yuborildi") + (f" (№ {esc(c['letter_no'])}, " if c.get("letter_no") else " (")
+                      + _dmy(c["letter_date"]) + ")."]
+        else:
+            lines += ["", tr("Bu haqda ota-onangiz ham xabardor qilindi.")]
+        lines += ["", tr("Darslarni qoldirmang — keyingi chegarada qattiqroq chora ko'riladi.") if o["ground"] == "davomat"
+                  else tr("Ichki tartib qoidalariga rioya qiling."),
+                  tr("Savollar bo'lsa — kurs koordinatoringizga murojaat qiling.")]
+        return "\n".join(lines)
+    return await studentnotify.send_text(bot, st["id"], build, "chora", "/chora")
+
+
+async def _notify_student_letter(bot, o: dict, c: dict, st: dict) -> bool:
+    """Ota-onaga ogohlantirish xati yuborilgani — talabaning o'ziga ham."""
+    import studentnotify
+    from i18n import tr
+
+    def build() -> str:
+        why = {"davomat": tr("uzrli sababsiz dars qoldirish"), "tartib": tr("ichki tartib qoidalarini buzish"),
+               "trimestr": tr("qayta o'qish (trimestr) shartnomasi bo'yicha to'lov qarzdorligi")}.get(o["ground"], "")
+        lines = ["✉️ <b>" + tr("Ogohlantirish xati") + "</b>", "",
+                 tr("Hurmatli {name} ({g}), fakultet dekanati ota-onangizga ogohlantirish xati yubordi: {why}.",
+                    name=esc(st["full_name"]), g=esc(st.get("group_name") or ""), why=why)]
+        if o["ground"] == "trimestr" and c.get("amount"):
+            lines.append(tr("Qarzdorlik: {s} so'm ({d} holatiga).", s=_money(c["amount"]), d=_dmy(c.get("as_of")))
+                         + (" " + tr("To'lash muddati — {d}.", d=_dmy(o["deadline"])) if o.get("deadline") else ""))
+        no, d = c.get("letter_no") or o.get("number"), c.get("letter_date") or o.get("date")
+        if no or d:
+            lines.append((f"№ {esc(no)}" if no else "") + (", " if no and d else "") + _dmy(d))
+        lines += ["", tr("Savollar bo'lsa — kurs koordinatoringizga murojaat qiling.")]
+        return "\n".join(lines)
+    return await studentnotify.send_text(bot, st["id"], build, "xat", "/chora")
+
+
+async def _notify_letter(bot, o: dict, counts: dict | None = None) -> int:
     """Ota-onaga ogohlantirish xati yuborildi — bot orqali qisqa xabar (xatning o'zi pochta yoki PDF orqali)."""
     from notifier import send_each
     from i18n import tr
     import loc
     sent = 0
     for c in o["cases"]:
+        st = await db.get_student(c["student_id"])
+        if not st:
+            continue
+        ok_ = await _notify_student_letter(bot, o, c, st)
+        if counts is not None:
+            counts["students"] = counts.get("students", 0) + int(ok_)
         pids = [r["parent_id"] for r in await db.fetchall("SELECT parent_id FROM parent_students WHERE student_id = ?",
                                                           (c["student_id"],))]
         if not pids:
             continue
-        st = await db.get_student(c["student_id"])
 
         async def build(st=st, c=c) -> str:
             why = {"davomat": tr("uzrli sababsiz dars qoldirish"), "tartib": tr("ichki tartib qoidalarini buzish"),
@@ -1415,9 +1476,10 @@ async def _deliver_pdf(bot, data: bytes, name: str, sids: list[int], dtype: str,
     import uuid
     import docstore
     import redact
+    import studentnotify
     from staffops import deliver_document
     an = await asyncio.to_thread(redact.analyze, data, await db.all_students_brief())
-    batch, out = uuid.uuid4().hex[:12], {"students": 0, "parents": 0, "skipped": [], "doc_id": None}
+    batch, out = uuid.uuid4().hex[:12], {"students": 0, "parents": 0, "self": 0, "skipped": [], "doc_id": None}
     for sid in sids:
         st = await db.get_student(sid)
         if not st:
@@ -1441,16 +1503,20 @@ async def _deliver_pdf(bot, data: bytes, name: str, sids: list[int], dtype: str,
         did = await db.add_document(sid, dtype, file_id, None, name, len(pdf), d or today().isoformat(), comment, user or 0,
                                     batch=batch, redacted=boxes)
         sent, total = await deliver_document(bot, did, st) if bot is not None else (0, 0)
+        to_student = await studentnotify.send_document(bot, did, st) if bot is not None else False  # talabaning o'ziga ham
         out["students"] += 1
         out["parents"] += sent
+        out["self"] += int(to_student)
         out["doc_id"] = did
         if not total:
-            out["skipped"].append({"name": st["full_name"], "reason": "ota-onasi botga ulanmagan (hujjat saqlandi)"})
+            out["skipped"].append({"name": st["full_name"], "reason": "ota-onasi botga ulanmagan (hujjat saqlandi"
+                                   + (", talabaning o'ziga yuborildi)" if to_student else ")")})
     return out
 
 
 def _note(res: dict, total: int) -> str:
-    parts = [f"ota-onaga yuborildi: {res['students']} / {total} talaba ({res['parents']} ota-ona)"]
+    parts = [f"ota-onaga yuborildi: {res['students']} / {total} talaba ({res['parents']} ota-ona)"
+             + (f", talabaning o'ziga: {res['self']}" if res.get("self") else "")]
     parts += [f"{x['name']} — {x['reason']}" for x in res["skipped"][:10]]
     return "; ".join(parts)[:900]
 

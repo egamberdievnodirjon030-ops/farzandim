@@ -327,6 +327,26 @@ CREATE TABLE IF NOT EXISTS student_categories (
 );
 CREATE INDEX IF NOT EXISTS idx_student_categories_cat ON student_categories(category);
 -- Talabaning Telegram hisobi (tashrif xabarlari uchun): shaxsiy havola yoki ota-onani tasdiqlash orqali
+-- Talabaning o'ziga yuborilgan xabarlar (choralar, rasmiy hujjatlar) — talaba ilovasidagi bildirishnomalar tarixi
+CREATE TABLE IF NOT EXISTS student_notices (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id  INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL,                  -- chora | xat | doc
+    text        TEXT NOT NULL,
+    document_id INTEGER,
+    created_at  TEXT NOT NULL,
+    read_at     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_student_notices ON student_notices(student_id, id);
+-- Talabaga talabalar boti orqali yuborilgan hujjat xabarlari (hujjat qaytarib olinsa — o'chiriladi)
+CREATE TABLE IF NOT EXISTS student_deliveries (
+    document_id INTEGER NOT NULL,
+    student_id  INTEGER NOT NULL,
+    chat_id     INTEGER NOT NULL,
+    message_id  INTEGER,
+    sent_at     TEXT NOT NULL,
+    PRIMARY KEY (document_id, student_id)
+);
 -- Talabaning shaxsiy (Manage) jadvali — sanali darslar: tadbirga yozilishda vaqt to'qnashuvini tekshirish uchun
 -- (Manage javob bermasa — shu nusxa). Har hafta yangilanganda o'sha hafta qatorlari almashtiriladi.
 CREATE TABLE IF NOT EXISTS student_lessons (
