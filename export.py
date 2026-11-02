@@ -46,12 +46,14 @@ async def collect(f: str = "") -> dict:
         return {"name": st["full_name"], "group": st.get("group_name") or "", "hemis": st.get("hemis_id") or "",
                 "linked": st["id"] in linked}
 
+    pcs = [x["attendance"]["percent"] for x in sts if x.get("attendance") and x["attendance"].get("percent") is not None]
     prob = sorted((x for x in sts if any(x["flags"].values())),
                   key=lambda x: (-sum(x["flags"].values()), x["student"]["full_name"]))
     data = {
         "meta": {"university": UNIVERSITY_NAME, "course": course_title(current_course()) or "", "filter": f,
                  "generated": now_iso(), "deadlines": dl},
         "total": len(sts), "linked": sum(1 for x in sts if x["student"]["id"] in linked),
+        "avg_att": round(sum(pcs) / len(pcs), 1) if pcs else None, "handled": sum(1 for x in sts if x.get("handled")),
         "prob": [{**base(x), "count": sum(x["flags"].values()),
                   "pairs": (x["attendance"]["counted"] if x["flags"]["att"] else None),
                   "action": absence.action_for(x["level"]) if x["flags"]["att"] else "",

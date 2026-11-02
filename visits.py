@@ -262,9 +262,9 @@ async def get(pid: int, full: bool = True) -> dict | None:
 
 
 async def plans(uid: int | None, frm: str = "", to: str = "", status: str = "") -> list[dict]:
-    """Ko'rinadigan rejalar: koordinator — o'ziniki, super-admin — kursning barchasi."""
+    """Ko'rinadigan rejalar: koordinator — o'ziniki, super-admin (va uid=None — tizim, dekan bosh sahifasi) — kursning barchasi."""
     where, args = ["1 = 1"], []
-    if not is_super(uid):
+    if uid is not None and not is_super(uid):
         where.append("coordinator_id = ?")
         args.append(uid)
     if frm:

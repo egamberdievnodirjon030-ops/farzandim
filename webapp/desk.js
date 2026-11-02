@@ -18,6 +18,19 @@ const S = { me: null, course: null, stu: null, stuCourse: null, timers: [], badg
 
 /* ---------------------------------------------------------------- belgilar */
 const P = {
+  grid: '<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
+  wallet: '<path d="M19 7V5.5A1.5 1.5 0 0 0 17.5 4h-12A2.5 2.5 0 0 0 3 6.5v11A2.5 2.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/><path d="M21 9H16a3 3 0 0 0 0 6h5z"/><path d="M3.5 6.5A2.5 2.5 0 0 0 6 9h13"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h.1a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
+  bell: '<path d="M18 8.5a6 6 0 1 0-12 0c0 6.5-2.5 8.5-2.5 8.5h17S18 15 18 8.5"/><path d="M10.3 20.5a1.9 1.9 0 0 0 3.4 0"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.3-2.4 3.6M12 17h.01"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  bars: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  trend: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  pie: '<path d="M21 12a9 9 0 1 1-9-9v9z"/><path d="M15 3.4A9 9 0 0 1 20.6 9H15z"/>',
+  task: '<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m8 12 3 3 5-6"/>',
+  plug: '<path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0zM12 17v4"/>',
+  gavel: '<path d="m14 5 5 5M9.5 9.5 13 6l5 5-3.5 3.5zM11 12l-7.5 7.5M3 21h9"/>',
+  smile: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
   poll: '<path d="M9 3h6v3H9zM9 4.5H6a1 1 0 0 0-1 1V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5.5a1 1 0 0 0-1-1h-3M8.5 12l2 2 4-4M8.5 17h7"/>',
   book: '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5zM4 19.5A1.5 1.5 0 0 0 5.5 21H20v-3M8 7h8M8 10.5h6"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -192,9 +205,10 @@ const emptyBox = (icon, title, text = '', action = '') =>
   `<div class="empty">${ic(icon)}<b>${esc(title)}</b>${text ? `<div>${text}</div>` : ''}${action ? `<div style="margin-top:14px">${action}</div>` : ''}</div>`;
 const skel = (h = 120, n = 1) => Array.from({ length: n }, () => `<div class="skel" style="height:${h}px;margin-bottom:16px"></div>`).join('');
 const main = () => $('#main');
-const PAGE_IC = { 'Kurs holati': 'panel', 'Talabalar': 'users', 'Jadval va fanlar': 'cal', 'Chora ko‘rish': 'shield', 'Xabarlar': 'chat', 'Bog‘lanish so‘rovlari': 'req', 'So‘rovlar': 'req',
+const PAGE_IC = { 'Kurs holati': 'grid', 'Bosh sahifa': 'grid', 'Talabalar': 'users', 'Jadval va fanlar': 'cal', 'Davomat va jadval': 'cal', 'Chora ko‘rish': 'shield', 'Intizomiy choralar': 'shield',
+  'Akademik natijalar': 'cap', 'To‘lovlar': 'wallet', 'Ijtimoiy toifalar': 'heart', 'Hisobot va ma’lumot': 'bars', 'Tizim va integratsiyalar': 'gear', 'Xabarlar': 'chat', 'Bog‘lanish so‘rovlari': 'req', 'So‘rovlar': 'req',
   'E’lon yuborish': 'mega', 'Rasmiy hujjat yuborish': 'file', 'So‘rovnomalar': 'poll', 'So‘rovnoma': 'poll', 'Yangi so‘rovnoma': 'poll',
-  'Ma’lumot va hisobot': 'upload', 'Barcha kurslar': 'chart', 'Kurslar va koordinatorlar': 'building', 'Ichki nizomlar': 'book',
+  'Hisobot va ma’lumot': 'upload', 'Barcha kurslar': 'chart', 'Kurslar va koordinatorlar': 'building', 'Ichki nizomlar': 'book',
   'Tizim': 'shield', 'Xatolik': 'alert' };
 function head(title, sub, actions = '') {
   const pi = PAGE_IC[title];
@@ -295,39 +309,134 @@ document.addEventListener('click', async e => {
 }, true);
 
 /* ---------------------------------------------------------------- karkas: yon menyu */
-const NAV_COURSE = [['#/panel', 'panel', 'Kurs holati'], ['#/students', 'users', 'Talabalar'], ['#/subjects', 'cal', 'Jadval va fanlar'], ['#/chora', 'shield', 'Chora ko‘rish', 'chora'], ['#/tashrif', 'home', 'Tashriflar', 'tashrif'], ['#/inbox', 'chat', 'Xabarlar', 'unread'],
-  ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar'], ['#/files', 'upload', 'Ma’lumot va hisobot']];
-const NAV_SUPER = [['#/super', 'chart', 'Barcha kurslar'], ['#/super/courses', 'building', 'Kurslar va koordinatorlar'], ['#/super/regs', 'book', 'Ichki nizomlar'], ['#/super/system', 'shield', 'Tizim']];
+const NAV_COURSE = [
+  ['Asosiy', [['#/panel', 'grid', 'Bosh sahifa'], ['#/students', 'users', 'Talabalar'], ['#/subjects', 'cal', 'Davomat va jadval'], ['#/academic', 'cap', 'Akademik natijalar']]],
+  ['Ish jarayonlari', [['#/chora', 'shield', 'Intizomiy choralar', 'chora'], ['#/tashrif', 'home', 'Tashrif va tadbirlar', 'tashrif'], ['#/social', 'heart', 'Ijtimoiy toifalar'], ['#/payments', 'wallet', 'To‘lovlar']]],
+  ['Aloqa', [['#/inbox', 'chat', 'Xabarlar', 'unread'], ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar']]],
+  ['Ma’lumot', [['#/files', 'bars', 'Hisobot va ma’lumot']]]];
+const NAV_SUPER = [['#/super', 'grid', 'Bosh sahifa'], ['#/super/courses', 'building', 'Kurslar va koordinatorlar'], ['#/super/regs', 'book', 'Ichki nizomlar'], ['#/super/system', 'gear', 'Tizim va integratsiyalar']];
+const roleName = () => (S.me.role === 'super' ? 'Dekanat (super-admin)' : 'Kurs koordinatori');
+const firstName = n => { const w = String(n || '').trim().split(/\s+/); return w.length > 1 && /(ov|ova|ev|eva|iy|aya)$/i.test(w[0]) ? w[1] : w[0] || ''; };
+function slim(on) { try { if (on === undefined) return localStorage.getItem('desk-slim') === '1'; localStorage.setItem('desk-slim', on ? '1' : '0'); } catch (_) { /* */ } return !!on; }
 
 function renderShell() {
   const me = S.me, sup = me.role === 'super';
   const courses = me.staff.courses || [];
   const navItem = ([href, icon, label, badge]) =>
     `<a href="${href}" data-nav="${href}" title="${label}">${ic(icon)}<span>${label}</span>${badge ? `<i class="badge" data-badge="${badge}" hidden></i>` : ''}</a>`;
-  $('#app').className = 'app';
+  const courseNav = NAV_COURSE.map(([h, items], i) => `<h6>${i === 0 && sup ? 'Joriy kurs' : esc(h)}</h6>${items.map(([href, icon, label, badge]) =>
+    navItem([href, icon, sup && href === '#/panel' ? 'Kurs holati' : label, badge])).join('')}`).join('');
+  $('#app').className = 'app' + (slim() ? ' slim' : '');
   $('#app').innerHTML = `
-    <aside class="side">
-      <div class="brand"><img class="seal-img" src="/static/jidu-seal.webp" alt="" width="42" height="42"><div><b>JIDU</b><span>Boshqaruv paneli</span></div></div>
+    <aside class="side" id="side">
+      <div class="brand"><img class="seal-img" src="/static/jidu-seal.webp" alt="" width="42" height="42"><div><b>JIDU</b><span>${sup ? 'Dekanat paneli' : 'Kurs koordinatori'}</span></div>
+        <button class="side-tg" data-act="slim" title="Menyuni yig‘ish / yoyish" aria-label="Menyuni yig‘ish">${ic('chevl')}</button></div>
       <div class="course-box">${sup && courses.length
         ? `<small>Joriy kurs</small><select id="course" aria-label="Joriy kurs">${courses.map(c => `<option value="${esc(c.key)}" ${c.key === S.course ? 'selected' : ''}>${esc(c.title)}</option>`).join('')}</select>`
         : `<small>Kurs</small><strong>${esc(me.staff.title || 'Kurs')}</strong>`}</div>
       <nav class="nav" aria-label="Bo‘limlar">
-        ${sup ? `<h6>Universitet</h6>${NAV_SUPER.map(navItem).join('')}<h6>Joriy kurs</h6>` : ''}
-        ${NAV_COURSE.map(navItem).join('')}
+        ${sup ? `<h6>Universitet</h6>${NAV_SUPER.map(navItem).join('')}` : ''}
+        ${courseNav}
       </nav>
-      <div class="me"><span class="av">${esc(initials(me.user.name))}</span>
-        <div><b>${esc(me.user.name)}</b><span>${sup ? 'Super-admin' : 'Kurs koordinatori'}</span></div>
-        <button data-act="theme" aria-label="Mavzu">${ic('auto')}</button>
-        <button data-act="logout" title="Chiqish" aria-label="Chiqish">${ic('logout')}</button></div>
+      <div class="side-foot"><button class="side-help" data-act="help">${ic('help')}<span>Yordam va qo‘llanma</span></button></div>
     </aside>
-    <main class="main" id="main"></main>
+    <div class="mainwrap">
+      <header class="topbar">
+        <button class="tb-btn tb-menu" data-act="nav" aria-label="Menyu" aria-controls="side">${ic('menu')}</button>
+        <div class="tb-hello"><b>Xush kelibsiz, ${esc(firstName(me.user.name))}!</b><span id="tbSub">${esc(roleName())} · ${todayLabel()}</span></div>
+        <div class="gsearch" role="search">${ic('search')}<input id="gq" type="search" placeholder="Talaba, guruh yoki HEMIS ID bo‘yicha qidirish…" autocomplete="off" aria-label="Qidirish">
+          <kbd>Ctrl K</kbd><div class="gs-res" id="gres" hidden></div></div>
+        <div class="tb-wrap"><button class="tb-btn" id="bell" aria-label="Bildirishnomalar" aria-haspopup="true">${ic('bell')}<i class="dot" id="bellDot" hidden></i></button>
+          <div class="menu" id="bellMenu" hidden></div></div>
+        <div class="tb-wrap"><button class="tb-user" id="userBtn" aria-haspopup="true"><span class="av">${esc(initials(me.user.name))}</span>
+          <span class="t"><b>${esc(me.user.name)}</b><span>${sup ? 'Dekanat' : 'Koordinator'}</span></span>${ic('chevd')}</button>
+          <div class="menu" id="userMenu" hidden></div></div>
+      </header>
+      <main class="main" id="main"></main>
+    </div>
     <div class="scrim" id="scrim"></div>
     <aside class="drawer" id="drawer" aria-hidden="true"><header><b>Talaba</b>
       <button class="btn ghost sm" data-act="close-drawer" aria-label="Yopish">${ic('x')}</button></header><div class="body" id="dbody"></div></aside>`;
   $('#course')?.addEventListener('change', e => { S.course = e.target.value; S.stu = null; S.me.staff.course = S.course;
     S.me.staff.title = courses.find(c => c.key === S.course)?.title || ''; refreshBadges();
     if (!location.hash.startsWith('#/super') && location.hash !== '#/panel') location.hash = '#/panel'; else route(); });
+  bindTopbar();
   paintBadges(); applyTheme();
+}
+/* ---------------------------------------------------------------- yuqori panel: qidiruv, bildirishnomalar, foydalanuvchi */
+const NAV_FLAT = () => [...(S.me.role === 'super' ? NAV_SUPER : []), ...NAV_COURSE.flatMap(([, it]) => it)];
+function closeMenus(except) { ['#bellMenu', '#userMenu', '#gres'].forEach(m => { if (m !== except) { const n = $(m); if (n) n.hidden = true; } }); }
+function bindTopbar() {
+  const q = $('#gq'), res = $('#gres');
+  let tm = null, cur = 0, items = [];
+  const pick = it => { closeMenus(); q.value = ''; q.blur();
+    if (it.href) location.hash = it.href; else openStudent(it.id, it.course || null); };
+  const paint = () => {
+    $$('button', res).forEach((b, i) => b.classList.toggle('on', i === cur));
+  };
+  const search = async () => {
+    const t = norm(q.value);
+    if (t.length < 2) { res.hidden = true; return; }
+    let rows = [];
+    try { rows = S.me.role === 'super' ? (await loadAllStudents()).rows : (await loadStudents()).rows; } catch (_) { rows = []; }
+    const studs = rows.filter(r => norm(r.name).includes(t) || norm(r.group).includes(t) || norm(r.hemis_id) === t).slice(0, 8);
+    const pages = NAV_FLAT().filter(([, , l]) => norm(l).includes(t)).slice(0, 3);
+    items = [...pages.map(([href, icon, label]) => ({ href, icon, label })), ...studs.map(r => ({ id: r.id, course: r.course || null, r }))];
+    cur = 0;
+    res.innerHTML = items.length ? `${pages.length ? '<h6>Bo‘limlar</h6>' : ''}${items.map((it, i) => it.href
+        ? `<button data-i="${i}"><span class="hic c-blue">${ic(it.icon)}</span><span class="t"><b>${esc(it.label)}</b><span>bo‘limni ochish</span></span></button>`
+        : `${i === pages.length ? '<h6>Talabalar</h6>' : ''}<button data-i="${i}"><span class="av-s">${esc(initials(it.r.name))}</span><span class="t"><b>${esc(it.r.name)}</b>
+          <span>${esc(it.r.group || '')}${it.r.course_title ? ' · ' + esc(it.r.course_title) : ''}${it.r.hemis_id ? ' · HEMIS ' + esc(it.r.hemis_id) : ''}${it.r.problems ? ` · <b style="color:var(--red)">${it.r.problems} ta masala</b>` : ''}</span></span></button>`).join('')}`
+      : emptyBox('search', 'Hech narsa topilmadi', 'Familiya, ism, guruh yoki HEMIS ID ni yozing.');
+    res.hidden = false; paint();
+    $$('button', res).forEach(b => b.addEventListener('mousedown', e => { e.preventDefault(); pick(items[Number(b.dataset.i)]); }));
+  };
+  q.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(search, 160); });
+  q.addEventListener('focus', () => { if (q.value.trim().length >= 2) search(); });
+  q.addEventListener('blur', () => setTimeout(() => { res.hidden = true; }, 120));
+  q.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (items.length) { cur = (cur + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; paint(); } }
+    else if (e.key === 'Enter' && items[cur] && !res.hidden) { e.preventDefault(); pick(items[cur]); }
+    else if (e.key === 'Escape') { q.value = ''; res.hidden = true; q.blur(); }
+  });
+  const toggle = (btn, menu, fill) => $(btn).addEventListener('click', e => { e.stopPropagation(); const m = $(menu);
+    if (!m.hidden) { m.hidden = true; return; } closeMenus(menu); fill(m); m.hidden = false; });
+  toggle('#bell', '#bellMenu', m => {
+    const B = S.badges, rows = [['#/inbox', 'chat', 'c-blue', 'Javobsiz xabarlar', 'ota-onalar yozgan', B.unread], ['#/requests', 'req', 'c-violet', 'Bog‘lanish so‘rovlari', 'farzandni bog‘lash', B.requests],
+      ['#/chora', 'shield', 'c-red', 'Chora kutilmoqda', 'chegaraga yetganlar', B.chora], ['#/tashrif', 'home', 'c-amber', 'Tashriflar', 'dalolatnoma yoki javob kutilmoqda', B.tashrif]];
+    const any = rows.some(r => r[5]);
+    m.innerHTML = `<h6>Bildirishnomalar${S.me.role === 'super' ? ` · ${esc(S.me.staff.title || '')}` : ''}</h6>${rows.map(([h, icn, c, t, sub, n]) => `<a href="${h}" class="${c}"><span class="mi-ic">${ic(icn)}</span>
+      <span class="mi-t"><b>${t}</b><span>${sub}</span></span>${n ? `<span class="mi-n">${n > 99 ? '99+' : n}</span>` : `<span class="mi-ok">${ic('check')}</span>`}</a>`).join('')}
+      ${any ? '' : '<p class="hint" style="margin:6px 10px 8px">Hammasi ko‘rib chiqilgan.</p>'}`;
+    $$('a', m).forEach(a => a.addEventListener('click', () => { m.hidden = true; }));
+  });
+  toggle('#userBtn', '#userMenu', m => {
+    const p = themePref();
+    m.innerHTML = `<div style="display:flex;gap:10px;align-items:center;padding:8px 10px 10px"><span class="av-s" style="width:40px;height:40px">${esc(initials(S.me.user.name))}</span>
+        <div><b>${esc(S.me.user.name)}</b><div class="hint">${esc(roleName())}${S.me.staff.title && S.me.role !== 'super' ? ' · ' + esc(S.me.staff.title) : ''}</div></div></div>
+      <hr><h6>Mavzu</h6><div class="themes">${['auto', 'light', 'dark'].map(k => `<button data-theme-set="${k}" class="${p === k ? 'on' : ''}">${THEME_NAMES[k]}</button>`).join('')}</div>
+      <hr><button class="mi" data-act="help"><span class="mi-ic c-blue">${ic('help')}</span><span class="mi-t"><b>Yordam va qo‘llanma</b></span></button>
+      <button class="mi" data-act="logout"><span class="mi-ic c-red">${ic('logout')}</span><span class="mi-t"><b>Chiqish</b><span>qayta kirish — Telegram orqali</span></span></button>`;
+    $$('[data-theme-set]', m).forEach(b => b.addEventListener('click', e => { e.stopPropagation();
+      try { localStorage.setItem('desk-theme', b.dataset.themeSet); } catch (_) { /* */ } applyTheme();
+      $$('[data-theme-set]', m).forEach(x => x.classList.toggle('on', x === b)); }));
+  });
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.tb-wrap')) closeMenus('#gres');
+  const app = $('#app');  // telefonda ochiq menyu: tashqarisi bosilsa yopiladi
+  if (app && app.classList.contains('navopen') && !e.target.closest('.side, .tb-menu')) app.classList.remove('navopen');
+});
+function helpDlg() {
+  const sup = S.me.role === 'super';
+  formDlg('Yordam va qo‘llanma', `<div class="hint" style="font-size:14px;color:var(--ink);display:grid;gap:10px">
+    <p style="margin:0"><b>Qidiruv</b> — yuqoridagi maydon (<b>Ctrl+K</b>): talaba familiyasi, guruh yoki HEMIS ID; bo‘lim nomini yozsangiz — o‘sha bo‘lim.</p>
+    ${sup ? '<p style="margin:0"><b>Bosh sahifa</b> — barcha kurslar: «Umumiy» yoki kursni tanlang; kurs tanlansa — o‘sha kursning holati ochiladi.</p>' : ''}
+    <p style="margin:0"><b>Bosh sahifa</b> — kurs holati: muammoli talabalar, bugungi vazifalar (bosilsa — kerakli bo‘lim), yaqin tadbirlar, dinamika.</p>
+    <p style="margin:0"><b>Intizomiy choralar</b> — chegaraga yetganlar → bildirishnoma (imzolangan PDF) → farmoyish/buyruq (imzolangan PDF, ota-onaga va talabaga darhol) → ota-onaga xat.</p>
+    <p style="margin:0"><b>To‘lovlar</b> — kontrakt va trimestr qarzdorlari; to‘lov cheki yoki kvitansiyasini yuklab qarzni yopish.</p>
+    <p style="margin:0"><b>Hisobot va ma’lumot</b> — Excel fayllarni yuklash (turini tizim o‘zi aniqlaydi) va hisobotni yuklab olish.</p>
+    <p style="margin:0">Bildirishnomalar (🔔) — javobsiz xabarlar, so‘rovlar, kutilayotgan choralar. Mavzu va chiqish — o‘ng yuqoridagi ism ustida.</p></div>`, 'Tushunarli');
 }
 function markNav() {
   const h = location.hash.split('?')[0] || '#/';
@@ -356,7 +465,7 @@ async function refreshBadges() {
 
 /* ---------------------------------------------------------------- yo'naltirish */
 async function route() {
-  clearTimers(); closeDrawer();
+  clearTimers(); closeDrawer(); $('#app')?.classList.remove('navopen');
   const [path, qs] = (location.hash.slice(1) || '/').split('?');
   const q = new URLSearchParams(qs || '');
   const parts = path.split('/').filter(Boolean);
@@ -364,7 +473,7 @@ async function route() {
   if (!parts.length) { location.replace(sup ? '#/super' : '#/panel'); return; }
   markNav();
   const pages = { panel: pPanel, students: pStudents, subjects: pSubjects, chora: pChora, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles, surveys: pSurveys,
-    tashrif: typeof pTashrif === 'function' ? pTashrif : pPanel };
+    tashrif: typeof pTashrif === 'function' ? pTashrif : pPanel, academic: pAcademic, payments: pPayments, social: typeof pSocial === 'function' ? pSocial : pPanel };
   try {
     if (parts[0] === 'super') {
       if (!sup) { location.replace('#/panel'); return; }
@@ -384,66 +493,7 @@ async function route() {
 
 /* ================================================================ kurs holati (panel) */
 function tone(v, bad = 'bordo') { return v ? bad : 'ok'; }
-async function pPanel() {
-  document.title = 'Kurs holati — Boshqaruv paneli';
-  view(head('Kurs holati', courseSub()) + skel(110) + skel(360));
-  const [d, ib, rq, ch, vt, sc] = await Promise.all([api('/api/staff/panel'), api('/api/staff/inbox'), api('/api/staff/requests'),
-    api('/api/staff/discipline/badge').catch(() => null), api('/api/staff/visits/badge').catch(() => null),
-    typeof socialSection === 'function' ? api('/api/staff/social').catch(() => null) : null]);
-  const cover = pct(d.linked, d.total);
-  const unread = ib.items.reduce((a, i) => a + (i.unread || 0), 0);
-  const share = n => (d.total ? `${pct(n, d.total)}% talabalar` : '');
-  const [km, ku] = moneyShort(d.kontrakt.sum), [tm, tu] = moneyShort(d.trimestr.sum);
-  const band = (d.scope ? `<p class="hint scope">${ic('info')}${esc(d.scope.replace(/^\s*ℹ️?\s*/u, ''))}</p>` : '') + `<section class="kpis" aria-label="Asosiy ko‘rsatkichlar">
-    ${kpi({ href: '#/students', icon: 'users', c: 'people', label: 'Talabalar', value: num(d.total, 0), unit: 'ta',
-      sub: `${ic('link')} ota-onasi ulangan: <b>${d.linked}</b> · ${cover}%`, meter: cover })}
-    ${kpi({ href: '#/students?f=att', icon: 'calx', c: 'att', label: 'Davomat muammosi', value: d.att, unit: 'ta', state: probState(d.att),
-      title: d.handled ? `Chora ko‘rilgan (imzolangan asl nusxasi bilan) ${d.handled} ta talaba bu yerda hisoblanmaydi — ular «Chora ko‘rilganlar»da` : '',
-      sub: (d.att ? `<span class="ln">chegaraga yetgan, chora kutilmoqda · ${share(d.att)}</span>` : '<span class="ln">chora kutayotgan talaba yo‘q</span>')
-        + (d.handled ? `<span class="ln">${ic('shield')} chora ko‘rilgan: <b>${d.handled}</b> ta</span>` : '') })}
-    ${ch ? kpi({ href: '#/chora?tab=hist', icon: 'shield', c: 'risk', label: 'Chora ko‘rilganlar', value: ch.kpi.students, unit: 'ta',
-      state: ch.new ? 'bad' : 'ok', title: `O‘quv yilida jami ${ch.kpi.total} ta chora`,
-      sub: `<span class="ln">ogohlantirish: <b>${ch.kpi.ogohlantirish}</b> · hayfsan: <b>${ch.kpi.hayfsan}</b></span>${ch.new ? `<span class="ln">chora kutilmoqda: <b>${ch.new}</b> ta</span>` : ''}` }) : ''}
-    ${ch && ch.kpi.letters ? lettersKpi(ch.kpi.letters) : ''}
-    ${vt && typeof tashrifKpi === 'function' ? tashrifKpi(vt) : ''}
-    ${kpi({ href: '#/students?f=acad', icon: 'bookx', c: 'acad', label: 'Akademik qarz', value: d.acad, unit: 'ta', state: probState(d.acad),
-      sub: 'qarzdorlar ro‘yxati bo‘yicha' })}
-    ${kpi({ href: '#/students?f=gpa', icon: 'cap', c: 'gpa', label: 'GPA past', value: d.gpa, unit: 'ta', state: probState(d.gpa),
-      sub: `${limNum(d.gpa_min)} dan past — kursdan o‘tmaydi` })}
-    ${kpi({ href: '#/students?f=prob', icon: 'flame', c: 'risk', label: '3+ masalali', value: d.multi, unit: 'ta', state: probState(d.multi),
-      sub: 'birinchi navbatda e’tibor' })}
-    ${kpi({ href: '#/students?f=kontrakt', icon: 'dollar', c: 'money', label: 'Kontrakt qarzi', value: km, unit: ku, state: probState(d.kontrakt.count, 'warn'),
-      sub: `${d.kontrakt.count} ta talaba${d.kontrakt.count ? ` · o‘rtacha ${mlnPlain(d.kontrakt.sum / d.kontrakt.count)}` : ''}`, title: money(d.kontrakt.sum) })}
-    ${kpi({ href: '#/students?f=trimestr', icon: 'receipt', c: 'money2', label: 'Trimestr qarzi', value: tm, unit: tu, state: probState(d.trimestr.count, 'warn'),
-      sub: `${d.trimestr.count} ta talaba${d.trimestr.count ? ` · o‘rtacha ${mlnPlain(d.trimestr.sum / d.trimestr.count)}` : ''}`, title: money(d.trimestr.sum) })}
-    ${kpi({ href: '#/inbox', icon: 'inbox', c: 'msg', label: 'Javobsiz xabarlar', value: unread, unit: 'ta', state: unread ? 'bad' : 'ok',
-      sub: `${ic('req')} bog‘lanish so‘rovlari: <b>${rq.items.length}</b>` })}
-  </section>`;
-  const top = d.top.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Talaba</th><th>Masalalar</th><th class="r">Davomat</th></tr></thead>
-    <tbody>${d.top.map(r => `<tr class="click" data-student="${r.id}"><td class="name"><b>${esc(r.name)}</b><span>${esc(r.group)}${r.hemis_id ? ', HEMIS ' + esc(r.hemis_id) : ''}</span></td>
-      <td><div class="wrapc">${issueChips(r)}</div></td><td class="r">${r.percent != null ? r.percent + '%' : '<span class="dash">—</span>'}</td></tr>`).join('')}</tbody></table></div>`
-    : emptyBox('ok', 'Muammoli talaba yo‘q', 'Davomat, baholar va to‘lovlar bo‘yicha e’tibor talab qiladigan holat topilmadi.');
-  const fresh = ib.items.filter(i => i.unread).slice(0, 6);
-  const msgs = fresh.length ? `<ul class="list">${fresh.map(i => `<li><a href="#/inbox/${i.sid}/${i.pid}"><span class="av-s">${esc(initials(i.parent))}</span>
-      <div class="t"><b>${esc(i.parent)} <span class="chip bordo" style="height:20px;margin-left:4px">${i.unread}</span></b><p>${esc(i.student)}: ${esc(i.last)}</p></div><time>${when(i.at)}</time></a></li>`).join('')}</ul>`
-    : `<div class="pad"><div class="note ok">${ic('ok')}<span>Javob kutayotgan xabar yo‘q.</span></div></div>`;
-  view(head('Kurs holati', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + band + dynSection(d.dynamics)
-    + (sc ? socialSection(sc, d.total) : '') + `
-    <div class="grid-2">
-      <section class="sec"><header>${H('target', 'E’tibor talab qiladigan talabalar', 'risk')}<a href="#/students?f=prob">Barchasi ${ic('arrow')}</a></header>${top}</section>
-      <div class="stack">
-        <section class="sec"><header>${H('chat', 'Yangi xabarlar', 'msg')}<a href="#/inbox">Xabarlar ${ic('arrow')}</a></header>${msgs}</section>
-        <section class="sec"><header>${H('req', 'Bog‘lanish so‘rovlari', 'people')}</header><div class="pad">${rq.items.length
-          ? `<div class="note warn">${ic('req')}<span><b>${rq.items.length} ta</b> ota-ona farzandini bog‘lashni so‘rayapti.</span></div>
-             <div style="margin-top:12px"><a class="btn primary" href="#/requests">Ko‘rib chiqish</a></div>`
-          : `<div class="note ok">${ic('ok')}<span>Kutilayotgan so‘rov yo‘q.</span></div>`}</div></section>
-        <section class="sec"><header>${H('download', 'Hisobot', 'people')}</header><div class="pad actions">
-          <button class="btn" data-act="export" data-fmt="x">${ic('download')} Excel yuklab olish</button>
-          <button class="btn" data-act="export" data-fmt="p">${ic('file')} PDF yuklab olish</button></div></section>
-      </div>
-    </div>
-    <p class="foot">${ic('clock')} Ma’lumotlar oxirgi marta yangilangan: ${d.updated ? when(d.updated) : 'hali yuklanmagan'}.</p>`);
-}
+/* «Kurs holati» (bosh sahifa) — home.js dagi pPanel */
 /* Dinamika: kichik grafik (sparkline) — oxirgi nuqta ajratib ko'rsatiladi */
 function spark(points, cls) {
   const v = points.map(p => p.value), W = 120, H = 34, P = 3;
@@ -677,10 +727,10 @@ const dayLabel = iso => { const d = parseDate(iso); return d ? `${d.getDate()}-$
 
 /* ================================================================ jadval va fanlar (guruh bo'yicha) */
 async function pSubjects(parts, q) {
-  document.title = 'Jadval va fanlar — Boshqaruv paneli';
+  document.title = 'Davomat va jadval — Boshqaruv paneli';
   const st = S.subjState = S.subjState || { group: '', week: '' };
   if (q && q.has('group')) st.group = q.get('group');
-  view(head('Jadval va fanlar', courseSub()) + skel(60) + skel(320));
+  view(head('Davomat va jadval', courseSub()) + skel(60) + skel(320));
   const qs = new URLSearchParams(); if (st.group) qs.set('group', st.group); if (st.group && st.week) qs.set('week', st.week);
   const d = await api('/api/staff/subjects' + (qs.toString() ? '?' + qs : ''));
   const sch = d.schedule, canCred = !myGroups().length;
@@ -698,7 +748,7 @@ async function pSubjects(parts, q) {
         <td class="r nowrap">${x.limit != null ? `<span title="${esc(credSrc(x))}">${x.pairs && x.credits_src !== 'manual' ? `${num(x.pairs)} para` : `${num(x.credits)} kr`} · <b>${x.limit} para</b></span>` : '<span class="dash">kredit yo‘q</span>'}${canCred ? ` <button class="btn sm ghost" data-cred="${esc(x.key)}" data-cv="${x.credits || ''}" data-cn="${esc(x.subject)}" title="Kreditni kiritish">${ic('edit')}</button>` : ''}</td>
         <td class="r">${x.over_students ? `<span class="icnt bad">${ic('alert')}${x.over_students}</span>` : '<span class="dash">0</span>'}${x.warn_students ? ` <span class="chip warn" title="1 para qoldi">+${x.warn_students}</span>` : ''}</td></tr>`).join('')}</tbody></table></div>`
     : emptyBox('cal', 'Davomat ma’lumoti yo‘q', 'Kunlik davomat (dars bo‘yicha) yuklanganda fanlar kesimi shu yerda ko‘rinadi.');
-  view(head('Jadval va fanlar', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
+  view(head('Davomat va jadval', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
     <div class="toolbar"><select class="select" id="sg" aria-label="Guruh"><option value="">Barcha guruhlar — faqat fanlar kesimi</option>
       ${d.groups.map(g => `<option value="${esc(g.name)}" ${group_key(g.name) === group_key(st.group) ? 'selected' : ''}>${esc(g.name)} (${g.students} talaba)</option>`).join('')}</select>
       ${sch ? `<div class="seg"><button data-w="${sch.prev}">${ic('chevl')} Oldingi</button><button disabled class="on">${dayLabel(sch.monday)} · ${sch.week_type} hafta</button><button data-w="${sch.next}">Keyingi ${ic('chevr')}</button></div>` : ''}</div>
@@ -800,7 +850,7 @@ function formDlg(title, inner, okText = 'Saqlash', danger = false) {
   });
 }
 async function pChora(parts, q) {
-  document.title = 'Chora ko‘rish — Boshqaruv paneli';
+  document.title = 'Intizomiy choralar — Boshqaruv paneli';
   const st = S.chora = S.chora || { tab: 'list', m: 'ogohlantirish', sel: new Set(), hm: '', hg: '' };
   if (q && (q.get('tab') || q.get('m') || q.has('aq') || q.has('hm'))) {  // havoladan (masalan, «Kurs holati»dan) — bir marta; keyin yorliqlar o'zi almashadi
     if (q.get('tab')) st.tab = q.get('tab');
@@ -809,7 +859,7 @@ async function pChora(parts, q) {
     if (q.has('aq')) { st.aq = q.get('aq'); st.at = ''; }
     history.replaceState(null, '', '#/chora');
   }
-  view(head('Chora ko‘rish', courseSub()) + skel(70) + skel(320));
+  view(head('Intizomiy choralar', courseSub()) + skel(70) + skel(320));
   const d = await api('/api/staff/discipline');
   S.chData = d;
   S.badges.chora = (d.counts.ogohlantirish || 0) + (d.counts.hayfsan || 0); paintBadges();
@@ -824,7 +874,7 @@ async function pChora(parts, q) {
   else if (st.tab === 'hist') body = `<div id="ch-hist">${skel(90)}${skel(260)}</div>`;
   else if (st.tab === 'arch') body = choraArch(st);
   else body = choraTpl(d);
-  view(head('Chora ko‘rish', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + tabs + body);
+  view(head('Intizomiy choralar', courseSub(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + tabs + body);
   $$('[data-tab]').forEach(b => b.addEventListener('click', () => { st.tab = b.dataset.tab; route(); }));
   $('[data-ch="tartib"]').addEventListener('click', () => choraTartib(d));
   if (st.tab === 'list') (st.m === 'trimestr' ? bindChoraTri : bindChoraList)(d, st);
@@ -1640,8 +1690,8 @@ const KINDS = [['auto', 'Turini bot aniqlasin'], ['students', 'Talabalar'], ['at
 const SECTIONS_EXP = [['all', 'To‘liq hisobot'], ['prob', 'Muammoli talabalar'], ['att', 'Davomati past talabalar'], ['acad', 'Akademik qarzdorlar'],
   ['kontrakt', 'Kontrakt qarzdorlari'], ['trimestr', 'Trimestr qarzdorlari']];
 async function pFiles() {
-  document.title = 'Ma’lumot va hisobot — Boshqaruv paneli';
-  view(head('Ma’lumot va hisobot', courseSub()) + `<div class="cols">
+  document.title = 'Hisobot va ma’lumot — Boshqaruv paneli';
+  view(head('Hisobot va ma’lumot', courseSub()) + `<div class="cols">
     <section class="sec"><header>${H('upload', 'Excel fayllarni yuklash', 'att')}</header><div class="pad">
       <label class="dz" id="dz"><input type="file" id="files" accept=".xlsx,.xlsm" multiple hidden>
         <span class="ic">${ic('upload')}</span><b>Fayllarni shu yerga tashlang</b><span>yoki bosib tanlang — .xlsx, bir nechta faylni birga</span></label>
@@ -1883,53 +1933,7 @@ function onLive(ev) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me && !LIVE.ctrl) connectLive(); });
 
 /* ================================================================ super-admin */
-async function pSuperOverview() {
-  document.title = 'Barcha kurslar — Boshqaruv paneli';
-  view(head('Barcha kurslar', todayLabel()) + skel(110) + skel(320));
-  const d = await api('/api/super/overview');
-  const tot = d.courses.reduce((a, c) => ({ total: a.total + c.total, linked: a.linked + c.linked, prob: a.prob + c.prob, multi: a.multi + c.multi,
-    k: a.k + c.kontrakt.sum, t: a.t + c.trimestr.sum }), { total: 0, linked: 0, prob: 0, multi: 0, k: 0, t: 0 });
-  const kc = d.courses.reduce((a, c) => a + c.kontrakt.count, 0), tc = d.courses.reduce((a, c) => a + c.trimestr.count, 0);
-  const [km, ku] = moneyShort(tot.k), [tm, tu] = moneyShort(tot.t);
-  const cover = pct(tot.linked, tot.total);
-  const moneyCell = (m, icon) => m.count ? `<span class="mcell" title="${money(m.sum)}">${ic(icon)}<b>${mlnPlain(m.sum)}</b><small>${m.count} ta talaba</small></span>` : '<span class="dash">—</span>';
-  const countCell = (n, icon, cls) => n ? `<span class="icnt ${cls}">${ic(icon)}${n}</span>` : '<span class="dash">0</span>';
-  // chora ko'rilganlar — barcha kurslar (o'quv yili boshidan)
-  const DS = ['students', 'total', 'repeat', 'pending', 'ogohlantirish', 'hayfsan', 'boshqa', 'xat', 'davomat', 'tartib', 'trimestr', 'letters'];
-  const disc = d.courses.reduce((a, c) => { DS.forEach(k => { a[k] += (c.disc && c.disc[k]) || 0; }); return a; }, Object.fromEntries(DS.map(k => [k, 0])));
-  const discTitle = x => x ? `O‘quv yilida: ${x.total} ta chora — ogohlantirish ${x.ogohlantirish}, hayfsan ${x.hayfsan}, boshqa ${x.boshqa}, xat ${x.xat}; asos: davomat ${x.davomat}, ichki tartib ${x.tartib}, trimestr ${x.trimestr}` : 'ma’lumot yo‘q';
-  const discCell = x => !x ? '<span class="dash">—</span>' : `<span title="${esc(discTitle(x))}">${countCell(x.students, 'shield', x.pending ? 'bad' : '')}${x.pending ? `<small class="warn-t" style="display:block">kutilmoqda: ${x.pending}</small>` : ''}</span>`;
-  view(head('Barcha kurslar', todayLabel(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `
-    <section class="kpis k3" aria-label="Universitet bo‘yicha ko‘rsatkichlar">
-      ${kpi({ href: '#/super/courses', icon: 'layers', c: 'people', label: 'Kurslar', value: d.courses.length, unit: 'ta', sub: `${ic('users')} kurs koordinatorlari: <b>${d.coordinators}</b>` })}
-      ${kpi({ icon: 'users', c: 'people', label: 'Talabalar', value: num(tot.total, 0), unit: 'ta', sub: `${ic('link')} ota-onasi ulangan: <b>${num(tot.linked, 0)}</b> · ${cover}%`, meter: cover })}
-      ${kpi({ icon: 'flame', c: 'risk', label: 'Muammoli talabalar', value: tot.prob, unit: 'ta', state: probState(tot.multi), sub: `3 va undan ko‘p masala: <b>${tot.multi}</b>` })}
-      ${kpi({ icon: 'dollar', c: 'money', label: 'Kontrakt qarzi', value: km, unit: ku, state: probState(kc, 'warn'), sub: `${kc} ta talaba`, title: money(tot.k) })}
-      ${kpi({ icon: 'receipt', c: 'money2', label: 'Trimestr qarzi', value: tm, unit: tu, state: probState(tc, 'warn'), sub: `${tc} ta talaba`, title: money(tot.t) })}
-      ${kpi({ href: '#/super/system', icon: 'server', c: 'sys', label: 'Tizim', value: d.errors_24h ? d.errors_24h : 'Barqaror', unit: d.errors_24h ? 'ta xato' : '',
-        state: d.errors_24h ? 'bad' : 'ok', sub: `${ic('db')} zaxira: ${d.last_backup ? when(d.last_backup) : 'hali olinmagan'}` })}
-    </section>
-    <section class="kpis k2" aria-label="Talabalar bo‘yicha choralar">
-      ${kpi({ icon: 'shield', c: 'risk', label: 'Chora ko‘rilganlar (barcha kurslar)', value: disc.students, unit: 'talaba', state: disc.pending ? 'bad' : null,
-        title: `O‘quv yili boshidan rasman ko‘rilgan choralar: ${disc.total} ta`,
-        sub: `<span class="ln">dekan ogohlantirishi: <b>${disc.ogohlantirish}</b> · hayfsan: <b>${disc.hayfsan}</b> · boshqa: <b>${disc.boshqa}</b></span>
-          <span class="ln">asos — davomat: <b>${disc.davomat}</b> · ichki tartib: <b>${disc.tartib}</b> · trimestr: <b>${disc.trimestr}</b></span>
-          <span class="ln">ota-onaga xat: <b>${disc.letters}</b>${disc.repeat ? ` · takroriy: <b>${disc.repeat}</b> talaba` : ''}</span>
-          ${disc.pending ? `<span class="ln warn-t">chora kutilmoqda: <b>${disc.pending}</b> ta talaba</span>` : ''}` })}
-      ${typeof socialKpi === 'function' ? socialKpi(d.courses) : ''}
-    </section>
-    <section class="sec"><header>${H('layers', 'Kurslar kesimida', 'people')}<a href="#/super/courses">Kurslarni boshqarish ${ic('arrow')}</a></header>
-      ${d.courses.length ? `<div class="tbl-wrap" style="max-height:none"><table class="tbl courses"><thead><tr><th>Kurs</th><th>Kurs koordinatorlari</th><th class="r">Talabalar</th><th>Ota-onasi ulangan</th>
-        <th class="r">Muammoli</th><th class="r">Davomat</th><th class="r">Akademik</th><th class="r" title="O‘quv yilida chora ko‘rilgan talabalar">Chora</th><th class="r">Kontrakt qarzi</th><th class="r">Trimestr qarzi</th><th></th></tr></thead><tbody>
-        ${d.courses.map(c => `<tr><td class="name"><div class="cname"><span class="h-ic sm c-people" aria-hidden="true">${ic('layers')}</span><b>${esc(c.title)}</b></div></td>
-          <td>${c.admins.length ? `<div class="people">${c.admins.map(a => `<span class="person"><span class="av-s">${/^\p{L}/u.test(a.label) && !/^ID\b/.test(a.label) ? esc(initials(a.label)) : ic('users')}</span>${esc(a.label)}</span>`).join('')}</div>` : `<span class="chip warn">${ic('alert')}tayinlanmagan</span>`}</td>
-          <td class="r">${c.total}</td><td>${pctCell(c.total ? pct(c.linked, c.total) : null)}</td>
-          <td class="r">${countCell(c.prob, 'flame', c.multi ? 'bad' : '')}</td><td class="r">${countCell(c.att, 'calx', 'bad')}</td><td class="r">${countCell(c.acad, 'bookx', 'bad')}</td>
-          <td class="r">${discCell(c.disc)}</td>
-          <td class="r">${moneyCell(c.kontrakt, 'dollar')}</td><td class="r">${moneyCell(c.trimestr, 'receipt')}</td>
-          <td class="r"><button class="btn sm" data-act="enter" data-key="${esc(c.key)}">Kirish ${ic('arrow')}</button></td></tr>`).join('')}</tbody></table></div>`
-        : emptyBox('building', 'Hali kurs yo‘q', '', `<a class="btn primary" href="#/super/courses">${ic('plus')} Kurs yaratish</a>`)}</section>`);
-}
+/* «Barcha kurslar» (dekan bosh sahifasi) — home.js dagi pSuperOverview */
 async function pSuperCourses() {
   document.title = 'Kurslar va koordinatorlar — Boshqaruv paneli';
   const d = await api('/api/super/courses');
@@ -1945,10 +1949,10 @@ async function pSuperCourses() {
       </tbody></table></div>` : emptyBox('building', 'Hali kurs yo‘q', 'Birinchi kursni yarating va unga kurs koordinatorini tayinlang.')}</section>`);
 }
 async function pSuperSystem() {
-  document.title = 'Tizim — Boshqaruv paneli';
-  view(head('Tizim', todayLabel()) + skel(160) + skel(300));
+  document.title = 'Tizim va integratsiyalar — Boshqaruv paneli';
+  view(head('Tizim va integratsiyalar', todayLabel()) + skel(160) + skel(300));
   const [o, e, pt] = await Promise.all([api('/api/super/overview'), api('/api/super/errors'), api('/api/super/pair_times')]);
-  view(head('Tizim', todayLabel(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `<div class="cols">
+  view(head('Tizim va integratsiyalar', todayLabel(), `<button class="btn" data-act="reload">${ic('refresh')} Yangilash</button>`) + `<div class="cols">
     <section class="sec"><header>${H('db', 'Zaxira nusxa', 'sys')}</header><div class="pad">
       <div class="kv" style="margin-bottom:14px"><span>Oxirgi zaxira nusxa</span><b>${o.last_backup ? when(o.last_backup) : 'hali olinmagan'}</b>
         <span>Avtomatik</span><b>har kuni 03:00, 14 kun saqlanadi</b><span>Shifrlash</span><b>AES-256</b></div>
@@ -2197,7 +2201,10 @@ document.addEventListener('click', async e => {
     for (let i = 1; i <= 8; i++) { const a = $(`[data-pt="${i}"][data-k="0"]`).value, z = $(`[data-pt="${i}"][data-k="1"]`).value; if (a || z) times[i] = [a, z]; }
     try { await api('/api/super/pair_times', { method: 'POST', json: { times } }); toast('Juftlik vaqtlari saqlandi — jadvallarda darhol ko‘rinadi'); route(); }
     catch (err) { toast(`${(err.data?.error || '').replace('time:', '')}-juftlik vaqti noto‘g‘ri: boshlanishi tugashidan oldin bo‘lsin`, true); }
-  } else if (act === 'close-drawer') closeDrawer();
+  } else if (act === 'nav') { $('#app').classList.toggle('navopen');
+  } else if (act === 'slim') { $('#app').classList.toggle('slim', slim(!$('#app').classList.contains('slim'))); }
+  else if (act === 'help') { closeMenus(); helpDlg(); }
+  else if (act === 'close-drawer') closeDrawer();
   else if (act === 'reload') route();
   else if (act === 'reload-students') { S.stu = null; S.stuAll = null; route(); }
   else if (act === 'logout') {
@@ -2268,7 +2275,8 @@ document.addEventListener('click', async e => {
   }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeDrawer();
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { const g = $('#gq'); if (g) { e.preventDefault(); g.focus(); g.select(); return; } }
+  if (e.key === 'Escape') { closeDrawer(); closeMenus(); }
   if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) { const q = $('#q'); if (q) { e.preventDefault(); q.focus(); } }
 });
 function switchCourse(key) {

@@ -763,17 +763,29 @@ def _row(x: dict) -> dict:
             "handled": x.get("handled")}  # davomat chegarasi bo'yicha chora ko'rilgan (asl nusxasi bilan) — muammoli emas
 
 
+def _semester_label() -> str:
+    from utils import academic_year_start, semester_start
+    y = academic_year_start().year
+    return f"{y}/{y + 1}-o'quv yili, {1 if semester_start().month >= 8 else 2}-semestr"
+
+
 @staff_route
 async def api_staff_panel(request):
     students = scope_students(await db.fetchall("SELECT * FROM students ORDER BY group_name, full_name"))
+    groups = sorted({s["group_name"] for s in students if s.get("group_name")})
+    grp = request.query.get("group", "")
+    gk = group_key(grp) if grp else ""
+    if gk:  # bitta guruh (koordinator doirasida)
+        students = [s for s in students if s.get("group_key") == gk]
     sts = await status.staff_statuses(students)
     linked = {r["student_id"] for r in await db.fetchall(
         "SELECT DISTINCT ps.student_id FROM parent_students ps JOIN parents p ON p.tg_id = ps.parent_id WHERE p.active = 1")}
-    rows = [_row(x) for x in sts]
+    rows = await _with_measures([_row(x) for x in sts])
     k = [r for r in rows if r["kontrakt"]]
     t = [r for r in rows if r["trimestr"]]
     inbox = scope_students(await db.inbox(200))
     pending = len(await _pending_requests())
+    import dashboard
     return ok({"course": course_title(request["course"]) if request["course"] != "_" else "",
                "total": len(rows), "linked": sum(1 for x in sts if x["student"]["id"] in linked),
                "att": sum(1 for r in rows if r["flags"]["att"]), "acad": sum(1 for r in rows if r["flags"]["acad"]),
@@ -783,8 +795,21 @@ async def api_staff_panel(request):
                "multi": sum(1 for r in rows if r["problems"] >= 3), "handled": sum(1 for r in rows if r["handled"]),
                "unread": sum(i["unread"] for i in inbox), "link_requests": pending,
                "top": sorted([r for r in rows if r["problems"]], key=lambda r: (-r["problems"], r["name"]))[:30],
+               "prob": sum(1 for r in rows if r["problems"]), "mix": dashboard.problems_mix(rows),
+               "groups": dashboard.groups_breakdown(rows), "chora": sum(1 for r in rows if r["measures"]),
                "updated": await _last_update(), "scope": scope_label(request["user"]["id"]),
-               "dynamics": await course_trends.course_dynamics(viewer_scope())})
+               "group": grp if gk and students else "", "group_list": groups, "semester": _semester_label(),
+               "dynamics": await course_trends.course_dynamics({gk} if gk and students else viewer_scope())})
+
+
+@staff_route
+async def api_staff_home(request):
+    """Bosh sahifaning o'ng ustuni va pasti: bugungi vazifalar, yaqin tadbir va tashriflar, integratsiyalar holati."""
+    import dashboard
+    uid = request["user"]["id"]
+    unread = sum(i["unread"] for i in scope_students(await db.inbox(200)))
+    tasks = await dashboard.course_tasks(uid, viewer_scope(), unread, len(await _pending_requests()))
+    return ok({"tasks": tasks, "events": await dashboard.events(uid), "integrations": await dashboard.integrations(request.app["bot"])})
 
 
 async def _student_rows(q: str = "", limit: int = 3000) -> list[dict]:
@@ -1894,8 +1919,9 @@ async def api_super_overview(request):
     from logsetup import errors_since
     import discipline
     import socialcat
+    import dashboard
     info = {c["key"]: c for c in await courses_info()}
-    rows = []
+    rows, events = [], []
     for key in db.keys():
         with use_course(None if key == "_" else key):
             d = await export.collect("")
@@ -1909,16 +1935,42 @@ async def api_super_overview(request):
                 log.exception("Chora ko'rsatkichlari (%s)", key)
                 disc = None
             social = await socialcat.summary(None)
+            flow = ds["flow"] if disc else {}
+            try:
+                dyn = await course_trends.course_dynamics(None)
+            except Exception:  # noqa: BLE001
+                log.exception("Kurs dinamikasi (%s)", key)
+                dyn = []
+            ev = await dashboard.events(None, limit=4)
+            unread = sum(i["unread"] for i in await db.inbox(200))
+            reqs = (await db.fetchone("SELECT COUNT(*) AS n FROM link_requests WHERE status = 'pending'"))["n"]
         c = info.get(key, {})
-        rows.append({"key": key, "title": course_title(key) if key != "_" else "Kurs", "admins": c.get("admins", []),
+        title = course_title(key) if key != "_" else "Kurs"
+        events += [{**e, "course": key, "course_title": title} for e in ev]
+        rows.append({"key": key, "title": title, "admins": c.get("admins", []),
                      "total": d["total"], "linked": d["linked"], "prob": len(d["prob"]),
                      "multi": sum(1 for r in d["prob"] if r["count"] >= 3), "att": len(d["att"]), "acad": len(d["acad"]),
+                     "gpa": len(d["gpa"]), "avg_att": d["avg_att"], "handled": d["handled"],
                      "kontrakt": {"count": len(d["kontrakt"]), "sum": sum(r["debt"] for r in d["kontrakt"])},
                      "trimestr": {"count": len(d["trimestr"]), "sum": sum(r["debt"] for r in d["trimestr"])},
-                     "parents": c.get("parents", 0), "disc": disc, "social": social})
+                     "parents": c.get("parents", 0), "disc": disc, "flow": flow, "social": social, "dynamics": dyn,
+                     "unread": unread, "requests": reqs})
     last = await central.get_meta("last_backup")
+    errs = errors_since(24)
+    T = dashboard._task
+    tasks = [  # dekan / super-admin: barcha kurslar bo'yicha
+        T("dean_sign", "Imzolanadigan farmoyish va buyruqlar (2-bosqich)", sum(r["flow"].get("order", 0) for r in rows), "#/super",
+          "talaba — kurslar kesimida", "bad"),
+        T("chora_new", "Chegaraga yetgan, chora kutilayotgan talabalar", sum((r["disc"] or {}).get("pending", 0) for r in rows), "#/super"),
+        T("letters", "Ota-onaga xati yuborilmagan choralar", sum(r["flow"].get("letters", 0) for r in rows), "#/super"),
+        T("no_coord", "Kurs koordinatori tayinlanmagan kurslar", sum(1 for r in rows if not r["admins"]), "#/super/courses", "", "bad"),
+        T("inbox", "Javobsiz xabarlar (barcha kurslar)", sum(r["unread"] for r in rows), "#/super", ""),
+        T("errors", "Tizim xatolari (24 soat)", errs, "#/super/system", "", "bad"),
+    ]
     return ok({"courses": rows, "coordinators": sum(len(r["admins"]) for r in rows), "last_backup": last,
-               "errors_24h": errors_since(24)})
+               "errors_24h": errs, "tasks": tasks, "semester": _semester_label(),
+               "events": sorted(events, key=lambda e: (e["date"], e["start"]))[:6],
+               "integrations": await dashboard.integrations(request.app["bot"], list(db.keys()))})
 
 
 @super_route
@@ -2278,6 +2330,7 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/app/info", api_app_info)
     r.add_post("/api/integration/{kind}", api_integration_push)
     r.add_get("/api/staff/panel", api_staff_panel)
+    r.add_get("/api/staff/home", api_staff_home)
     r.add_get("/api/staff/students", api_staff_students)
     r.add_get("/api/staff/student/{sid:\\d+}", api_staff_student)
     r.add_get("/api/staff/student/{sid:\\d+}/schedule", api_staff_student_schedule)
@@ -2369,3 +2422,5 @@ def setup_routes(app: web.Application) -> None:
     visitsapi.setup(r)
     import socialapi  # talabalarning ijtimoiy toifalari
     socialapi.setup(r)
+    import paymentsapi  # to'lovlar: qarzdorlar, chek / kvitansiya bilan qarzni yopish
+    paymentsapi.setup(r)

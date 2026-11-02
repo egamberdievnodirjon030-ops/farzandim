@@ -512,6 +512,23 @@ CREATE TABLE IF NOT EXISTS payments (
     imported_at TEXT NOT NULL,
     PRIMARY KEY (student_id, kind, as_of)
 );
+-- To'lov cheki / kvitansiyasi (kurs koordinatori yuklaydi): qarz yopiladi (qisman — kamayadi). payments ga shu sanadagi
+-- yozuv qo'shiladi (prev — o'sha sanada avval bor bo'lgan yozuv, bekor qilinsa tiklanadi)
+CREATE TABLE IF NOT EXISTS payment_receipts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id  INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL,              -- kontrakt | trimestr
+    amount      REAL NOT NULL,              -- qabul qilingan summa
+    debt_before REAL NOT NULL, debt_after REAL NOT NULL,
+    paid_date   TEXT,                       -- chekdagi to'lov sanasi
+    as_of       TEXT NOT NULL,              -- payments dagi yozuv sanasi
+    prev        TEXT,                       -- o'sha sanadagi oldingi yozuv (JSON)
+    name        TEXT NOT NULL, path TEXT NOT NULL, mime TEXT, size INTEGER,
+    note        TEXT,
+    uploaded_at TEXT NOT NULL, by_user INTEGER,
+    cancelled_at TEXT, cancelled_by INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_payment_receipts_student ON payment_receipts(student_id);
 -- Yuklangan fayllar (import): har bir yozuvda import_id — qaysi fayldan kelgani; o'chirilsa shu fayldan kelgan
 -- ma'lumotlar, ota-onalarga ketgan bildirishnomalar va Telegram xabarlari ham olib tashlanadi
 CREATE TABLE IF NOT EXISTS imports (
@@ -650,6 +667,8 @@ def _imp() -> int | None:
     from tenancy import current_import
     return current_import.get()
 
+
+RECEIPT_NOTE = "To'lov cheki № "  # receipts.py: chek bilan yozilgan payments qatorining izohi (hisobot emas)
 
 class Database:
     def __init__(self) -> None:
@@ -1196,12 +1215,15 @@ class Database:
         await self.conn.commit()
 
     async def payment_coverage(self, kind: str) -> list[tuple[str, str]]:
-        """[(sana, guruh_kaliti | '*'), ...]. Qamrov yozilmagan eski hisobotlar — butun kurs uchun deb olinadi."""
+        """[(sana, guruh_kaliti | '*'), ...]. Qamrov yozilmagan eski hisobotlar — butun kurs uchun deb olinadi.
+        To'lov cheki bilan yozilgan qatorlar (koordinator yuklagan — bitta talaba) hisobot emas: qamrovga kirmaydi,
+        aks holda shu sanada boshqa talabalarning qarzi «yo'q» deb ko'rinib qolardi."""
         rows = [(r["as_of"], r["group_key"]) for r in
                 await self.fetchall("SELECT as_of, group_key FROM payment_reports WHERE kind = ?", (kind,))]
         known = {d for d, _ in rows}
         rows += [(r["as_of"], "*") for r in await self.fetchall(
-            "SELECT DISTINCT as_of FROM payments WHERE kind = ?", (kind,)) if r["as_of"] not in known]
+            "SELECT DISTINCT as_of FROM payments WHERE kind = ? AND (note IS NULL OR note NOT LIKE ?)", (kind, RECEIPT_NOTE + "%"))
+            if r["as_of"] not in known]
         return rows
 
     @staticmethod

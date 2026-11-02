@@ -170,6 +170,11 @@ async function socialAssignDlg(cat = '', preset = null, course = null) {
 /* o'zgarishdan keyin: ochiq ro'yxat / talaba kartasi va «Kurs holati» bo'limi (yon panel yopilmaydi) */
 async function socialRefresh(cat, sid, course) {
   const dr = $('#drawer');
+  if (location.hash.startsWith('#/social') && !course) {
+    if (sid && $('#stu-social')) loadStudentSocial(sid, course);
+    pSocial();
+    return;
+  }
   if (sid && $('#stu-social')) loadStudentSocial(sid, course);
   else if (dr && dr.classList.contains('on') && $('#soc-list')) openSocial(cat);
   const sec = $('.soc-sec');
@@ -211,3 +216,51 @@ document.addEventListener('click', async e => {
     socialRefresh(del.dataset.cat, one ? sid : null, course);
   } catch (err) { toast(socErr(err), true); }
 }, true);
+
+/* ---------------------------------------------------------------- «Ijtimoiy toifalar» sahifasi: kartalar + to'liq ro'yxat */
+const SOC_TONE = { nogironlik: 'amber', ijtimoiy: 'violet', chin_yetim: 'blue', mehribonlik: 'green' };
+async function pSocial() {
+  document.title = 'Ijtimoiy toifalar — Boshqaruv paneli';
+  const st = S.socp = S.socp || { cat: '', g: '', q: '' };
+  view(head('Ijtimoiy toifalar', courseSub()) + skel(138) + skel(360));
+  const s = await api('/api/staff/social');
+  const lists = await Promise.all(Object.keys(s.meta).map(k => api(`/api/staff/social/list?cat=${k}`).then(d => d.items).catch(() => [])));
+  const items = lists.flat();
+  const groups = [...new Set(items.map(r => r.group_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'uz'));
+  const cards = Object.entries(s.cats).map(([k, x]) => {
+    const lines = socLines(k, x, s.meta);
+    return `<a class="kc ${SOC_TONE[k] || 'blue'} ${st.cat === k ? 'sel' : ''}" href="#" data-socf="${k}"><div class="kc-h"><span class="kc-ic">${ic((SOC[k] || {}).icon || 'users')}</span>${esc(x.title)}</div>
+      <div class="kc-v">${x.students}<small>ta</small></div><div class="kc-s">${lines.length ? lines.slice(0, 3).join(' · ') : esc((SOC[k] || {}).hint || '')}</div>
+      <span class="kc-bg" aria-hidden="true">${ic((SOC[k] || {}).icon || 'users')}</span></a>`;
+  }).join('');
+  const draw = () => {
+    const q = norm(st.q);
+    const by = new Map();
+    for (const r of items) {
+      if ((st.cat && r.category !== st.cat) || (st.g && r.group_name !== st.g) || (q && !norm(r.full_name).includes(q) && norm(r.hemis_id) !== q)) continue;
+      const o = by.get(r.student_id) || { id: r.student_id, name: r.full_name, group: r.group_name || '', hemis: r.hemis_id, cats: [] };
+      o.cats.push(r); by.set(r.student_id, o);
+    }
+    const rows = [...by.values()].sort((a, b) => a.group.localeCompare(b.group, 'uz') || a.name.localeCompare(b.name, 'uz'));
+    $('#socn').textContent = `${rows.length} ta talaba`;
+    $('#socl').innerHTML = rows.length ? `<table class="tbl"><thead><tr><th>Talaba</th><th>Guruh</th><th>Toifalar</th><th>Izoh, manba</th><th></th></tr></thead><tbody>
+      ${rows.map(o => `<tr class="click" data-student="${o.id}"><td class="name"><b>${esc(o.name)}</b><span>${o.hemis ? 'HEMIS ' + esc(o.hemis) : ''}</span></td><td class="nowrap">${esc(o.group)}</td>
+        <td><div style="display:flex;gap:5px;flex-wrap:wrap">${o.cats.map(r => `<span class="pill ${{ amber: 'amber', violet: 'violet', blue: 'blue', green: 'green' }[SOC_TONE[r.category]] || 'gray'}">${esc(r.label)}</span>`).join('')}</div></td>
+        <td class="sub-l" style="white-space:normal">${o.cats.map(r => [r.note, SOC_SRC[r.source], r.set_at ? dmy(r.set_at) : ''].filter(Boolean).join(', ')).filter(Boolean).map(esc).join('<br>') || '—'}</td>
+        <td class="r nowrap">${o.cats.map(r => `<button class="btn sm ghost" data-soc-del="${o.id}" data-cat="${r.category}" data-sub="${esc(r.sub)}" data-name="${esc(o.name)}" title="«${esc(r.label)}» toifasini olib tashlash" aria-label="Toifani olib tashlash">${ic('x')}</button>`).join('')}</td></tr>`).join('')}</tbody></table>`
+      : emptyBox('heart', items.length ? 'Topilmadi' : 'Hali hech kimga toifa berilmagan', items.length ? 'Filtrni o‘zgartiring.' : 'Toifa fayl bilan («Hisobot va ma’lumot» → «Ijtimoiy toifalar» shabloni) yoki qo‘lda — «Toifa belgilash» tugmasi orqali beriladi.');
+  };
+  view(head('Ijtimoiy toifalar', courseSub(), `<a class="btn" href="#/files">${ic('upload')} Fayldan yuklash</a><button class="btn primary" data-soc-add>${ic('plus')} Toifa belgilash</button>`) + `
+    <div class="kpi5" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:20px">${cards}</div>
+    <section class="sec"><div class="pad" style="padding-top:16px"><div class="toolbar" style="margin:0">
+      <div class="seg" id="socc"><button data-c="" class="${st.cat ? '' : 'on'}">Hammasi<span class="n">${s.students}</span></button>${Object.entries(s.cats).map(([k, x]) => `<button data-c="${k}" class="${st.cat === k ? 'on' : ''}">${esc(x.short || x.title)}<span class="n">${x.students}</span></button>`).join('')}</div>
+      <div class="search">${ic('search')}<input class="input" id="socq" type="search" placeholder="Ism yoki HEMIS ID" value="${esc(st.q)}"></div>
+      <select class="select" id="socg"><option value="">Barcha guruhlar</option>${groups.map(g => `<option ${g === st.g ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>
+      <span class="grow"></span><span class="count" id="socn"></span></div></div><div class="tbl-wrap" id="socl"></div></section>`);
+  draw();
+  const setCat = c => { st.cat = c; $$('#socc button').forEach(x => x.classList.toggle('on', x.dataset.c === c)); $$('[data-socf]').forEach(x => x.classList.toggle('sel', x.dataset.socf === c)); draw(); };
+  $('#socc').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (b) setCat(b.dataset.c); });
+  $$('[data-socf]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); setCat(st.cat === a.dataset.socf ? '' : a.dataset.socf); }));
+  $('#socq').addEventListener('input', e => { st.q = e.target.value; draw(); });
+  $('#socg').addEventListener('change', e => { st.g = e.target.value; draw(); });
+}

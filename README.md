@@ -321,8 +321,16 @@ Kurs koordinatori va super-admin uchun kompyuter brauzerida ishlaydigan to'liq b
 
 **Kirish — parolsiz, bot orqali.** Botda «💻 Kompyuter versiyasi» tugmasini bosing yoki `/kompyuter` buyrug'ini yuboring (Telegram ichidagi ilovada — kurs holati sahifasi pastidagi «Kompyuter versiyasi» kartasi). Bot **10 daqiqa** amal qiladigan, **bir marta** ishlatiladigan havola yuboradi; uni kompyuterda (Telegram Desktop yoki web.telegram.org) bosing va ochilgan sahifada «Kirish» ni bosing. Seans **12 soat** davom etadi; umumiy kompyuterda ishlagandan so'ng chap pastdagi «Chiqish» tugmasini bosing.
 
+**Ko'rinish.** Chapda — bo'limlarga ajratilgan menyu (Asosiy, Ish jarayonlari, Aloqa, Ma'lumot; «‹» tugmasi — ixcham menyu), yuqorida — salomlashuv va sana, **umumiy qidiruv** (talaba F.I.Sh., guruh yoki HEMIS ID va bo'lim nomi; `Ctrl+K`, ↑ ↓ va Enter), **qo'ng'iroqcha** (javobsiz xabarlar, bog'lash so'rovlari, chora kutayotgan talabalar, tashrif javoblari) va foydalanuvchi menyusi (mavzu: avtomatik, kunduzgi, tungi; qo'llanma; chiqish). Telefonda menyu «☰» tugmasi bilan chapdan ochiladi.
+
+**Bosh sahifa (kurs koordinatori).** Guruh tanlash (barcha guruhlar yoki bittasi), joriy semestr, Excel va PDF hisobot. Beshta rangli karta — **jami talabalar** (ota-onasi ulanganlar ulushi), **faol (muammosiz)**, **muammoli talabalar** (3+ masalalilar), **chora ko'rilganlar** (kutilayotganlar) va **ijtimoiy toifadagilar**; har biri tegishli ro'yxatga olib boradi. So'ng: **asosiy ko'rsatkichlar dinamikasi** (yorliqlar: davomat, chegaraga yetganlar, kontrakt, trimestr — sichqoncha ustida qiymat, oxirgi qiymat va o'zgarish), **muammolar tarkibi** (davomat, akademik qarz, past GPA, kontrakt, trimestr — soni va ulushi), **guruhlar kesimida holat** (talabalar, muammoli, o'rtacha davomat, chora; qator bosilsa — o'sha guruh talabalari), **intizomiy choralar** (o'quv yili: ogohlantirish, hayfsan, boshqa, ota-onaga xat) va e'tibor talab qiladigan talabalar. O'ng ustunda — **bugungi vazifalar** (chegaraga yetganlar, 1- va 2-bosqich imzolangan hujjatlari, ota-onaga xatlar, xabarlar, so'rovlar, dalolatnomalar; bajarilgani o'zi yo'qoladi), **yaqin tadbir va tashriflar** (2 hafta) va moliyaviy qarzdorlik; pastda — **integratsiyalar holati** (Manage, HEMIS fayllari — oxirgi yuklash, Telegram botlar).
+
+**Bosh sahifa (dekan / super-admin).** Xuddi shu ko'rinish barcha kurslar bo'yicha: «Umumiy» va kurslar tugmalari (kurs bosilsa — o'sha kursning bosh sahifasi), yig'ma kartalar, kurslar bo'yicha dinamika (har kurs — alohida chiziq), muammolar tarkibi, **kurslar kesimida holat** (koordinator, talabalar, muammoli, davomat, chora kutilayotganlar, qarzdorlar), barcha kurslardagi intizomiy choralar; vazifalar — imzolanadigan farmoyish va buyruqlar, chora kutilayotganlar, yuborilmagan xatlar, koordinatorsiz kurslar, javobsiz xabarlar, tizim xatolari; har kursning yaqin tadbirlari, moliya va tizim (zaxira nusxa, xatolar).
+
 **Kurs koordinatori uchun:**
-- **Kurs holati** — asosiy ko'rsatkichlar (davomat muammosi, akademik qarz, 3+ masalali, kontrakt va trimestr qarzi — har biri ro'yxatga olib boradi), ijtimoiy toifalar kartalari (nogironlik, ijtimoiy himoya, chin yetim, mehribonlik uyi), e'tibor talab qiladigan talabalar, yangi xabarlar, bog'lanish so'rovlari va bir tugmali hisobot;
+- **Akademik natijalar** — akademik qarzdorlar (qarzdor fanlari bilan), GPA past va GPA bo'yicha ro'yxat, guruh filtri, o'rtacha GPA va eng ko'p qarz bo'lgan fanlar;
+- **To'lovlar** — kontrakt va trimestr qarzdorlari (shartnoma, to'langan, qarz, hisobot sanasi; qidiruv va guruh), **to'lov cheki yoki kvitansiyasini yuklab qarzni yopish** va cheklar arxivi (pastda — «To'lov cheki bilan qarzni yopish»);
+- **Ijtimoiy toifalar** — toifa kartalari (bosilsa — filtr) va barcha belgilangan talabalar jadvali: toifalar, izoh va manba, olib tashlash; «Toifa belgilash» va «Fayldan yuklash»;
 - **Talabalar** — butun kurs bitta jadvalda: davomat foizi va sababsiz darslar, chora, akademik qarz, GPA, kontrakt, trimestr, masalalar soni; istalgan ustun bo'yicha saralash, filtrlar (muammoli, davomat, akademik, kontrakt, trimestr), guruh va qidiruv (familiya, ism, guruh yoki HEMIS ID; «/» tugmasi — qidiruvga o'tish). Qatorni bossangiz — yon panelda talaba kartasi: masalalar, chegaralar zinapoyasi, akademik qarzlar, to'lovlar, dinamika va ota-onalar (har biriga «Yozish»);
 - **Xabarlar** — suhbatlar ro'yxati va suhbat yonma-yon; ota-ona rus yoki ingliz tilida bo'lsa, javobni qaysi tilda yozish ko'rsatiladi; Ctrl+Enter — yuborish;
 - **So'rovlar** — telefon raqami bazada topilmagan ota-onalarning farzandni bog'lash so'rovlari: ota-ona yozgan ma'lumot so'ralgan talaba bilan yonma-yon; tasdiqlash yoki rad etish (ota-onaga o'z tilida xabar boradi);
@@ -334,7 +342,7 @@ Kurs koordinatori va super-admin uchun kompyuter brauzerida ishlaydigan to'liq b
 
 **Xavfsizlik.** Seans imzolangan cookie'da saqlanadi (HttpOnly — sahifadagi skriptlar uni o'qiy olmaydi; HTTPS'da Secure; SameSite=Lax); har bir API so'rovi maxsus sarlavha bilan keladi — begona sayt sizning brauzeringiz nomidan so'rov yubora olmaydi. Havola faqat kurs koordinatori va super-admin uchun beriladi; huquq har bir so'rovda qayta tekshiriladi — super-admin koordinatorni olib tashlasa, uning ochiq seansi darhol kuchini yo'qotadi. Kurs koordinatori faqat o'z kursini, super-admin barcha kurslarni ko'radi.
 
-**Ekran.** 1366 va undan keng ekranda to'liq ko'rinish; 1200 pikseldan tor ekranda yon menyu ixcham (belgilar) ko'rinishga o'tadi. Mavzu — yon menyu pastidagi tugma bilan: avtomatik (tizim mavzusi), kunduzgi yoki tungi. Yangi xabar yoki so'rov kelganda panel o'ng pastida darhol bildirishnoma chiqadi. Kompyuter versiyasi ham `WEBAPP_URL` (HTTPS manzil) sozlanganda ishlaydi — qo'shimcha sozlama talab qilinmaydi.
+**Ekran.** 1366 va undan keng ekranda to'liq ko'rinish; 1200 pikseldan tor ekranda yon menyu ixcham (belgilar) ko'rinishga o'tadi, telefonda — «☰» tugmasi bilan ochiladi. Mavzu — yuqori o'ngdagi foydalanuvchi menyusidan: avtomatik (tizim mavzusi), kunduzgi yoki tungi. Yangi xabar yoki so'rov kelganda panel o'ng pastida darhol bildirishnoma chiqadi. Kompyuter versiyasi ham `WEBAPP_URL` (HTTPS manzil) sozlanganda ishlaydi — qo'shimcha sozlama talab qilinmaydi.
 
 ## O'rnatish
 
@@ -492,6 +500,16 @@ Hisobotlar alohida yuklanadi (/import → «💰 Kontrakt qarzdorligi» yoki «�
 | 0–59 | «2» (akademik qarz — faqat qarzdorlar ro'yxatida bo'lsa) |
 
 Ball 0,5 dan boshlab yuqoriga yaxlitlanadi: 69,5 → 70 → «4»; 59,5 → 60 → «3». Baholardagi «2» o'z-o'zidan akademik qarz emas (qayta o'qishda yopilgan bo'lishi mumkin). Bo'limda: **jami nechta fandan qarzdorligi va qaysi fanlar** (ro'yxat bo'yicha, semestr bilan), so'ng barcha fanlar 5 baholik bahosi bilan. «📝 Baholar» bo'limida ham 100 ballik ball yonida 5 baholik baho ko'rinadi; yangi baho haqidagi xabarda «2» olingan fanlar alohida ko'rsatiladi.
+
+### To'lov cheki bilan qarzni yopish
+
+Talaba (yoki ota-ona) to'lov qilib **chek yoki kvitansiyasini** yuborsa, kurs koordinatorining o'zi uni boshqaruv panelida yuklaydi: **«To'lovlar»** → «Kontrakt» yoki «Trimestr» → talaba qatorida **«Chek yuklash»** → fayl (**PDF yoki rasm**: JPG, PNG, WEBP, HEIC; 15 MB gacha), to'langan summa (bo'sh qoldirilsa — qarz to'liq), to'lov sanasi va izoh (masalan, «Click orqali»). Natija:
+
+- summa qarzga teng (yoki bo'sh) — qarz yopiladi va talaba **qarzdorlar ro'yxatidan chiqadi** (bosh sahifa, «Talabalar», «Muammoli talabalar», hisobotlar — hammasida);
+- summa kam — qarz shu summaga **kamayadi**, talaba ro'yxatda qoladi («chek bo'yicha kamaygan» belgisi bilan);
+- chek **«Cheklar arxivi»** da saqlanadi: sana, talaba, summa, qarz (oldin → keyin), faylni ochish; xato yuklangan bo'lsa — **«Bekor qilish»**: qarz avvalgi holatiga qaytadi (yozuv arxivda «bekor qilingan» bo'lib qoladi).
+
+Chek — bitta talabaning yozuvi, buxgalteriya hisoboti emas: boshqa talabalarning qarziga ta'sir qilmaydi. Buxgalteriyaning **keyingi hisoboti** (sanasi chekdan keyin yoki shu kuni) ustun — unda qarz hali ko'rinsa, o'sha holat olinadi. Fayllar kurs papkasida (`data/<kurs>/cheklar/`) saqlanadi; kurs koordinatori faqat o'z kursi talabalarining cheklarini ko'radi.
 
 Kurs koordinatori uchun: `/qarzdorlar` — moliyaviy qarzdorlar (kontrakt va trimestr alohida; `/qarzdorlar trimestr 2-kurs`), `/akademik` — akademik qarzdorlar (nechta va qaysi fanlar), `/talaba` — talabaning to'lov shakli, ikkala qarzi va akademik qarzi, `/stat` — umumiy ko'rsatkichlar; import natijasida qarzdorlar soni, jami qarz, eng katta qarzlar va akademik qarzdorlar soni chiqadi.
 
@@ -1044,6 +1062,9 @@ visitsapi.py      — «Tashriflar» bo'limi API si (boshqaruv paneli)
 docxtable.py      — jadvalli Word hujjat (tadbir ishtirokchilari ro'yxati): A4, sarlavha qatori har sahifada
 socialcat.py      — ijtimoiy toifalar: nogironlik, ijtimoiy himoya (reestr, daftarlar), chin yetim, mehribonlik uyi
 socialapi.py      — ijtimoiy toifalar API si (kurs holati kartalari, ro'yxat, qo'lda belgilash, talaba kartasi)
+dashboard.py      — bosh sahifa qismlari: bugungi vazifalar, yaqin tadbir va tashriflar, integratsiyalar holati, guruhlar kesimi
+receipts.py       — to'lov cheki / kvitansiyasi: qarzni yopish (qisman), bekor qilish, arxiv
+paymentsapi.py    — «To'lovlar» bo'limi API si (qarzdorlar, chek yuklash va bekor qilish, faylni ochish)
 handlers/visits.py — tashrif va tadbir bot oqimlari: talaba havolasi, javoblari, e'londa ro'yxatdan o'tish, talabalar
                     boti menyusi (/start, telefon bilan ulanish, «Tadbirlarim»); koordinator: /yol (turgan joydan yo'l)
 tashrif/          — «Qanday boriladi»: manzilni xaritadan topish, bekatlar, metro, yo'nalish (tashrif-py dan), tuman
@@ -1063,7 +1084,8 @@ docstore.py       — rasmiy hujjatlar ombori va ilovada ko'rish (PDF sahifalari
 handlers/appgate.py — ilova rejimida ota-onaning botdagi matnlari va eski tugmalari — ilovaga yo'naltiriladi
 webapp/           — ilovaning o'zi: index.html, app.js, app.css; kompyuter versiyasi: desk.html, desk.js, desk.css,
                     tashrif.js («Tashriflar»: kalendar, xarita, dalolatnoma va imzo, Word), social.js (ijtimoiy
-                    toifalar: kartalar, ro'yxat, qo'lda belgilash); vendor/leaflet — xarita;
+                    toifalar: kartalar, ro'yxat, qo'lda belgilash), home.js (bosh sahifa — dekan va koordinator,
+                    grafiklar; «Akademik natijalar», «To'lovlar»); vendor/leaflet — xarita;
                     shriftlar (Golos Text, PT Serif)
 ilova_sinov.bat   — Windows: ilovani vaqtincha HTTPS orqali sinash (ilova_sinov.ps1 ni ishga tushiradi)
 ilova_sinov.sh    — Linux/macOS: xuddi shu (Cloudflare Quick Tunnel + bot)

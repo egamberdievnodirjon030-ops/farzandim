@@ -21,7 +21,7 @@ Object.assign(P, {
   chevr: '<path d="m9 6 6 6-6 6"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>'
 });
-PAGE_IC['Tashriflar'] = 'home';
+PAGE_IC['Tashriflar'] = PAGE_IC['Tashrif va tadbirlar'] = 'home';
 
 /* ---------------------------------------------------------------- turlar, holatlar, javoblar */
 const VT = {
@@ -111,10 +111,10 @@ function tashrifKpi(c) {
 
 /* ================================================================ sahifa */
 async function pTashrif(parts, q) {
-  document.title = 'Tashriflar — Boshqaruv paneli';
+  document.title = 'Tashrif va tadbirlar — Boshqaruv paneli';
   const st = S.tash = S.tash || { tab: 'plans', mon: isoD(mondayOf(new Date())), view: 'week', type: '' };
   if (q && q.get('tab')) { st.tab = q.get('tab'); history.replaceState(null, '', '#/tashrif'); }
-  view(head('Tashriflar', courseSub(), `<button class="btn primary" data-vnew>${ic('plus')} Yangi reja</button>`) + skel(70) + skel(320));
+  view(head('Tashrif va tadbirlar', courseSub(), `<button class="btn primary" data-vnew>${ic('plus')} Yangi reja</button>`) + skel(70) + skel(320));
   const mon = parseDate(st.mon + 'T00:00');
   const from = isoD(addDays(mon, -7 * 5)), to = isoD(addDays(mon, 7 * 10));
   const d = await api(`/api/staff/visits?from=${from}&to=${to}`);
@@ -128,7 +128,7 @@ async function pTashrif(parts, q) {
   if (st.tab === 'plans') body = plansView(d, st);
   else if (st.tab === 'homes') body = `<div id="v-homes">${skel(110)}${skel(420)}</div>`;
   else body = `<div id="v-report">${skel(110)}${skel(300)}</div>`;
-  view(head('Tashriflar', courseSub(), `<button class="btn primary" data-vnew>${ic('plus')} Yangi reja</button>`) + tabs + body);
+  view(head('Tashrif va tadbirlar', courseSub(), `<button class="btn primary" data-vnew>${ic('plus')} Yangi reja</button>`) + tabs + body);
   $$('[data-vtab]').forEach(b => b.addEventListener('click', () => { st.tab = b.dataset.vtab; route(); }));
   $('[data-vnew]')?.addEventListener('click', () => planEditor(null));
   bindPlanCards(main());
