@@ -246,7 +246,9 @@ ma'lumot — **talabaning o'zi haqida**:
 
 - **Asosiy** — talaba kartasi, e'tibor talab qiladigan masalalar (davomat chegarasi, past GPA, akademik qarz, chora,
   fan bo'yicha chegara), davomat, GPA, akademik qarz, kontrakt va trimestr, bugungi darslar;
-- **Jadval, Davomat, Baholar, To'lovlar, Dinamika, Hujjatlar** — ota-onalar ilovasidagi bilan bir xil;
+- **Jadval, Davomat, Baholar, To'lovlar, Dinamika, Hujjatlar** — ota-onalar ilovasidagi bilan bir xil; «Baholar»da — yuklangan
+  barcha baholar (har bir fanda joriy, oraliq, yakuniy nazoratlar: ball, maksimal ball, sana; umumiy ball va 5 baholik baho),
+  bosh sahifada — **so'nggi baholar** (ota-onalar ilovasida ham);
 - **Tadbir va tashriflar** — o'zi ishtirokchi bo'lgan tadbir, madaniy tashrif va ijara tashriflari; ijara tashrifini
   **tasdiqlash**; guruhiga ochiq e'lonlarda **ro'yxatdan o'tish** va chiqish — tadbir vaqtida darsi (Manage'dagi shaxsiy
   jadvali bo'yicha) yoki boshqa tadbiri bo'lsa, avval ko'rsatiladi va «baribir qo'shilasizmi?» so'raladi;
@@ -353,6 +355,7 @@ Kurs koordinatori va super-admin uchun kompyuter brauzerida ishlaydigan to'liq b
 
 **Kurs koordinatori uchun:**
 - **Akademik natijalar** — akademik qarzdorlar (qarzdor fanlari bilan), GPA past va GPA bo'yicha ro'yxat, guruh filtri, o'rtacha GPA va eng ko'p qarz bo'lgan fanlar;
+- **Talaba kartasi** (talaba bosilganda; dekanda — barcha kurslardan) — **yuklangan baholar**: semestrlar bo'yicha (oxirgisi ochiq), har bir fanda barcha nazoratlar (joriy, oraliq, yakuniy … — ball / maksimal ball va sana), umumiy 100 ballik ball va 5 baholik baho, kredit, akademik qarz belgisi; baholar soni va oxirgi yuklangan vaqti. Umumiy ball hali yo'q fan ham ko'rinadi (faqat nazorat baholari bilan);
 - **To'lovlar** — kontrakt va trimestr qarzdorlari (shartnoma, to'langan, qarz, hisobot sanasi; qidiruv va guruh), **to'lov cheki yoki kvitansiyasini yuklab qarzni yopish** va cheklar arxivi (pastda — «To'lov cheki bilan qarzni yopish»);
 - **Ijtimoiy toifalar** — toifa kartalari (bosilsa — filtr) va barcha belgilangan talabalar jadvali: toifalar, izoh va manba, olib tashlash; «Toifa belgilash» va «Fayldan yuklash»;
 - **Talabalar** — butun kurs bitta jadvalda: davomat foizi va sababsiz darslar, chora, akademik qarz, GPA, kontrakt, trimestr, masalalar soni; istalgan ustun bo'yicha saralash, filtrlar (muammoli, davomat, akademik, kontrakt, trimestr), guruh va qidiruv (familiya, ism, guruh yoki HEMIS ID; «/» tugmasi — qidiruvga o'tish). Qatorni bossangiz — yon panelda talaba kartasi: masalalar, chegaralar zinapoyasi, akademik qarzlar, to'lovlar, dinamika va ota-onalar (har biriga «Yozish»);

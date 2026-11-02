@@ -231,6 +231,7 @@ async def overview(st: dict, key: str) -> dict:
             "gpa": _gpa(s["gpa"]), "gpa_low": s["flags"]["gpa"], "gpa_min": GPA_MIN,
             "pays": await _payments(st, s["pays"], dl), "issues": issues,
             "trend": await trends.short_line(st), "dynamics": await trends.mini(st), "today": [_lesson(x, marks, subj) for x in lessons],
+            "recent_grades": await recent_grades(st["id"]),
             "updated": await _last_update()}
 
 
@@ -388,29 +389,62 @@ async def week_schedule(st: dict, week: str = "") -> dict:
             "prev": (monday - timedelta(days=7)).isoformat(), "next": (monday + timedelta(days=7)).isoformat()}
 
 
-@child_route
-async def api_grades(request):
-    st = request["student"]
+async def grades_data(st: dict) -> dict:
+    """Talabaning yuklangan baholari — ota-ona va talaba ilovasi («Baholar»), koordinator va dekan (talaba kartasi) uchun
+    bir xil: semestr → fan → umumiy ball (100 ballik bo'lsa) va 5 baholik baho, hamda barcha nazoratlar (joriy, oraliq,
+    yakuniy …: ball / maksimal, sana). Umumiy ball hali yo'q fan ham ko'rinadi (faqat nazorat baholari bilan)."""
     summary = await academic.summary(st["id"])
     results = summary["results"]
-    items = await db.fetchall("SELECT subject, control_type, semester, score, max_score, date FROM grades WHERE student_id = ?",
-                              (st["id"],))
+    items = await db.fetchall("SELECT subject, control_type, semester, score, max_score, date, credits FROM grades "
+                              "WHERE student_id = ? ORDER BY date, id", (st["id"],))
     detail: dict[tuple, list] = {}
+    names: dict[tuple, str] = {}
+    credits: dict[tuple, float] = {}
     for g in items:
-        detail.setdefault((str(g["semester"]), normalize_text(g["subject"])), []).append(
-            {"control": loc.term(g["control_type"]), "score": g["score"], "max": g["max_score"], "date": g["date"]})
-    sems = {}
-    for r in results:
-        sem = str(r["semester"])
-        sems.setdefault(sem, []).append({"subject": loc.term(r["subject"]), "score": r["score"], "grade": r["grade"],
-                                         "debt": r["debt"], "credits": r.get("credits"),
-                                         "items": detail.get((sem, normalize_text(r["subject"])), [])})
+        k = (str(g["semester"] or ""), normalize_text(g["subject"]))
+        names.setdefault(k, g["subject"])
+        if g.get("credits"):
+            credits[k] = g["credits"]
+        detail.setdefault(k, []).append({"control": loc.term(g["control_type"]), "raw": g["control_type"], "score": g["score"],
+                                         "max": g["max_score"], "date": g["date"]})
+    totals = {(str(r["semester"] or ""), normalize_text(r["subject"])): r for r in results}
+    sems: dict[str, list] = {}
+    for k in sorted(set(detail) | set(totals), key=lambda x: (x[0], names.get(x, x[1]).lower())):
+        r = totals.get(k)
+        its = [x for x in detail.get(k, []) if not (r and x["raw"] == r["control_type"])]  # umumiy ball — alohida ustunda
+        for x in its:
+            x.pop("raw", None)
+        sems.setdefault(k[0], []).append({
+            "subject": loc.term(r["subject"] if r else names[k]), "score": r["score"] if r else None,
+            "grade": r["grade"] if r else None, "debt": bool(r and r["debt"]),
+            "credits": (r or {}).get("credits") or credits.get(k), "items": its})
     off = await db.gpa_for(st["id"])  # GPA — faqat HEMIS «Performance GPA» faylidan
     gpa = off["gpa"] if off else None
-    return ok({"gpa": _gpa(gpa), "gpa_low": academic.gpa_low(gpa), "gpa_min": GPA_MIN, "weighted": False,
-               "gpa_as_of": (off or {}).get("changed_at") or (off or {}).get("recorded_at"),
-               "semesters": [{"semester": k, "gpa": None, "subjects": v} for k, v in sorted(sems.items(), reverse=True)],
-               "debts": len(summary["debts"]), "debt_list": [_debt(d) for d in summary["debts"]]})
+    up = await db.fetchone("SELECT MAX(uploaded_at) AS v FROM imports WHERE kind = 'grades' AND deleted_at IS NULL")
+    return {"gpa": _gpa(gpa), "gpa_low": academic.gpa_low(gpa), "gpa_min": GPA_MIN, "weighted": False,
+            "gpa_as_of": (off or {}).get("changed_at") or (off or {}).get("recorded_at"),
+            "semesters": [{"semester": k, "gpa": None, "subjects": v} for k, v in sorted(sems.items(), reverse=True)],
+            "count": len(items), "uploaded": (up or {}).get("v"),
+            "debts": len(summary["debts"]), "debt_list": [_debt(d) for d in summary["debts"]]}
+
+
+async def recent_grades(sid: int, limit: int = 5) -> list[dict]:
+    """So'nggi yuklangan baholar (bosh sahifa uchun): sanasi bo'yicha, sanasizlari — yuklanish tartibida."""
+    rows = await db.fetchall("SELECT subject, control_type, score, max_score, date, semester FROM grades WHERE student_id = ? "
+                             "ORDER BY date IS NULL, date DESC, id DESC LIMIT ?", (sid, limit))
+    out = []
+    for g in rows:
+        x = {"subject": loc.term(g["subject"]), "control": loc.term(g["control_type"]), "score": g["score"],
+             "max": g["max_score"], "date": g["date"], "semester": g["semester"]}
+        if academic.is_total(g):
+            x["grade"] = academic.five_point(g["score"])
+        out.append(x)
+    return out
+
+
+@child_route
+async def api_grades(request):
+    return ok(await grades_data(request["student"]))
 
 
 def _debt(d: dict) -> dict:
@@ -871,6 +905,7 @@ async def api_staff_student(request):
                                 "JOIN parents p ON p.tg_id = ps.parent_id WHERE ps.student_id = ?", (st["id"],))
     data["parents"] = [{**p, "lang": await central.get_lang(p["tg_id"]) or "uz"} for p in parents]
     data["subjects"] = await _subject_rows("s.id = ?", [st["id"]])
+    data["grades"] = await grades_data(st)  # yuklangan baholar (koordinator va dekan — talaba kartasida)
     import discipline
     data["measures"] = await discipline.student_measures(st["id"])
     a = data.get("attendance") or {}

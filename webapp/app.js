@@ -151,6 +151,11 @@ const t = (k, v = {}) => {
   for (const [a, b] of Object.entries(v)) s = s.replaceAll('{' + a + '}', b);
   return s;
 };
+Object.assign(T.uz, { no_total: 'umumiy ball hali yo‘q', grades_upd: 'Baholar oxirgi marta yuklangan: {t}', recent_grades: 'So‘nggi baholar',
+  controls_h: 'Nazoratlar' });
+Object.assign(T.ru, { no_total: 'итоговый балл пока не выставлен', grades_upd: 'Оценки последний раз загружены: {t}', recent_grades: 'Последние оценки',
+  controls_h: 'Контроль' });
+Object.assign(T.en, { no_total: 'no final score yet', grades_upd: 'Grades last uploaded: {t}', recent_grades: 'Latest grades', controls_h: 'Assessments' });
 if (STUDENT) {  // talaba ilovasi: «farzand» o'rniga — talabaning o'zi; talabaga xos bo'limlar
   Object.assign(T.uz, { sec_act: 'Faoliyat', portal: 'Talaba portali', my_children: 'Mening sahifam', choose_child: 'Kursni tanlang',
     events: 'Tadbir va tashriflar', events_nav: 'Tadbirlar', measures: 'Choralar', mine_events: 'Mening tadbir va tashriflarim',
@@ -535,7 +540,7 @@ async function viewHome() {
       ${kpis}
       <div class="dk-grid home">
         <div class="dk-col">${parentDyn(o.dynamics)}</div>
-        <div class="dk-col">${lessons}${o.updated ? `<p class="muted small" style="text-align:center">${t('updated', { t: when(o.updated) })}</p>` : ''}</div>
+        <div class="dk-col">${lessons}${recentGrades(o.recent_grades)}${o.updated ? `<p class="muted small" style="text-align:center">${t('updated', { t: when(o.updated) })}</p>` : ''}</div>
       </div>` });
     animateRings();
     return;
@@ -547,6 +552,7 @@ async function viewHome() {
     ${parentDyn(o.dynamics)}
     <section class="section"><div class="section-head"><h2>${hi('today_lessons')}${t('today_lessons')}</h2><a href="#/schedule">${t('schedule')}</a></div>
       <div class="list">${o.today.length ? o.today.map(l => lessonRow(l)).join('') : `<div class="empty" style="padding:22px">${t('no_lessons_today')}</div>`}</div></section>
+    ${recentGrades(o.recent_grades)}
     ${tutor.name || tutor.phone ? `<section class="section"><div class="section-head"><h2>${hi('coordinator')}${t('coordinator')}</h2></div>
       <div class="card" style="display:flex;align-items:center;gap:12px"><div class="chat-head" style="padding:0;box-shadow:none;flex:1;background:none">
       <div class="av">${esc((tutor.name || '?').trim().charAt(0))}</div><div><b>${esc(tutor.name || '')}</b><div class="muted small">${esc(fmtPhone(tutor.phone))}</div></div></div>
@@ -687,6 +693,28 @@ function renderSchedule() {
 }
 
 /* ================================================================ baholar */
+/* yuklangan baholar: fan qatori — umumiy ball (100 ballik) va 5 baholik baho, ostida barcha nazoratlar (joriy, oraliq …) */
+const ctrlChip = x => `<span class="gctl" title="${esc(x.control)}${x.date ? ' · ' + esc(dateLabel(x.date, true)) : ''}">${esc(x.control)}
+  <b class="num">${x.score != null ? num(x.score) : '—'}${x.max ? `<small>/${num(x.max)}</small>` : ''}</b>${x.date ? `<i>${esc(dateLabel(x.date))}</i>` : ''}</span>`;
+function gradeRow(g) {
+  const has = g.score != null;
+  return `<div class="subject ${g.debt ? 'debt' : ''}"><div><div style="font-weight:600">${esc(g.subject)}</div>
+    <div class="small muted num">${has ? `${num(g.score)} / 100` : t('no_total')}${g.credits ? ' · ' + num(g.credits) + ' ' + t('credits') : ''}${g.debt ? ' · <span style="color:var(--bordo-fg)">' + t('debt_subject') + '</span>' : ''}</div></div>
+    ${has ? `<div class="grade g${g.grade}">${g.grade}</div>` : '<div class="grade g0" title="' + esc(t('no_total')) + '">—</div>'}
+    ${g.items && g.items.length ? `<div class="gctls">${g.items.map(ctrlChip).join('')}</div>` : ''}
+    ${has ? `<div class="meter"><i style="width:${Math.min(100, g.score)}%"></i></div>` : ''}</div>`;
+}
+function gradesUpd(d) {
+  return d.uploaded ? `<p class="muted small gupd">${ic('clock')}${t('grades_upd', { t: when(d.uploaded) })}</p>` : '';
+}
+function recentGrades(list) {
+  if (!list || !list.length) return '';
+  return `<section class="section"><div class="section-head"><h2>${hi('semN')}${t('recent_grades')}</h2><a href="#/grades">${t('grades')}</a></div>
+    <div class="list">${list.map(x => `<div class="row" style="cursor:default"><div class="ic">${ic('grade')}</div><div class="body"><div class="t">${esc(x.subject)}</div>
+      <div class="d">${esc(x.control)}${x.date ? ' · ' + esc(dateLabel(x.date)) : ''}</div></div>
+      ${x.grade ? `<span class="grade g${x.grade}" style="width:36px;height:36px;font-size:16px">${x.grade}</span>` : ''}
+      <b class="num" style="white-space:nowrap">${x.score != null ? num(x.score) : '—'}${x.max ? `<small class="muted">/${num(x.max)}</small>` : ''}</b></div>`).join('')}</div></section>`;
+}
 async function viewGrades() {
   const c = S.child;
   page({ title: t('grades'), sub: c.short, active: '#/grades', body: switcher() + loading() });
@@ -705,20 +733,19 @@ async function viewGrades() {
       <div class="tile st-tile">${tk(t('grade_scale'), 'grade', 'people')}<div class="dk-scale">${[['90–100', 5], ['70–89', 4], ['60–69', 3], ['0–59', 2]].map(([r, g]) =>
         `<span><i class="grade g${g}">${g}</i><small class="num">${r}</small></span>`).join('')}</div></div></div>`;
     const sems = d.semesters.map(sm => `<section class="card"><div class="section-head" style="margin:0 0 4px"><h2>${hi('semN')}${t('semN', { n: sm.semester })}</h2>${sm.gpa != null ? `<span class="muted num">GPA ${gpaNum(sm.gpa)}</span>` : ''}</div>
-      <table class="dk-tbl"><thead><tr><th>${t('subj_h')}</th><th class="r">${t('credits_h')}</th><th style="width:38%">${t('score_h')}</th><th class="r">${t('grade_h')}</th></tr></thead><tbody>
+      <table class="dk-tbl"><thead><tr><th>${t('subj_h')}</th><th>${t('controls_h')}</th><th class="r">${t('credits_h')}</th><th style="width:26%">${t('score_h')}</th><th class="r">${t('grade_h')}</th></tr></thead><tbody>
       ${sm.subjects.map(g => `<tr class="${g.debt ? 'debt' : ''}"><td><b>${esc(g.subject)}</b>${g.debt ? `<div class="small" style="color:var(--bordo-fg)">${t('debt_subject')}</div>` : ''}</td>
+        <td>${g.items && g.items.length ? `<div class="gctls">${g.items.map(ctrlChip).join('')}</div>` : '<span class="muted">—</span>'}</td>
         <td class="r num">${g.credits ? num(g.credits) : '—'}</td>
-        <td><div class="dk-bar"><i style="width:${Math.min(100, g.score)}%"></i></div><span class="num small">${num(g.score)} / 100</span></td>
-        <td class="r"><span class="grade g${g.grade}">${g.grade}</span></td></tr>`).join('')}</tbody></table></section>`).join('');
-    return page({ title: t('grades'), sub: c.name, active: '#/grades', wide: true, body: head + sems });
+        <td>${g.score != null ? `<div class="dk-bar"><i style="width:${Math.min(100, g.score)}%"></i></div><span class="num small">${num(g.score)} / 100</span>` : `<span class="muted small">${t('no_total')}</span>`}</td>
+        <td class="r">${g.score != null ? `<span class="grade g${g.grade}">${g.grade}</span>` : '<span class="grade g0">—</span>'}</td></tr>`).join('')}</tbody></table></section>`).join('');
+    return page({ title: t('grades'), sub: c.name, active: '#/grades', wide: true, body: head + sems + gradesUpd(d) });
   }
   const body = switcher() + `<div class="card" style="display:flex;justify-content:space-between;align-items:center">
       <div><div class="muted small">${t('gpa_long')}</div><div class="bigstat"><b class="num">${d.gpa != null ? gpaNum(d.gpa) : '—'}</b><span class="muted">/ 5</span></div>${d.gpa_as_of ? `<div class="small muted">HEMIS · ${dateLabel(d.gpa_as_of, true)}</div>` : ''}${d.gpa_low ? `<div class="small" style="color:var(--bordo-fg);font-weight:600;margin-top:2px">${t('gpa_low', { min: limNum(d.gpa_min) })}</div>` : ''}</div>
       ${d.debts ? `<a class="pill bordo" href="#/debts" style="font-size:14px;padding:8px 12px">${t('acad')}: ${d.debts} ${ic('chev')}</a>` : `<span class="pill ok" style="font-size:14px;padding:8px 12px">${t('acad')}: ${t('no_debt').toLowerCase()}</span>`}</div>
     ${d.semesters.map(s => `<section class="section"><div class="section-head"><h2>${hi('semN')}${t('semN', { n: s.semester })}</h2>${s.gpa != null ? `<span class="muted num">GPA ${gpaNum(s.gpa)}</span>` : ''}</div>
-      <div class="list">${s.subjects.map(g => `<div class="subject ${g.debt ? 'debt' : ''}"><div><div style="font-weight:600">${esc(g.subject)}</div>
-        <div class="small muted num">${num(g.score)} / 100${g.credits ? ' · ' + num(g.credits) + ' ' + t('credits') : ''}${g.debt ? ' · <span style="color:var(--bordo-fg)">' + t('debt_subject') + '</span>' : ''}</div></div>
-        <div class="grade g${g.grade}">${g.grade}</div><div class="meter"><i style="width:${Math.min(100, g.score)}%"></i></div></div>`).join('')}</div></section>`).join('')}
+      <div class="list">${s.subjects.map(gradeRow).join('')}</div></section>`).join('')}${gradesUpd(d)}
     <section class="section"><div class="card"><div class="section-head" style="margin:0 0 8px"><h2>${hi('grade_scale')}${t('grade_scale')}</h2></div>
       <div class="grid2" style="grid-template-columns:repeat(4,1fr);gap:8px">${[['90–100', 5], ['70–89', 4], ['60–69', 3], ['0–59', 2]].map(([r, g]) =>
         `<div style="text-align:center"><div class="grade g${g}" style="margin:0 auto 4px">${g}</div><span class="small muted num">${r}</span></div>`).join('')}</div></div></section>`;
@@ -1316,6 +1343,9 @@ async function viewStaffStudent(sid) {
       ${payTile('kontrakt', o.pays.kontrakt)}${payTile('trimestr', o.pays.trimestr)}</div>
     ${o.academic.count ? `<section class="section"><div class="section-head"><h2>${hi('Akademik qarzdorlik')}Akademik qarzdorlik</h2><span class="muted small">${o.academic.count} ta fan</span></div>
       <div class="list">${o.academic.debts.map(debtRow).join('')}</div></section>` : ''}
+    ${o.grades && o.grades.semesters.length ? o.grades.semesters.map((sm, i) => `<section class="section"><div class="section-head"><h2>${hi('semN')}Baholar — ${esc(sm.semester || '—')}-semestr</h2>${i ? '' : `<span class="muted small">${o.grades.count} ta baho</span>`}</div>
+      <div class="list">${sm.subjects.map(gradeRow).join('')}</div></section>`).join('') + gradesUpd(o.grades)
+      : `<section class="section"><div class="section-head"><h2>${hi('semN')}Baholar</h2></div><div class="list">${empty('grade', 'Baholar hali yuklanmagan')}</div></section>`}
     ${o.subjects && o.subjects.length ? `<section class="section"><div class="section-head"><h2>${hi('by_subject')}Fanlar bo‘yicha davomat</h2></div>
       <div class="list">${o.subjects.map(x => `<div class="row" style="cursor:default"><div class="body"><div class="t">${esc(x.subject)}</div>
         ${lessonAtt({ pct: x.pct, total: x.total, kelmadi: x.kelmadi, limit: x.limit, left: x.left, state: x.state })}</div></div>`).join('')}</div></section>` : ''}

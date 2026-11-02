@@ -1296,3 +1296,30 @@ tr.muted-row td:last-child { opacity: 1; }
   .kpi5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dash-side { grid-template-columns: minmax(0, 1fr); }
   .kc-v { font-size: 26px; } .donut svg { width: 150px; height: 150px; }
 }
+
+/* talaba kartasi: yuklangan baholar */
+.gsem { border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; overflow: hidden; }
+.gsem > summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; background: var(--surface-2); }
+.gsem > summary::-webkit-details-marker { display: none; }
+.gsem > summary span { flex: 1; color: var(--muted); font-size: 13px; }
+.gsem > summary em { color: var(--bordo-600, var(--red)); font-style: normal; font-weight: 600; }
+.gsem > summary svg.i { width: 16px; height: 16px; color: var(--muted); transition: transform .15s; }
+.gsem[open] > summary svg.i { transform: rotate(180deg); }
+.gtbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.gtbl th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding: 8px 12px; }
+.gtbl td { padding: 9px 12px; border-top: 1px solid var(--line-2); vertical-align: top; }
+.gtbl .r { text-align: right; white-space: nowrap; }
+.gtbl td small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.gtbl td small.bad { color: var(--bordo-600, var(--red)); font-weight: 600; }
+.gtbl tr.debt td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+.gctls { display: flex; flex-wrap: wrap; gap: 5px; }
+.gctl { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line-2);
+  font-size: 12px; color: var(--muted); white-space: nowrap; }
+.gctl b { color: var(--ink); font-size: 12.5px; } .gctl b small { color: var(--muted); font-weight: 500; }
+.gctl i { font-style: normal; font-size: 11px; opacity: .8; }
+.gb { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; font-weight: 800; font-size: 14px; }
+.gb.ok { background: color-mix(in srgb, var(--green) 14%, var(--surface)); color: var(--green); }
+.gb.navy { background: var(--blue-50); color: var(--blue); }
+.gb.warn { background: color-mix(in srgb, var(--amber) 16%, var(--surface)); color: color-mix(in srgb, var(--amber) 85%, var(--ink)); }
+.gb.bordo { background: color-mix(in srgb, var(--red) 13%, var(--surface)); color: var(--red); }
+.gtbl .gctl small { display: inline; margin: 0; font-size: 11.5px; }

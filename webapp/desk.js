@@ -671,6 +671,7 @@ async function openStudent(id, course = null) {
       ${m.ground === 'davomat' ? `davomat, sababsiz ${pairs(m.hours)}` : m.ground === 'trimestr' ? `trimestr qarzi ${money(m.amount)}` : `ichki tartib: ${esc(m.rule || '')}`}
       ${m.files ? `<span class="chip ok">${ic('file')} ${m.files} ta hujjat</span>` : '<span class="chip warn">asl hujjat yo‘q</span>'}</span><b>${m.number ? '№ ' + esc(m.number) + ', ' : ''}${dmy(m.date)}</b></div>`).join('')}
       <div style="margin-top:10px"><button class="btn sm" data-chs="${id}">${ic('folder')} Hujjatlarni ochish</button></div></div>` : ''}
+    ${gradesBox(d.grades)}
     <div class="box" id="stu-social">${skel(40)}</div>
     <div class="box" id="stu-home">${skel(60)}</div>
     ${d.subjects && d.subjects.length ? `<div class="box"><h4>Fanlar bo‘yicha davomat</h4><div class="subj-list">${d.subjects.map(subjRow).join('')}</div></div>` : ''}
@@ -685,6 +686,21 @@ async function openStudent(id, course = null) {
   loadStudentWeek(id, course, '');
   if (typeof loadStudentHome === 'function') loadStudentHome(id, course); else $('#stu-home')?.remove();
   if (typeof loadStudentSocial === 'function') loadStudentSocial(id, course); else $('#stu-social')?.remove();
+}
+/* talaba kartasi: yuklangan baholar — semestrlar (oxirgisi ochiq), fan: nazoratlar (joriy, oraliq, yakuniy …), umumiy ball, baho */
+const gradeTone = g => g == null ? 'muted' : g >= 5 ? 'ok' : g === 4 ? 'navy' : g === 3 ? 'warn' : 'bordo';
+function gradesBox(gd) {
+  if (!gd) return '';
+  if (!gd.semesters.length) return `<div class="box"><h4>Baholar</h4><div class="hint">Baholar hali yuklanmagan («Hisobot va ma’lumot» → Baholar fayli yoki HEMIS «O‘rtacha ball»).</div></div>`;
+  const ctl = x => `<span class="gctl" title="${esc(x.control)}${x.date ? ' · ' + dmy(x.date) : ''}">${esc(x.control)} <b class="num">${x.score != null ? num(x.score) : '—'}${x.max ? `<small>/${num(x.max)}</small>` : ''}</b>${x.date ? `<i>${dmy(x.date)}</i>` : ''}</span>`;
+  const sem = (sm, open) => `<details class="gsem"${open ? ' open' : ''}><summary><b>${esc(sm.semester || '—')}-semestr</b><span>${sm.subjects.length} ta fan${sm.subjects.some(g => g.debt) ? ` · <em>qarz: ${sm.subjects.filter(g => g.debt).length}</em>` : ''}</span>${ic('chevd')}</summary>
+    <table class="gtbl"><thead><tr><th>Fan</th><th>Nazoratlar</th><th class="r">Ball</th><th class="r">Baho</th></tr></thead><tbody>
+    ${sm.subjects.map(g => `<tr class="${g.debt ? 'debt' : ''}"><td><b>${esc(g.subject)}</b>${g.credits ? `<small>${num(g.credits)} kredit</small>` : ''}${g.debt ? '<small class="bad">akademik qarz</small>' : ''}</td>
+      <td>${g.items.length ? `<div class="gctls">${g.items.map(ctl).join('')}</div>` : '<span class="dash">—</span>'}</td>
+      <td class="r num">${g.score != null ? num(g.score) : '<span class="dash" title="Umumiy ball hali yuklanmagan">—</span>'}</td>
+      <td class="r">${g.grade != null ? `<span class="gb ${gradeTone(g.grade)}">${g.grade}</span>` : '<span class="dash">—</span>'}</td></tr>`).join('')}</tbody></table></details>`;
+  return `<div class="box"><h4 class="h4row"><span>Baholar</span><span class="hint" style="margin:0;font-weight:500">${gd.count} ta baho${gd.uploaded ? ` · yuklangan: ${when(gd.uploaded)}` : ''}</span></h4>
+    ${gd.semesters.map((sm, i) => sem(sm, i === 0)).join('')}</div>`;
 }
 /* fan qatori: nomi, davomat chizig'i va foizi, sababsiz/sababli */
 function attTone(p) { return p == null ? '' : p >= 90 ? 'ok' : p >= 75 ? 'warn' : 'bad'; }
