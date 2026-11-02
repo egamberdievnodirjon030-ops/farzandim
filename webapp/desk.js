@@ -206,7 +206,7 @@ const emptyBox = (icon, title, text = '', action = '') =>
   `<div class="empty">${ic(icon)}<b>${esc(title)}</b>${text ? `<div>${text}</div>` : ''}${action ? `<div style="margin-top:14px">${action}</div>` : ''}</div>`;
 const skel = (h = 120, n = 1) => Array.from({ length: n }, () => `<div class="skel" style="height:${h}px;margin-bottom:16px"></div>`).join('');
 const main = () => $('#main');
-const PAGE_IC = { 'Talabalar kiritgan': 'user1', 'Kurs holati': 'grid', 'Bosh sahifa': 'grid', 'Talabalar': 'users', 'Jadval va fanlar': 'cal', 'Davomat va jadval': 'cal', 'Chora ko‘rish': 'shield', 'Intizomiy choralar': 'shield',
+const PAGE_IC = { 'Kurs holati': 'grid', 'Bosh sahifa': 'grid', 'Talabalar': 'users', 'Jadval va fanlar': 'cal', 'Davomat va jadval': 'cal', 'Chora ko‘rish': 'shield', 'Intizomiy choralar': 'shield',
   'Akademik natijalar': 'cap', 'To‘lovlar': 'wallet', 'Ijtimoiy toifalar': 'heart', 'Hisobot va ma’lumot': 'bars', 'Tizim va integratsiyalar': 'gear', 'Xabarlar': 'chat', 'Bog‘lanish so‘rovlari': 'req', 'So‘rovlar': 'req',
   'E’lon yuborish': 'mega', 'Rasmiy hujjat yuborish': 'file', 'So‘rovnomalar': 'poll', 'So‘rovnoma': 'poll', 'Yangi so‘rovnoma': 'poll',
   'Hisobot va ma’lumot': 'upload', 'Barcha kurslar': 'chart', 'Kurslar va koordinatorlar': 'building', 'Ichki nizomlar': 'book',
@@ -313,7 +313,7 @@ document.addEventListener('click', async e => {
 const NAV_COURSE = [
   ['Asosiy', [['#/panel', 'grid', 'Bosh sahifa'], ['#/students', 'users', 'Talabalar'], ['#/subjects', 'cal', 'Davomat va jadval'], ['#/academic', 'cap', 'Akademik natijalar']]],
   ['Ish jarayonlari', [['#/chora', 'shield', 'Intizomiy choralar', 'chora'], ['#/tashrif', 'home', 'Tashrif va tadbirlar', 'tashrif'], ['#/social', 'heart', 'Ijtimoiy toifalar'], ['#/payments', 'wallet', 'To‘lovlar']]],
-  ['Aloqa', [['#/inbox', 'chat', 'Xabarlar', 'unread'], ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/selfdata', 'user1', 'Talabalar kiritgan', 'selfdata'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar']]],
+  ['Aloqa', [['#/inbox', 'chat', 'Xabarlar', 'unread'], ['#/requests', 'req', 'So‘rovlar', 'requests'], ['#/announce', 'mega', 'E’lon yuborish'], ['#/docs', 'file', 'Hujjat yuborish'], ['#/surveys', 'poll', 'So‘rovnomalar']]],
   ['Ma’lumot', [['#/files', 'bars', 'Hisobot va ma’lumot']]]];
 const NAV_SUPER = [['#/super', 'grid', 'Bosh sahifa'], ['#/super/courses', 'building', 'Kurslar va koordinatorlar'], ['#/super/regs', 'book', 'Ichki nizomlar'], ['#/super/system', 'gear', 'Tizim va integratsiyalar']];
 const roleName = () => (S.me.role === 'super' ? 'Dekanat (super-admin)' : 'Kurs koordinatori');
@@ -404,8 +404,7 @@ function bindTopbar() {
     if (!m.hidden) { m.hidden = true; return; } closeMenus(menu); fill(m); m.hidden = false; });
   toggle('#bell', '#bellMenu', m => {
     const B = S.badges, rows = [['#/inbox', 'chat', 'c-blue', 'Javobsiz xabarlar', 'ota-onalar yozgan', B.unread], ['#/requests', 'req', 'c-violet', 'Bog‘lanish so‘rovlari', 'farzandni bog‘lash', B.requests],
-      ['#/chora', 'shield', 'c-red', 'Chora kutilmoqda', 'chegaraga yetganlar', B.chora], ['#/tashrif', 'home', 'c-amber', 'Tashriflar', 'dalolatnoma yoki javob kutilmoqda', B.tashrif],
-      ['#/selfdata', 'user1', 'c-green', 'Talabalar kiritgan', 'yashash joyi, ijtimoiy toifa — tekshiring', B.selfdata]];
+      ['#/chora', 'shield', 'c-red', 'Chora kutilmoqda', 'chegaraga yetganlar', B.chora], ['#/tashrif', 'home', 'c-amber', 'Tashriflar', 'dalolatnoma yoki javob kutilmoqda', B.tashrif]];
     const any = rows.some(r => r[5]);
     m.innerHTML = `<h6>Bildirishnomalar${S.me.role === 'super' ? ` · ${esc(S.me.staff.title || '')}` : ''}</h6>${rows.map(([h, icn, c, t, sub, n]) => `<a href="${h}" class="${c}"><span class="mi-ic">${ic(icn)}</span>
       <span class="mi-t"><b>${t}</b><span>${sub}</span></span>${n ? `<span class="mi-n">${n > 99 ? '99+' : n}</span>` : `<span class="mi-ok">${ic('check')}</span>`}</a>`).join('')}
@@ -455,10 +454,8 @@ function paintBadges() {
 }
 async function refreshBadges() {
   try {
-    const [ib, rq, ch, vt, sd] = await Promise.all([api('/api/staff/inbox'), api('/api/staff/requests'),
-      api('/api/staff/discipline/badge').catch(() => ({ new: 0 })), api('/api/staff/visits/badge').catch(() => null),
-      api('/api/staff/selfdata').catch(() => null)]);
-    S.badges.selfdata = sd ? sd.pending : 0;
+    const [ib, rq, ch, vt] = await Promise.all([api('/api/staff/inbox'), api('/api/staff/requests'),
+      api('/api/staff/discipline/badge').catch(() => ({ new: 0 })), api('/api/staff/visits/badge').catch(() => null)]);
     S.badges.unread = ib.items.reduce((s, i) => s + (i.unread || 0), 0);
     S.badges.requests = rq.items.length;
     S.badges.chora = ch.new || 0;
@@ -477,8 +474,7 @@ async function route() {
   if (!parts.length) { location.replace(sup ? '#/super' : '#/panel'); return; }
   markNav();
   const pages = { panel: pPanel, students: pStudents, subjects: pSubjects, chora: pChora, inbox: pInbox, requests: pRequests, announce: pAnnounce, docs: pDocs, files: pFiles, surveys: pSurveys,
-    tashrif: typeof pTashrif === 'function' ? pTashrif : pPanel, academic: pAcademic, payments: pPayments, social: typeof pSocial === 'function' ? pSocial : pPanel,
-    selfdata: typeof pSelfData === 'function' ? pSelfData : pPanel };
+    tashrif: typeof pTashrif === 'function' ? pTashrif : pPanel, academic: pAcademic, payments: pPayments, social: typeof pSocial === 'function' ? pSocial : pPanel };
   try {
     if (parts[0] === 'super') {
       if (!sup) { location.replace('#/panel'); return; }

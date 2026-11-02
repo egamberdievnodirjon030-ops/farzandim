@@ -271,10 +271,11 @@ so'raladi (keyin bosh sahifada eslatma turadi; «Keyinroq» — keyingi ochilish
 - **Ijtimoiy toifa** — nogironlik (guruhi bilan), ijtimoiy himoya (qaysi reestr yoki daftar), chin yetim, mehribonlik uyi —
   yoki «Hech biriga kirmayman»; asos hujjat (ixtiyoriy). Koordinator yoki fayl bilan belgilangan toifani talaba o'zgartira olmaydi.
 
-Kurs koordinatorida: talaba kartasida «Talaba o'zi kiritgan · sana» va **«Tasdiqlash»** tugmasi; boshqaruv panelida yangi
-**«Talabalar kiritgan»** sahifasi (menyuda tekshirilmaganlar soni bilan) — yashash joylari va toifalar ro'yxati, tasdiqlash
-yoki olib tashlash; bosh sahifa vazifasi va bildirishnomalarda ham. Xonadon toifasini qo'yish ham tekshiruv hisoblanadi;
-koordinator yashash joyini tahrir qilsa, talaba endi o'zgartira olmaydi. Dekanda — kurslar bo'yicha vazifa.
+Kurs koordinatori va dekan buni **talaba kartasida** ko'radi: «Yashash joyi va tashriflar» bo'limida «Talaba o'zi kiritgan ·
+sana» va **«Tasdiqlash»** tugmasi; «Ijtimoiy toifa» bo'limida — «talaba o'zi kiritgan · tekshirilmagan», «Tasdiqlash» yoki
+olib tashlash. Xonadon toifasini qo'yish ham tekshiruv hisoblanadi; koordinator yashash joyini tahrir qilsa, talaba endi
+o'zgartira olmaydi. Umumiy ro'yxat — hisobotdagi «Yashash joylari» va «Ijtimoiy toifalar» varaqlarida (kim kiritgani va
+tekshirilganmi).
 
 **Kirish va xavfsizlik.** Ilova Telegram imzosi bilan ochiladi (talabalar botining tokeni bilan tekshiriladi; alohida bot
 sozlanmagan bo'lsa — asosiy bot). Talaba kimligi — botga ulangan hisobi (shaxsiy havola, telefon raqami yoki ota-onani
@@ -1129,7 +1130,7 @@ receipts.py       — to'lov cheki / kvitansiyasi: qarzni yopish (qisman), bekor
 studentnotify.py  — talabaning o'ziga: chora xabarlari va rasmiy hujjatlar (talabalar boti, ilovadagi tarix)
 studentapp.py     — talaba ilovasi API si (/api/s/…): talabalar boti imzosi, faqat o'zi, tadbirlarga yozilish, bildirishnomalar,
                     yashash joyi va ijtimoiy toifani talaba o'zi kiritishi
-selfdata.py       — «Talabalar kiritgan» (koordinator tekshiruvi) va talabalar botiga ulanish holati
+selfdata.py       — talabalar botiga ulanish holati, talaba kiritgan toifani tasdiqlash
 paymentsapi.py    — «To'lovlar» bo'limi API si (qarzdorlar, chek yuklash va bekor qilish, faylni ochish)
 handlers/visits.py — tashrif va tadbir bot oqimlari: talaba havolasi, javoblari, e'londa ro'yxatdan o'tish, talabalar
                     boti menyusi (/start, telefon bilan ulanish, «Tadbirlarim»); koordinator: /yol (turgan joydan yo'l)

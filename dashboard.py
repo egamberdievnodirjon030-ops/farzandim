@@ -48,18 +48,7 @@ async def course_tasks(uid: int | None, scope: set[str] | None, unread: int, req
         _task("requests", "Farzandni bog'lash so'rovlarini ko'rib chiqish", requests, "#/requests"),
         _task("acts", "Ijara tashrifi dalolatnomalarini to'ldirish", vt.get("need_act", 0), "#/tashrif"),
         _task("visit_answers", "Talaba javobini kutayotgan tashriflar", vt.get("students", 0), "#/tashrif", "", "info"),
-        _task("selfdata", "Talabalar kiritgan ma'lumotlarni tekshirish", await _selfdata(), "#/selfdata",
-              "yashash joyi va ijtimoiy toifa — talaba ilovasidan"),
     ]
-
-
-async def _selfdata() -> int:
-    import selfdata
-    try:
-        return await selfdata.pending_count()
-    except Exception:  # noqa: BLE001
-        log.exception("Talabalar kiritgan ma'lumotlar")
-        return 0
 
 
 async def events(uid: int | None, days: int = 14, limit: int = 6) -> list[dict]:

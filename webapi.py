@@ -808,7 +808,7 @@ async def api_staff_panel(request):
     import dashboard
     import selfdata
     return ok({"course": course_title(request["course"]) if request["course"] != "_" else "",
-               "bot": await selfdata.bot_stats(students), "selfdata": await selfdata.pending_count(students),
+               "bot": await selfdata.bot_stats(students),
                "total": len(rows), "linked": sum(1 for x in sts if x["student"]["id"] in linked),
                "att": sum(1 for r in rows if r["flags"]["att"]), "acad": sum(1 for r in rows if r["flags"]["acad"]),
                "gpa": sum(1 for r in rows if r["flags"]["gpa"]), "gpa_min": GPA_MIN,
@@ -1975,7 +1975,6 @@ async def api_super_overview(request):
             import selfdata
             all_st = await db.fetchall("SELECT id, group_key FROM students")
             bot = await selfdata.bot_stats(all_st)
-            selfd = await selfdata.pending_count(all_st)
         c = info.get(key, {})
         title = course_title(key) if key != "_" else "Kurs"
         events += [{**e, "course": key, "course_title": title} for e in ev]
@@ -1986,7 +1985,7 @@ async def api_super_overview(request):
                      "kontrakt": {"count": len(d["kontrakt"]), "sum": sum(r["debt"] for r in d["kontrakt"])},
                      "trimestr": {"count": len(d["trimestr"]), "sum": sum(r["debt"] for r in d["trimestr"])},
                      "parents": c.get("parents", 0), "disc": disc, "flow": flow, "social": social, "dynamics": dyn,
-                     "unread": unread, "requests": reqs, "bot": bot, "selfdata": selfd})
+                     "unread": unread, "requests": reqs, "bot": bot})
     last = await central.get_meta("last_backup")
     errs = errors_since(24)
     T = dashboard._task
@@ -1998,8 +1997,6 @@ async def api_super_overview(request):
         T("no_coord", "Kurs koordinatori tayinlanmagan kurslar", sum(1 for r in rows if not r["admins"]), "#/super/courses", "", "bad"),
         T("inbox", "Javobsiz xabarlar (barcha kurslar)", sum(r["unread"] for r in rows), "#/super", ""),
         T("errors", "Tizim xatolari (24 soat)", errs, "#/super/system", "", "bad"),
-        T("selfdata", "Talabalar kiritgan ma'lumotlar (koordinator tekshiradi)", sum(r["selfdata"] for r in rows), "#/super",
-          "yashash joyi, ijtimoiy toifa", "info"),
     ]
     return ok({"courses": rows, "coordinators": sum(len(r["admins"]) for r in rows), "last_backup": last,
                "errors_24h": errs, "tasks": tasks, "semester": _semester_label(),
@@ -2339,7 +2336,7 @@ def setup_routes(app: web.Application) -> None:
     r.add_get("/api/me", api_me)
     import studentapp  # talaba ilovasi: /api/s/…
     studentapp.setup(r)
-    import selfdata  # talabalar kiritgan ma'lumotlar, talabalar boti
+    import selfdata  # talabalar boti, talaba kiritganini tasdiqlash
     selfdata.setup(r)
     base = "/api/c/{course}/{sid:\\d+}"
     r.add_get(base + "/overview", api_overview)
