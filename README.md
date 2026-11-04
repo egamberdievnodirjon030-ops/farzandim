@@ -395,7 +395,7 @@ Kurs koordinatori va super-admin uchun kompyuter brauzerida ishlaydigan to'liq b
 
 **Xavfsizlik.** Seans imzolangan cookie'da saqlanadi (HttpOnly — sahifadagi skriptlar uni o'qiy olmaydi; HTTPS'da Secure; SameSite=Lax); har bir API so'rovi maxsus sarlavha bilan keladi — begona sayt sizning brauzeringiz nomidan so'rov yubora olmaydi. Havola faqat kurs koordinatori va super-admin uchun beriladi; huquq har bir so'rovda qayta tekshiriladi — super-admin koordinatorni olib tashlasa, uning ochiq seansi darhol kuchini yo'qotadi. Kurs koordinatori faqat o'z kursini, super-admin barcha kurslarni ko'radi.
 
-**Ekran.** 1366 va undan keng ekranda to'liq ko'rinish; 1200 pikseldan tor ekranda yon menyu ixcham (belgilar) ko'rinishga o'tadi, telefonda — «☰» tugmasi bilan ochiladi. Mavzu — yuqori o'ngdagi foydalanuvchi menyusidan: avtomatik (tizim mavzusi), kunduzgi yoki tungi. Yangi xabar yoki so'rov kelganda panel o'ng pastida darhol bildirishnoma chiqadi. Kompyuter versiyasi ham `WEBAPP_URL` (HTTPS manzil) sozlanganda ishlaydi — qo'shimcha sozlama talab qilinmaydi.
+**Ekran.** 1366 va undan keng ekranda to'liq ko'rinish; 1200 pikseldan tor ekranda yon menyu ixcham (belgilar) ko'rinishga o'tadi, telefonda — «☰» tugmasi bilan ochiladi. Telefon va planshetda sahifa yoki oyna ochilganda klaviatura o'zi chiqmaydi — faqat yozish maydoni bosilganda (kompyuterda kursor avvalgidek maydonga qo'yiladi). Mavzu — yuqori o'ngdagi foydalanuvchi menyusidan: avtomatik (tizim mavzusi), kunduzgi yoki tungi. Yangi xabar yoki so'rov kelganda panel o'ng pastida darhol bildirishnoma chiqadi. Kompyuter versiyasi ham `WEBAPP_URL` (HTTPS manzil) sozlanganda ishlaydi — qo'shimcha sozlama talab qilinmaydi.
 
 ## O'rnatish
 
