@@ -1090,7 +1090,7 @@ to'qnashuvi uning o'z jadvalidan tekshiriladi — shu hafta uchun Manage'dan dar
 «Vaqt to'qnashuvi»ga qarang). `INTEGRATION_URL` Manage (UWED) bo'lsa, `INTEGRATION_SCHEDULE` yozilmagan bo'lsa ham shu
 ma'lum manzil ishlatiladi.
 
-Kalit berilganda: `.env` ni to'ldiring → botni qayta ishga tushiring → `/integratsiya` → «🔍 Tekshirish». Manage dasturchilari uchun qisqa talablar: `INTEGRATSIYA.md`. Integratsiya yoqilgandan keyin ham davomat va jadvalni Excel bilan yuklash mumkin (zaxira yo'l) — keyingi avtomatik yangilanishda manbadagi ma'lumot ustun.
+Kalit berilganda: `.env` ni to'ldiring → botni qayta ishga tushiring → `/integratsiya` → «🔍 Tekshirish». Manage dasturchilari uchun qisqa talablar: `INTEGRATSIYA.md`; to'liq integratsiya bo'yicha bosqichma-bosqich vazifalar ro'yxati: `MANAGE_VAZIFALAR.md`. Integratsiya yoqilgandan keyin ham davomat va jadvalni Excel bilan yuklash mumkin (zaxira yo'l) — keyingi avtomatik yangilanishda manbadagi ma'lumot ustun.
 
 ## Cheklovlar va keyingi qadamlar
 
