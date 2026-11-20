@@ -6,21 +6,6 @@
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-/* Sensorli ekran (telefon, planshet): sahifa yoki oyna ochilganda klaviatura o'zi chiqmasin — faqat yozish maydoni
-   bosilganda. Brauzer showModal() da birinchi maydonga o'zi fokus beradi; telefonda fokus oynaning o'ziga beriladi. */
-const TOUCH = matchMedia('(hover: none), (pointer: coarse)').matches;
-const softFocus = el => { if (el && !TOUCH) el.focus(); };
-if (TOUCH && window.HTMLDialogElement) {
-  const show = HTMLDialogElement.prototype.showModal;
-  HTMLDialogElement.prototype.showModal = function (...a) {
-    if (!this.hasAttribute('tabindex')) this.tabIndex = -1;
-    this.setAttribute('autofocus', '');
-    const r = show.apply(this, a);
-    const f = document.activeElement;
-    if (f && f !== this && /^(INPUT|TEXTAREA|SELECT)$/.test(f.tagName)) { f.blur(); this.focus({ preventScroll: true }); }
-    return r;
-  };
-}
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 /* bot hisobotlaridagi xavfsiz teglar (<b>, <i>, <code>, <u>) — qolgani matn sifatida */
 const safeHtml = s => esc(s).replace(/&lt;(\/?)(b|i|u|code)&gt;/g, '<$1$2>');
@@ -190,7 +175,7 @@ function dialog({ title, text = '', fields = [], ok = 'Saqlash', danger = false 
     d.returnValue = '';
     d.onclose = () => res(d.returnValue === 'ok' ? Object.fromEntries(new FormData(d.querySelector('form'))) : null);
     d.showModal();
-    softFocus(d.querySelector('input') || d.querySelector('.btn.primary, .btn.solid'));
+    (d.querySelector('input') || d.querySelector('.btn.primary, .btn.solid'))?.focus();
   });
 }
 /* Kurs koordinatoriga guruhlar biriktirish: belgilanganlar va qo'lda yozilganlar saqlanadi (null — bekor qilindi) */
@@ -900,7 +885,7 @@ function formDlg(title, inner, okText = 'Saqlash', danger = false) {
     d.returnValue = '';
     d.onclose = () => res(d.returnValue === 'ok' ? new FormData(d.querySelector('form')) : null);
     d.showModal();
-    softFocus(d.querySelector('input:not([type=hidden]), textarea'));
+    d.querySelector('input:not([type=hidden]), textarea')?.focus();
   });
 }
 async function pChora(parts, q) {
@@ -1440,7 +1425,7 @@ function choraArch(st) {
 function bindChoraArch(st) {
   let tm = null;
   $('#arq').addEventListener('input', e => { clearTimeout(tm); tm = setTimeout(() => { st.aq = e.target.value.trim(); loadChoraArch(st); }, 300); });
-  if (!st.aq) softFocus($('#arq'));
+  if (!st.aq) $('#arq').focus();
   loadChoraArch(st);
 }
 async function loadChoraArch(st) {
@@ -1642,7 +1627,7 @@ async function openThread(sid, pid, quiet = false) {
       await openThread(sid, pid); refreshBadges();
     } catch (err) { toast('Javob yuborilmadi: ' + (err.data?.error || err.message), true); btn.disabled = false; }
   });
-  if (!quiet) softFocus(ta);
+  if (!quiet) ta.focus();
 }
 
 /* ================================================================ bog'lanish so'rovlari */
@@ -1721,7 +1706,7 @@ async function pAnnounce() {
   $('#send').addEventListener('click', async e => {
     const btn = e.currentTarget;  // kutishdan (await) keyin e.currentTarget bo'sh bo'ladi — oldindan olinadi
     const text = $('#txt').value.trim();
-    if (!text) { toast('Avval e’lon matnini yozing', true); softFocus($('#txt')); return; }
+    if (!text) { toast('Avval e’lon matnini yozing', true); $('#txt').focus(); return; }
     const course = S.me.staff.title || 'joriy kurs';
     const who = allCourses ? '<b>barcha kurslarning</b> ota-onalariga' : sel.size ? `«${esc(course)}» kursining <b>${esc([...sel].join(', '))}</b> guruh${sel.size > 1 ? 'lar' : ''}i ota-onalariga` : `«<b>${esc(course)}</b>» kursining butun ota-onalariga`;
     if (!await confirmDlg('E’lonni yuborasizmi?', `E’lon ${who} Telegram orqali yuboriladi. Yuborilgan e’lonni qaytarib bo‘lmaydi.`, 'Yuborish')) return;
