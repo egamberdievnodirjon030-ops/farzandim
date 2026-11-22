@@ -1,0 +1,35 @@
+[project]
+name = "taxi-bot"
+version = "1.0.0"
+description = "Shahar ichi taksi xizmati uchun Telegram botlar (yo'lovchi + haydovchi)"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram==3.33.0",
+    "sqlalchemy[asyncio]==2.1.9",
+    "aiosqlite==0.22.1",
+    "pydantic-settings==2.16.3",
+    "tzdata",
+]
+
+[project.optional-dependencies]
+postgres = ["asyncpg"]
+redis = ["redis"]
+dev = ["pytest", "pytest-asyncio"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["taxi_bot*"]
+
+[project.scripts]
+taxi-bot = "taxi_bot.app:run"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110

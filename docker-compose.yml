@@ -1,0 +1,25 @@
+services:
+  bot:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    # PostgreSQL ishlatsangiz: DATABASE_URL=postgresql+asyncpg://taxi:taxi@postgres:5432/taxi
+    # depends_on: [postgres]
+
+  # postgres:
+  #   image: postgres:17
+  #   environment: {POSTGRES_USER: taxi, POSTGRES_PASSWORD: taxi, POSTGRES_DB: taxi}
+  #   volumes: [pgdata:/var/lib/postgresql/data]
+  #   restart: unless-stopped
+
+  # Haqiqiy yo'llar bo'yicha aniq masofa uchun (README: "OSRM").  OSRM_URL=http://osrm:5000
+  # osrm:
+  #   image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+  #   command: osrm-routed --algorithm mld /data/uzbekistan-latest.osrm
+  #   volumes: [./osrm:/data]
+  #   restart: unless-stopped
+
+# volumes:
+#   pgdata:
