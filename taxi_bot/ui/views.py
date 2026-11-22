@@ -201,16 +201,12 @@ class Views:
             ),
         )
 
-    @staticmethod
-    def _share(share_url: str | None):
-        return btn("👨‍👩‍👧 Yaqinlarga ulashish", url=share_url) if share_url else None
-
     def _car_rows(self, card: Card, d: Driver) -> None:
         card.row("🚘 Avtomobil", car_line(d))
         card.row("🔢 Davlat raqami", d.car_plate)
         card.row("⭐ Reyting", f"{d.rating:.2f}")
 
-    def driver_found(self, o: Order, d: Driver, share_url: str | None = None) -> View:
+    def driver_found(self, o: Order, d: Driver) -> View:
         card = Card("🚕 Haydovchi topildi!")
         self._car_rows(card, d)
         if o.pickup_eta_s:
@@ -221,12 +217,11 @@ class Views:
             card,
             inline(
                 btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY),
-                self._share(share_url),
                 btn("❌ Bekor qilish", cb=PCb(action="cancel", oid=o.id), style=DANGER),
             ),
         )
 
-    def driver_arrived(self, o: Order, d: Driver, share_url: str | None = None) -> View:
+    def driver_arrived(self, o: Order, d: Driver) -> View:
         card = Card("🚕 Haydovchi yetib keldi!")
         card.para(f"{car_line(d)} · {d.car_plate} sizni kutmoqda.")
         card.row("⏳ Bepul kutish", f"{self.s.free_wait_min} daq")
@@ -235,12 +230,11 @@ class Views:
             card,
             inline(
                 btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY),
-                self._share(share_url),
                 btn("❌ Bekor qilish", cb=PCb(action="cancel", oid=o.id), style=DANGER),
             ),
         )
 
-    def trip_started(self, o: Order, d: Driver, share_url: str | None = None) -> View:
+    def trip_started(self, o: Order, d: Driver) -> View:
         card = Card("🚀 Safar boshlandi — oq yo'l!")
         card.row("🚘 Avtomobil", f"{car_line(d)} · {d.car_plate}")
         card.row("💰 Narx", self.m(o.est_price) if o.est_price else self.taximeter_text())
@@ -250,9 +244,6 @@ class Views:
             inline(
                 btn("🏁 Manzilga yetib keldim", cb=PCb(action="arrive", oid=o.id), style=SUCCESS),
                 btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY),
-                [self._share(share_url), btn("🆘 SOS", cb=PCb(action="sos", oid=o.id), style=DANGER)]
-                if share_url
-                else btn("🆘 SOS", cb=PCb(action="sos", oid=o.id), style=DANGER),
             ),
         )
 
@@ -312,20 +303,6 @@ class Views:
             f"🚕 <b>Haydovchi yaqinlashmoqda</b> — {format_distance(distance_m)} qoldi.\n"
             f"{h(car_line(d))} · <b>{h(d.car_plate)}</b>. Chiqishga tayyorlaning 🙂"
         )
-
-    # =================================================================== YAQINLAR KUZATUVI
-    def watcher_card(self, o: Order, d: Driver) -> View:
-        status = {
-            OrderStatus.ACCEPTED: "🚕 Haydovchi yo'lovchi oldiga ketmoqda",
-            OrderStatus.ARRIVED: "⏳ Haydovchi yo'lovchini kutmoqda",
-            OrderStatus.IN_PROGRESS: "🚀 Safar davom etmoqda",
-            OrderStatus.FINISHING: "🏁 Manzilga yetib kelishmoqda",
-        }.get(OrderStatus(o.status), "🚕 Safar")
-        card = Card(f"👨‍👩‍👧 Yaqiningiz safari #{o.id}")
-        card.row("📍 Holat", status)
-        self._car_rows(card, d)
-        card.foot("Mashinaning joylashuvi quyidagi jonli xaritada. Safar tugagach kuzatuv o'chadi.")
-        return View.of(card)
 
     # =================================================================== SAQLANGAN MANZILLAR
     def places_menu(self, places: list[SavedPlace]) -> View:
@@ -436,7 +413,7 @@ class Views:
     def offer_gone(self, o: Order) -> View:
         return View.plain(f"⌛️ Buyurtma #{o.id} boshqa haydovchi tomonidan olindi.")
 
-    def driver_order(self, o: Order, d: Driver, *, auto: bool = False) -> View:
+    def driver_order(self, o: Order, d: Driver) -> View:
         call = btn("📞 Yo'lovchi bilan aloqa", cb=DCb(action="call", oid=o.id), style=PRIMARY)
         status = OrderStatus(o.status)
         if status == OrderStatus.ACCEPTED:
@@ -450,8 +427,6 @@ class Views:
             card.row("💬 Izoh", o.comment)
             if o.rider_phone:
                 card.para("👤 Buyurtma boshqa odam uchun — «Aloqa» sizni aynan o'sha yo'lovchi bilan bog'laydi.")
-            if auto:
-                card.foot("⚡ Avto-qabul: buyurtma sizga avtomatik biriktirildi.")
             markup = inline(
                 btn(
                     "📍 Yo'lovchini olish manzili",
@@ -501,6 +476,7 @@ class Views:
             if o.wait_charge:
                 card.row("⏳ Kutish", self.m(o.wait_charge))
             card.row("💰 To'lov", self.m(o.final_price))
+            card.para("🟢 Siz bo'shsiz — yangi buyurtmalar kelaveradi.")
             if self.s.finish_confirm_timeout_min:
                 card.foot(
                     f"Yo'lovchi {int(self.s.finish_confirm_timeout_min)} daqiqa ichida javob bermasa, "
@@ -526,25 +502,14 @@ class Views:
 
         card = Card("⚙️ Sozlamalar")
         card.row("🧭 Navigator", NAVIGATORS.get(d.navigator, d.navigator))
-        card.row("⚡ Avto-qabul", "yoqilgan" if d.auto_accept else "o'chiq")
         home = "yoqilgan" if d.home_mode else ("o'chiq" if d.home_lat is not None else "uy belgilanmagan")
         card.row("🏡 Uyga rejimi", home)
-        card.para(
-            "⚡ Avto-qabul — eng yaqin bo'lsangiz buyurtma bosishsiz, bir zumda sizga biriktiriladi."
-        )
         card.para("🏡 Uyga rejimi — faqat uyingiz tomonga ketayotgan buyurtmalar keladi (ish oxirida qulay).")
         nav_row = [
             btn(("✅ " if key == d.navigator else "") + name, cb=_D(action="nav", val=i))
             for i, (key, name) in enumerate(NAVIGATORS.items())
         ]
-        rows: list = [
-            nav_row,
-            btn(
-                "⚡ Avto-qabulni o'chirish" if d.auto_accept else "⚡ Avto-qabulni yoqish",
-                cb=_D(action="auto"),
-                style=None if d.auto_accept else SUCCESS,
-            ),
-        ]
+        rows: list = [nav_row]
         if d.home_lat is not None:
             rows.append(
                 btn(

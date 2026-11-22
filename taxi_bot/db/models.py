@@ -116,8 +116,6 @@ class Driver(Base):
     trips_count: Mapped[int] = mapped_column(Integer, default=0)
     cancel_count: Mapped[int] = mapped_column(Integer, default=0)
     navigator: Mapped[str] = mapped_column(String(16), default="google")
-    # ⚡ Avto-qabul: eng yaqin bo'lsa buyurtma bosishsiz biriktiriladi
-    auto_accept: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     # 🏡 "Uyga" rejimi: faqat uy tomonga ketayotgan buyurtmalar
     home_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     home_lat: Mapped[float | None] = mapped_column(Float)
@@ -165,7 +163,6 @@ class Order(Base):
     cancel_reason: Mapped[str | None] = mapped_column(String(64))
     call_count: Mapped[int] = mapped_column(Integer, default=0)
     near_notified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
-    track_token: Mapped[str | None] = mapped_column(String(32))  # yaqinlar kuzatuvi havolasi
     rider_phone: Mapped[str | None] = mapped_column(String(32))  # boshqa odam uchun buyurtma
 
     # Telegram xabarlari (kartalar)
@@ -242,19 +239,6 @@ class FavoriteDriver(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     passenger_id: Mapped[int] = mapped_column(ForeignKey("passengers.id"), index=True)
     driver_id: Mapped[int] = mapped_column(ForeignKey("drivers.id"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-
-
-class TripWatcher(Base):
-    """👨‍👩‍👧 Safarni kuzatayotgan yaqinlar (yo'lovchi havola orqali ulashgan)."""
-
-    __tablename__ = "trip_watchers"
-    __table_args__ = (UniqueConstraint("order_id", "tg_id"),)
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
-    tg_id: Mapped[int] = mapped_column(BigInteger)
-    live_msg_id: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

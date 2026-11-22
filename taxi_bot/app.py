@@ -14,7 +14,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
 
 from .bots.admin import build_admin_router
-from .bots.common import RoleMiddleware, build_fallback_router, build_role_router, build_tracking_router
+from .bots.common import RoleMiddleware, build_fallback_router, build_role_router
 from .bots.driver import build_driver_router
 from .bots.passenger import build_passenger_router
 from .config import Settings, get_settings
@@ -30,7 +30,6 @@ def build_dispatcher(svc: TaxiService, storage: BaseStorage, bot_roles: dict[int
     """`bot_roles=None` — bitta bot rejimi (rol foydalanuvchidan so'raladi)."""
     dp = Dispatcher(storage=storage, svc=svc)
     dp.update.outer_middleware(RoleMiddleware(svc, bot_roles))
-    dp.include_router(build_tracking_router())
     if bot_roles is None:
         dp.include_router(build_role_router())
     dp.include_router(build_admin_router())
@@ -93,6 +92,11 @@ async def main() -> None:
 
     passenger_bot, driver_bot = build_bots(settings)
     admin_chats = [settings.admin_chat_id] if settings.admin_chat_id else list(settings.admin_ids)
+    if not admin_chats:
+        log.warning(
+            "ADMIN_IDS ham, ADMIN_CHAT_ID ham ko'rsatilmagan: haydovchi arizalari va aloqa so'rovlari "
+            "hech kimga yuborilmaydi! .env faylida ADMIN_IDS ni to'ldiring."
+        )
     messenger = Messenger(
         {Role.PASSENGER: passenger_bot, Role.DRIVER: driver_bot},
         rich_enabled=settings.rich_messages,
@@ -107,10 +111,6 @@ async def main() -> None:
     bots = [passenger_bot] if settings.single_bot else [passenger_bot, driver_bot]
 
     await setup_commands(settings, passenger_bot, driver_bot)
-    try:  # "Yaqinlarga ulashish" havolasi uchun bot username
-        svc.share_username = (await passenger_bot.get_me()).username
-    except TelegramAPIError as exc:  # pragma: no cover - tarmoq
-        log.warning("Bot username olinmadi: %s", exc)
     await svc.resume()
     maintenance = asyncio.create_task(svc.run_maintenance(), name="maintenance")
     log.info(

@@ -91,7 +91,6 @@ class Settings(BaseSettings):
     no_show_wait_min: float = 5.0
     near_notify_radius_m: float = 400.0  # "Haydovchi yaqinlashmoqda" xabari
     auto_arrive_radius_m: float = 70.0  # GPS bo'yicha avtomatik "Yetib keldim" (0 = o'chirilgan)
-    emergency_phones: str = "102 — militsiya · 103 — tez yordam · 112 — favqulodda"
     rating_prior: float = 4.7  # yangi haydovchi reytingi (ustuvorlik chegarasidan biroz past)
     rating_prior_weight: int = 5
 

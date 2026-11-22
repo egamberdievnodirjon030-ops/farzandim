@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import secrets
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Select, func, or_, select, update
+from sqlalchemy import Select, case, func, or_, select, update
 
 from ..config import Settings
 from ..db import Database
@@ -41,6 +40,7 @@ from .features import FeaturesMixin
 from .geo import Point, bearing_deg, bounding_box, haversine_m
 from .matching import Candidate, bayesian_rating, home_gain
 from .pricing import Tariff
+from .privacy import mask_contacts
 from .routing import RoutingService
 from .telephony import TelephonyService, normalize_phone
 
@@ -100,6 +100,7 @@ class TaxiService(FeaturesMixin):
         self._locks: dict[int, asyncio.Lock] = {}
         self._live_edit_at: dict[int, float] = {}
         self._call_at: dict[tuple[int, str], float] = {}
+        self._passenger_locks: dict[int, asyncio.Lock] = {}
 
     # ======================================================================== yordamchi
     def _lock(self, order_id: int) -> asyncio.Lock:
@@ -262,29 +263,45 @@ class TaxiService(FeaturesMixin):
             comment=comment,
         )
 
+    def _passenger_lock(self, passenger_tg: int) -> asyncio.Lock:
+        lock = self._passenger_locks.get(passenger_tg)
+        if lock is None:
+            lock = self._passenger_locks[passenger_tg] = asyncio.Lock()
+        return lock
+
+    async def _has_active_order(self, s, passenger_id: int, exclude_id: int | None = None) -> bool:
+        q = select(Order.id).where(
+            Order.passenger_id == passenger_id,
+            Order.status.in_(
+                [
+                    OrderStatus.SEARCHING,
+                    OrderStatus.ACCEPTED,
+                    OrderStatus.ARRIVED,
+                    OrderStatus.IN_PROGRESS,
+                    OrderStatus.FINISHING,
+                ]
+            ),
+        )
+        if exclude_id is not None:
+            q = q.where(Order.id != exclude_id)
+        return bool(await s.scalar(q.limit(1)))
+
     async def create_order(
         self, passenger_tg: int, q: Quote, card_message_id: int | None = None
     ) -> Order | None:
-        """Buyurtma yaratadi va qidiruvni boshlaydi. Faol buyurtma bo'lsa — None."""
+        """Buyurtma yaratadi va qidiruvni boshlaydi. Faol buyurtma bo'lsa — None.
+
+        Yo'lovchi bo'yicha qulf: "Buyurtma berish" ikki marta tez bosilsa ham bitta buyurtma yaratiladi.
+        """
+        async with self._passenger_lock(passenger_tg):
+            return await self._create_order(passenger_tg, q, card_message_id)
+
+    async def _create_order(self, passenger_tg: int, q: Quote, card_message_id: int | None) -> Order | None:
         async with self.db.session() as s:
             p = await s.scalar(select(Passenger).where(Passenger.tg_id == passenger_tg))
             if p is None or p.is_blocked:
                 return None
-            existing = await s.scalar(
-                select(Order.id).where(
-                    Order.passenger_id == p.id,
-                    Order.status.in_(
-                        [
-                            OrderStatus.SEARCHING,
-                            OrderStatus.ACCEPTED,
-                            OrderStatus.ARRIVED,
-                            OrderStatus.IN_PROGRESS,
-                            OrderStatus.FINISHING,
-                        ]
-                    ),
-                )
-            )
-            if existing:
+            if await self._has_active_order(s, p.id):
                 return None
             now = utcnow()
             order = Order(
@@ -296,7 +313,7 @@ class TaxiService(FeaturesMixin):
                 dest_lat=q.dest_lat,
                 dest_lon=q.dest_lon,
                 dest_title=q.dest_title,
-                comment=q.comment,
+                comment=mask_contacts(q.comment)[0] if q.comment else None,
                 est_distance_m=int(q.distance_m) if q.distance_m is not None else None,
                 est_duration_s=int(q.duration_s) if q.duration_s is not None else None,
                 est_price=q.price,
@@ -327,7 +344,7 @@ class TaxiService(FeaturesMixin):
         order = await self.active_order(p.id)
         if order is None or order.status != OrderStatus.SEARCHING:
             return None
-        comment = text.strip()[:300]
+        comment = mask_contacts(text.strip()[:300])[0]
         await self._set_order_fields(order.id, comment=comment)
         order.comment = comment
         async with self._lock(order.id):
@@ -390,7 +407,6 @@ class TaxiService(FeaturesMixin):
                 self.views.cancelled_passenger(order, "Siz buyurtmani bekor qildingiz."),
             )
             await self._drop_live(order, passenger)
-            await self._watchers_status(order_id, "❌ Safar bekor qilindi.", final=True)
             if driver is not None:
                 card = Card(f"❌ Buyurtma #{order_id} bekor qilindi")
                 card.para("Yo'lovchi buyurtmani bekor qildi. Siz yana yangi buyurtmalarni qabul qilasiz.")
@@ -404,8 +420,10 @@ class TaxiService(FeaturesMixin):
         bundle = await self._order_bundle(order_id)
         if bundle is None or bundle[1].tg_id != passenger_tg:
             return False
-        order, _passenger, _ = bundle
-        async with self.db.session() as s:
+        order, passenger, _ = bundle
+        async with self._passenger_lock(passenger_tg), self.db.session() as s:
+            if await self._has_active_order(s, passenger.id, exclude_id=order_id):
+                return False  # eski "Qayta qidirish" tugmasi — yangi buyurtma allaqachon bor
             res = await s.execute(
                 _upd(Order)
                 .where(Order.id == order_id, Order.status == OrderStatus.NO_DRIVERS)
@@ -434,47 +452,52 @@ class TaxiService(FeaturesMixin):
             return False
         return await self._complete(order_id, auto=False)
 
-    async def passenger_not_yet(self, passenger_tg: int, order_id: int) -> bool:
+    async def passenger_not_yet(self, passenger_tg: int, order_id: int) -> str:
+        """Natija: ok | driver_busy | not_found."""
         bundle = await self._order_bundle(order_id)
-        if bundle is None or bundle[1].tg_id != passenger_tg:
-            return False
-        order, _passenger, driver = bundle
+        if bundle is None or bundle[1].tg_id != passenger_tg or bundle[2] is None:
+            return "not_found"
+        _order, _passenger, driver = bundle
         async with self._lock(order_id):
-            async with self.db.session() as s:
-                res = await s.execute(
-                    _upd(Order)
-                    .where(Order.id == order_id, Order.status == OrderStatus.FINISHING)
-                    .values(
-                        status=OrderStatus.IN_PROGRESS,
-                        finish_requested_at=None,
-                        final_price=None,
-                        wait_charge=None,
+            try:
+                async with self.db.session() as s:
+                    # Haydovchini safarga qaytaramiz — agar u hali yangi buyurtma olmagan bo'lsa
+                    claimed = await s.execute(
+                        _upd(Driver)
+                        .where(Driver.id == driver.id, Driver.current_order_id.is_(None))
+                        .values(current_order_id=order_id)
                     )
-                )
-                if res.rowcount != 1:
-                    return False
+                    if claimed.rowcount != 1:
+                        return "driver_busy"
+                    res = await s.execute(
+                        _upd(Order)
+                        .where(Order.id == order_id, Order.status == OrderStatus.FINISHING)
+                        .values(
+                            status=OrderStatus.IN_PROGRESS,
+                            finish_requested_at=None,
+                            final_price=None,
+                            wait_charge=None,
+                        )
+                    )
+                    if res.rowcount != 1:
+                        raise _Abort("not_found")  # rollback: haydovchi bog'lanishi ham bekor
+            except _Abort:
+                return "not_found"
             order = await self.get_order(order_id)
-            if driver is not None:
-                await self.msg.edit(
-                    Role.PASSENGER,
-                    passenger_tg,
-                    order.passenger_msg_id,
-                    self.views.trip_started(order, driver, self.share_url(order)),
-                )
-                new_id = await self.msg.replace(
-                    Role.DRIVER,
-                    driver.tg_id,
-                    order.driver_msg_id,
-                    self.views.driver_order(order, driver),
-                )
-                await self._set_order_fields(order_id, driver_msg_id=new_id)
-                await self.msg.send(
-                    Role.DRIVER,
-                    driver.tg_id,
-                    View.plain("ℹ️ Yo'lovchi hali manzilga yetmaganini bildirdi. Safar davom etmoqda."),
-                    silent=True,
-                )
-        return True
+            await self.msg.edit(
+                Role.PASSENGER, passenger_tg, order.passenger_msg_id, self.views.trip_started(order, driver)
+            )
+            new_id = await self.msg.replace(
+                Role.DRIVER, driver.tg_id, order.driver_msg_id, self.views.driver_order(order, driver)
+            )
+            await self._set_order_fields(order_id, driver_msg_id=new_id)
+            await self.msg.send(
+                Role.DRIVER,
+                driver.tg_id,
+                View.plain("ℹ️ Yo'lovchi hali manzilga yetmaganini bildirdi. Safar davom etmoqda."),
+                silent=True,
+            )
+        return "ok"
 
     async def rate(self, passenger_tg: int, order_id: int, stars: int) -> Order | None:
         stars = max(1, min(5, stars))
@@ -676,7 +699,7 @@ class TaxiService(FeaturesMixin):
                     values = self._track_step(fresh, lat, lon, accuracy, now)
                     if values:
                         await self._set_order_fields(order_id, **values)
-        # Yo'lovchidagi va yaqinlaridagi jonli xarita (Telegram limitlari uchun siyraklashtirilgan)
+        # Yo'lovchidagi jonli xarita (Telegram limitlari uchun siyraklashtirilgan)
         loop_now = time.monotonic()
         if loop_now - self._live_edit_at.get(order_id, 0.0) >= LIVE_EDIT_INTERVAL:
             self._live_edit_at[order_id] = loop_now
@@ -684,7 +707,6 @@ class TaxiService(FeaturesMixin):
                 await self.msg.edit_live_location(
                     Role.PASSENGER, passenger.tg_id, order.passenger_live_msg_id, lat, lon, heading
                 )
-            await self._watchers_live(order_id, lat, lon, heading)
         if not order.passenger_live_msg_id and order.status in (OrderStatus.ACCEPTED, OrderStatus.ARRIVED):
             async with self._lock(order_id):
                 fresh = await self.get_order(order_id)
@@ -785,7 +807,6 @@ class TaxiService(FeaturesMixin):
                 precise=r.precise,
                 bearing=bearing_deg(d.lat, d.lon, pickup.lat, pickup.lon),  # type: ignore[arg-type]
                 accuracy_m=d.loc_accuracy,
-                auto_accept=bool(d.auto_accept),
                 favorite=d.id in favorites,
                 home_bound=home_bound,
             )
@@ -832,41 +853,6 @@ class TaxiService(FeaturesMixin):
         return await self._to_candidates(
             drivers, Point(order.pickup_lat, order.pickup_lon), radius_m, favorites=favorites, order=order
         )
-
-    async def auto_assign(self, order: Order, c: Candidate) -> bool:
-        """⚡ Avto-qabul: buyurtma haydovchiga bosishsiz biriktiriladi."""
-        async with self.db.session() as s:
-            d = await s.get(Driver, c.driver_id)
-            o = await s.get(Order, order.id)
-            if (
-                d is None
-                or o is None
-                or not d.auto_accept
-                or d.current_order_id is not None
-                or o.status != OrderStatus.SEARCHING
-                or o.search_round != order.search_round
-            ):
-                return False
-            offer = OrderOffer(
-                order_id=o.id,
-                driver_id=d.id,
-                search_round=o.search_round,
-                wave=o.wave,
-                distance_m=int(c.road_m),
-                eta_s=int(c.eta_s),
-            )
-            s.add(offer)
-            await s.flush()
-            offer_id = offer.id
-        result = await self.accept_offer(c.tg_id, order.id, None, auto=True)
-        if not result.ok:
-            async with self.db.session() as s:
-                await s.execute(
-                    _upd(OrderOffer)
-                    .where(OrderOffer.id == offer_id, OrderOffer.status == OfferStatus.SENT)
-                    .values(status=OfferStatus.WITHDRAWN)
-                )
-        return result.ok
 
     async def send_offers(self, order: Order, candidates: list[Candidate], wave: int) -> list[int]:
         sem = asyncio.Semaphore(max(1, self.settings.max_offer_concurrency))
@@ -1022,7 +1008,7 @@ class TaxiService(FeaturesMixin):
 
     # -------------------------------------------------------------- taklifga javob
     async def accept_offer(
-        self, driver_tg: int, order_id: int, message_id: int | None = None, *, auto: bool = False
+        self, driver_tg: int, order_id: int, message_id: int | None = None
     ) -> ActionResult:
         now = utcnow()
         try:
@@ -1086,19 +1072,18 @@ class TaxiService(FeaturesMixin):
                     Point(driver.lat, driver.lon), Point(order.pickup_lat, order.pickup_lon)  # type: ignore[arg-type]
                 )
                 order.pickup_eta_s = int(route.duration_s)
-            order.track_token = order.track_token or secrets.token_urlsafe(9)
             near = self._driver_location_fresh(driver) and haversine_m(
                 driver.lat, driver.lon, order.pickup_lat, order.pickup_lon  # type: ignore[arg-type]
             ) <= self.settings.near_notify_radius_m
             card_id = message_id or offer_message_id
-            view = self.views.driver_order(order, driver, auto=auto)
+            view = self.views.driver_order(order, driver)
             if not (card_id and await self.msg.edit(Role.DRIVER, driver_tg, card_id, view)):
                 card_id = await self.msg.send(Role.DRIVER, driver_tg, view)
             passenger_msg = await self.msg.replace(
                 Role.PASSENGER,
                 passenger.tg_id,
                 order.passenger_msg_id,
-                self.views.driver_found(order, driver, self.share_url(order)),
+                self.views.driver_found(order, driver),
                 effect=None,
             )
             live_id = None
@@ -1112,12 +1097,7 @@ class TaxiService(FeaturesMixin):
                 passenger_msg_id=passenger_msg,
                 passenger_live_msg_id=live_id,
                 pickup_eta_s=order.pickup_eta_s,
-                track_token=order.track_token,
                 near_notified=near,
-            )
-        if await self._watchers(order_id):  # qayta qidiruvdan keyin yangi haydovchi
-            await self._watchers_status(
-                order_id, f"🚕 Yangi haydovchi topildi: {driver.car_color} {driver.car_model} · {driver.car_plate}"
             )
         return ActionResult(True)
 
@@ -1169,7 +1149,7 @@ class TaxiService(FeaturesMixin):
                 Role.PASSENGER,
                 passenger.tg_id,
                 order.passenger_msg_id,
-                self.views.driver_arrived(order, driver, self.share_url(order)),
+                self.views.driver_arrived(order, driver),
             )
             await self._set_order_fields(order_id, passenger_msg_id=new_id)
         if auto:
@@ -1179,7 +1159,6 @@ class TaxiService(FeaturesMixin):
                 View.plain("📍 Siz manzildasiz — yo'lovchiga «yetib keldi» xabari avtomatik yuborildi."),
                 silent=True,
             )
-        await self._watchers_status(order_id, "⏳ Haydovchi yetib keldi va yaqiningizni kutmoqda.")
         return True
 
     async def driver_start(self, driver_tg: int, order_id: int) -> bool:
@@ -1215,10 +1194,9 @@ class TaxiService(FeaturesMixin):
                 Role.PASSENGER,
                 passenger.tg_id,
                 order.passenger_msg_id,
-                self.views.trip_started(order, driver, self.share_url(order)),
+                self.views.trip_started(order, driver),
             )
             await self._set_order_fields(order_id, passenger_msg_id=new_id)
-        await self._watchers_status(order_id, "🚀 Safar boshlandi. Mashinani xaritada kuzatishingiz mumkin.")
         return True
 
     def _final_price(self, order: Order, driver: Driver) -> tuple[int, int, float, dict]:
@@ -1272,6 +1250,13 @@ class TaxiService(FeaturesMixin):
                 )
                 if res.rowcount != 1:
                     return False
+                # Haydovchi darhol bo'shaydi — yo'lovchi tasdig'ini kutib turmaydi.
+                # Xizmat haqi baribir faqat tasdiqdan (yoki muddat tugagach) keyin yechiladi.
+                await s.execute(
+                    _upd(Driver)
+                    .where(Driver.id == driver.id, Driver.current_order_id == order_id)
+                    .values(current_order_id=None)
+                )
             order = await self.get_order(order_id)
             await self.msg.edit(Role.DRIVER, driver_tg, order.driver_msg_id, self.views.driver_order(order, driver))
             new_id = await self.msg.replace(
@@ -1321,7 +1306,10 @@ class TaxiService(FeaturesMixin):
                     .where(Driver.id == driver.id)
                     .values(
                         balance=Driver.balance - commission,
-                        current_order_id=None,
+                        # haydovchi allaqachon yangi buyurtma olgan bo'lishi mumkin — unga tegmaymiz
+                        current_order_id=case(
+                            (Driver.current_order_id == order_id, None), else_=Driver.current_order_id
+                        ),
                         trips_count=Driver.trips_count + 1,
                     )
                 )
@@ -1356,7 +1344,6 @@ class TaxiService(FeaturesMixin):
                 Role.DRIVER, driver.tg_id, order.driver_msg_id, self.views.driver_order(order, driver)
             )
             await self._set_order_fields(order_id, passenger_msg_id=p_id, driver_msg_id=d_id)
-            await self._watchers_status(order_id, "✅ Safar yakunlandi — yaqiningiz manzilga yetib keldi.", final=True)
             if driver.balance < self.settings.min_driver_balance:
                 await self.msg.send(
                     Role.DRIVER,
@@ -1414,6 +1401,7 @@ class TaxiService(FeaturesMixin):
                             accepted_at=None,
                             arrived_at=None,
                             pickup_eta_s=None,
+                            near_notified=False,
                             wave=0,
                         )
                     )
@@ -1444,14 +1432,11 @@ class TaxiService(FeaturesMixin):
             card.para(text)
             await self.msg.edit(Role.DRIVER, driver_tg, order.driver_msg_id, View.of(card))
             if no_show:
-                await self._watchers_status(order_id, "❌ Safar bekor qilindi.", final=True)
                 view = self.views.cancelled_passenger(
                     order, "Haydovchi sizni kutdi, ammo siz chiqmadingiz. Buyurtma bekor qilindi."
                 )
                 await self.msg.replace(Role.PASSENGER, passenger.tg_id, order.passenger_msg_id, view)
             else:
-                await self._watchers_reset_live(order_id)
-                await self._watchers_status(order_id, "🔄 Haydovchi almashtirilmoqda — yangi haydovchi qidirilmoqda.")
                 view = self.views.searching(order, None, 0)
                 view.text = "⚠️ Haydovchi buyurtmani bekor qildi. Yangi haydovchi qidirilmoqda…\n\n" + view.text
                 new_id = await self.msg.replace(Role.PASSENGER, passenger.tg_id, order.passenger_msg_id, view)
@@ -1555,9 +1540,8 @@ class TaxiService(FeaturesMixin):
             target_role, target, prefix = Role.PASSENGER, passenger.tg_id, "🚕 Haydovchi"
         else:
             target_role, target, prefix = Role.DRIVER, driver.tg_id, "🙋 Yo'lovchi"
-        sent = await self.msg.send(
-            target_role, target, View.plain(f"💬 <b>{prefix}</b> (#{order.id}):\n{h(text[:1000])}")
-        )
+        safe, _ = mask_contacts(text[:1000])
+        sent = await self.msg.send(target_role, target, View.plain(f"💬 <b>{prefix}</b> (#{order.id}):\n{h(safe)}"))
         return sent is not None
 
     async def relay_voice(self, role: Role, tg_id: int, file_id: str) -> bool:

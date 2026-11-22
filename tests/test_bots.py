@@ -312,8 +312,13 @@ async def offer_message_id(h: Harness, order_id: int) -> int:
 
     from taxi_bot.db.models import OrderOffer
 
-    async with h.svc.db.session() as s:
-        return await s.scalar(select(OrderOffer.message_id).where(OrderOffer.order_id == order_id))
+    for _ in range(100):  # xabar yuborilgach, uning ID si bazaga biroz keyin yoziladi
+        async with h.svc.db.session() as s:
+            mid = await s.scalar(select(OrderOffer.message_id).where(OrderOffer.order_id == order_id))
+        if mid:
+            return mid
+        await asyncio.sleep(0.01)
+    raise AssertionError("taklif xabari topilmadi")
 
 
 async def test_single_bot_asks_role_first(harness, center):
@@ -338,15 +343,11 @@ async def test_stale_button_and_foreign_order_are_rejected(harness, center):
     assert "topilmadi" in h.session.calls(h.pbot.id, "AnswerCallbackQuery")[-1].text
 
 
-MOM = User(id=7009, is_bot=False, first_name="Onam")
-
-
 async def test_competitive_features_end_to_end(harness, center):
-    """Saqlangan manzil → 3 bosishda buyurtma, boshqa odam uchun, ulashish, SOS, sevimli, sozlamalar."""
+    """Saqlangan manzil → 3 bosishda buyurtma, boshqa odam uchun, sevimli haydovchi, "Uyga" rejimi."""
     from taxi_bot.db.models import FavoriteDriver, Order
 
     h = await harness()
-    h.svc.share_username = "ArabalarTaxiBot"
     pbot, dbot = h.pbot, h.dbot
     driver = await register_and_approve_driver(h, offset(*center, 300, 200))
 
@@ -383,31 +384,20 @@ async def test_competitive_features_end_to_end(harness, center):
         await asyncio.sleep(0.02)
     await h.press(dbot, DRIVER, f"d:acc:{order.id}:0", message_id=await offer_message_id(h, order.id))
     order = await h.svc.get_order(order.id)
-    assert order.status == OrderStatus.ACCEPTED and order.track_token
+    assert order.status == OrderStatus.ACCEPTED
 
-    # 👨‍👩‍👧 Yaqinlar kuzatuvi
-    found = [m for m in h.session.calls(pbot.id, "SendRichMessage") if m.chat_id == PASSENGER.id][-1]
-    urls = [b.url for row in found.reply_markup.inline_keyboard for b in row if b.url]
-    assert any("t.me/share/url" in u and order.track_token in u for u in urls)
-    await h.send(pbot, MOM, text=f"/start trk_{order.track_token}")
-    assert "Yaqiningiz safari" in h.last_text(pbot, MOM.id)
-
-    # ⚙️ Haydovchi sozlamalari: avto-qabul
+    # ⚙️ Haydovchi sozlamalari: uy manzili va "Uyga" rejimi
     await h.send(dbot, DRIVER, text="⚙️ Sozlamalar")
-    assert "d:auto:0:0" in h.callbacks(dbot, DRIVER.id)
-    await h.press(dbot, DRIVER, "d:auto:0:0")
-    assert (await h.svc.get_driver(driver.id)).auto_accept
+    assert "d:sethome:0:0" in h.callbacks(dbot, DRIVER.id)
+    await h.press(dbot, DRIVER, "d:sethome:0:0")
+    await h.send(dbot, DRIVER, location=Location(latitude=home[0], longitude=home[1]))
+    await h.press(dbot, DRIVER, "d:home:0:0")
+    d = await h.svc.get_driver(driver.id)
+    assert d.home_mode and abs(d.home_lat - home[0]) < 1e-9
 
-    # 🆘 SOS safar davomida
     await h.press(dbot, DRIVER, f"d:start:{order.id}:0")
-    assert f"p:sos:{order.id}:0" in h.callbacks(pbot, PASSENGER.id)
-    await h.press(pbot, PASSENGER, f"p:sos:{order.id}:0")
-    assert "SOS" in h.last_text(dbot, ADMIN.id) or any(
-        "SOS" in (m.text or "") for m in h.session.calls(dbot.id, "SendMessage") if m.chat_id == ADMIN.id
-    )
     await h.press(dbot, DRIVER, f"d:fin:{order.id}:0")
     await h.press(pbot, PASSENGER, f"p:ok:{order.id}:0")
-    assert "yakunlandi" in h.last_text(pbot, MOM.id)
 
     # ⭐ baho → ❤️ sevimli → 💾 Ish manzili
     await h.press(pbot, PASSENGER, f"p:rate:{order.id}:5")
@@ -425,9 +415,3 @@ async def test_competitive_features_end_to_end(harness, center):
     # Maxfiylik: boshqa odamning raqami ham haydovchiga ko'rinmaydi
     to_driver = h.session.dump(dbot.id, DRIVER.id)
     assert "934445566" not in to_driver and PASSENGER_PHONE[1:] not in to_driver
-
-
-async def test_tracking_link_works_in_single_bot_mode_without_role(harness):
-    h = await harness(single=True)
-    await h.send(h.pbot, MOM, text="/start trk_yoq")
-    assert "topilmadi" in h.last_text(h.pbot, MOM.id)

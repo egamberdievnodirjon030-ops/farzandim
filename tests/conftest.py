@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import os
 from dataclasses import dataclass, field
 
 import pytest
@@ -105,10 +106,15 @@ async def make_service(tmp_path):
     created: list[tuple[TaxiService, Database]] = []
 
     async def factory(**overrides) -> tuple[TaxiService, FakeMessenger]:
-        settings = make_settings(
-            database_url=f"sqlite+aiosqlite:///{tmp_path}/t{len(created)}.db", **overrides
-        )
+        # TEST_DATABASE_URL berilsa (masalan PostgreSQL), testlar o'sha bazada ishlaydi
+        url = os.environ.get("TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{tmp_path}/t{len(created)}.db"
+        settings = make_settings(database_url=url, **overrides)
         db = Database(settings.database_url)
+        if os.environ.get("TEST_DATABASE_URL"):
+            from taxi_bot.db.models import Base
+
+            async with db.engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
         await db.create_all()
         fake = FakeMessenger()
         svc = TaxiService(settings, db, fake)  # type: ignore[arg-type]

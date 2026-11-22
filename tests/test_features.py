@@ -1,13 +1,10 @@
-"""Raqobatdagi ustunliklar: avto-qabul, sevimli haydovchi, "Uyga" rejimi, yaqinlar kuzatuvi va boshqalar."""
+"""Raqobatdagi ustunliklar: sevimli haydovchi, "Uyga" rejimi, saqlangan manzillar va boshqalar."""
 
 from __future__ import annotations
 
 import asyncio
-from urllib.parse import parse_qs, urlparse
 
-from sqlalchemy import select
-
-from taxi_bot.db.models import Driver, OrderStatus, TripWatcher
+from taxi_bot.db.models import Driver, OrderStatus
 from taxi_bot.ui.messenger import Role
 
 from .conftest import offset
@@ -28,43 +25,6 @@ async def _accepted(svc, center, tg=2001, **kw):
     assert await wait_for(lambda: _has_offer(svc, order.id, d.id))
     assert (await svc.accept_offer(tg, order.id)).ok
     return d, await svc.get_order(order.id)
-
-
-# ---------------------------------------------------------------- ⚡ avto-qabul
-async def test_auto_accept_assigns_instantly(make_service, center):
-    svc, fake = await make_service(priority_headstart_sec=0)
-    manual = await add_driver(svc, 3001, *offset(*center, 200, 0), rating=4.95)
-    auto = await add_driver(svc, 3002, *offset(*center, 400, 0), rating=4.6)
-    await _set(svc, auto.id, auto_accept=True)
-    await add_passenger(svc)
-    order = await order_now(svc, center)
-    assert await wait_for(lambda: _status_is(svc, order.id, OrderStatus.ACCEPTED), timeout=1)
-    o = await svc.get_order(order.id)
-    assert o.driver_id == auto.id
-    assert await wait_for(lambda: _has_msg(fake, 3002), timeout=1)
-    card = fake.to(Role.DRIVER, 3002)[-1].view.text
-    assert "Avto-qabul" in card and "yo'lovchi oldiga" in card
-    # Qo'lda qabul qiluvchi haydovchi taklif ham olmaydi (yoki olsa ham o'chirildi)
-    assert not [x for x in await offers(svc, order.id) if x.driver_id == manual.id and x.status == "sent"]
-
-
-async def _has_msg(fake, chat_id):
-    return bool(fake.to(Role.DRIVER, chat_id))
-
-
-async def _status_is(svc, order_id, status):
-    return (await svc.get_order(order_id)).status == status
-
-
-async def test_auto_accept_skipped_when_driver_busy_falls_back_to_offers(make_service, center):
-    svc, _ = await make_service(priority_headstart_sec=0)
-    auto = await add_driver(svc, 3101, *offset(*center, 300, 0))
-    await _set(svc, auto.id, auto_accept=True, current_order_id=999)  # band
-    other = await add_driver(svc, 3102, *offset(*center, 500, 0))
-    await add_passenger(svc)
-    order = await order_now(svc, center)
-    assert await wait_for(lambda: _has_offer(svc, order.id, other.id))
-    assert (await svc.get_order(order.id)).status == OrderStatus.SEARCHING
 
 
 # ---------------------------------------------------------------- ❤️ sevimli haydovchi
@@ -142,50 +102,6 @@ async def test_inaccurate_gps_does_not_auto_arrive(make_service, center):
     assert (await svc.get_order(order.id)).status == OrderStatus.ACCEPTED
 
 
-# ---------------------------------------------------------------- 👨‍👩‍👧 yaqinlar kuzatuvi
-async def test_trip_sharing_live_tracking_for_family(make_service, center):
-    svc, fake = await make_service(priority_headstart_sec=0, auto_arrive_radius_m=0)
-    svc.share_username = "ArabalarTaxiBot"
-    _d, order = await _accepted(svc, center, tg=3601)
-    assert order.track_token
-    found = fake.to(Role.PASSENGER, PASSENGER_TG)[-1].view
-    share = [b.url for row in found.markup.inline_keyboard for b in row if b.url]
-    assert share and order.track_token in parse_qs(urlparse(share[0]).query)["url"][0]
-
-    MOM = 9001
-    assert await svc.watch_trip(order.track_token, MOM) == "ok"
-    card = fake.to(Role.PASSENGER, MOM)[-1].view.text
-    assert "Yaqiningiz safari" in card and "01A3601" in card and "+998" not in card
-    assert any(x[0] == "send" and x[2] == MOM for x in fake.live)
-    assert await svc.watch_trip("noto'g'ri", MOM) == "not_found"
-
-    svc._live_edit_at.clear()
-    await svc.update_driver_location(3601, *offset(*center, 500, 0), accuracy=5, is_live=True)
-    assert any(x[0] == "edit" and x[2] == MOM for x in fake.live)
-    assert await svc.driver_arrived(3601, order.id)
-    assert "kutmoqda" in fake.to(Role.PASSENGER, MOM)[-1].view.text
-    assert await svc.driver_start(3601, order.id)
-    assert await svc.passenger_confirm_arrival(PASSENGER_TG, order.id)
-    assert "yakunlandi" in fake.to(Role.PASSENGER, MOM)[-1].view.text
-    live_id = next(x[3] for x in fake.live if x[0] == "send" and x[2] == MOM)
-    assert (Role.PASSENGER, MOM, live_id) in fake.deleted  # haydovchi joylashuvi o'chirildi
-    async with svc.db.session() as s:
-        assert not (await s.scalars(select(TripWatcher))).all()
-    assert await svc.watch_trip(order.track_token, MOM) == "ended"
-
-
-# ---------------------------------------------------------------- 🆘 SOS
-async def test_sos_alerts_dispatcher_with_location(make_service, center):
-    svc, fake = await make_service(priority_headstart_sec=0)
-    _d, order = await _accepted(svc, center, tg=3701)
-    assert await svc.driver_start(3701, order.id)
-    assert await svc.sos(PASSENGER_TG, order.id)
-    alert = fake.admin[-1].text
-    assert "SOS" in alert and "01A3701" in alert and "+998935556677" in alert
-    assert any(x[0] == "send" and x[2] == 999 for x in fake.live)  # mashina joylashuvi dispetcherga
-    assert not await svc.sos(12345, order.id)  # begona odam
-
-
 # ---------------------------------------------------------------- 🏠 saqlangan manzillar
 async def test_saved_places_show_in_destination_prompt(make_service, center):
     svc, _ = await make_service()
@@ -252,4 +168,4 @@ async def test_migration_adds_new_columns_to_old_database(tmp_path):
     await db.create_all()
     await db.close()
     con = sqlite3.connect(path)
-    assert con.execute("SELECT full_name, auto_accept, home_mode FROM drivers").fetchall() == [("Ali", 0, 0)]
+    assert con.execute("SELECT full_name, home_mode, home_lat FROM drivers").fetchall() == [("Ali", 0, None)]

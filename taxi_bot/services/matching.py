@@ -26,7 +26,6 @@ class Candidate:
     precise: bool  # True — road_m haqiqiy yo'l bo'yicha hisoblangan
     bearing: float = 0.0  # haydovchidan yo'lovchiga yo'nalish
     accuracy_m: float | None = None
-    auto_accept: bool = False  # ⚡ bosishsiz biriktiriladi
     favorite: bool = False  # ❤️ yo'lovchining sevimli haydovchisi
     home_bound: bool = False  # 🏡 safar haydovchining uyi tomonga
 

@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiogram import BaseMiddleware, Bot, Router
-from aiogram.filters import Command, CommandObject, CommandStart, Filter
+from aiogram.filters import Command, CommandStart, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, ErrorEvent, Message, TelegramObject
 
@@ -141,30 +141,6 @@ def build_role_router() -> Router:
                 await passenger_start(callback.message, callback.from_user, svc)
             else:
                 await driver_start(callback.message, callback.from_user, svc, state)
-
-    return router
-
-
-def build_tracking_router() -> Router:
-    """👨‍👩‍👧 Yaqinlar kuzatuvi: t.me/<bot>?start=trk_<token> — har qanday rol uchun ishlaydi."""
-    from aiogram import F
-
-    router = Router(name="tracking")
-
-    @router.message(CommandStart(deep_link=True, magic=F.args.startswith("trk_")))
-    async def track(message: Message, command: CommandObject, svc: TaxiService, role: Role | None = None,
-                    role_mw: RoleMiddleware | None = None) -> None:
-        if role_mw is not None and role_mw.bot_roles is not None and role == Role.DRIVER:
-            await message.answer("Bu havola yo'lovchilar botida ochiladi.")
-            return
-        result = await svc.watch_trip(command.args[4:], message.from_user.id)  # type: ignore[index,union-attr]
-        texts = {
-            "not_found": "❌ Kuzatuv havolasi topilmadi.",
-            "ended": "✅ Bu safar allaqachon yakunlangan.",
-            "limit": "⚠️ Bu safarni kuzatuvchilar soni chegarasiga yetdi.",
-        }
-        if result != "ok":
-            await message.answer(texts.get(result, "❌ Xatolik."))
 
     return router
 

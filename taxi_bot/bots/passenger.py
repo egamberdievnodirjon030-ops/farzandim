@@ -353,7 +353,7 @@ def build_passenger_router() -> Router:
     @router.callback_query(PCb.filter(F.action == "retry"))
     async def retry(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
         ok = await svc.retry_search(callback.from_user.id, callback_data.oid)
-        await callback.answer("🔎 Qayta qidirilmoqda…" if ok else "Buyurtma eskirgan")
+        await callback.answer("🔎 Qayta qidirilmoqda…" if ok else "Bu buyurtma eskirgan yoki sizda boshqa faol buyurtma bor.")
 
     @router.callback_query(PCb.filter(F.action == "call"))
     async def call(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
@@ -367,8 +367,14 @@ def build_passenger_router() -> Router:
 
     @router.callback_query(PCb.filter(F.action == "notyet"))
     async def not_yet(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
-        ok = await svc.passenger_not_yet(callback.from_user.id, callback_data.oid)
-        await callback.answer("Haydovchiga xabar berildi. Safar davom etmoqda." if ok else "Buyurtma topilmadi.")
+        result = await svc.passenger_not_yet(callback.from_user.id, callback_data.oid)
+        phone = f" Operator: {svc.settings.company_phone}" if svc.settings.company_phone else ""
+        texts = {
+            "ok": "Haydovchiga xabar berildi. Safar davom etmoqda.",
+            "driver_busy": "Haydovchi safarni yakunlab, boshqa buyurtmaga o'tgan. Muammo bo'lsa, operatorga "
+            "murojaat qiling." + phone,
+        }
+        await callback.answer(texts.get(result, "Buyurtma topilmadi."), show_alert=result == "driver_busy")
 
     @router.callback_query(PCb.filter(F.action == "rate"))
     async def rate(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
@@ -410,16 +416,6 @@ def build_passenger_router() -> Router:
         place = await svc.save_place_from_order(callback.from_user.id, callback_data.oid, kind)
         await callback.answer("💾 Saqlandi! Keyingi safar bir bosishda tanlaysiz." if place else "Saqlab bo'lmadi")
         await refresh_rated(callback, svc, callback_data.oid)
-
-    @router.callback_query(PCb.filter(F.action == "sos"))
-    async def sos(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
-        ok = await svc.sos(callback.from_user.id, callback_data.oid)
-        text = (
-            "🆘 Dispetcherga xabar va mashina joylashuvi yuborildi. Siz bilan bog'lanishadi.\n\n"
-            if ok
-            else "Safar faol emas.\n\n"
-        )
-        await callback.answer(text + svc.settings.emergency_phones, show_alert=True)
 
     # ------------------------------------------------------------------ 📍 Manzillarim
     @router.message(F.text == "📍 Manzillarim")
@@ -533,9 +529,7 @@ def build_passenger_router() -> Router:
             "✨ <b>Qulayliklar:</b>\n"
             "🏠 <b>📍 Manzillarim</b> — Uy/Ish manzilini saqlang, taksi 3 bosishda.\n"
             "❤️ Yoqqan haydovchini sevimlilarga qo'shing — buyurtmangizni birinchi u ko'radi.\n"
-            "👨‍👩‍👧 Safarni yaqinlaringizga ulashing — ular mashinani jonli kuzatadi.\n"
             "👤 Ota-onangiz yoki do'stingiz uchun ham buyurtma bera olasiz.\n"
-            "🆘 Safar paytida SOS tugmasi — dispetcher darhol xabardor bo'ladi.\n"
             "🔒 Narx qat'iy — talab oshganda ham ko'tarilmaydi.\n\n"
             f"💰 Tarif: {h(svc.tariff.describe(s.currency))}\n"
             f"⏳ Kutish: {s.free_wait_min} daqiqa bepul, keyin {h(money(s.per_wait_min, s.currency))}/daq\n\n"

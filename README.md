@@ -17,7 +17,7 @@ xabar effektlari, bosilmaydigan va nusxa oluvchi tugmalar.
 |---|---|
 | 🙋 **Yo'lovchi** | 1 tugma — **🚕 Taksi chaqirish** (joylashuv avtomatik yuboriladi) → manzil (ixtiyoriy) → narx → **Buyurtma berish** |
 | 🚕 **Haydovchi** | Buyurtmada 2 asosiy tugma: **📍 Yo'lovchini olish manzili** (navigatorda yo'l darhol ochiladi) va **📞 Yo'lovchi bilan aloqa** (kompaniya raqami orqali) |
-| 🔒 **Maxfiylik** | Telefon raqamlari, ismlar, profillar bir-biriga **hech qachon** ko'rinmaydi. Yo'lovchi faqat mashina modeli, rangi, davlat raqami va reytingni ko'radi |
+| 🔒 **Maxfiylik** | Telefon raqamlari, ismlar, profillar bir-biriga **hech qachon** ko'rinmaydi. Yo'lovchi faqat mashina modeli, rangi, davlat raqami va reytingni ko'radi. Izoh va chatda yozilgan telefon raqam / @username avtomatik yashiriladi (`•••`) — kompaniyani chetlab o'tib kelishishning oldi olinadi |
 | 🎯 **Aniq qidiruv** | Faqat bo'sh haydovchilar; masofa diapazonlari bo'yicha to'lqinlar; har bir to'lqin **1 daqiqa**; **reytingi yuqorilar birinchi** ko'radi |
 | 💳 **Balans** | Yo'lovchi manzilga yetganini **tasdiqlagandan so'ng** haydovchi balansidan xizmat narxining **10%** yechiladi |
 | 🗺 **Jonli xarita** | Yo'lovchi mashina yaqinlashishini Telegram jonli xaritasida kuzatadi |
@@ -38,15 +38,13 @@ Kuchli tomonimiz — Telegram ichida ishlash, mahalliy odatlarga moslik va haydo
 | 🔒 **Qat'iy narx** | Narx buyurtmadan oldin ko'rsatiladi va talab oshganda ham ko'tarilmaydi |
 | ❤️ **Sevimli haydovchi** | Yoqqan haydovchini saqlang — u yaqin bo'lsa, buyurtmangizni **birinchi** bo'lib ko'radi |
 | 👤 **Boshqa odam uchun buyurtma** | Ota-ona, bola yoki mehmon uchun: haydovchi aynan o'sha odam bilan kompaniya raqami orqali bog'lanadi |
-| 👨‍👩‍👧 **Yaqinlarga ulashish** | Bir tugma — oila a'zosi Telegram'da mashinani jonli xaritada kuzatadi, holat xabarlari keladi |
-| 🆘 **SOS** | Safar paytida dispetcherga ikki tomon ma'lumoti va mashinaning joylashuvi darhol yuboriladi |
 | 📍 **"Haydovchi yaqinlashmoqda"** | ~400 m qolganda ogohlantirish — chiqishga tayyorlanasiz, bepul kutish vaqti tejaladi |
 
 ### Haydovchi uchun (haydovchi ko'p bo'lsa — mashina tez keladi)
 | Imkoniyat | Nima beradi |
 |---|---|
 | 💸 **Past komissiya (10%)** | Faqat yakunlangan va yo'lovchi tasdiqlagan safardan |
-| ⚡ **Avto-qabul** | Eng yaqin bo'lsangiz buyurtma bosishsiz, bir zumda biriktiriladi — yo'lovchi uchun ham kutish nolga yaqin |
+| 🟢 **Safar tugashi bilan bo'sh** | «Safarni yakunlash» bosilgach darhol yangi buyurtma oladi — yo'lovchi tasdig'ini kutib turmaydi (10% baribir faqat tasdiqdan keyin yechiladi) |
 | 🏡 **"Uyga" rejimi** | Ish oxirida faqat uy tomonga ketayotgan buyurtmalar (bo'sh qaytishning oldi olinadi) |
 | 🧭 **Shaffof taklif** | Qabul qilishdan oldin masofa, safar uzunligi, **yo'nalishi** va narxi ko'rinadi |
 | 🚫 **Jarimasiz** | Taklifni o'tkazib yuborish reyting yoki balansga ta'sir qilmaydi |
@@ -90,8 +88,7 @@ Yo'lovchi                      Tizim                                  Haydovchi
    Kutish davomida shu radiusda **yangi bo'shagan** haydovchi ham darhol taklif oladi.
 4. **Reyting ustuvorligi** — to'lqin ichida reytingi `PRIORITY_RATING` (4.8) dan yuqorilar
    `PRIORITY_HEADSTART_SEC` (10 s) oldin ko'radi; tartib: reyting ↓, yetib kelish vaqti ↑.
-5. **⚡ Avto-qabul** — to'lqindagi eng yaxshi nomzodlardan avto-qabul yoqilgani bo'lsa, buyurtma darhol unga
-   biriktiriladi (taklif kutilmaydi). 🏡 "Uyga" rejimidagi haydovchiga faqat uy tomonga ketayotgan buyurtma chiqadi.
+5. **🏡 "Uyga" rejimi** — bu rejimdagi haydovchiga faqat uy tomonga ketayotgan (manzili ma'lum) buyurtma chiqadi.
 6. **Qabul qilish atomik** — `UPDATE … WHERE status='searching'`: bir vaqtda 10 kishi bossa ham faqat bittasi
    oladi, qolganlaridagi taklif darhol o'chiriladi.
 7. Haydovchi bekor qilsa — buyurtma avtomatik qayta qidiruvga tushadi (bekor qilgan haydovchiga qayta chiqmaydi).
@@ -227,10 +224,13 @@ OSRM ishlamay qolsa, tizim avtomatik taxminiy hisobga o'tadi.
 ```bash
 pip install -r requirements.txt pytest pytest-asyncio
 pytest -q
+# PostgreSQL'da tekshirish (servis testlari):
+TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-44 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
-avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, avto-qabul, sevimli haydovchi, "Uyga" rejimi,
-yaqinlar kuzatuvi, SOS, saqlangan manzillar, eski bazani yangilash va **ikkala botning to'liq end-to-end sinovi**
+46 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
+manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
+end-to-end sinovi**
 (soxta Telegram server bilan) — jumladan, hech bir so'rovda boshqa tomonning raqami yoki ismi yo'qligini tekshirish.
 
 ## 📁 Tuzilma
@@ -242,7 +242,8 @@ taxi_bot/
 ├── db/models.py           # Passenger, Driver, Order, OrderOffer, Transaction
 ├── services/
 │   ├── taxi.py            # biznes-logika: buyurtma holatlari, komissiya, aloqa, chat
-│   ├── features.py        # manzillar, sevimlilar, yaqinlar kuzatuvi, SOS, avto-qabul, uyga rejimi
+│   ├── features.py        # saqlangan manzillar, sevimli haydovchilar, "Uyga" rejimi
+│   ├── privacy.py         # chat va izohdagi telefon raqam / username'larni yashirish
 │   ├── dispatch.py        # to'lqinli qidiruv dvigateli
 │   ├── matching.py        # nomzodlarni saralash (masofa, reyting)
 │   ├── geo.py, routing.py # Haversine, OSRM

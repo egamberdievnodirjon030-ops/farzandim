@@ -505,21 +505,6 @@ def build_driver_router() -> Router:
         if isinstance(callback.message, Message):
             await show_settings(callback.message, svc, callback.from_user.id, edit=True)
 
-    @router.callback_query(DCb.filter(F.action == "auto"))
-    async def toggle_auto(callback: CallbackQuery, svc: TaxiService) -> None:
-        d = await svc.toggle_auto_accept(callback.from_user.id)
-        if d is None:
-            await callback.answer()
-            return
-        await callback.answer(
-            "⚡ Avto-qabul yoqildi: eng yaqin bo'lsangiz buyurtma bir zumda sizga biriktiriladi."
-            if d.auto_accept
-            else "Avto-qabul o'chirildi.",
-            show_alert=d.auto_accept,
-        )
-        if isinstance(callback.message, Message):
-            await show_settings(callback.message, svc, callback.from_user.id, edit=True)
-
     @router.callback_query(DCb.filter(F.action == "home"))
     async def toggle_home(callback: CallbackQuery, svc: TaxiService) -> None:
         d = await svc.toggle_home_mode(callback.from_user.id)
@@ -554,7 +539,6 @@ def build_driver_router() -> Router:
             "1 daqiqada hech kim olmasa — keyingi radiusdagilarga.\n"
             "💬 Safar davomida shu yerga yozgan xabaringiz yo'lovchiga anonim yetkaziladi.\n\n"
             "⚙️ <b>Sozlamalar:</b>\n"
-            "⚡ <b>Avto-qabul</b> — eng yaqin bo'lsangiz buyurtma bosishsiz, bir zumda biriktiriladi.\n"
             "🏡 <b>Uyga rejimi</b> — ish oxirida faqat uyingiz tomonga ketayotgan buyurtmalar.\n"
             "🚫 Buyurtmani o'tkazib yuborganingiz uchun hech qanday jarima yo'q."
             + role
