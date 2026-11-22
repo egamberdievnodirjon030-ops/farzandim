@@ -5,6 +5,10 @@ Shahar ichida taksi chaqirish va haydovchilarni boshqarish tizimi. Ikkita bot �
 Telegramning eng yangi bot imkoniyatlari ishlatilgan: rangli tugmalar, xarita bloki bilan Rich Message kartalari,
 xabar effektlari, bosilmaydigan va nusxa oluvchi tugmalar.
 
+![Taxminiy ko'rinish](skrinshotlar/0_umumiy.png)
+
+*Taxminiy ko'rinish: matn, tugma va ranglar bot kodidan olingan; alohida ekranlar — `skrinshotlar/` papkasida.*
+
 ---
 
 ## ✨ Asosiy imkoniyatlar
