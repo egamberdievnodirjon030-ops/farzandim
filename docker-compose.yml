@@ -4,7 +4,8 @@ services:
     env_file: .env
     restart: unless-stopped
     volumes:
-      - ./data:/app/data
+      # Baza (taxi.db) shu volume'da saqlanadi — konteyner qayta yaratilsa ham o'chmaydi
+      - taxi-data:/app/data
     # PostgreSQL ishlatsangiz: DATABASE_URL=postgresql+asyncpg://taxi:taxi@postgres:5432/taxi
     # depends_on: [postgres]
 
@@ -21,5 +22,6 @@ services:
   #   volumes: [./osrm:/data]
   #   restart: unless-stopped
 
-# volumes:
-#   pgdata:
+volumes:
+  taxi-data:
+  # pgdata:

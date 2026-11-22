@@ -108,9 +108,19 @@ nano .env    # tokenlar, ADMIN_IDS, tarif, COMPANY_PHONE ...
 
 **Docker (tavsiya):**
 ```bash
-docker compose up -d --build
-docker compose logs -f bot
+docker compose up -d --build     # yig'ish va fonda ishga tushirish
+docker compose logs -f bot       # loglar ("Run polling for bot @..." — bot ishlayapti)
 ```
+
+| Amal | Buyruq |
+|---|---|
+| To'xtatish | `docker compose down` |
+| Qayta ishga tushirish (`.env` o'zgargach) | `docker compose up -d` |
+| Kodni yangilash | `git pull && docker compose up -d --build` |
+| Bazani zaxiralash | `docker compose cp bot:/app/data/taxi.db ./taxi-backup.db` |
+
+Baza `taxi-data` nomli Docker volume'da saqlanadi — konteyner qayta yaratilsa ham o'chmaydi
+(`docker compose down -v` esa uni **o'chiradi**). Server qayta yoqilsa, bot o'zi ishga tushadi.
 
 **Oddiy usul (Python 3.11+):**
 ```bash
