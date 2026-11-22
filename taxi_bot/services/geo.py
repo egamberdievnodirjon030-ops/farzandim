@@ -52,9 +52,32 @@ _COMPASS = (
 )
 
 
+_COMPASS_TO = (
+    "shimolga",
+    "shimoli-sharqqa",
+    "sharqqa",
+    "janubi-sharqqa",
+    "janubga",
+    "janubi-g'arbga",
+    "g'arbga",
+    "shimoli-g'arbga",
+)
+
+
+def _sector(bearing: float) -> int:
+    return int(((bearing % 360) + 22.5) // 45) % 8
+
+
 def compass(bearing: float) -> str:
-    arrow, name = _COMPASS[int(((bearing % 360) + 22.5) // 45) % 8]
+    """Qayerda: "↗️ shimoli-sharqda"."""
+    arrow, name = _COMPASS[_sector(bearing)]
     return f"{arrow} {name}"
+
+
+def compass_to(bearing: float) -> str:
+    """Qayerga: "↗️ shimoli-sharqqa"."""
+    idx = _sector(bearing)
+    return f"{_COMPASS[idx][0]} {_COMPASS_TO[idx]}"
 
 
 def format_distance(meters: float) -> str:

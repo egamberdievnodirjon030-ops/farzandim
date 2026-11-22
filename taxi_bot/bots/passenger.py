@@ -46,6 +46,15 @@ async def ack(message: Message) -> None:
 class Draft(StatesGroup):
     destination = State()
     confirm = State()
+    rider = State()
+
+
+class PlaceAdd(StatesGroup):
+    waiting = State()
+
+
+PLACE_KINDS = ("home", "work", "other")
+MENU_TEXTS = {"📋 Safarlarim", "📍 Manzillarim", "ℹ️ Yordam"}
 
 
 async def passenger_start(message: Message, user: User, svc: TaxiService) -> None:
@@ -77,7 +86,7 @@ def build_passenger_router() -> Router:
         await state.clear()
         await passenger_start(message, message.from_user, svc)  # type: ignore[arg-type]
 
-    @router.message(F.contact)
+    @router.message(F.contact, StateFilter(None))
     async def contact(message: Message, svc: TaxiService) -> None:
         c = message.contact
         if c.user_id != message.from_user.id:  # type: ignore[union-attr]
@@ -120,14 +129,12 @@ def build_passenger_router() -> Router:
             comment=None,
             quote_msg=None,
         )
-        await message.answer(
-            svc.views.destination_prompt(loc.horizontal_accuracy),
-            reply_markup=svc.views.destination_keyboard(),
-        )
+        places = await svc.list_places(p.id)
         recents = await svc.recent_destinations(p.id)
-        if recents:
-            view = svc.views.recent_destinations(recents, (loc.latitude, loc.longitude))
-            await message.answer(view.text, reply_markup=view.markup)
+        view = svc.views.destination_prompt(
+            loc.horizontal_accuracy, (loc.latitude, loc.longitude), places, recents
+        )
+        await message.answer(view.text, reply_markup=view.markup)
 
     # ------------------------------------------------------------------ manzil
     async def show_quote(
@@ -147,7 +154,7 @@ def build_passenger_router() -> Router:
             if dist < MIN_TRIP_M:
                 await message.answer(
                     f"📍 Manzil olish joyiga juda yaqin ({format_distance(dist)}). "
-                    "Xaritada boshqa nuqtani tanlang yoki «⏭ Manzilsiz davom etish» ni bosing."
+                    "Xaritada boshqa nuqtani tanlang yoki «⏭ Manzilsiz (taksometr)» tugmasini bosing."
                 )
                 return
         quote = await svc.build_quote(
@@ -159,6 +166,7 @@ def build_passenger_router() -> Router:
             dest_title,
             data.get("comment"),
         )
+        quote.rider_phone = data.get("rider_phone")
         await state.update_data(quote=asdict(quote))
         await state.set_state(Draft.confirm)
         view = svc.views.quote(quote)
@@ -176,7 +184,7 @@ def build_passenger_router() -> Router:
             loc, title = message.location, None
         await show_quote(message, svc, state, (loc.latitude, loc.longitude), title)
 
-    @router.message(F.text == "⏭ Manzilsiz davom etish", StateFilter(Draft.destination, Draft.confirm))
+    @router.message(F.text.in_({"⏭ Manzilsiz davom etish", "⏭ Manzilsiz"}), StateFilter(Draft.destination, Draft.confirm))
     async def no_destination(message: Message, svc: TaxiService, state: FSMContext) -> None:
         await show_quote(message, svc, state, None, None)
 
@@ -188,7 +196,7 @@ def build_passenger_router() -> Router:
         await state.clear()
         await message.answer("Buyurtma bekor qilindi.", reply_markup=svc.views.passenger_menu())
 
-    @router.message(F.text, StateFilter(Draft.destination, Draft.confirm))
+    @router.message(F.text, ~F.text.in_(MENU_TEXTS), StateFilter(Draft.destination, Draft.confirm))
     async def draft_comment(message: Message, svc: TaxiService, state: FSMContext) -> None:
         comment = (message.text or "").strip()[:300]
         await state.update_data(comment=comment)
@@ -202,8 +210,73 @@ def build_passenger_router() -> Router:
         else:
             await message.answer(
                 "💬 Izoh sifatida saqlandi. Endi manzilni xaritada belgilang (📎 → Joylashuv) "
-                "yoki «⏭ Manzilsiz davom etish» ni bosing."
+                "yoki «⏭ Manzilsiz (taksometr)» tugmasini bosing."
             )
+
+    @router.callback_query(PCb.filter(F.action == "nodest"))
+    async def nodest(callback: CallbackQuery, svc: TaxiService, state: FSMContext) -> None:
+        if await state.get_state() is None:
+            await callback.answer("Avval 🚕 Taksi chaqirish tugmasini bosing", show_alert=True)
+            return
+        await callback.answer()
+        await show_quote(callback.message, svc, state, None, None)  # type: ignore[arg-type]
+
+    @router.callback_query(PCb.filter(F.action == "place"))
+    async def place_pick(callback: CallbackQuery, callback_data: PCb, svc: TaxiService, state: FSMContext) -> None:
+        place = await svc.get_place(callback.from_user.id, callback_data.oid)
+        if place is None:
+            await callback.answer("Manzil topilmadi")
+            return
+        if await state.get_state() is None:
+            await callback.answer("Avval 🚕 Taksi chaqirish tugmasini bosing", show_alert=True)
+            return
+        await callback.answer()
+        await show_quote(callback.message, svc, state, (place.lat, place.lon), place.title)  # type: ignore[arg-type]
+
+    # 👤 Boshqa odam uchun buyurtma
+    async def rerender_quote(message: Message, svc: TaxiService, state: FSMContext) -> None:
+        data = await state.get_data()
+        q = Quote(**{**data["quote"], "rider_phone": data.get("rider_phone")})
+        await state.update_data(quote=asdict(q))
+        await state.set_state(Draft.confirm)
+        if data.get("quote_msg"):
+            await svc.msg.delete(Role.PASSENGER, message.chat.id, data["quote_msg"])
+        msg_id = await svc.msg.send(Role.PASSENGER, message.chat.id, svc.views.quote(q))
+        await state.update_data(quote_msg=msg_id)
+
+    @router.callback_query(PCb.filter(F.action == "rider"))
+    async def rider_ask(callback: CallbackQuery, state: FSMContext) -> None:
+        if await state.get_state() != Draft.confirm.state:
+            await callback.answer("Buyurtma eskirgan", show_alert=True)
+            return
+        await state.set_state(Draft.rider)
+        await callback.answer()
+        await callback.message.answer(  # type: ignore[union-attr]
+            "👤 <b>Kim uchun buyurtma?</b>\n\n📎 → <b>Kontakt</b> orqali odamni tanlang yoki raqamini yozing "
+            "(masalan: <code>90 123 45 67</code>).\nHaydovchi u bilan kompaniya raqami orqali bog'lanadi — "
+            "raqam haydovchiga ko'rinmaydi."
+        )
+
+    @router.message(Draft.rider, F.contact | F.text)
+    async def rider_set(message: Message, svc: TaxiService, state: FSMContext) -> None:
+        from ..services.telephony import normalize_phone
+
+        raw = message.contact.phone_number if message.contact else (message.text or "")
+        phone = normalize_phone(raw)
+        if phone is None or len(phone) < 12:
+            await message.answer("Raqam noto'g'ri. Masalan: <code>90 123 45 67</code> yoki kontakt yuboring.")
+            return
+        await state.update_data(rider_phone=phone)
+        await rerender_quote(message, svc, state)
+
+    @router.callback_query(PCb.filter(F.action == "self"))
+    async def rider_self(callback: CallbackQuery, svc: TaxiService, state: FSMContext) -> None:
+        if await state.get_state() != Draft.confirm.state:
+            await callback.answer("Buyurtma eskirgan", show_alert=True)
+            return
+        await callback.answer("O'zingiz uchun")
+        await state.update_data(rider_phone=None)
+        await rerender_quote(callback.message, svc, state)  # type: ignore[arg-type]
 
     @router.callback_query(PCb.filter(F.action == "recent"))
     async def recent(callback: CallbackQuery, callback_data: PCb, svc: TaxiService, state: FSMContext) -> None:
@@ -304,13 +377,117 @@ def build_passenger_router() -> Router:
             await callback.answer("Baho allaqachon qo'yilgan.")
             return
         await callback.answer("🙏 Rahmat!")
-        if isinstance(callback.message, Message):
+        await refresh_rated(callback, svc, order.id)
+
+    async def refresh_rated(callback: CallbackQuery, svc: TaxiService, order_id: int) -> None:
+        order = await svc.get_order(order_id)
+        p = await svc.get_passenger_by_tg(callback.from_user.id)
+        if order is None or p is None or not isinstance(callback.message, Message):
+            return
+        is_fav = bool(order.driver_id) and await svc.is_favorite(p.id, order.driver_id)  # type: ignore[arg-type]
+        kinds = {pl.kind for pl in await svc.list_places(p.id)}
+        await svc.msg.edit(
+            Role.PASSENGER,
+            callback.message.chat.id,
+            callback.message.message_id,
+            svc.views.rated(order, order.rating or 5, is_favorite=is_fav, saved_kinds=kinds),
+        )
+
+    @router.callback_query(PCb.filter(F.action == "fav"))
+    async def favorite(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
+        ok = await svc.add_favorite(callback.from_user.id, callback_data.oid)
+        await callback.answer(
+            "❤️ Qo'shildi! Bu haydovchi yaqin bo'lsa, buyurtmangizni birinchi bo'lib ko'radi."
+            if ok
+            else "Topilmadi",
+            show_alert=ok,
+        )
+        await refresh_rated(callback, svc, callback_data.oid)
+
+    @router.callback_query(PCb.filter(F.action == "savedest"))
+    async def save_dest(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
+        kind = ("home", "work")[min(max(callback_data.val, 0), 1)]
+        place = await svc.save_place_from_order(callback.from_user.id, callback_data.oid, kind)
+        await callback.answer("💾 Saqlandi! Keyingi safar bir bosishda tanlaysiz." if place else "Saqlab bo'lmadi")
+        await refresh_rated(callback, svc, callback_data.oid)
+
+    @router.callback_query(PCb.filter(F.action == "sos"))
+    async def sos(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
+        ok = await svc.sos(callback.from_user.id, callback_data.oid)
+        text = (
+            "🆘 Dispetcherga xabar va mashina joylashuvi yuborildi. Siz bilan bog'lanishadi.\n\n"
+            if ok
+            else "Safar faol emas.\n\n"
+        )
+        await callback.answer(text + svc.settings.emergency_phones, show_alert=True)
+
+    # ------------------------------------------------------------------ 📍 Manzillarim
+    @router.message(F.text == "📍 Manzillarim")
+    async def places_menu(message: Message, svc: TaxiService, state: FSMContext) -> None:
+        await state.clear()
+        p = await svc.ensure_passenger(message.from_user.id, message.from_user.first_name or "")  # type: ignore[union-attr]
+        await svc.msg.send(Role.PASSENGER, message.chat.id, svc.views.places_menu(await svc.list_places(p.id)))
+
+    @router.callback_query(PCb.filter(F.action == "addplace"))
+    async def add_place(callback: CallbackQuery, callback_data: PCb, svc: TaxiService, state: FSMContext) -> None:
+        from ..ui.kit import kb_button
+        from ..ui.views import PLACE_ICONS, PLACE_NAMES
+
+        kind = PLACE_KINDS[min(max(callback_data.val, 0), 2)]
+        await state.set_state(PlaceAdd.waiting)
+        await state.update_data(kind=kind)
+        await callback.answer()
+        from aiogram.types import ReplyKeyboardMarkup
+
+        await callback.message.answer(  # type: ignore[union-attr]
+            f"{PLACE_ICONS[kind]} <b>{PLACE_NAMES[kind]}</b> manzilini yuboring:\n"
+            "📎 → <b>Joylashuv</b> → xaritada nuqtani belgilang, yoki hozir shu yerda bo'lsangiz — pastdagi tugma.",
+            reply_markup=ReplyKeyboardMarkup(
+                keyboard=[[kb_button("📍 Hozirgi joylashuvim", location=True)], [kb_button("❌ Bekor qilish")]],
+                resize_keyboard=True,
+                one_time_keyboard=True,
+            ),
+        )
+
+    @router.message(PlaceAdd.waiting, F.location | F.venue)
+    async def place_location(message: Message, svc: TaxiService, state: FSMContext) -> None:
+        data = await state.get_data()
+        await state.clear()
+        loc = message.venue.location if message.venue else message.location
+        title = message.venue.title if message.venue else None
+        place = await svc.save_place(message.from_user.id, data.get("kind", "other"), loc.latitude, loc.longitude, title)  # type: ignore[union-attr]
+        p = await svc.get_passenger_by_tg(message.from_user.id)  # type: ignore[union-attr]
+        await message.answer(
+            "💾 Manzil saqlandi!" if place else "⚠️ Saqlab bo'lmadi (ko'pi bilan 5 ta qo'shimcha manzil).",
+            reply_markup=svc.views.passenger_menu(),
+        )
+        if p:
+            await svc.msg.send(Role.PASSENGER, message.chat.id, svc.views.places_menu(await svc.list_places(p.id)))
+
+    @router.message(PlaceAdd.waiting)
+    async def place_cancel(message: Message, svc: TaxiService, state: FSMContext) -> None:
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=svc.views.passenger_menu())
+
+    @router.callback_query(PCb.filter(F.action == "delplace"))
+    async def del_place(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
+        ok = await svc.delete_place(callback.from_user.id, callback_data.oid)
+        await callback.answer("🗑 O'chirildi" if ok else "Topilmadi")
+        p = await svc.get_passenger_by_tg(callback.from_user.id)
+        if p and isinstance(callback.message, Message):
             await svc.msg.edit(
                 Role.PASSENGER,
                 callback.message.chat.id,
                 callback.message.message_id,
-                svc.views.rated(order, callback_data.val),
+                svc.views.places_menu(await svc.list_places(p.id)),
             )
+
+    @router.callback_query(PCb.filter(F.action == "unfav"))
+    async def unfavorite(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
+        ok = await svc.remove_favorite(callback.from_user.id, callback_data.oid)
+        await callback.answer("💔 Sevimlilardan olib tashlandi" if ok else "Topilmadi")
+        if ok and isinstance(callback.message, Message):
+            await callback.message.edit_reply_markup(reply_markup=None)
 
     # ------------------------------------------------------------------ menyu
     @router.message(F.text == "📋 Safarlarim")
@@ -328,7 +505,17 @@ def build_passenger_router() -> Router:
                 f"<b>#{o.id}</b> · {local:%d.%m %H:%M} · {STATUS_UZ[OrderStatus(o.status)]}"
                 + (f" · {price}" if price else "")
             )
-        await message.answer("\n".join(lines))
+        favorites = await svc.list_favorites(p.id) if p else []
+        markup = None
+        if favorites:
+            from ..ui.kit import btn, inline
+
+            lines.append("\n❤️ <b>Sevimli haydovchilaringiz</b> — buyurtmangizni birinchi ko'radi:")
+            lines.extend(f"• {h(d.car_color)} {h(d.car_model)} · {h(d.car_plate)} · ⭐ {d.rating:.2f}" for d in favorites)
+            markup = inline(
+                *[btn(f"💔 {d.car_plate} — olib tashlash", cb=PCb(action="unfav", oid=d.id)) for d in favorites]
+            )
+        await message.answer("\n".join(lines), reply_markup=markup)
 
     @router.message(Command("help"))
     @router.message(F.text == "ℹ️ Yordam")
@@ -343,6 +530,13 @@ def build_passenger_router() -> Router:
             "3️⃣ Narxni ko'rib, <b>Buyurtma berish</b> ni bosing.\n"
             "4️⃣ Eng yaqin bo'sh haydovchi topiladi, mashina harakatini xaritada kuzatasiz.\n"
             "5️⃣ Manzilga yetgach, <b>✅ Ha, yetib keldim</b> ni bosing va haydovchini baholang.\n\n"
+            "✨ <b>Qulayliklar:</b>\n"
+            "🏠 <b>📍 Manzillarim</b> — Uy/Ish manzilini saqlang, taksi 3 bosishda.\n"
+            "❤️ Yoqqan haydovchini sevimlilarga qo'shing — buyurtmangizni birinchi u ko'radi.\n"
+            "👨‍👩‍👧 Safarni yaqinlaringizga ulashing — ular mashinani jonli kuzatadi.\n"
+            "👤 Ota-onangiz yoki do'stingiz uchun ham buyurtma bera olasiz.\n"
+            "🆘 Safar paytida SOS tugmasi — dispetcher darhol xabardor bo'ladi.\n"
+            "🔒 Narx qat'iy — talab oshganda ham ko'tarilmaydi.\n\n"
             f"💰 Tarif: {h(svc.tariff.describe(s.currency))}\n"
             f"⏳ Kutish: {s.free_wait_min} daqiqa bepul, keyin {h(money(s.per_wait_min, s.currency))}/daq\n\n"
             "🔒 Raqamingiz haydovchiga ko'rinmaydi — aloqa kompaniya raqami orqali bo'ladi. "

@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from sqlalchemy import event
+from sqlalchemy import event, inspect
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
@@ -34,6 +34,7 @@ class Database:
     async def create_all(self) -> None:
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(_add_missing_columns)
 
     @asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
@@ -43,6 +44,25 @@ class Database:
 
     async def close(self) -> None:
         await self.engine.dispose()
+
+
+def _add_missing_columns(sync_conn) -> None:
+    """Yangi versiyada qo'shilgan ustunlarni mavjud bazaga qo'shadi (ma'lumot yo'qolmaydi)."""
+    inspector = inspect(sync_conn)
+    dialect = sync_conn.dialect
+    for table in Base.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            continue
+        existing = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing:
+                continue
+            ddl = f'ALTER TABLE {table.name} ADD COLUMN {column.name} {column.type.compile(dialect=dialect)}'
+            if column.server_default is not None:
+                default = column.server_default.arg
+                default_sql = default.compile(dialect=dialect) if hasattr(default, "compile") else f"'{default}'"
+                ddl += f" DEFAULT {default_sql} NOT NULL"
+            sync_conn.exec_driver_sql(ddl)
 
 
 def _sqlite_pragmas(dbapi_connection, _record) -> None:  # pragma: no cover - driver specific

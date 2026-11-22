@@ -6,7 +6,6 @@ import re
 from datetime import UTC, datetime, timedelta
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -32,6 +31,10 @@ from .passenger import ack
 LIVE_FOREVER = 0x7FFFFFFF
 CAR_MODELS = ["Cobalt", "Nexia 3", "Gentra", "Lacetti", "Spark", "Onix", "Malibu", "Tracker", "Damas"]
 CAR_COLORS = ["Oq", "Qora", "Kumush", "Kulrang", "Ko'k", "Qizil", "Jigarrang", "Mokriy asfalt"]
+
+
+class HomeSet(StatesGroup):
+    waiting = State()
 
 
 class Reg(StatesGroup):
@@ -281,6 +284,28 @@ def build_driver_router() -> Router:
         elif not edited:
             await ack(message)
 
+    @router.callback_query(DCb.filter(F.action == "sethome"))
+    async def set_home_ask(callback: CallbackQuery, state: FSMContext) -> None:
+        await state.set_state(HomeSet.waiting)
+        await callback.answer()
+        await callback.message.answer(  # type: ignore[union-attr]
+            "🏡 <b>Uy manzilingizni yuboring:</b> 📎 → <b>Joylashuv</b> → xaritada uyingizni belgilang.\n"
+            "Bekor qilish uchun istalgan matn yozing."
+        )
+
+    @router.message(HomeSet.waiting, F.location | F.venue)
+    async def set_home(message: Message, svc: TaxiService, state: FSMContext) -> None:
+        await state.clear()
+        loc = message.venue.location if message.venue else message.location
+        await svc.set_home(message.from_user.id, loc.latitude, loc.longitude)  # type: ignore[union-attr]
+        await message.answer("🏡 Uy manzili saqlandi. Endi «Uyga rejimi»ni yoqishingiz mumkin.")
+        await show_settings(message, svc, message.from_user.id, edit=False)  # type: ignore[union-attr]
+
+    @router.message(HomeSet.waiting)
+    async def set_home_cancel(message: Message, state: FSMContext) -> None:
+        await state.clear()
+        await message.answer("Bekor qilindi.")
+
     @router.message(F.location)
     async def location(message: Message, svc: TaxiService) -> None:
         await handle_location(message, svc, edited=False)
@@ -459,23 +484,17 @@ def build_driver_router() -> Router:
             f"💳 Balans: <b>{h(money(d.balance, cur))}</b>"
         )
 
-    def nav_markup(current: str):
-        return inline(
-            *[
-                btn(("✅ " if key == current else "") + name, cb=DCb(action="nav", val=i), style=SUCCESS if key == current else None)
-                for i, (key, name) in enumerate(NAVIGATORS.items())
-            ]
-        )
+    async def show_settings(message: Message, svc: TaxiService, tg_id: int, *, edit: bool) -> None:
+        d = await svc.get_driver_by_tg(tg_id)
+        if d is None:
+            return
+        view = svc.views.driver_settings(d)
+        if not (edit and await svc.msg.edit(Role.DRIVER, message.chat.id, message.message_id, view)):
+            await svc.msg.send(Role.DRIVER, message.chat.id, view)
 
     @router.message(F.text == "⚙️ Sozlamalar")
     async def settings_(message: Message, svc: TaxiService) -> None:
-        d = await svc.get_driver_by_tg(message.from_user.id)  # type: ignore[union-attr]
-        if d is None:
-            return
-        await message.answer(
-            "⚙️ <b>Navigator</b> — «📍 Yo'lovchini olish manzili» bosilganda qaysi ilovada yo'l ochilsin?",
-            reply_markup=nav_markup(d.navigator),
-        )
+        await show_settings(message, svc, message.from_user.id, edit=False)  # type: ignore[union-attr]
 
     @router.callback_query(DCb.filter(F.action == "nav"))
     async def set_nav(callback: CallbackQuery, callback_data: DCb, svc: TaxiService) -> None:
@@ -484,10 +503,37 @@ def build_driver_router() -> Router:
         await svc.set_navigator(callback.from_user.id, key)
         await callback.answer(f"✅ {NAVIGATORS[key]}")
         if isinstance(callback.message, Message):
-            try:
-                await callback.message.edit_reply_markup(reply_markup=nav_markup(key))
-            except TelegramAPIError:
-                pass
+            await show_settings(callback.message, svc, callback.from_user.id, edit=True)
+
+    @router.callback_query(DCb.filter(F.action == "auto"))
+    async def toggle_auto(callback: CallbackQuery, svc: TaxiService) -> None:
+        d = await svc.toggle_auto_accept(callback.from_user.id)
+        if d is None:
+            await callback.answer()
+            return
+        await callback.answer(
+            "⚡ Avto-qabul yoqildi: eng yaqin bo'lsangiz buyurtma bir zumda sizga biriktiriladi."
+            if d.auto_accept
+            else "Avto-qabul o'chirildi.",
+            show_alert=d.auto_accept,
+        )
+        if isinstance(callback.message, Message):
+            await show_settings(callback.message, svc, callback.from_user.id, edit=True)
+
+    @router.callback_query(DCb.filter(F.action == "home"))
+    async def toggle_home(callback: CallbackQuery, svc: TaxiService) -> None:
+        d = await svc.toggle_home_mode(callback.from_user.id)
+        if d is None or d.home_lat is None:
+            await callback.answer("Avval uy manzilini belgilang.", show_alert=True)
+            return
+        await callback.answer(
+            "🏡 Uyga rejimi yoqildi: faqat uyingiz tomonga ketayotgan buyurtmalar keladi."
+            if d.home_mode
+            else "Uyga rejimi o'chirildi — barcha buyurtmalar keladi.",
+            show_alert=d.home_mode,
+        )
+        if isinstance(callback.message, Message):
+            await show_settings(callback.message, svc, callback.from_user.id, edit=True)
 
     @router.message(F.text == "ℹ️ Yordam")
     @router.message(Command("help"))
@@ -501,11 +547,16 @@ def build_driver_router() -> Router:
             "3️⃣ <b>📍 Yo'lovchini olish manzili</b> — navigatorda yo'l darhol ochiladi.\n"
             "4️⃣ <b>📞 Yo'lovchi bilan aloqa</b> — kompaniya raqami orqali ulanasiz.\n"
             "5️⃣ <b>✅ Yetib keldim</b> → <b>🚀 Safarni boshlash</b> → <b>🏁 Safarni yakunlash</b>.\n"
+            "📍 Yo'lovchi oldiga yetganingizda «Yetib keldim» GPS orqali avtomatik bosiladi.\n"
             "6️⃣ Yo'lovchi manzilga yetganini tasdiqlagach, balansdan "
             f"<b>{s.commission_percent:g}%</b> xizmat haqi yechiladi.\n\n"
             "🏆 Buyurtmalar avval eng yaqin va reytingi yuqori haydovchilarga ko'rinadi. "
             "1 daqiqada hech kim olmasa — keyingi radiusdagilarga.\n"
-            "💬 Safar davomida shu yerga yozgan xabaringiz yo'lovchiga anonim yetkaziladi."
+            "💬 Safar davomida shu yerga yozgan xabaringiz yo'lovchiga anonim yetkaziladi.\n\n"
+            "⚙️ <b>Sozlamalar:</b>\n"
+            "⚡ <b>Avto-qabul</b> — eng yaqin bo'lsangiz buyurtma bosishsiz, bir zumda biriktiriladi.\n"
+            "🏡 <b>Uyga rejimi</b> — ish oxirida faqat uyingiz tomonga ketayotgan buyurtmalar.\n"
+            "🚫 Buyurtmani o'tkazib yuborganingiz uchun hech qanday jarima yo'q."
             + role
         )
 

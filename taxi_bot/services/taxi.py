@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import secrets
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from ..db.models import (
     DRIVER_ACTIVE_STATUSES,
     Driver,
     DriverStatus,
+    FavoriteDriver,
     OfferStatus,
     Order,
     OrderOffer,
@@ -35,8 +37,9 @@ from ..ui.kit import DANGER, SUCCESS, ACb, Card, View, btn, h, inline
 from ..ui.messenger import EFFECT_PARTY, Messenger, Role
 from ..ui.views import Quote, Views
 from .dispatch import DispatchEngine
+from .features import FeaturesMixin
 from .geo import Point, bearing_deg, bounding_box, haversine_m
-from .matching import Candidate, bayesian_rating
+from .matching import Candidate, bayesian_rating, home_gain
 from .pricing import Tariff
 from .routing import RoutingService
 from .telephony import TelephonyService, normalize_phone
@@ -74,7 +77,7 @@ def _upd(model):
     return update(model).execution_options(synchronize_session=False)
 
 
-class TaxiService:
+class TaxiService(FeaturesMixin):
     def __init__(
         self,
         settings: Settings,
@@ -297,6 +300,7 @@ class TaxiService:
                 est_distance_m=int(q.distance_m) if q.distance_m is not None else None,
                 est_duration_s=int(q.duration_s) if q.duration_s is not None else None,
                 est_price=q.price,
+                rider_phone=q.rider_phone,
                 created_at=now,
                 search_started_at=now,
             )
@@ -386,6 +390,7 @@ class TaxiService:
                 self.views.cancelled_passenger(order, "Siz buyurtmani bekor qildingiz."),
             )
             await self._drop_live(order, passenger)
+            await self._watchers_status(order_id, "❌ Safar bekor qilindi.", final=True)
             if driver is not None:
                 card = Card(f"❌ Buyurtma #{order_id} bekor qilindi")
                 card.para("Yo'lovchi buyurtmani bekor qildi. Siz yana yangi buyurtmalarni qabul qilasiz.")
@@ -451,7 +456,10 @@ class TaxiService:
             order = await self.get_order(order_id)
             if driver is not None:
                 await self.msg.edit(
-                    Role.PASSENGER, passenger_tg, order.passenger_msg_id, self.views.trip_started(order, driver)
+                    Role.PASSENGER,
+                    passenger_tg,
+                    order.passenger_msg_id,
+                    self.views.trip_started(order, driver, self.share_url(order)),
                 )
                 new_id = await self.msg.replace(
                     Role.DRIVER,
@@ -668,15 +676,16 @@ class TaxiService:
                     values = self._track_step(fresh, lat, lon, accuracy, now)
                     if values:
                         await self._set_order_fields(order_id, **values)
-        # Yo'lovchidagi jonli xarita
+        # Yo'lovchidagi va yaqinlaridagi jonli xarita (Telegram limitlari uchun siyraklashtirilgan)
         loop_now = time.monotonic()
-        if order.passenger_live_msg_id:
-            if loop_now - self._live_edit_at.get(order_id, 0.0) >= LIVE_EDIT_INTERVAL:
-                self._live_edit_at[order_id] = loop_now
+        if loop_now - self._live_edit_at.get(order_id, 0.0) >= LIVE_EDIT_INTERVAL:
+            self._live_edit_at[order_id] = loop_now
+            if order.passenger_live_msg_id:
                 await self.msg.edit_live_location(
                     Role.PASSENGER, passenger.tg_id, order.passenger_live_msg_id, lat, lon, heading
                 )
-        elif order.status in (OrderStatus.ACCEPTED, OrderStatus.ARRIVED):
+            await self._watchers_live(order_id, lat, lon, heading)
+        if not order.passenger_live_msg_id and order.status in (OrderStatus.ACCEPTED, OrderStatus.ARRIVED):
             async with self._lock(order_id):
                 fresh = await self.get_order(order_id)
                 if fresh and not fresh.passenger_live_msg_id and fresh.status in DRIVER_ACTIVE_STATUSES:
@@ -685,6 +694,25 @@ class TaxiService:
                     )
                     if live_id:
                         await self._set_order_fields(order_id, passenger_live_msg_id=live_id)
+        # Yaqinlashish xabari va GPS bo'yicha avtomatik "Yetib keldim"
+        if order.status == OrderStatus.ACCEPTED:
+            s_ = self.settings
+            dist = haversine_m(lat, lon, order.pickup_lat, order.pickup_lon)
+            if (
+                s_.auto_arrive_radius_m > 0
+                and dist <= s_.auto_arrive_radius_m
+                and (accuracy is None or accuracy <= 50)
+            ):
+                await self.driver_arrived(d.tg_id, order_id, auto=True)
+            elif dist <= s_.near_notify_radius_m and not order.near_notified:
+                async with self.db.session() as s:
+                    res = await s.execute(
+                        _upd(Order)
+                        .where(Order.id == order_id, Order.near_notified.is_(False))
+                        .values(near_notified=True)
+                    )
+                if res.rowcount == 1:
+                    await self.msg.send(Role.PASSENGER, passenger.tg_id, self.views.near_alert(order, d, dist))
 
     @staticmethod
     def _track_step(order: Order, lat: float, lon: float, accuracy: float | None, now: datetime) -> dict:
@@ -718,15 +746,34 @@ class TaxiService:
             Driver.lon.between(min_lon, max_lon),
         )
 
-    async def _to_candidates(self, drivers: Sequence[Driver], pickup: Point, radius_m: float) -> list[Candidate]:
-        near = [
-            (d, haversine_m(d.lat, d.lon, pickup.lat, pickup.lon))  # type: ignore[arg-type]
-            for d in drivers
-        ]
-        near = [(d, dist) for d, dist in near if dist <= radius_m]
+    async def _to_candidates(
+        self,
+        drivers: Sequence[Driver],
+        pickup: Point,
+        radius_m: float,
+        *,
+        favorites: set[int] | None = None,
+        order: Order | None = None,
+    ) -> list[Candidate]:
+        favorites = favorites or set()
+        near: list[tuple[Driver, float, bool]] = []
+        for d in drivers:
+            dist = haversine_m(d.lat, d.lon, pickup.lat, pickup.lon)  # type: ignore[arg-type]
+            if dist > radius_m:
+                continue
+            home_bound = False
+            if d.home_mode and d.home_lat is not None and d.home_lon is not None:
+                # 🏡 "Uyga" rejimi: faqat uy tomonga olib boradigan, manzili ma'lum buyurtmalar
+                if order is None or not order.has_destination:
+                    continue
+                gain = home_gain(d.lat, d.lon, d.home_lat, d.home_lon, order.dest_lat, order.dest_lon)  # type: ignore[arg-type]
+                if gain < self.settings.home_mode_min_gain:
+                    continue
+                home_bound = True
+            near.append((d, dist, home_bound))
         if not near:
             return []
-        routes = await self.routing.many_to_one([Point(d.lat, d.lon) for d, _ in near], pickup)  # type: ignore[arg-type]
+        routes = await self.routing.many_to_one([Point(d.lat, d.lon) for d, _, _ in near], pickup)  # type: ignore[arg-type]
         return [
             Candidate(
                 driver_id=d.id,
@@ -738,19 +785,37 @@ class TaxiService:
                 precise=r.precise,
                 bearing=bearing_deg(d.lat, d.lon, pickup.lat, pickup.lon),  # type: ignore[arg-type]
                 accuracy_m=d.loc_accuracy,
+                auto_accept=bool(d.auto_accept),
+                favorite=d.id in favorites,
+                home_bound=home_bound,
             )
-            for (d, dist), r in zip(near, routes, strict=True)
+            for (d, dist, home_bound), r in zip(near, routes, strict=True)
         ]
 
     async def _nearby(self, pickup: Point, radius_m: float) -> list[Candidate]:
         async with self.db.session() as s:
-            drivers = (await s.scalars(self._candidate_query(pickup.lat, pickup.lon, radius_m))).all()
+            drivers = (
+                await s.scalars(
+                    self._candidate_query(pickup.lat, pickup.lon, radius_m).where(Driver.home_mode.is_(False))
+                )
+            ).all()
         return await self._to_candidates(drivers, pickup, radius_m)
 
-    async def find_candidates(self, order: Order, radius_m: float) -> list[Candidate]:
+    async def find_candidates(
+        self, order: Order, radius_m: float, *, favorites_only: bool = False
+    ) -> list[Candidate]:
         """Buyurtma uchun hali taklif olmagan bo'sh haydovchilar."""
         async with self.db.session() as s:
             passenger_tg = await s.scalar(select(Passenger.tg_id).where(Passenger.id == order.passenger_id))
+            favorites = set(
+                (
+                    await s.scalars(
+                        select(FavoriteDriver.driver_id).where(FavoriteDriver.passenger_id == order.passenger_id)
+                    )
+                ).all()
+            )
+            if favorites_only and not favorites:
+                return []
             excluded = select(OrderOffer.driver_id).where(
                 OrderOffer.order_id == order.id,
                 or_(
@@ -761,8 +826,47 @@ class TaxiService:
             q = self._candidate_query(order.pickup_lat, order.pickup_lon, radius_m).where(
                 Driver.id.not_in(excluded), Driver.tg_id != passenger_tg
             )
+            if favorites_only:
+                q = q.where(Driver.id.in_(favorites))
             drivers = (await s.scalars(q)).all()
-        return await self._to_candidates(drivers, Point(order.pickup_lat, order.pickup_lon), radius_m)
+        return await self._to_candidates(
+            drivers, Point(order.pickup_lat, order.pickup_lon), radius_m, favorites=favorites, order=order
+        )
+
+    async def auto_assign(self, order: Order, c: Candidate) -> bool:
+        """⚡ Avto-qabul: buyurtma haydovchiga bosishsiz biriktiriladi."""
+        async with self.db.session() as s:
+            d = await s.get(Driver, c.driver_id)
+            o = await s.get(Order, order.id)
+            if (
+                d is None
+                or o is None
+                or not d.auto_accept
+                or d.current_order_id is not None
+                or o.status != OrderStatus.SEARCHING
+                or o.search_round != order.search_round
+            ):
+                return False
+            offer = OrderOffer(
+                order_id=o.id,
+                driver_id=d.id,
+                search_round=o.search_round,
+                wave=o.wave,
+                distance_m=int(c.road_m),
+                eta_s=int(c.eta_s),
+            )
+            s.add(offer)
+            await s.flush()
+            offer_id = offer.id
+        result = await self.accept_offer(c.tg_id, order.id, None, auto=True)
+        if not result.ok:
+            async with self.db.session() as s:
+                await s.execute(
+                    _upd(OrderOffer)
+                    .where(OrderOffer.id == offer_id, OrderOffer.status == OfferStatus.SENT)
+                    .values(status=OfferStatus.WITHDRAWN)
+                )
+        return result.ok
 
     async def send_offers(self, order: Order, candidates: list[Candidate], wave: int) -> list[int]:
         sem = asyncio.Semaphore(max(1, self.settings.max_offer_concurrency))
@@ -917,7 +1021,9 @@ class TaxiService:
             self.dispatch.wake(offer.order_id)
 
     # -------------------------------------------------------------- taklifga javob
-    async def accept_offer(self, driver_tg: int, order_id: int, message_id: int | None = None) -> ActionResult:
+    async def accept_offer(
+        self, driver_tg: int, order_id: int, message_id: int | None = None, *, auto: bool = False
+    ) -> ActionResult:
         now = utcnow()
         try:
             async with self.db.session() as s:
@@ -980,15 +1086,19 @@ class TaxiService:
                     Point(driver.lat, driver.lon), Point(order.pickup_lat, order.pickup_lon)  # type: ignore[arg-type]
                 )
                 order.pickup_eta_s = int(route.duration_s)
+            order.track_token = order.track_token or secrets.token_urlsafe(9)
+            near = self._driver_location_fresh(driver) and haversine_m(
+                driver.lat, driver.lon, order.pickup_lat, order.pickup_lon  # type: ignore[arg-type]
+            ) <= self.settings.near_notify_radius_m
             card_id = message_id or offer_message_id
-            view = self.views.driver_order(order, driver)
+            view = self.views.driver_order(order, driver, auto=auto)
             if not (card_id and await self.msg.edit(Role.DRIVER, driver_tg, card_id, view)):
                 card_id = await self.msg.send(Role.DRIVER, driver_tg, view)
             passenger_msg = await self.msg.replace(
                 Role.PASSENGER,
                 passenger.tg_id,
                 order.passenger_msg_id,
-                self.views.driver_found(order, driver),
+                self.views.driver_found(order, driver, self.share_url(order)),
                 effect=None,
             )
             live_id = None
@@ -1002,6 +1112,12 @@ class TaxiService:
                 passenger_msg_id=passenger_msg,
                 passenger_live_msg_id=live_id,
                 pickup_eta_s=order.pickup_eta_s,
+                track_token=order.track_token,
+                near_notified=near,
+            )
+        if await self._watchers(order_id):  # qayta qidiruvdan keyin yangi haydovchi
+            await self._watchers_status(
+                order_id, f"🚕 Yangi haydovchi topildi: {driver.car_color} {driver.car_model} · {driver.car_plate}"
             )
         return ActionResult(True)
 
@@ -1033,7 +1149,7 @@ class TaxiService:
             return None
         return order, passenger, driver
 
-    async def driver_arrived(self, driver_tg: int, order_id: int) -> bool:
+    async def driver_arrived(self, driver_tg: int, order_id: int, *, auto: bool = False) -> bool:
         bundle = await self._driver_order(driver_tg, order_id)
         if bundle is None:
             return False
@@ -1050,9 +1166,20 @@ class TaxiService:
             order = await self.get_order(order_id)
             await self.msg.edit(Role.DRIVER, driver_tg, order.driver_msg_id, self.views.driver_order(order, driver))
             new_id = await self.msg.replace(
-                Role.PASSENGER, passenger.tg_id, order.passenger_msg_id, self.views.driver_arrived(order, driver)
+                Role.PASSENGER,
+                passenger.tg_id,
+                order.passenger_msg_id,
+                self.views.driver_arrived(order, driver, self.share_url(order)),
             )
             await self._set_order_fields(order_id, passenger_msg_id=new_id)
+        if auto:
+            await self.msg.send(
+                Role.DRIVER,
+                driver_tg,
+                View.plain("📍 Siz manzildasiz — yo'lovchiga «yetib keldi» xabari avtomatik yuborildi."),
+                silent=True,
+            )
+        await self._watchers_status(order_id, "⏳ Haydovchi yetib keldi va yaqiningizni kutmoqda.")
         return True
 
     async def driver_start(self, driver_tg: int, order_id: int) -> bool:
@@ -1085,9 +1212,13 @@ class TaxiService:
             order = await self.get_order(order_id)
             await self.msg.edit(Role.DRIVER, driver_tg, order.driver_msg_id, self.views.driver_order(order, driver))
             new_id = await self.msg.replace(
-                Role.PASSENGER, passenger.tg_id, order.passenger_msg_id, self.views.trip_started(order, driver)
+                Role.PASSENGER,
+                passenger.tg_id,
+                order.passenger_msg_id,
+                self.views.trip_started(order, driver, self.share_url(order)),
             )
             await self._set_order_fields(order_id, passenger_msg_id=new_id)
+        await self._watchers_status(order_id, "🚀 Safar boshlandi. Mashinani xaritada kuzatishingiz mumkin.")
         return True
 
     def _final_price(self, order: Order, driver: Driver) -> tuple[int, int, float, dict]:
@@ -1225,6 +1356,7 @@ class TaxiService:
                 Role.DRIVER, driver.tg_id, order.driver_msg_id, self.views.driver_order(order, driver)
             )
             await self._set_order_fields(order_id, passenger_msg_id=p_id, driver_msg_id=d_id)
+            await self._watchers_status(order_id, "✅ Safar yakunlandi — yaqiningiz manzilga yetib keldi.", final=True)
             if driver.balance < self.settings.min_driver_balance:
                 await self.msg.send(
                     Role.DRIVER,
@@ -1312,11 +1444,14 @@ class TaxiService:
             card.para(text)
             await self.msg.edit(Role.DRIVER, driver_tg, order.driver_msg_id, View.of(card))
             if no_show:
+                await self._watchers_status(order_id, "❌ Safar bekor qilindi.", final=True)
                 view = self.views.cancelled_passenger(
                     order, "Haydovchi sizni kutdi, ammo siz chiqmadingiz. Buyurtma bekor qilindi."
                 )
                 await self.msg.replace(Role.PASSENGER, passenger.tg_id, order.passenger_msg_id, view)
             else:
+                await self._watchers_reset_live(order_id)
+                await self._watchers_status(order_id, "🔄 Haydovchi almashtirilmoqda — yangi haydovchi qidirilmoqda.")
                 view = self.views.searching(order, None, 0)
                 view.text = "⚠️ Haydovchi buyurtmani bekor qildi. Yangi haydovchi qidirilmoqda…\n\n" + view.text
                 new_id = await self.msg.replace(Role.PASSENGER, passenger.tg_id, order.passenger_msg_id, view)
@@ -1354,7 +1489,8 @@ class TaxiService:
             return f"⏳ Qo'ng'iroq ulanmoqda. Qayta urinish uchun {wait} soniya kuting."
         if order.call_count >= self.settings.calls_per_order:
             return "⚠️ Bu buyurtma uchun qo'ng'iroqlar soni tugadi. Chat orqali yozing."
-        first, second = (driver.phone, passenger.phone) if side == Role.DRIVER else (passenger.phone, driver.phone)
+        rider = order.rider_phone or passenger.phone  # boshqa odam uchun buyurtmada — aynan o'sha odam
+        first, second = (driver.phone, rider) if side == Role.DRIVER else (passenger.phone, driver.phone)
         other = "yo'lovchi" if side == Role.DRIVER else "haydovchi"
         if not first or not second:
             return "⚠️ Telefon raqami topilmadi. Chat orqali yozing — xabaringiz yetkaziladi."
@@ -1373,7 +1509,9 @@ class TaxiService:
                     f"📞 <b>Aloqa so'rovi — buyurtma #{order_id}</b>\n"
                     f"{who} {other} bilan bog'lanishni so'radi.\n\n"
                     f"Haydovchi: <code>{h(driver.phone)}</code>\n"
-                    f"Yo'lovchi: <code>{h(passenger.phone)}</code>\n\n"
+                    f"Yo'lovchi: <code>{h(rider)}</code>"
+                    + (f" (buyurtmachi: <code>{h(passenger.phone)}</code>)" if order.rider_phone else "")
+                    + "\n\n"
                     "Kompaniya raqamidan ikkala tomonni ulang."
                 )
             )

@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     osrm_url: str | None = None  # masalan: http://osrm:5000 (aniq yo'l masofasi uchun)
     max_offer_concurrency: int = 20
 
+    # ❤️ Sevimli haydovchilar avval ko'radi (shu radius ichida bo'lsa)
+    favorite_radius_km: float = 3.0
+    favorite_headstart_sec: float = 10.0
+    # 🏡 "Uyga" rejimi: manzil haydovchini uyiga kamida shuncha foiz yaqinlashtirishi kerak
+    home_mode_min_gain: float = 0.25
+
     # --- Joylashuv ----------------------------------------------------------
     require_live_location: bool = True
     static_location_ttl_min: float = 10.0
@@ -83,6 +89,9 @@ class Settings(BaseSettings):
     # --- Safar --------------------------------------------------------------
     finish_confirm_timeout_min: float = 10.0  # 0 = faqat yo'lovchi tasdig'i
     no_show_wait_min: float = 5.0
+    near_notify_radius_m: float = 400.0  # "Haydovchi yaqinlashmoqda" xabari
+    auto_arrive_radius_m: float = 70.0  # GPS bo'yicha avtomatik "Yetib keldim" (0 = o'chirilgan)
+    emergency_phones: str = "102 — militsiya · 103 — tez yordam · 112 — favqulodda"
     rating_prior: float = 4.7  # yangi haydovchi reytingi (ustuvorlik chegarasidan biroz past)
     rating_prior_weight: int = 5
 

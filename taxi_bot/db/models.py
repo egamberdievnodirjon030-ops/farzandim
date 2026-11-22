@@ -15,6 +15,8 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
+    false,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -114,6 +116,12 @@ class Driver(Base):
     trips_count: Mapped[int] = mapped_column(Integer, default=0)
     cancel_count: Mapped[int] = mapped_column(Integer, default=0)
     navigator: Mapped[str] = mapped_column(String(16), default="google")
+    # ⚡ Avto-qabul: eng yaqin bo'lsa buyurtma bosishsiz biriktiriladi
+    auto_accept: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # 🏡 "Uyga" rejimi: faqat uy tomonga ketayotgan buyurtmalar
+    home_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    home_lat: Mapped[float | None] = mapped_column(Float)
+    home_lon: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -156,6 +164,9 @@ class Order(Base):
     cancelled_by: Mapped[str | None] = mapped_column(String(16))
     cancel_reason: Mapped[str | None] = mapped_column(String(64))
     call_count: Mapped[int] = mapped_column(Integer, default=0)
+    near_notified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    track_token: Mapped[str | None] = mapped_column(String(32))  # yaqinlar kuzatuvi havolasi
+    rider_phone: Mapped[str | None] = mapped_column(String(32))  # boshqa odam uchun buyurtma
 
     # Telegram xabarlari (kartalar)
     passenger_msg_id: Mapped[int | None] = mapped_column(BigInteger)
@@ -206,6 +217,45 @@ class Transaction(Base):
     external_id: Mapped[str | None] = mapped_column(String(128), unique=True)
     note: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class SavedPlace(Base):
+    """Yo'lovchining saqlangan manzillari: 🏠 Uy, 🏢 Ish, 📌 boshqa."""
+
+    __tablename__ = "saved_places"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    passenger_id: Mapped[int] = mapped_column(ForeignKey("passengers.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(8))  # home | work | other
+    title: Mapped[str] = mapped_column(String(64))
+    lat: Mapped[float] = mapped_column(Float)
+    lon: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class FavoriteDriver(Base):
+    """❤️ Sevimli haydovchi — yo'lovchining buyurtmasi avval unga ko'rinadi."""
+
+    __tablename__ = "favorite_drivers"
+    __table_args__ = (UniqueConstraint("passenger_id", "driver_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    passenger_id: Mapped[int] = mapped_column(ForeignKey("passengers.id"), index=True)
+    driver_id: Mapped[int] = mapped_column(ForeignKey("drivers.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class TripWatcher(Base):
+    """👨‍👩‍👧 Safarni kuzatayotgan yaqinlar (yo'lovchi havola orqali ulashgan)."""
+
+    __tablename__ = "trip_watchers"
+    __table_args__ = (UniqueConstraint("order_id", "tg_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    tg_id: Mapped[int] = mapped_column(BigInteger)
+    live_msg_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class BotUser(Base):

@@ -336,3 +336,98 @@ async def test_stale_button_and_foreign_order_are_rejected(harness, center):
     assert ans.show_alert
     await h.press(h.pbot, PASSENGER, "p:cancel:12345:0")
     assert "topilmadi" in h.session.calls(h.pbot.id, "AnswerCallbackQuery")[-1].text
+
+
+MOM = User(id=7009, is_bot=False, first_name="Onam")
+
+
+async def test_competitive_features_end_to_end(harness, center):
+    """Saqlangan manzil → 3 bosishda buyurtma, boshqa odam uchun, ulashish, SOS, sevimli, sozlamalar."""
+    from taxi_bot.db.models import FavoriteDriver, Order
+
+    h = await harness()
+    h.svc.share_username = "ArabalarTaxiBot"
+    pbot, dbot = h.pbot, h.dbot
+    driver = await register_and_approve_driver(h, offset(*center, 300, 200))
+
+    await h.send(pbot, PASSENGER, text="/start")
+    await h.send(pbot, PASSENGER, contact=Contact(phone_number=PASSENGER_PHONE, first_name="J", user_id=PASSENGER.id))
+
+    # 🏠 Uy manzilini saqlash
+    await h.send(pbot, PASSENGER, text="📍 Manzillarim")
+    assert "p:addplace:0:0" in h.callbacks(pbot, PASSENGER.id)
+    await h.press(pbot, PASSENGER, "p:addplace:0:0")
+    home = offset(*center, 2500, 1500)
+    await h.send(pbot, PASSENGER, location=Location(latitude=home[0], longitude=home[1]))
+    assert "Manzil saqlandi" in "".join(m.text or "" for m in h.session.calls(pbot.id, "SendMessage"))
+    p = await h.svc.get_passenger_by_tg(PASSENGER.id)
+    place = (await h.svc.list_places(p.id))[0]
+
+    # 1) Taksi chaqirish → 2) 🏠 Uy → 3) Buyurtma berish
+    await h.send(pbot, PASSENGER, location=Location(latitude=center[0], longitude=center[1], horizontal_accuracy=10))
+    assert f"p:place:{place.id}:0" in h.callbacks(pbot, PASSENGER.id)
+    await h.press(pbot, PASSENGER, f"p:place:{place.id}:0")
+    assert "Buyurtmani tasdiqlang" in h.last_text(pbot, PASSENGER.id)
+    # 👤 boshqa odam uchun
+    await h.press(pbot, PASSENGER, "p:rider:0:0")
+    await h.send(pbot, PASSENGER, text="93 444 55 66")
+    assert "boshqa odam" in h.last_text(pbot, PASSENGER.id)
+    await h.press(pbot, PASSENGER, "p:confirm:0:0")
+    order = await h.svc.active_order(p.id)
+    assert order.rider_phone == "+998934445566"
+    assert abs(order.dest_lat - home[0]) < 1e-9 and abs(order.dest_lon - home[1]) < 1e-9
+
+    for _ in range(100):
+        if f"d:acc:{order.id}:0" in h.callbacks(dbot, DRIVER.id):
+            break
+        await asyncio.sleep(0.02)
+    await h.press(dbot, DRIVER, f"d:acc:{order.id}:0", message_id=await offer_message_id(h, order.id))
+    order = await h.svc.get_order(order.id)
+    assert order.status == OrderStatus.ACCEPTED and order.track_token
+
+    # 👨‍👩‍👧 Yaqinlar kuzatuvi
+    found = [m for m in h.session.calls(pbot.id, "SendRichMessage") if m.chat_id == PASSENGER.id][-1]
+    urls = [b.url for row in found.reply_markup.inline_keyboard for b in row if b.url]
+    assert any("t.me/share/url" in u and order.track_token in u for u in urls)
+    await h.send(pbot, MOM, text=f"/start trk_{order.track_token}")
+    assert "Yaqiningiz safari" in h.last_text(pbot, MOM.id)
+
+    # ⚙️ Haydovchi sozlamalari: avto-qabul
+    await h.send(dbot, DRIVER, text="⚙️ Sozlamalar")
+    assert "d:auto:0:0" in h.callbacks(dbot, DRIVER.id)
+    await h.press(dbot, DRIVER, "d:auto:0:0")
+    assert (await h.svc.get_driver(driver.id)).auto_accept
+
+    # 🆘 SOS safar davomida
+    await h.press(dbot, DRIVER, f"d:start:{order.id}:0")
+    assert f"p:sos:{order.id}:0" in h.callbacks(pbot, PASSENGER.id)
+    await h.press(pbot, PASSENGER, f"p:sos:{order.id}:0")
+    assert "SOS" in h.last_text(dbot, ADMIN.id) or any(
+        "SOS" in (m.text or "") for m in h.session.calls(dbot.id, "SendMessage") if m.chat_id == ADMIN.id
+    )
+    await h.press(dbot, DRIVER, f"d:fin:{order.id}:0")
+    await h.press(pbot, PASSENGER, f"p:ok:{order.id}:0")
+    assert "yakunlandi" in h.last_text(pbot, MOM.id)
+
+    # ⭐ baho → ❤️ sevimli → 💾 Ish manzili
+    await h.press(pbot, PASSENGER, f"p:rate:{order.id}:5")
+    assert f"p:fav:{order.id}:0" in h.callbacks(pbot, PASSENGER.id)
+    await h.press(pbot, PASSENGER, f"p:fav:{order.id}:0")
+    await h.press(pbot, PASSENGER, f"p:savedest:{order.id}:1")
+    async with h.svc.db.session() as s:
+        from sqlalchemy import select
+
+        assert await s.scalar(select(FavoriteDriver.driver_id)) == driver.id
+        assert (await s.get(Order, order.id)).status == OrderStatus.COMPLETED
+    kinds = {pl.kind for pl in await h.svc.list_places(p.id)}
+    assert kinds == {"home", "work"}
+
+    # Maxfiylik: boshqa odamning raqami ham haydovchiga ko'rinmaydi
+    to_driver = h.session.dump(dbot.id, DRIVER.id)
+    assert "934445566" not in to_driver and PASSENGER_PHONE[1:] not in to_driver
+
+
+async def test_tracking_link_works_in_single_bot_mode_without_role(harness):
+    h = await harness(single=True)
+    await h.send(h.pbot, MOM, text="/start trk_yoq")
+    assert "topilmadi" in h.last_text(h.pbot, MOM.id)

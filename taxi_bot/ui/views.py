@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 from ..config import Settings
-from ..db.models import Driver, Order, OrderStatus
-from ..services.geo import compass, format_distance, format_duration
+from ..db.models import Driver, Order, OrderStatus, SavedPlace
+from ..services.geo import bearing_deg, compass, compass_to, format_distance, format_duration
 from ..services.matching import Candidate
 from ..services.pricing import Tariff, money
 from .kit import (
@@ -41,6 +41,17 @@ class Quote:
     nearby_count: int
     nearest_eta_s: float | None
     comment: str | None = None
+    rider_phone: str | None = None  # boshqa odam uchun buyurtma
+
+
+PLACE_ICONS = {"home": "🏠", "work": "🏢", "other": "📌"}
+PLACE_NAMES = {"home": "Uy", "work": "Ish", "other": "Manzil"}
+
+
+def mask_phone(phone: str | None) -> str:
+    if not phone:
+        return ""
+    return phone[:4] + " ** *** " + phone[-4:-2] + " " + phone[-2:] if len(phone) >= 9 else phone
 
 
 def car_line(d: Driver) -> str:
@@ -63,7 +74,7 @@ class Views:
         return ReplyKeyboardMarkup(
             keyboard=[
                 [kb_button("🚕 Taksi chaqirish", style=SUCCESS, location=True, emoji="taxi")],
-                [kb_button("📋 Safarlarim"), kb_button("ℹ️ Yordam")],
+                [kb_button("📋 Safarlarim"), kb_button("📍 Manzillarim"), kb_button("ℹ️ Yordam")],
             ],
             resize_keyboard=True,
             is_persistent=True,
@@ -77,16 +88,6 @@ class Views:
             one_time_keyboard=True,
         )
 
-    def destination_keyboard(self) -> ReplyKeyboardMarkup:
-        return ReplyKeyboardMarkup(
-            keyboard=[
-                [kb_button("⏭ Manzilsiz davom etish", style=PRIMARY)],
-                [kb_button("❌ Bekor qilish", style=DANGER)],
-            ],
-            resize_keyboard=True,
-            input_field_placeholder="📎 → Joylashuv → manzilni tanlang",
-        )
-
     def passenger_welcome(self, first_name: str) -> str:
         return (
             f"Assalomu alaykum, <b>{h(first_name)}</b>! 👋\n\n"
@@ -96,31 +97,54 @@ class Views:
             "🔒 Raqamingiz va shaxsiy ma'lumotlaringiz haydovchiga ko'rinmaydi."
         )
 
-    def destination_prompt(self, accuracy: float | None) -> str:
+    def destination_prompt(
+        self,
+        accuracy: float | None,
+        pickup: tuple[float, float],
+        places: list[SavedPlace] | None = None,
+        recents: list[Order] | None = None,
+    ) -> View:
+        """Bitta xabar: saqlangan manzillar + oxirgi manzillar + manzilsiz — 1 bosishda tanlash."""
+        from ..services.geo import haversine_m
+
         acc = ""
         if accuracy and accuracy > self.s.bad_accuracy_m:
             acc = (
                 f"\n⚠️ Joylashuv aniqligi past (±{int(accuracy)} m). GPS ni yoqib, qaytadan "
                 "yuborishingiz yoki xaritada aniq nuqtani tanlashingiz mumkin."
             )
-        return (
+        text = (
             "✅ <b>Olish joyi qabul qilindi.</b>" + acc + "\n\n"
-            "🏁 <b>Qayerga borasiz?</b>\n"
-            "📎 → <b>Joylashuv</b> → xaritada manzilni belgilang va yuboring.\n\n"
-            "Manzilni bilmasangiz — <b>⏭ Manzilsiz davom etish</b> (narx taksometr bo'yicha)."
+            "🏁 <b>Qayerga borasiz?</b> Pastdan tanlang yoki 📎 → <b>Joylashuv</b> orqali "
+            "xaritada belgilang."
         )
 
-    def recent_destinations(self, orders: list[Order], pickup: tuple[float, float]) -> View:
-        from ..services.geo import haversine_m
+        def dist(lat: float, lon: float) -> str:
+            return format_distance(haversine_m(pickup[0], pickup[1], lat, lon))
 
-        buttons = []
-        for o in orders:
-            dist = haversine_m(pickup[0], pickup[1], o.dest_lat or 0, o.dest_lon or 0)
-            title = o.dest_title or "Oldingi manzil"
-            buttons.append(
-                btn(f"🕘 {title[:28]} · {format_distance(dist)}", cb=PCb(action="recent", oid=o.id))
+        rows: list = []
+        saved_buttons = [
+            btn(
+                f"{PLACE_ICONS.get(p.kind, '📌')} {p.title[:16]} · {dist(p.lat, p.lon)}",
+                cb=PCb(action="place", oid=p.id),
+                style=PRIMARY if p.kind in ("home", "work") else None,
             )
-        return View.plain("🕘 <b>Oxirgi manzillaringiz:</b>", inline(*buttons))
+            for p in (places or [])
+            if haversine_m(pickup[0], pickup[1], p.lat, p.lon) > 150
+        ]
+        for i in range(0, len(saved_buttons), 2):
+            rows.append(saved_buttons[i : i + 2])
+        saved_points = [(p.lat, p.lon) for p in (places or [])]
+        for o in recents or []:
+            if any(haversine_m(o.dest_lat or 0, o.dest_lon or 0, a, b) < 200 for a, b in saved_points):
+                continue
+            title = o.dest_title or "Oldingi manzil"
+            rows.append(
+                btn(f"🕘 {title[:24]} · {dist(o.dest_lat or 0, o.dest_lon or 0)}", cb=PCb(action="recent", oid=o.id))
+            )
+        rows.append(btn("⏭ Manzilsiz (taksometr)", cb=PCb(action="nodest")))
+        rows.append(btn("❌ Bekor qilish", cb=PCb(action="draftx"), style=DANGER))
+        return View.plain(text, inline(*rows))
 
     def quote(self, q: Quote) -> View:
         card = Card("🚕 Buyurtmani tasdiqlang")
@@ -140,9 +164,16 @@ class Views:
         else:
             card.row("🚕 Yaqin atrofda", "hozircha bo'sh mashina yo'q — qidiruv kengaytiriladi")
         card.row("💬 Izoh", q.comment)
+        if q.rider_phone:
+            card.row("👤 Yo'lovchi", f"boshqa odam · {mask_phone(q.rider_phone)}")
         card.para("💬 Haydovchi uchun izoh qoldirish uchun shunchaki yozing (masalan: 3-podyezd oldida).")
+        card.foot("🔒 Narx qat'iy — tirbandlik yoki talab oshganda ham o'zgarmaydi.")
         markup = inline(
             btn("🚕 Buyurtma berish", cb=PCb(action="confirm"), style=SUCCESS, emoji="taxi"),
+            btn(
+                "👤 O'zim uchun" if q.rider_phone else "👤 Boshqa odam uchun",
+                cb=PCb(action="self" if q.rider_phone else "rider"),
+            ),
             btn("❌ Bekor qilish", cb=PCb(action="draftx"), style=DANGER),
         )
         return View.of(card, markup)
@@ -170,12 +201,16 @@ class Views:
             ),
         )
 
+    @staticmethod
+    def _share(share_url: str | None):
+        return btn("👨‍👩‍👧 Yaqinlarga ulashish", url=share_url) if share_url else None
+
     def _car_rows(self, card: Card, d: Driver) -> None:
         card.row("🚘 Avtomobil", car_line(d))
         card.row("🔢 Davlat raqami", d.car_plate)
         card.row("⭐ Reyting", f"{d.rating:.2f}")
 
-    def driver_found(self, o: Order, d: Driver) -> View:
+    def driver_found(self, o: Order, d: Driver, share_url: str | None = None) -> View:
         card = Card("🚕 Haydovchi topildi!")
         self._car_rows(card, d)
         if o.pickup_eta_s:
@@ -186,11 +221,12 @@ class Views:
             card,
             inline(
                 btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY),
+                self._share(share_url),
                 btn("❌ Bekor qilish", cb=PCb(action="cancel", oid=o.id), style=DANGER),
             ),
         )
 
-    def driver_arrived(self, o: Order, d: Driver) -> View:
+    def driver_arrived(self, o: Order, d: Driver, share_url: str | None = None) -> View:
         card = Card("🚕 Haydovchi yetib keldi!")
         card.para(f"{car_line(d)} · {d.car_plate} sizni kutmoqda.")
         card.row("⏳ Bepul kutish", f"{self.s.free_wait_min} daq")
@@ -199,11 +235,12 @@ class Views:
             card,
             inline(
                 btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY),
+                self._share(share_url),
                 btn("❌ Bekor qilish", cb=PCb(action="cancel", oid=o.id), style=DANGER),
             ),
         )
 
-    def trip_started(self, o: Order, d: Driver) -> View:
+    def trip_started(self, o: Order, d: Driver, share_url: str | None = None) -> View:
         card = Card("🚀 Safar boshlandi — oq yo'l!")
         card.row("🚘 Avtomobil", f"{car_line(d)} · {d.car_plate}")
         card.row("💰 Narx", self.m(o.est_price) if o.est_price else self.taximeter_text())
@@ -213,6 +250,9 @@ class Views:
             inline(
                 btn("🏁 Manzilga yetib keldim", cb=PCb(action="arrive", oid=o.id), style=SUCCESS),
                 btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY),
+                [self._share(share_url), btn("🆘 SOS", cb=PCb(action="sos", oid=o.id), style=DANGER)]
+                if share_url
+                else btn("🆘 SOS", cb=PCb(action="sos", oid=o.id), style=DANGER),
             ),
         )
 
@@ -244,11 +284,68 @@ class Views:
         ]
         return View.of(card, inline(stars))
 
-    def rated(self, o: Order, stars: int) -> View:
+    def rated(self, o: Order, stars: int, *, is_favorite: bool = False, saved_kinds: set[str] | None = None) -> View:
         card = Card("🙏 Rahmat!")
         card.row("Bahoyingiz", "⭐" * stars)
         card.row("💰 To'lov", self.m(o.final_price))
-        return View.of(card, inline(btn("✅ Baholandi", disabled=True)))
+        rows: list = [btn("✅ Baholandi", disabled=True)]
+        if stars >= 4:
+            rows.append(
+                btn("❤️ Sevimli haydovchim", disabled=True)
+                if is_favorite
+                else btn("❤️ Sevimli haydovchilarga qo'shish", cb=PCb(action="fav", oid=o.id), style=SUCCESS)
+            )
+        if o.has_destination:
+            saved_kinds = saved_kinds or set()
+            save_row = [
+                btn(f"💾 {PLACE_ICONS[k]} {PLACE_NAMES[k]} deb saqlash", cb=PCb(action="savedest", oid=o.id, val=i))
+                for i, k in enumerate(("home", "work"))
+                if k not in saved_kinds
+            ]
+            if save_row:
+                card.para("Bu manzilni saqlang — keyingi safar bir bosishda tanlaysiz:")
+                rows.append(save_row)
+        return View.of(card, inline(*rows))
+
+    def near_alert(self, o: Order, d: Driver, distance_m: float) -> View:
+        return View.plain(
+            f"🚕 <b>Haydovchi yaqinlashmoqda</b> — {format_distance(distance_m)} qoldi.\n"
+            f"{h(car_line(d))} · <b>{h(d.car_plate)}</b>. Chiqishga tayyorlaning 🙂"
+        )
+
+    # =================================================================== YAQINLAR KUZATUVI
+    def watcher_card(self, o: Order, d: Driver) -> View:
+        status = {
+            OrderStatus.ACCEPTED: "🚕 Haydovchi yo'lovchi oldiga ketmoqda",
+            OrderStatus.ARRIVED: "⏳ Haydovchi yo'lovchini kutmoqda",
+            OrderStatus.IN_PROGRESS: "🚀 Safar davom etmoqda",
+            OrderStatus.FINISHING: "🏁 Manzilga yetib kelishmoqda",
+        }.get(OrderStatus(o.status), "🚕 Safar")
+        card = Card(f"👨‍👩‍👧 Yaqiningiz safari #{o.id}")
+        card.row("📍 Holat", status)
+        self._car_rows(card, d)
+        card.foot("Mashinaning joylashuvi quyidagi jonli xaritada. Safar tugagach kuzatuv o'chadi.")
+        return View.of(card)
+
+    # =================================================================== SAQLANGAN MANZILLAR
+    def places_menu(self, places: list[SavedPlace]) -> View:
+        card = Card("📍 Manzillarim")
+        if places:
+            for p in places:
+                card.row(f"{PLACE_ICONS.get(p.kind, '📌')} {p.title}", f"{p.lat:.4f}, {p.lon:.4f}")
+            card.para("Taksi chaqirganda bu manzillar bir bosishda tanlanadi.")
+        else:
+            card.para("Hali saqlangan manzil yo'q. Uy va ish manzilingizni qo'shing — taksi 3 bosishda chaqiriladi.")
+        kinds = {p.kind for p in places}
+        add_row = [
+            btn(f"➕ {PLACE_ICONS[k]} {PLACE_NAMES[k]}", cb=PCb(action="addplace", val=i), style=PRIMARY)
+            for i, k in enumerate(("home", "work", "other"))
+            if k == "other" or k not in kinds
+        ]
+        rows: list = [add_row]
+        for p in places:
+            rows.append(btn(f"🗑 {PLACE_ICONS.get(p.kind, '📌')} {p.title} — o'chirish", cb=PCb(action="delplace", oid=p.id)))
+        return View.of(card, inline(*rows))
 
     def cancelled_passenger(self, o: Order, reason: str) -> View:
         card = Card("❌ Buyurtma bekor qilindi")
@@ -309,13 +406,25 @@ class Views:
         card.row("📍 Yo'lovchigacha", f"{format_distance(c.road_m)} · ~{format_duration(c.eta_s)}")
         card.row("🧭 Yo'nalish", compass(c.bearing))
         if o.has_destination and o.est_distance_m:
-            card.row("🏁 Safar", format_distance(o.est_distance_m))
+            direction = compass_to(
+                bearing_deg(o.pickup_lat, o.pickup_lon, o.dest_lat, o.dest_lon)  # type: ignore[arg-type]
+            )
+            card.row("🏁 Safar", f"{format_distance(o.est_distance_m)} · {direction}")
             card.row("💰 Narx", self.m(o.est_price))
         else:
             card.row("🏁 Safar", "manzil ko'rsatilmagan")
             card.row("💰 Narx", "taksometr")
         card.row("💬 Izoh", o.comment)
-        card.foot("Aniq manzil qabul qilgandan so'ng ochiladi.")
+        badges = []
+        if c.favorite:
+            badges.append("❤️ Sizni sevimli haydovchi deb belgilagan yo'lovchi")
+        if c.home_bound:
+            badges.append("🏡 Uyingiz tomonga")
+        if o.rider_phone:
+            badges.append("👤 Boshqa odam uchun buyurtma")
+        for b in badges:
+            card.para(b)
+        card.foot("Aniq manzil qabul qilgandan so'ng ochiladi. O'tkazib yuborish uchun jarima yo'q.")
         return View.of(
             card,
             inline(
@@ -327,7 +436,7 @@ class Views:
     def offer_gone(self, o: Order) -> View:
         return View.plain(f"⌛️ Buyurtma #{o.id} boshqa haydovchi tomonidan olindi.")
 
-    def driver_order(self, o: Order, d: Driver) -> View:
+    def driver_order(self, o: Order, d: Driver, *, auto: bool = False) -> View:
         call = btn("📞 Yo'lovchi bilan aloqa", cb=DCb(action="call", oid=o.id), style=PRIMARY)
         status = OrderStatus(o.status)
         if status == OrderStatus.ACCEPTED:
@@ -339,6 +448,10 @@ class Views:
             if o.has_destination and o.est_distance_m:
                 card.row("🏁 Safar", format_distance(o.est_distance_m))
             card.row("💬 Izoh", o.comment)
+            if o.rider_phone:
+                card.para("👤 Buyurtma boshqa odam uchun — «Aloqa» sizni aynan o'sha yo'lovchi bilan bog'laydi.")
+            if auto:
+                card.foot("⚡ Avto-qabul: buyurtma sizga avtomatik biriktirildi.")
             markup = inline(
                 btn(
                     "📍 Yo'lovchini olish manzili",
@@ -406,6 +519,42 @@ class Views:
             card = Card(f"❌ Buyurtma #{o.id} bekor qilindi")
             markup = None
         return View.of(card, markup)
+
+    def driver_settings(self, d: Driver) -> View:
+        from .kit import NAVIGATORS
+        from .kit import DCb as _D
+
+        card = Card("⚙️ Sozlamalar")
+        card.row("🧭 Navigator", NAVIGATORS.get(d.navigator, d.navigator))
+        card.row("⚡ Avto-qabul", "yoqilgan" if d.auto_accept else "o'chiq")
+        home = "yoqilgan" if d.home_mode else ("o'chiq" if d.home_lat is not None else "uy belgilanmagan")
+        card.row("🏡 Uyga rejimi", home)
+        card.para(
+            "⚡ Avto-qabul — eng yaqin bo'lsangiz buyurtma bosishsiz, bir zumda sizga biriktiriladi."
+        )
+        card.para("🏡 Uyga rejimi — faqat uyingiz tomonga ketayotgan buyurtmalar keladi (ish oxirida qulay).")
+        nav_row = [
+            btn(("✅ " if key == d.navigator else "") + name, cb=_D(action="nav", val=i))
+            for i, (key, name) in enumerate(NAVIGATORS.items())
+        ]
+        rows: list = [
+            nav_row,
+            btn(
+                "⚡ Avto-qabulni o'chirish" if d.auto_accept else "⚡ Avto-qabulni yoqish",
+                cb=_D(action="auto"),
+                style=None if d.auto_accept else SUCCESS,
+            ),
+        ]
+        if d.home_lat is not None:
+            rows.append(
+                btn(
+                    "🏡 Uyga rejimini o'chirish" if d.home_mode else "🏡 Uyga rejimini yoqish",
+                    cb=_D(action="home"),
+                    style=None if d.home_mode else SUCCESS,
+                )
+            )
+        rows.append(btn("📍 Uy manzilini belgilash" if d.home_lat is None else "📍 Uy manzilini o'zgartirish", cb=_D(action="sethome")))
+        return View.of(card, inline(*rows))
 
     def driver_cancel_confirm(self, o: Order) -> View:
         card = Card(f"Buyurtma #{o.id} ni bekor qilasizmi?")

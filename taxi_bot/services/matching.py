@@ -26,6 +26,9 @@ class Candidate:
     precise: bool  # True — road_m haqiqiy yo'l bo'yicha hisoblangan
     bearing: float = 0.0  # haydovchidan yo'lovchiga yo'nalish
     accuracy_m: float | None = None
+    auto_accept: bool = False  # ⚡ bosishsiz biriktiriladi
+    favorite: bool = False  # ❤️ yo'lovchining sevimli haydovchisi
+    home_bound: bool = False  # 🏡 safar haydovchining uyi tomonga
 
     @property
     def band_m(self) -> float:
@@ -48,6 +51,19 @@ def select_wave(
     priority = [c for c in in_band if c.rating >= priority_rating]
     rest = [c for c in in_band if c.rating < priority_rating]
     return priority, rest
+
+
+def home_gain(
+    driver_lat: float, driver_lon: float, home_lat: float, home_lon: float, dest_lat: float, dest_lon: float
+) -> float:
+    """Safar haydovchini uyiga qanchalik yaqinlashtiradi (0.3 = 30% yaqinroq, manfiy — uzoqlashadi)."""
+    from .geo import haversine_m
+
+    now = haversine_m(driver_lat, driver_lon, home_lat, home_lon)
+    if now < 300:  # allaqachon uyida
+        return 0.0
+    after = haversine_m(dest_lat, dest_lon, home_lat, home_lon)
+    return (now - after) / now
 
 
 def bayesian_rating(rating_sum: int, rating_count: int, prior: float, weight: int) -> float:

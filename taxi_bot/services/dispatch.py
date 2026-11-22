@@ -10,6 +10,8 @@ Har bir qidirilayotgan buyurtma uchun alohida asyncio vazifasi ishlaydi:
     umumiy vaqt tugasa -> "haydovchi topilmadi"
 
 Diapazonda hech kim bo'lmasa — kutilmaydi, darhol keyingisiga o'tiladi.
+❤️ Avval yo'lovchining sevimli haydovchilari (yaqin bo'lsa) ko'radi.
+⚡ Avto-qabul yoqilgan haydovchi diapazonda eng yaxshisi bo'lsa — buyurtma bir zumda biriktiriladi.
 To'lqindagi hamma rad etsa — muddatidan oldin keyingi to'lqinga o'tiladi.
 """
 
@@ -20,7 +22,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..db.models import OrderStatus, utcnow
-from .matching import select_wave
+from .matching import rank_key, select_wave
 
 if TYPE_CHECKING:
     from .taxi import TaxiService
@@ -86,6 +88,21 @@ class DispatchEngine:
             radii = [r * 1000 for r in s.wave_radii_km]
             wave = 0
 
+            # 0-bosqich: ❤️ sevimli haydovchilar (yaqin bo'lsa) birinchi bo'lib oladi
+            favorites = await self.svc.find_candidates(order, s.favorite_radius_km * 1000, favorites_only=True)
+            if favorites:
+                favorites.sort(key=rank_key)
+                if await self._try_auto(order, favorites):
+                    return
+                fav_ids = await self.svc.send_offers(order, favorites, -1)
+                headstart = min(s.favorite_headstart_sec, max(0.0, deadline - loop.time()))
+                if (
+                    fav_ids
+                    and headstart > 0
+                    and await self._sleep(order_id, search_round, headstart, fav_ids) == "stop"
+                ):
+                    return
+
             while True:
                 order = await self.svc.get_order(order_id)
                 if (
@@ -103,6 +120,9 @@ class DispatchEngine:
                 candidates = await self.svc.find_candidates(order, radius)
                 priority, rest = select_wave(candidates, radius, s.priority_rating)
                 wave_driver_ids: list[int] = []
+                # ⚡ Avto-qabul yoqilgan eng yaqin haydovchiga bir zumda biriktiramiz
+                if await self._try_auto(order, priority + rest):
+                    return
 
                 if priority:
                     wave_driver_ids += await self.svc.send_offers(order, priority, wave)
@@ -146,6 +166,8 @@ class DispatchEngine:
                         return
                     newcomers = await self.svc.find_candidates(order, radius)
                     priority, rest = select_wave(newcomers, radius, s.priority_rating)
+                    if await self._try_auto(order, priority + rest):
+                        return
                     if priority or rest:
                         wave_driver_ids += await self.svc.send_offers(order, priority + rest, wave)
                 wave += 1
@@ -157,6 +179,12 @@ class DispatchEngine:
                 await self.svc.on_search_failed(order_id, None)
             except Exception:
                 log.exception("on_search_failed xatosi")
+
+    async def _try_auto(self, order, ranked) -> bool:
+        for candidate in ranked:
+            if candidate.auto_accept and await self.svc.auto_assign(order, candidate):
+                return True
+        return False
 
     async def _sleep(
         self,

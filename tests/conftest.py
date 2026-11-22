@@ -31,6 +31,7 @@ class FakeMessenger:
     deleted: list[tuple[Role, int, int]] = field(default_factory=list)
     admin: list[View] = field(default_factory=list)
     live: list[tuple] = field(default_factory=list)
+    admin_chat_ids: list[int] = field(default_factory=lambda: [999])
     _ids: itertools.count = field(default_factory=lambda: itertools.count(100))
 
     async def send(self, role, chat_id, view, *, effect=None, silent=False):
