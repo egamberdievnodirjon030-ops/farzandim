@@ -32,6 +32,15 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
   (manzil mashinaning joriy joyiga o'zgaradi, narx bosib o'tilgan yo'l bo'yicha);
 * izoh, boshqa odam uchun buyurtma, baholash, sevimli haydovchi, manzilni saqlash.
 
+**Dizayn (Yandex Go uslubida):**
+* xaritada **🟢 start (olish joyi)** va **🏁 finish (manzil)** belgilari — ustida jonli yozuv: mashina kelishiga qolgan
+  vaqt («🚕 3 daq»), manzilgacha qolgan vaqt («7 daq»), «Shu yerda» va h.k.; GPS nuqtasi va mashinalar ustida turadi;
+* **«Qayerdan → Qayerga»** kartasi (yashil doira → qora kvadrat, nuqtali chiziq) — bosh sahifada, narxda va har bir
+  buyurtma holatida, yo'lovchida ham, haydovchida ham;
+* **kamera kuzatuvi** — xaritani o'zingiz surmagan bo'lsangiz, mashina va maqsad nuqta doim ekranda (pastki panel va
+  yuqori tugmalar ostida qolmaydi);
+* **tungi rejim** — Telegram mavzusi qorong'i bo'lsa, xarita ham qorong'i, belgilar unga moslashadi.
+
 **Ikkalasi uchun:**
 * **📡 Jonli joylashuv** — ilova ochilishi bilan **avtomatik yoqiladi** va **o'zingiz o'chirmaguningizcha** ishlaydi
   (yuqoridagi «📡» tugmasi; tanlov saqlanadi). Har ~3 soniyada yangilanadi. Yo'lovchining joylashuvi faqat faol

@@ -11,7 +11,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const S = {
   app: null, config: null, map: null, layers: {}, car: null, me: null,
   pickup: null, dest: null, quote: null, mode: "boot", order: null, offerIdx: 0,
-  pollBusy: false, route: null, routeBusy: false, pinHandler: null, location: null,
+  pollBusy: false, route: null, routeBusy: false, pinHandler: null, location: null, pins: {}, userMovedAt: 0,
   driver: null, online: false, live: true, liveBusy: false, paxMarker: null,
 };
 
@@ -234,6 +234,11 @@ function initMap(center) {
   }).addTo(S.map);
   for (const name of ["route", "markers", "cars", "radar"]) S.layers[name] = L.layerGroup().addTo(S.map);
   S.map.on("movestart", () => $("#center-pin").classList.add("lifted"));
+  // foydalanuvchi xaritani o'zi surdi — kamera kuzatuvi bir muddat to'xtaydi
+  const touched = () => { S.userMovedAt = Date.now(); };
+  S.map.on("dragstart", touched);
+  $("#map").addEventListener("wheel", touched, { passive: true });
+  $("#map").addEventListener("touchstart", (e) => { if (e.touches.length > 1) touched(); }, { passive: true });
   S.map.on("moveend", () => {
     $("#center-pin").classList.remove("lifted");
     if (S.pinHandler && !$("#center-pin").hidden) S.pinHandler(visibleCenter());
@@ -288,7 +293,7 @@ function fitTo(points) {
   if (!valid.length) return;
   if (valid.length === 1) return centerOn(valid[0][0], valid[0][1], 16);
   requestAnimationFrame(() => S.map.fitBounds(L.latLngBounds(valid), {
-    paddingTopLeft: [40, 90], paddingBottomRight: [40, sheetHeight() + 40], maxZoom: 17, animate: true,
+    paddingTopLeft: [50, 150], paddingBottomRight: [50, sheetHeight() + 30], maxZoom: 17, animate: true,
   }));
 }
 
@@ -409,11 +414,76 @@ function nearestSegment(coords, p) {
   return [best, bestD];
 }
 
-function abMarker(lat, lon, label, cls = "") {
-  return L.marker([lat, lon], {
-    icon: L.divIcon({ className: "", html: `<div class="ab-marker ${cls}">${label}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
-    interactive: false,
+// ---------------------------------------------------------------- start / finish belgilari (Yandex Go kabi)
+const PIN_BODY = "M18 44.5C18 44.5 33 29 33 17.8A15 15 0 0 0 3 17.8C3 29 18 44.5 18 44.5Z";
+const FLAG = '<rect class="fl-w" x="11.5" y="9.5" width="2.2" height="17" rx="1.1"/>'
+  + '<rect class="fl-w" x="13.7" y="9.5" width="11.5" height="8.6"/>'
+  + '<g class="fl-b"><rect x="13.7" y="9.5" width="2.9" height="2.9"/><rect x="19.4" y="9.5" width="2.9" height="2.9"/>'
+  + '<rect x="16.6" y="12.4" width="2.8" height="2.9"/><rect x="22.3" y="12.4" width="2.9" height="2.9"/>'
+  + '<rect x="13.7" y="15.3" width="2.9" height="2.8"/><rect x="19.4" y="15.3" width="2.9" height="2.8"/></g>';
+
+function pinIcon(kind, label) {
+  const inner = kind === "start" ? '<circle cx="18" cy="17.8" r="6.2" fill="#fff"/>' : FLAG;
+  const html = `<div class="mpin ${kind}">${label ? `<span class="mpin-label">${esc(label)}</span>` : ""}`
+    + `<svg viewBox="0 0 36 46" aria-hidden="true"><path class="mpin-body" d="${PIN_BODY}"/>${inner}</svg></div>`;
+  return L.divIcon({ className: "", html, iconSize: [36, 46], iconAnchor: [18, 45] });
+}
+
+/** Olish (start) va manzil (finish) belgilari: GPS nuqtasi va mashinalar ustida turadi, yozuvi yangilanadi. */
+function setPin(kind, latlon, label = "") {
+  let m = S.pins[kind];
+  if (!latlon) {
+    if (m) { m.remove(); S.pins[kind] = null; }
+    return;
+  }
+  if (!m) {
+    m = L.marker(latlon, { icon: pinIcon(kind, label), interactive: false, keyboard: false, zIndexOffset: kind === "start" ? 1200 : 1100 });
+    m._label = label;
+    S.pins[kind] = m;
+  } else {
+    m.setLatLng(latlon);
+    if (m._label !== label) { m.setIcon(pinIcon(kind, label)); m._label = label; }
+  }
+  if (!S.layers.markers.hasLayer(m)) S.layers.markers.addLayer(m);
+}
+
+function clearPins() { setPin("start", null); setPin("finish", null); }
+
+/** Nuqtaning ko'cha nomi (keshdan; bo'lmasa so'raladi va keyingi yangilanishda chiqadi). */
+function addr(lat, lon) {
+  const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  if (geoCache.has(key)) { const r = geoCache.get(key); return r ? r.title : null; }
+  reverse(lat, lon);
+  return null;
+}
+
+/** Yandex Go kabi «Qayerdan → Qayerga» kartasi: start — yashil doira, finish — qora kvadrat, nuqtali chiziq bilan. */
+function routeCard(from, to, { interactive = false, compact = false, toHint = "" } = {}) {
+  const tag = interactive ? "button" : "div";
+  const row = (id, dot, label, value, placeholder, hint, chev) => `<${tag} class="rc-row"${interactive ? ` id="${id}"` : ""}>
+      <i class="rc-dot ${dot}"></i><span class="txt"><span class="t2">${label}</span>
+      <span class="t1${value ? "" : " muted"}">${esc(value || placeholder)}</span>${hint ? `<span class="t3">${esc(hint)}</span>` : ""}</span>
+      ${chev ? '<span class="chev">›</span>' : ""}</${tag}>`;
+  return `<div class="route-card${compact ? " compact" : ""}">
+    ${row("pickup-field", "start", "Qayerdan", from, "Aniqlanmoqda…", "", false)}
+    ${row("dest-field", "finish", "Qayerga", to, "Manzilni tanlang", toHint, interactive)}</div>`;
+}
+
+/**
+ * Kamera kuzatuvi: foydalanuvchi xaritani o'zi surmagan bo'lsa (12 s), mashina va maqsad nuqta doim ko'rinib turadi.
+ * Nuqtalar ekranda bo'lsa, kamera qimirlamaydi (keraksiz silkinish yo'q).
+ */
+function follow(points) {
+  if (Date.now() - S.userMovedAt < 12000) return;
+  const valid = points.filter((p) => p && p[0] != null);
+  if (!valid.length) return;
+  const size = S.map.getSize();
+  const bottom = size.y - sheetHeight() - 30;
+  const outside = valid.some((p) => {
+    const pt = S.map.latLngToContainerPoint(p);
+    return pt.x < 30 || pt.x > size.x - 30 || pt.y < 130 || pt.y > bottom;
   });
+  if (outside) fitTo(valid);
 }
 
 function updateMe(loc) {
@@ -575,6 +645,7 @@ async function passengerPoll() {
 function resetMap() {
   S.layers.route.clearLayers();
   S.layers.markers.clearLayers();
+  clearPins();
   S.layers.radar.clearLayers();
   S.car = null;
   S.order = null;
@@ -604,17 +675,28 @@ function enterHome() {
   Back.hide();
   drawRoute(null);
   S.layers.markers.clearLayers();
+  clearPins();
   showPin("pickup", "");
   S.pinHandler = (c) => {
     // GPS nuqtasiga 15 m dan yaqin bo'lsa — aynan GPS koordinatasi (aniqlik saqlanadi)
     const g = S.location;
     const near = g && Math.hypot((c.lat - g.lat) * 111320, (c.lon - g.lon) * 111320 * Math.cos((g.lat * Math.PI) / 180)) < 15;
+    const prev = S.pickup;
     S.pickup = near ? { lat: g.lat, lon: g.lon, accuracy: g.accuracy, title: null } : { lat: c.lat, lon: c.lon, accuracy: null, title: null };
-    renderHome();
+    // xarita biroz siljisa (oyna o'lchami o'zgarsa) — manzil nomi saqlanadi
+    if (prev && prev.title && dist([prev.lat, prev.lon], [S.pickup.lat, S.pickup.lon]) < 12) {
+      S.pickup.title = prev.title;
+      S.pickup.subtitle = prev.subtitle;
+    }
+    if (S.mode === "home") renderHome();
     clearTimeout(reverseTimer);
+    const at = S.pickup;
     reverseTimer = setTimeout(async () => {
       const r = await reverse(c.lat, c.lon);
-      if (r && S.mode === "home") { S.pickup.title = r.title; S.pickup.subtitle = r.subtitle; renderHome(); }
+      if (!r || S.pickup !== at) return;
+      at.title = r.title;
+      at.subtitle = r.subtitle;
+      if (S.mode === "home") renderHome();
     }, 450);
     refreshNearby(true);
   };
@@ -635,13 +717,9 @@ function placeChips() {
 function renderHome() {
   const p = S.pickup || {};
   sheet(`
-    <button class="field" id="pickup-field"><span class="icon">🟡</span><span class="txt">
-      <div class="t1">${esc(p.title || "Olish joyi aniqlanmoqda…")}</div>
-      <div class="t2">${esc(p.subtitle || "Xaritani surib aniq nuqtani tanlang")}</div></span></button>
-    <button class="field" id="dest-field"><span class="icon">🏁</span><span class="txt"><div class="t1 muted">Qayerga boramiz? (xaritada)</div>
-      <div class="t2">Narx darhol va qat'iy</div></span><span>›</span></button>
-    <button class="field" id="dest-text"><span class="icon">✍️</span><span class="txt"><div class="t1 muted">Manzil nomini yozish</div>
-      <div class="t2">Masalan «Chorsu bozori» — narx taksometr bo'yicha (km)</div></span><span>›</span></button>
+    ${routeCard(p.title, null, { interactive: true, toHint: "Narx darhol va qat'iy" })}
+    <button class="link-row" id="dest-text"><span class="lr-ico">✍️</span><span class="txt"><span class="t1">Manzil nomini yozish</span>
+      <span class="t2">Xaritasiz — narx safar oxirida taksometr bo'yicha (km)</span></span><span class="chev">›</span></button>
     <div class="chips" id="chips">${placeChips()}</div>`);
   on("dest-field", openSearch);
   on("dest-text", writeDest);
@@ -746,13 +824,15 @@ async function setTextDest(name) {
   S.layers.cars.clearLayers();
   S.layers.markers.clearLayers();
   drawRoute(null);
-  abMarker(S.pickup.lat, S.pickup.lon, "A").addTo(S.layers.markers);
+  setPin("start", [S.pickup.lat, S.pickup.lon], "Olish joyi");
+  setPin("finish", null);
   sheet(`<div class="row between"><h2>Hisoblanmoqda…</h2></div><div class="searching-line"><i></i></div>`);
   Back.show(() => enterHome());
   try {
     const q = await api("/api/p/quote", { pickup: S.pickup, dest: { title: name } });
     if (S.mode !== "quote") return;
     S.quote = q;
+    setPin("start", [S.pickup.lat, S.pickup.lon], q.nearby ? `🚕 ${mins(q.nearest_eta_s)}` : "Olish joyi");
     centerOn(S.pickup.lat, S.pickup.lon, 16);
     renderQuote();
   } catch (e) { toast(e.message, true); enterHome(); }
@@ -765,8 +845,8 @@ async function setDest(dest) {
   hidePin();
   S.layers.cars.clearLayers();
   S.layers.markers.clearLayers();
-  abMarker(S.pickup.lat, S.pickup.lon, "A").addTo(S.layers.markers);
-  abMarker(dest.lat, dest.lon, "B", "b").addTo(S.layers.markers);
+  setPin("start", [S.pickup.lat, S.pickup.lon], "Olish joyi");
+  setPin("finish", [dest.lat, dest.lon], "Manzil");
   sheet(`<div class="row between"><h2>Narx hisoblanmoqda…</h2></div><div class="searching-line"><i></i></div>`);
   Back.show(() => enterHome());
   Second.hide();
@@ -776,6 +856,8 @@ async function setDest(dest) {
     S.quote = q;
     const a = [S.pickup.lat, S.pickup.lon];
     const b = [dest.lat, dest.lon];
+    setPin("start", a, q.nearby ? `🚕 ${mins(q.nearest_eta_s)}` : "Olish joyi");
+    setPin("finish", b, mins(q.duration_s));
     drawRoute(q.route, a, b);
     if (!q.route_precise) {
       fetchRouteDirect(a, b).then((c) => { if (c && S.mode === "quote" && S.quote === q) drawRoute(c, a, b); });
@@ -790,8 +872,8 @@ function renderQuote() {
   const t = S.config.tariff;
   if (S.dest && S.dest.text) {
     sheet(`
-      <div class="row between"><div><div class="muted small">✍️ ${esc(S.dest.title)}</div><div class="price">Taksometr</div></div>
-        <div class="muted small right">km bo'yicha</div></div>
+      ${routeCard(S.pickup.title || addr(S.pickup.lat, S.pickup.lon), `✍️ ${S.dest.title}`, { compact: true })}
+      <div class="row between mt"><div class="price">Taksometr</div><div class="muted small right">narx km bo'yicha</div></div>
       <div class="kv"><div><b>${num(t.base_fare)}</b><span>o'tirish (${t.base_km} km gacha)</span></div>
         <div><b>${num(t.per_km)}</b><span>${esc(S.config.currency)} / km</span></div>
         <div><b>${q.nearby ? mins(q.nearest_eta_s) : "—"}</b><span>${q.nearby ? `${q.nearby} ta mashina yaqin` : "yaqinda yo'q"}</span></div></div>
@@ -802,8 +884,8 @@ function renderQuote() {
     return;
   }
   sheet(`
-    <div class="row between"><div><div class="muted small">${esc(S.dest.title || "Manzil")}</div><div class="price">${money(q.price)}</div></div>
-      <div class="muted small right">🔒 Qat'iy narx</div></div>
+    ${routeCard(S.pickup.title || addr(S.pickup.lat, S.pickup.lon), S.dest.title || "Xaritada belgilangan nuqta", { compact: true })}
+    <div class="row between mt"><div class="price">${money(q.price)}</div><div class="muted small right">🔒 Qat'iy narx</div></div>
     <div class="kv"><div><b>${km(q.distance_m)}</b><span>masofa</span></div><div><b>${mins(q.duration_s)}</b><span>yo'lda</span></div>
       <div><b>${q.nearby ? mins(q.nearest_eta_s) : "—"}</b><span>${q.nearby ? `${q.nearby} ta mashina yaqin` : "yaqinda yo'q"}</span></div></div>
     <div class="field"><span class="icon">💬</span><span class="txt"><input id="comment" maxlength="200" placeholder="Haydovchiga izoh (masalan: 3-podyezd)"></span></div>
@@ -843,10 +925,27 @@ function renderPassengerOrder(state) {
   if (first) {
     S.layers.markers.clearLayers();
     S.car = null;
-    abMarker(pickup[0], pickup[1], "A").addTo(S.layers.markers);
-    if (dest) abMarker(dest[0], dest[1], "B", "b").addTo(S.layers.markers);
     haptic(o.status === "searching" ? "light" : "success");
   }
+  // 🟢 olish joyi va 🏁 manzil: yozuvda mashina kelish / manzilgacha qolgan vaqt (yo'l bo'yicha)
+  const leftTo = (b) => { const r = routeLeftFor(b); return r ? r.dur : null; };
+  let startLabel = "Olish joyi";
+  if (o.status === "searching") startLabel = "Qidirilmoqda…";
+  else if (o.status === "accepted") {
+    const eta = leftTo(pickup) ?? o.eta_s;
+    startLabel = eta != null ? `🚕 ${mins(eta)}` : "Olish joyi";
+  } else if (o.status === "arrived") startLabel = "🚕 Shu yerda";
+  let finishLabel = "Manzil";
+  if (o.status === "in_progress") {
+    const eta = leftTo(dest) ?? o.eta_s;
+    finishLabel = eta != null ? mins(eta) : "Manzil";
+  }
+  setPin("start", ["in_progress", "finishing"].includes(o.status) ? null : pickup, startLabel);
+  setPin("finish", dest, finishLabel);
+  const pickupName = (S.pickup && S.pickup.title && dist([S.pickup.lat, S.pickup.lon], pickup) < 30 ? S.pickup.title : null)
+    || addr(pickup[0], pickup[1]);
+  const destName = o.dest ? (o.dest.title || "Xaritada belgilangan nuqta") : o.dest_text ? `✍️ ${o.dest_text}` : "Ko'rsatilmagan (taksometr)";
+  const route = routeCard(pickupName, destName, { compact: true });
   const d = o.driver;
   radar(o.status === "searching", pickup[0], pickup[1]);
   if (o.status !== "searching") S.layers.cars.clearLayers();
@@ -856,10 +955,11 @@ function renderPassengerOrder(state) {
   if (o.status === "searching") {
     const s = o.search || {};
     if (first) { drawRoute(null); fitCircle(pickup[0], pickup[1], Math.min(s.radius_m || 1000, 2500)); refreshNearbyFor(pickup); }
-    sheet(`<h2>Haydovchi qidirilmoqda</h2><div class="muted">Eng yaqin va reytingi yuqori haydovchilar birinchi ko'radi</div>
+    sheet(`<h2>Haydovchi qidirilmoqda</h2><div class="muted small">Eng yaqin va reytingi yuqori haydovchilar birinchi ko'radi</div>
       <div class="searching-line"><i></i></div>
       <div class="kv"><div><b>${km(s.radius_m)}</b><span>radius</span></div><div><b>${s.offered || 0}</b><span>taklif yuborildi</span></div>
-      <div><b>${o.price ? money(o.price) : "taksometr"}</b><span>narx</span></div></div>`);
+      <div><b>${o.price ? num(o.price) : "—"}</b><span>${o.price ? `${esc(S.config.currency)} · qat'iy` : "taksometr"}</span></div></div>
+      ${route}`);
     Main.hide();
     Second.set("Bekor qilish", () => cancelOrder(o), { color: "#f2f3f5", textColor: "#e5453b" });
     return;
@@ -873,23 +973,24 @@ function renderPassengerOrder(state) {
   const carHtml = d ? `<div class="car"><div class="flex1"><div class="t1"><b>${esc(d.car)}</b></div>
       <div class="muted small">⭐ ${Number(d.rating).toFixed(2)}</div></div><span class="plate">${esc(d.plate)}</span></div>` : "";
   if (o.status === "accepted") {
-    if (carPos) { routeBetween(carPos, pickup); if (first) fitTo([carPos, pickup]); } else if (first) fitTo([pickup]);
+    if (carPos) { routeBetween(carPos, pickup); if (first) fitTo([carPos, pickup]); else follow([carPos, pickup]); } else if (first) fitTo([pickup]);
     sheet(`<div class="row between"><h2>Haydovchi yo'lda</h2><div class="route-left" id="route-left">${routeLeftInner(pickup, o.eta_s)}</div></div>
-      ${carHtml}<div class="btns"><button class="btn" id="call">📞 Aloqa</button><button class="btn red" id="cancel">Bekor qilish</button></div>`);
+      ${carHtml}${route}<div class="btns"><button class="btn" id="call">📞 Aloqa</button><button class="btn red" id="cancel">Bekor qilish</button></div>`);
   } else if (o.status === "arrived") {
     drawRoute(null);
     if (first) fitTo([pickup]);
     const free = o.free_wait_left_s;
     sheet(`<h2>Haydovchi sizni kutmoqda</h2>${carHtml}
       <div class="note">${free > 0 ? `⏳ Bepul kutish: ${Math.ceil(free / 60)} daq qoldi` : `⏳ Pullik kutish boshlandi: ${money(S.config.tariff.per_wait_min)}/daq`}</div>
-      <div class="btns"><button class="btn" id="call">📞 Aloqa</button><button class="btn red" id="cancel">Bekor qilish</button></div>`);
+      ${route}<div class="btns"><button class="btn" id="call">📞 Aloqa</button><button class="btn red" id="cancel">Bekor qilish</button></div>`);
   } else if (o.status === "in_progress") {
-    if (carPos && dest) { routeBetween(carPos, dest); if (first) fitTo([carPos, dest]); } else if (first && carPos) fitTo([carPos]);
+    if (carPos && dest) { routeBetween(carPos, dest); if (first) fitTo([carPos, dest]); else follow([carPos, dest]); }
+    else if (carPos) { if (first) fitTo([carPos]); else follow([carPos]); }
     const stopped = o.dest && o.dest.title === "Yo'lovchi to'xtatgan joy";
     sheet(`<div class="row between"><h2>Safardamiz</h2><div class="route-left" id="route-left">${dest ? routeLeftInner(dest, o.eta_s) : ""}</div></div>
-      ${carHtml}${o.dest_text ? `<div class="note">✍️ Manzil: ${esc(o.dest_text)}</div>` : ""}
-      <div class="muted small">${o.fixed_price ? `Narx: ${money(o.price)}` : "Narx bosib o'tilgan km bo'yicha (taksometr)"}</div>
-      <div class="muted small">🏁 Haydovchi manzilingizga yetib kelganda safarni yakunlaydi.</div>
+      ${carHtml}${route}
+      <div class="muted small mt">${o.fixed_price ? `💰 Narx: <b>${money(o.price)}</b> (qat'iy)` : "💰 Narx bosib o'tilgan km bo'yicha (taksometr)"} ·
+        🏁 haydovchi manzilda yakunlaydi</div>
       <div class="btns"><button class="btn" id="call">📞 Aloqa</button><button class="btn" id="noop" disabled>🛣 ${km(o.trip_distance_m)}</button></div>`);
     Main.hide();
     if (dest && !stopped) {
@@ -906,7 +1007,7 @@ function renderPassengerOrder(state) {
       <div class="muted small">${o.wait_charge ? `shundan kutish: ${money(o.wait_charge)} · ` : ""}${km(o.trip_distance_m)}</div>
       <div class="note">To'lovni haydovchiga bering. Tasdiqlaganingizdan so'ng safar yakunlanadi.</div>`);
     Main.set("✅ Ha, yetib keldim", () => act("arrived", o.id), { color: "#22a447", textColor: "#ffffff" });
-    Second.set("Yo'q, hali emas", () => act("notyet", o.id), { color: "#f2f3f5", textColor: "#e5453b" });
+    Second.hide();
     return;
   }
   Main.hide();
@@ -1080,7 +1181,7 @@ function renderDriver(st) {
 }
 
 function renderDriverIdle(st, d) {
-  if (S.mode !== "idle") { S.layers.markers.clearLayers(); drawRoute(null); S.car = null; showPassengerLive(null); }
+  if (S.mode !== "idle") { S.layers.markers.clearLayers(); clearPins(); drawRoute(null); S.car = null; showPassengerLive(null); }
   S.mode = "idle";
   Second.hide();
   const s = st.stats || {};
@@ -1092,7 +1193,7 @@ function renderDriverIdle(st, d) {
     <div class="kv"><div><b>${s.today_trips || 0}</b><span>bugungi safar</span></div><div><b>${num(s.today_income || 0)}</b><span>bugungi tushum</span></div>
       <div><b>${S.config.commission_percent}%</b><span>xizmat haqi</span></div></div>
     <button class="big-toggle ${d.online ? "on" : "off"}" id="toggle">${d.online ? "🔴 Liniyadan chiqish" : "🟢 Liniyaga chiqish"}</button>
-    ${d.online ? '<div class="muted small mt">📡 Ilova ochiq turganda joylashuv o\'zi yangilanadi. Ilova yopilganda ham buyurtma olish uchun chatda: 📎 → Joylashuv → Jonli joylashuv → «Men o\'chirmagunimcha».</div>' : ""}`);
+    ${d.online ? '<div class="muted small mt center">📡 Joylashuv avtomatik yangilanadi · ⚙️ da batafsil</div>' : ""}`);
   Main.hide();
   on("toggle", toggleOnline);
 }
@@ -1184,34 +1285,39 @@ function renderDriverOrder(o, d) {
   if (first) {
     haptic("success");
     S.layers.markers.clearLayers();
-    abMarker(pickup[0], pickup[1], "A").addTo(S.layers.markers);
-    if (dest) abMarker(dest[0], dest[1], "B", "b").addTo(S.layers.markers);
   }
+  const leftTo = (b) => { const r = routeLeftFor(b); return r ? r.dur : null; };
+  const pickEta = leftTo(pickup);
+  setPin("start", ["in_progress", "finishing"].includes(o.status) ? null : pickup,
+    o.status === "arrived" ? "Yo'lovchi" : pickEta != null ? `🙋 ${mins(pickEta)}` : "Yo'lovchi");
+  const destEta = dest ? leftTo(dest) : null;
+  setPin("finish", dest, o.status === "in_progress" && destEta != null ? mins(destEta) : "Manzil");
   const steps = ["accepted", "arrived", "in_progress", "finishing"];
   const idx = steps.indexOf(o.status);
   const stepper = `<div class="steps">${steps.map((_, i) => `<i class="${i <= idx ? "done" : ""}"></i>`).join("")}</div>`;
   showPassengerLive(o.passenger_live);
   const target = o.status === "in_progress" && dest ? dest : pickup;
-  if (me && o.status !== "finishing") { routeBetween(me, target); if (first) fitTo([me, target]); }
+  if (me && o.status !== "finishing") { routeBetween(me, target); if (first) fitTo([me, target]); else follow([me, target]); }
   else if (first) fitTo([target]);
+  const destName = o.dest ? (o.dest.title || "Xaritada belgilangan nuqta") : o.dest_text ? `✍️ ${o.dest_text} (yo'lovchi yozgan)` : "Ko'rsatilmagan (taksometr)";
+  const route = routeCard(addr(pickup[0], pickup[1]), destName, { compact: true });
   const navBtn = `<button class="btn" id="nav">🧭 Navigator</button>`;
   const callBtn = `<button class="btn" id="call">📞 Aloqa</button>`;
-  const destNote = o.dest_text ? `<div class="note">✍️ Manzil (yo'lovchi yozgan): ${esc(o.dest_text)} · taksometr</div>` : "";
   if (o.status === "accepted") {
     sheet(`${stepper}<div class="row between"><h2>Yo'lovchi oldiga</h2><div class="route-left" id="route-left">${routeLeftInner(pickup)}</div></div>
-      <div class="muted" id="addr">Manzil aniqlanmoqda…</div>${destNote}
+      ${route}
       ${o.comment ? `<div class="note">💬 ${esc(o.comment)}</div>` : ""}${o.rider ? '<span class="badge">👤 Boshqa odam uchun</span>' : ""}
       <div class="btns">${navBtn}${callBtn}</div><button class="btn red mt" id="dcancel">Bekor qilish</button>`);
-    reverse(pickup[0], pickup[1]).then((r) => { const el = $("#addr"); if (el && r) el.textContent = `📍 ${r.title}${r.subtitle ? ", " + r.subtitle : ""}`; });
     Main.set("✅ Yetib keldim", () => dAct("arrived", o.id), { color: "#2f6fed", textColor: "#ffffff" });
     Second.hide();
   } else if (o.status === "arrived") {
     const waited = o.arrived_at ? (Date.now() - new Date(o.arrived_at).getTime()) / 60000 : 0;
     sheet(`${stepper}<h2>Yo'lovchi kutilmoqda</h2>
       <div class="note">⏳ ${Math.floor(waited)} daq kutildi · ${o.free_wait_min} daq bepul</div>
+      ${route}
       ${o.comment ? `<div class="note">💬 ${esc(o.comment)}</div>` : ""}
       <div class="btns">${callBtn}<button class="btn red" id="noshow" ${waited < o.no_show_wait_min ? "disabled" : ""}>🚫 Chiqmadi</button></div>
-      ${dest ? `<div class="muted small mt">🧭 Boshlaganingizda ${esc(NAV_NAMES[d.navigator] || "navigator")} manzilgacha yo'lni o'zi ochadi.</div>` : destNote}`);
+      ${dest ? `<div class="muted small mt">🧭 Boshlaganingizda ${esc(NAV_NAMES[d.navigator] || "navigator")} manzilgacha yo'lni o'zi ochadi.</div>` : ""}`);
     Main.set("🚀 Safarni boshlash", () => {
       // Navigator foydalanuvchi bosgan zahoti ochiladi (Telegram faqat shunda ruxsat beradi)
       if (dest) openLink(navUrl(d.navigator, dest[0], dest[1]));
@@ -1227,7 +1333,7 @@ function renderDriverOrder(o, d) {
     sheet(`${stepper}<div class="row between"><h2>Safar davom etmoqda</h2><div class="route-left" id="route-left">${dest ? routeLeftInner(dest) : ""}</div></div>
       <div class="kv"><div><b>${km(t.distance_m)}</b><span>bosib o'tildi</span></div><div><b>${t.minutes || 0} daq</b><span>yo'lda</span></div>
         <div><b>${num(o.fixed_price ? o.price : t.price)}</b><span>${o.fixed_price ? "qat'iy narx" : "taksometr (km)"}</span></div></div>
-      ${destNote}${dest && !canFinish ? `<div class="muted small">🏁 Safarni yo'lovchi belgilagan manzilga yetib kelganda yakunlaysiz.</div>` : ""}
+      ${route}${dest && !canFinish ? `<div class="muted small mt">🏁 Safarni yo'lovchi belgilagan manzilga yetib kelganda yakunlaysiz.</div>` : ""}
       <div class="btns">${dest ? navBtn : ""}${callBtn}</div>`);
     if (canFinish) Main.set("🏁 Safarni yakunlash", () => finishTrip(o), { color: "#e5453b", textColor: "#ffffff" });
     else {
@@ -1293,6 +1399,8 @@ function renderDriverSettings() {
       <div class="t2">Faqat uy tomonga ketayotgan buyurtmalar</div></span></div>
     <div class="btns"><button class="btn" id="set-home">📍 Uy = hozirgi joy</button>
       <button class="btn ${d.home_mode ? "red" : ""}" id="home-mode" ${d.home_set ? "" : "disabled"}>${d.home_mode ? "O'chirish" : "Yoqish"}</button></div>
+    <div class="note">📡 Ilova ochiq turganda joylashuv o'zi yangilanadi. Ilova yopilganda ham buyurtma olish uchun bot chatida:
+      📎 → Joylashuv → Jonli joylashuv → «Men o'chirmagunimcha».</div>
 `);
   Main.hide();
   Second.hide();
@@ -1354,6 +1462,9 @@ async function boot() {
   tg.expand();
   try { tg.disableVerticalSwipes(); } catch { /* eski klient */ }
   try { tg.setHeaderColor("bg_color"); } catch { /* eski klient */ }
+  const applyScheme = () => document.body.classList.toggle("dark", tg.colorScheme === "dark");
+  applyScheme();
+  try { tg.onEvent("themeChanged", applyScheme); } catch { /* eski klient */ }
   try {
     S.app = await resolveApp();
   } catch (e) {
