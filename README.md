@@ -35,7 +35,7 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
 * safar bosqichlari, **🧭 Navigator** (Google/Yandex/Waze), **📞 Aloqa**, **jonli taksometr**, balans va bugungi tushum.
 
 **Ishga tushirish:** Telegram ilovani faqat **HTTPS** manzildan ochadi.
-* **Kompyuterda (Windows):** `start.bat` rasmiy `cloudflared.exe` ni o'zi yuklab oladi va bepul
+* **Kompyuterda (Windows):** `start.bat` (`run.py`) rasmiy `cloudflared.exe` ni o'zi yuklab oladi va bepul
   `https://….trycloudflare.com` tunnelini ochadi; bot menyusidagi tugma avtomatik yangilanadi
   (manzil har ishga tushganda o'zgaradi — bu normal). Agar tarmoq (antivirus, korporativ filtr) yuklab olishni
   to'sib qo'ysa — fayl buzilgan bo'lsa u avtomatik o'chiriladi va bot **chat rejimida ishlayveradi**. Qo'lda o'rnatish:
@@ -178,6 +178,10 @@ yuboriladi — foydalanuvchi hech narsani sezmaydi (`RICH_MESSAGES=false` bilan 
    * hammasi `.env` fayliga yoziladi va bot ishga tushadi.
 4. Keyingi safar shunchaki `start.bat` ni bosing. To'xtatish — `Ctrl+C` yoki oynani yopish.
 
+`start.bat` faqat Python'ni topib, `run.py` ni ishga tushiradi; qolgan hamma ishni (disk joyi, kutubxonalar,
+cloudflared, sozlash) `run.py` bajaradi. Oyna **o'zicha yopilmaydi** — xato bo'lsa, matni oynada qoladi.
+Agar `start.bat` ishlamasa, papkada manzil satriga `cmd` yozib Enter bosing va `py run.py` ni kiriting.
+
 ### Mac / Linux
 ```bash
 bash start.sh
@@ -195,7 +199,7 @@ python -m taxi_bot                # ishga tushirish
 ### Bilish kerak
 * Bot **kompyuter yoniq va dastur ochiq turgan paytda** ishlaydi. Windows'da uyqu rejimini o'chiring:
   *Sozlamalar → Tizim → Quvvat → Uyqu: Hech qachon*. Doimiy ishlashi uchun keyinchalik serverga (VPS) o'tkazing — pastda Docker bo'limi.
-* Diskda kamida **~300 MB bo'sh joy** kerak (kutubxonalar ~70 MB, cloudflared ~60 MB). `start.bat` buni o'zi tekshiradi;
+* Diskda kamida **~300 MB bo'sh joy** kerak (kutubxonalar ~70 MB, cloudflared ~60 MB). `run.py` buni o'zi tekshiradi;
   `No space left on device` xatosi — disk to'lgan: vaqtinchalik fayllar, Savat, loyihaning eski nusxasini tozalang.
 * Bitta token bilan **faqat bitta nusxa** ishlashi mumkin. Loglarda `TelegramConflictError` chiqsa — bot boshqa joyda ham ishlab turibdi.
 * Ma'lumotlar `data\taxi.db` faylida, loglar `data\bot.log` da. Zaxira uchun `data` papkasini nusxalang.
