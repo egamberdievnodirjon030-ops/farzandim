@@ -29,6 +29,7 @@ Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 TG_ID = web.RequestKey("tg_id", int)
 FIRST_NAME = web.RequestKey("first_name", str)
 APP = web.RequestKey("app", Role)
+BOT_ROLE = web.RequestKey("bot_role", object)  # Role | None: ikki bot rejimida bot rolni o'zi belgilaydi
 
 
 class MiniAppServer:
@@ -88,11 +89,15 @@ class MiniAppServer:
             if user is None:
                 return web.json_response({"error": "Telegram orqali oching"}, status=401)
             tg_id, first_name, bot_role = user
-            app = request.headers.get("X-App", "passenger")
-            app_role = Role.DRIVER if app == "driver" else Role.PASSENGER
-            if bot_role is not None and bot_role != app_role:
-                return web.json_response({"error": "Noto'g'ri bot"}, status=403)
+            app = request.headers.get("X-App")
+            if app in ("driver", "passenger"):
+                app_role = Role.DRIVER if app == "driver" else Role.PASSENGER
+                if bot_role is not None and bot_role != app_role:
+                    return web.json_response({"error": "Noto'g'ri bot"}, status=403)
+            else:  # ilova hali rolni bilmaydi (masalan /api/role)
+                app_role = bot_role or Role.PASSENGER
             request[TG_ID], request[FIRST_NAME], request[APP] = tg_id, first_name, app_role
+            request[BOT_ROLE] = bot_role
         try:
             response = await handler(request)
         except ValueError as exc:
@@ -131,10 +136,19 @@ class MiniAppServer:
     async def index(self, request: web.Request) -> web.Response:
         return web.FileResponse(STATIC / "index.html")
 
+    async def role(self, request: web.Request) -> web.Response:
+        """Ilova qaysi rejimda ochilishi kerak: bot roli (ikki bot) yoki foydalanuvchi tanlagan rol (bitta bot)."""
+        role = request[BOT_ROLE] or await self.svc.get_user_role(request[TG_ID])
+        return web.json_response({"role": role.value if role else None, "single_bot": self.svc.settings.single_bot})
+
     async def me(self, request: web.Request) -> web.Response:
         tg_id, role = request[TG_ID], request[APP]
         if self.svc.settings.single_bot:
-            await self.svc.set_user_role(tg_id, role)
+            current = await self.svc.get_user_role(tg_id)
+            if current != role:
+                if current == Role.DRIVER and await self.svc.driver_busy(tg_id):
+                    return self.fail("Avval joriy safarni yakunlang — so'ng yo'lovchi rejimiga o'tasiz")
+                await self.svc.set_user_role(tg_id, role)
         if role == Role.PASSENGER:
             await self.svc.ensure_passenger(tg_id, request[FIRST_NAME])
         return web.json_response({"config": self.svc.app_config(), "role": role.value, "first_name": request[FIRST_NAME]})
@@ -318,6 +332,7 @@ class MiniAppServer:
             [
                 web.get("/", self.index),
                 web.get("/api/me", self.me),
+                web.get("/api/role", self.role),
                 web.get("/api/geocode", self.geocode),
                 web.get("/api/reverse", self.reverse),
                 web.post("/api/route", self.route),

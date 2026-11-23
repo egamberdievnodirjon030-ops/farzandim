@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 
 from aiohttp.test_utils import TestClient, TestServer
 
-from taxi_bot.db.models import DriverStatus, OrderStatus
+from taxi_bot.db.models import Driver, DriverStatus, OrderStatus
 from taxi_bot.miniapp.server import MiniAppServer
 from taxi_bot.ui.messenger import Role
 
@@ -34,8 +34,10 @@ def init_data(token: str, user_id: int, name: str = "Test", age: int = 0) -> str
 
 
 class AppClient:
-    def __init__(self, client: TestClient, token: str, user_id: int, app: str, name: str = "Test"):
-        self.client, self.headers = client, {"Authorization": f"tma {init_data(token, user_id, name)}", "X-App": app}
+    def __init__(self, client: TestClient, token: str, user_id: int, app: str | None, name: str = "Test"):
+        self.client, self.headers = client, {"Authorization": f"tma {init_data(token, user_id, name)}"}
+        if app:
+            self.headers["X-App"] = app
 
     async def get(self, path: str, status: int = 200):
         resp = await self.client.get(path, headers=self.headers)
@@ -227,5 +229,52 @@ async def test_saved_places_from_app(make_service, center):
         assert places[0]["kind"] == "home" and places[0]["title"] == "Uy"
         await p.post(f"/api/p/places/{res['id']}/delete")
         assert (await p.get("/api/p/state"))["places"] == []
+    finally:
+        await client.close()
+
+
+async def test_app_opens_in_role_chosen_in_chat(make_service):
+    """Foydalanuvchi xatosi: chatda «Haydovchi» tanlansa ham ilova yo'lovchi bo'lib ochilardi."""
+    svc, _ = await make_service(driver_bot_token="")
+    client = await start(svc, [(P_TOKEN, None)])
+    try:
+        fresh = AppClient(client, P_TOKEN, 8201, None)
+        assert (await fresh.get("/api/role"))["role"] is None  # hali tanlamagan — ilova so'raydi
+        await svc.set_user_role(8201, Role.DRIVER)  # chatda «🚕 Haydovchi» bosildi
+        assert (await fresh.get("/api/role")) == {"role": "driver", "single_bot": True}
+        # ilova shu rolda ochiladi va rolni qayta yozib yubormaydi
+        await AppClient(client, P_TOKEN, 8201, "driver").get("/api/me")
+        assert await svc.get_user_role(8201) == Role.DRIVER
+    finally:
+        await client.close()
+
+
+async def test_role_switch_in_app_and_busy_driver_guard(make_service, center):
+    svc, _ = await make_service(driver_bot_token="")
+    client = await start(svc, [(P_TOKEN, None)])
+    try:
+        d = await add_driver(svc, 8202, *center)
+        await svc.set_user_role(8202, Role.DRIVER)
+        async with svc.db.session() as s:
+            (await s.get(Driver, d.id)).current_order_id = 999  # faol safar
+        busy = await AppClient(client, P_TOKEN, 8202, "passenger").get("/api/me", status=409)
+        assert "safarni yakunlang" in busy["error"]
+        assert await svc.get_user_role(8202) == Role.DRIVER
+        async with svc.db.session() as s:
+            (await s.get(Driver, d.id)).current_order_id = None
+        await AppClient(client, P_TOKEN, 8202, "passenger").get("/api/me")
+        assert await svc.get_user_role(8202) == Role.PASSENGER
+        assert (await AppClient(client, P_TOKEN, 8202, None).get("/api/role"))["role"] == "passenger"
+    finally:
+        await client.close()
+
+
+async def test_two_bots_role_comes_from_bot(make_service):
+    svc, _ = await make_service()
+    client = await start(svc, TWO_BOTS)
+    try:
+        assert (await AppClient(client, D_TOKEN, 8203, None).get("/api/role"))["role"] == "driver"
+        assert (await AppClient(client, P_TOKEN, 8203, None).get("/api/role"))["role"] == "passenger"
+        await AppClient(client, D_TOKEN, 8203, "passenger").get("/api/me", status=403)  # boshqa bot roli — rad
     finally:
         await client.close()

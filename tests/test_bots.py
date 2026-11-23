@@ -334,6 +334,23 @@ async def test_single_bot_asks_role_first(harness, center):
     assert "haydovchilar uchun bot" in h.last_text(bot, DRIVER.id)
 
 
+async def test_single_bot_driver_on_trip_cannot_switch_to_passenger(harness, center):
+    from taxi_bot.db.models import Driver
+
+    h = await harness(single=True)
+    bot = h.pbot
+    await h.send(bot, DRIVER, text="/start")
+    await h.press(bot, DRIVER, "role:driver")
+    d = await h.svc.register_driver(DRIVER.id, "Ali", "+998901112233", "Cobalt", "Oq", "01A111AA")
+    async with h.svc.db.session() as s:
+        (await s.get(Driver, d.id)).current_order_id = 777  # safarda
+    await h.send(bot, DRIVER, text="/role")
+    await h.press(bot, DRIVER, "role:passenger")
+    ans = h.session.calls(bot.id, "AnswerCallbackQuery")[-1]
+    assert ans.show_alert and "safarni yakunlang" in ans.text
+    assert await h.svc.get_user_role(DRIVER.id) == Role.DRIVER
+
+
 async def test_stale_button_and_foreign_order_are_rejected(harness, center):
     h = await harness()
     await h.press(h.dbot, DRIVER, "d:acc:12345:0")

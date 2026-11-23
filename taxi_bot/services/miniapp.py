@@ -72,6 +72,12 @@ class MiniAppMixin:
         if role == Role.PASSENGER:
             await self.driver_offline(tg_id)
 
+    async def driver_busy(self: TaxiService, tg_id: int) -> bool:
+        """Haydovchida hozir faol safar bormi (rolni almashtirishdan oldin tekshiriladi)."""
+        async with self.db.session() as s:
+            current = await s.scalar(select(Driver.current_order_id).where(Driver.tg_id == tg_id))
+        return current is not None
+
     async def save_verified_phone(self: TaxiService, tg_id: int, phone: str) -> None:
         """Telegram tasdiqlagan raqam (ilovadagi «raqamni ulashish» yoki botga yuborilgan kontakt)."""
         phone = normalize_phone(phone) or phone

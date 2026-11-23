@@ -7,10 +7,6 @@ const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ESC[c]);
 const num = (n) => Math.round(n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch { /* ixtiyoriy */ } },
-};
 
 const S = {
   app: null, config: null, map: null, layers: {}, car: null, me: null,
@@ -101,7 +97,8 @@ function openLink(url) {
 
 // ====================================================================== API
 async function api(path, body) {
-  const opts = { headers: { Authorization: `tma ${tg ? tg.initData : ""}`, "X-App": S.app } };
+  const opts = { headers: { Authorization: `tma ${tg ? tg.initData : ""}` } };
+  if (S.app) opts.headers["X-App"] = S.app;
   if (body !== undefined) {
     opts.method = "POST";
     opts.headers["Content-Type"] = "application/json";
@@ -342,7 +339,40 @@ async function reverse(lat, lon) {
 // ====================================================================== YO'LOVCHI
 let reverseTimer = null;
 
+// ---------------------------------------------------------------- rolni almashtirish (bitta bot rejimi)
+function roleChip() {
+  if (!S.config || !S.config.single_bot) return "";
+  return S.app === "driver"
+    ? `<button class="chip-btn role" id="switch-role">🙋 Yo'lovchi rejimi</button>`
+    : `<button class="chip-btn role" id="switch-role">🚕 Haydovchi rejimi</button>`;
+}
+
+async function switchRole() {
+  const next = S.app === "driver" ? "passenger" : "driver";
+  const ok = await confirmBox(next === "driver"
+    ? "Haydovchi rejimiga o'tasizmi?"
+    : "Yo'lovchi rejimiga o'tasizmi? Liniyadan chiqasiz — buyurtmalar kelmaydi.");
+  if (!ok) return;
+  const prev = S.app;
+  S.app = next;
+  try {
+    await api("/api/me"); // tanlov saqlanadi: keyingi safar ilova shu rejimda ochiladi
+  } catch (e) {
+    S.app = prev;
+    return toast(e.message, true);
+  }
+  haptic("success");
+  // #tgWebAppData (hash) saqlanadi — Telegram ma'lumotlari qayta yuklashda yo'qolmaydi
+  location.replace(`${location.pathname}?app=${next}${location.hash}`);
+}
+
+function passengerTop() {
+  $("#top").innerHTML = roleChip();
+  on("switch-role", switchRole);
+}
+
 async function passengerStart() {
+  passengerTop();
   const state = await api("/api/p/state");
   S.state = state;
   if (!state.registered) return renderPhoneShare("passenger");
@@ -757,8 +787,9 @@ async function driverRefresh() {
 function driverTop(d) {
   $("#top").innerHTML = d ? `<button class="chip-btn" id="bal">💳 ${money(d.balance)}</button>
     <button class="chip-btn"><span class="status-pill"><i class="dot ${d.online ? "on" : ""}"></i>${d.online ? "Liniyada" : "Oflayn"}</span></button>
-    <button class="chip-btn" id="settings">⚙️</button>` : "";
+    <button class="chip-btn" id="settings">⚙️</button>` : roleChip();
   on("settings", renderDriverSettings);
+  on("switch-role", switchRole);
   on("bal", () => toast(`Balans: ${money(d.balance)} · minimal: ${money(S.config.min_driver_balance)}`));
 }
 
@@ -955,7 +986,9 @@ function renderDriverSettings() {
     <div class="field"><span class="icon">🏡</span><span class="txt"><div class="t1">«Uyga» rejimi: ${d.home_mode ? "yoqilgan" : "o'chiq"}</div>
       <div class="t2">Faqat uy tomonga ketayotgan buyurtmalar</div></span></div>
     <div class="btns"><button class="btn" id="set-home">📍 Uy = hozirgi joy</button>
-      <button class="btn ${d.home_mode ? "red" : ""}" id="home-mode" ${d.home_set ? "" : "disabled"}>${d.home_mode ? "O'chirish" : "Yoqish"}</button></div>`);
+      <button class="btn ${d.home_mode ? "red" : ""}" id="home-mode" ${d.home_set ? "" : "disabled"}>${d.home_mode ? "O'chirish" : "Yoqish"}</button></div>
+    ${S.config.single_bot ? `<div class="btns"><button class="btn" id="switch-role">🙋 Yo'lovchi rejimiga o'tish</button></div>` : ""}`);
+  on("switch-role", switchRole);
   Main.hide();
   Second.hide();
   Back.show(() => { Back.hide(); S.mode = "idle"; driverRefresh(); });
@@ -986,9 +1019,22 @@ function chooseRole() {
   document.getElementById("boot").hidden = true;
   sheet(`<h2>Xush kelibsiz! 🚕</h2><div class="muted">Kim sifatida davom etasiz?</div>
     <div class="btns"><button class="btn accent" id="as-passenger">🙋 Yo'lovchi</button><button class="btn" id="as-driver">🚕 Haydovchi</button></div>`);
-  const pick = (role) => { store.set("taxi_app", role); location.search = `?app=${role}`; };
+  const pick = (role) => {
+    S.app = role;
+    sheet("");
+    document.getElementById("boot").hidden = false;
+    launch();
+  };
   on("as-passenger", () => pick("passenger"));
   on("as-driver", () => pick("driver"));
+}
+
+/** Ilova rejimi: havoladagi ?app= → botda tanlangan rol (bazadan) → so'raladi. */
+async function resolveApp() {
+  const param = new URLSearchParams(location.search).get("app");
+  if (param === "driver" || param === "passenger") return param;
+  const r = await api("/api/role");
+  return r.role;
 }
 
 async function boot() {
@@ -1001,12 +1047,21 @@ async function boot() {
   tg.expand();
   try { tg.disableVerticalSwipes(); } catch { /* eski klient */ }
   try { tg.setHeaderColor("bg_color"); } catch { /* eski klient */ }
-  const param = new URLSearchParams(location.search).get("app");
-  S.app = param === "driver" || param === "passenger" ? param : store.get("taxi_app");
+  try {
+    S.app = await resolveApp();
+  } catch (e) {
+    $("#boot").querySelector(".boot-text").textContent = e.message;
+    $("#boot .spinner").hidden = true;
+    return;
+  }
   if (!S.app) {
     S.config = { currency: "so'm", tile_url: "", tile_attribution: "" };
     return chooseRole();
   }
+  await launch();
+}
+
+async function launch() {
   try {
     const me = await api("/api/me");
     S.config = me.config;

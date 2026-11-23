@@ -34,6 +34,10 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
   taxminiy hudud (aniq manzil qabul qilingach ochiladi);
 * safar bosqichlari, **🧭 Navigator** (Google/Yandex/Waze), **📞 Aloqa**, **jonli taksometr**, balans va bugungi tushum.
 
+**Bitta bot rejimida rol:** ilova chatda tanlangan rolda ochiladi (`/role` → «🙋 Yo'lovchi» / «🚕 Haydovchi»).
+Ilovaning o'zida ham almashtirish mumkin: yo'lovchida yuqoridagi **«🚕 Haydovchi rejimi»**, haydovchida
+**⚙️ → «🙋 Yo'lovchi rejimiga o'tish»**. Tanlov saqlanadi; faol safardagi haydovchi safarni yakunlamaguncha yo'lovchiga o'tolmaydi.
+
 **Ishga tushirish:** Telegram ilovani faqat **HTTPS** manzildan ochadi.
 * **Kompyuterda (Windows):** `start.bat` (`run.py`) rasmiy `cloudflared.exe` ni o'zi yuklab oladi va bepul
   `https://….trycloudflare.com` tunnelini **fonda** ochadi. Bot darhol ishlay boshlaydi, tunnel ochilgach menyudagi
@@ -338,7 +342,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-74 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+78 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**

@@ -112,6 +112,9 @@ def build_role_router() -> Router:
         state: FSMContext,
     ) -> None:
         role = Role(callback_data.role)
+        if role == Role.PASSENGER and await svc.driver_busy(callback.from_user.id):
+            await callback.answer("Avval joriy safarni yakunlang — so'ng yo'lovchi rejimiga o'tasiz.", show_alert=True)
+            return
         await state.clear()
         await role_mw.set_role(callback.from_user.id, role)
         if role == Role.PASSENGER:
