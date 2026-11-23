@@ -43,8 +43,8 @@ if not exist "cloudflared.exe" (
     where cloudflared >nul 2>nul
     if errorlevel 1 (
         echo Telegram ilovasi uchun cloudflared yuklab olinmoqda - rasmiy Cloudflare GitHub sahifasidan...
-        powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe } catch { exit 1 }"
-        if errorlevel 1 echo [!] cloudflared yuklanmadi - bot chat rejimida ishlaydi, ilova ochilmaydi.
+        powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; try { Invoke-WebRequest -UseBasicParsing -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe; $f = Get-Item cloudflared.exe; $b = [IO.File]::ReadAllBytes($f.FullName)[0..1]; if ($f.Length -lt 5000000 -or $b[0] -ne 77 -or $b[1] -ne 90) { Remove-Item cloudflared.exe; exit 1 } } catch { if (Test-Path cloudflared.exe) { Remove-Item cloudflared.exe }; exit 1 }"
+        if errorlevel 1 echo [!] cloudflared yuklanmadi yoki buzilgan - bot chat rejimida ishlaydi. Qo'lda o'rnatish: README, Telegram ilovasi bo'limi.
     )
 )
 

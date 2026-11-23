@@ -110,24 +110,29 @@ async def main() -> None:
     dp = build_dispatcher(svc, build_storage(settings), bot_roles)
     bots = [passenger_bot] if settings.single_bot else [passenger_bot, driver_bot]
 
-    for bot in bots:  # avval webhook o'rnatilgan bo'lsa, polling ishlamaydi — o'chiramiz
-        try:
-            await bot.delete_webhook(drop_pending_updates=False)
-        except TelegramAPIError as exc:
-            log.warning("Webhook o'chirilmadi: %s", exc)
-    await setup_commands(settings, passenger_bot, driver_bot)
-    await svc.resume()
-    panel = await start_admin_panel(settings, svc)
-    miniapp, tunnel = await start_miniapp(settings, svc, passenger_bot, driver_bot)
-    maintenance = asyncio.create_task(svc.run_maintenance(), name="maintenance")
-    log.info(
-        "Taksi bot ishga tushdi: %s",
-        "bitta bot rejimi (rol so'raladi)" if settings.single_bot else "ikki bot rejimi (yo'lovchi + haydovchi)",
-    )
+    panel = miniapp = tunnel = maintenance = None
     try:
+        for bot in bots:  # avval webhook o'rnatilgan bo'lsa, polling ishlamaydi — o'chiramiz
+            try:
+                await bot.delete_webhook(drop_pending_updates=False)
+            except TelegramAPIError as exc:
+                log.warning("Webhook o'chirilmadi: %s", exc)
+        await setup_commands(settings, passenger_bot, driver_bot)
+        await svc.resume()
+        panel = await start_admin_panel(settings, svc)
+        try:  # ilova (Mini App) ishga tushmasa ham bot chat rejimida ishlayveradi
+            miniapp, tunnel = await start_miniapp(settings, svc, passenger_bot, driver_bot)
+        except Exception:
+            log.exception("Telegram ilovasini ishga tushirib bo'lmadi — bot chat rejimida ishlaydi")
+        maintenance = asyncio.create_task(svc.run_maintenance(), name="maintenance")
+        log.info(
+            "Taksi bot ishga tushdi: %s",
+            "bitta bot rejimi (rol so'raladi)" if settings.single_bot else "ikki bot rejimi (yo'lovchi + haydovchi)",
+        )
         await dp.start_polling(*bots, allowed_updates=dp.resolve_used_update_types())
     finally:
-        maintenance.cancel()
+        if maintenance:
+            maintenance.cancel()
         if panel:
             await panel.stop()
         if tunnel:
@@ -135,6 +140,8 @@ async def main() -> None:
         if miniapp:
             await miniapp.stop()
         await svc.close()
+        for bot in {id(b): b for b in (passenger_bot, driver_bot)}.values():
+            await bot.session.close()
         await db.close()
 
 
@@ -164,6 +171,8 @@ async def start_miniapp(settings: Settings, svc: TaxiService, passenger_bot: Bot
             print("⏳ Ilova uchun HTTPS tunnel ochilmoqda (cloudflared)...")
             tunnel = QuickTunnel(settings.webapp_port)
             url = await tunnel.start()
+            if not url:
+                tunnel = None
         else:
             print(
                 "ℹ️ Telegram ilovasi (Mini App) uchun HTTPS manzil kerak. cloudflared o'rnating — README:"
