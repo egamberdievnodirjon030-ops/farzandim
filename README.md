@@ -36,13 +36,20 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
 
 **Ishga tushirish:** Telegram ilovani faqat **HTTPS** manzildan ochadi.
 * **Kompyuterda (Windows):** `start.bat` (`run.py`) rasmiy `cloudflared.exe` ni o'zi yuklab oladi va bepul
-  `https://….trycloudflare.com` tunnelini ochadi; bot menyusidagi tugma avtomatik yangilanadi
-  (manzil har ishga tushganda o'zgaradi — bu normal). Agar tarmoq (antivirus, korporativ filtr) yuklab olishni
-  to'sib qo'ysa — fayl buzilgan bo'lsa u avtomatik o'chiriladi va bot **chat rejimida ishlayveradi**. Qo'lda o'rnatish:
-  `winget install --id Cloudflare.cloudflared` yoki [GitHub'dan](https://github.com/cloudflare/cloudflared/releases/latest)
-  `cloudflared-windows-amd64.exe` ni yuklab, nomini `cloudflared.exe` qilib loyiha papkasiga qo'ying (~60 MB bo'lishi kerak).
-  Ilovani butunlay o'chirish: `.env` da `WEBAPP_TUNNEL=none`. Mac/Linux: `brew install cloudflared` yoki
-  [cloudflared'ni o'rnating](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
+  `https://….trycloudflare.com` tunnelini **fonda** ochadi. Bot darhol ishlay boshlaydi, tunnel ochilgach menyudagi
+  «🚕 Taksi» tugmasi o'zi yangilanadi (manzil har ishga tushganda o'zgaradi — bu normal).
+  * Cloudflare ishlamasa, **zaxira tunnel** — [localhost.run](https://localhost.run) — Windows 10/11 dagi o'rnatilgan
+    `ssh` orqali o'zi sinab ko'riladi (`https://….lhr.life`).
+  * Tunnel uzilsa — qayta ochiladi va tugma yangi manzilga o'tadi. Umuman ochilmasa — tugma olib tashlanadi
+    (buzuq havola qolmaydi), bot **chat rejimida ishlayveradi** va sababi oynada yoziladi
+    (`⚠️ Cloudflare tunnel ochilmadi: ...`).
+  * Telegram'da tugma eski manzilni ochsa — bot chatini yopib qayta oching.
+  * Qo'lda o'rnatish: `winget install --id Cloudflare.cloudflared` yoki
+    [GitHub'dan](https://github.com/cloudflare/cloudflared/releases/latest) `cloudflared-windows-amd64.exe` ni yuklab,
+    nomini `cloudflared.exe` qilib loyiha papkasiga qo'ying (~60 MB bo'lishi kerak). Buzilgan fayl avtomatik o'chiriladi.
+  * Ilovani butunlay o'chirish: `.env` da `WEBAPP_TUNNEL=none`. Mac/Linux: `brew install cloudflared` yoki
+    [cloudflared'ni o'rnating](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
+  * Bepul tunnellar sinov uchun. Doimiy ishlash uchun — pastdagi doimiy domen varianti.
 * **Serverda (doimiy domen):** `.env` da `WEBAPP_URL=https://taxi.sizning-domen.uz`, `WEBAPP_HOST=0.0.0.0` va
   domenni reverse-proxy (masalan Caddy) orqali `8081`-portga yo'naltiring.
 
@@ -323,7 +330,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-65 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+68 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**

@@ -146,13 +146,16 @@ async def main() -> None:
 
 
 async def start_miniapp(settings: Settings, svc: TaxiService, passenger_bot: Bot, driver_bot: Bot):
-    """Telegram Mini App: server + (kerak bo'lsa) Cloudflare tunnel + bot menyusidagi "🚕 Taksi" tugmasi."""
-    if not settings.webapp_enabled:
-        return None, None
-    from aiogram.types import MenuButtonWebApp, WebAppInfo
+    """Telegram Mini App: server + (kerak bo'lsa) fondagi HTTPS tunnel + bot menyusidagi "🚕 Taksi" tugmasi."""
 
+    async def menu(url: str | None) -> None:
+        await apply_menu(settings, svc, passenger_bot, driver_bot, url)
+
+    if not settings.webapp_enabled:
+        await menu(None)
+        return None, None
     from .miniapp.server import MiniAppServer
-    from .services.tunnel import QuickTunnel, find_cloudflared
+    from .services.tunnel import Tunnel
 
     p_token = settings.passenger_bot_token.get_secret_value()
     if settings.single_bot:
@@ -164,39 +167,54 @@ async def start_miniapp(settings: Settings, svc: TaxiService, passenger_bot: Bot
         await server.start()
     except OSError as exc:
         log.warning("Mini App serveri ishga tushmadi (%s-port band?): %s", settings.webapp_port, exc)
+        await menu(None)
         return None, None
-    url, tunnel = settings.webapp_url, None
-    if not url and settings.webapp_tunnel == "auto":
-        if find_cloudflared():
-            print("⏳ Ilova uchun HTTPS tunnel ochilmoqda (cloudflared)...")
-            tunnel = QuickTunnel(settings.webapp_port)
-            url = await tunnel.start()
-            if not url:
-                tunnel = None
-        else:
-            print(
-                "ℹ️ Telegram ilovasi (Mini App) uchun HTTPS manzil kerak. cloudflared o'rnating — README:"
-                " «Telegram ilovasi» bo'limi. Hozircha bot oddiy chat rejimida ishlaydi."
-            )
-    if not url:
-        return server, tunnel
-    svc.webapp_url = url.rstrip("/")
+    if settings.webapp_url:
+        await menu(settings.webapp_url)
+        return server, None
+    if settings.webapp_tunnel != "auto":
+        await menu(None)
+        return server, None
+    tunnel = Tunnel(settings.webapp_port, on_change=menu)
+    if not tunnel.available:
+        await menu(None)
+        print(
+            "ℹ️ Telegram ilovasi (Mini App) uchun HTTPS manzil kerak, lekin cloudflared ham, ssh ham topilmadi."
+            " README: «Telegram ilovasi» bo'limi. Hozircha bot oddiy chat rejimida ishlaydi."
+        )
+        return server, None
+    await menu(None)  # oldingi ishga tushirishdan qolgan eski (endi ishlamaydigan) havolani darhol olib tashlaymiz
+    print("⏳ Ilova uchun HTTPS tunnel fonda ochilmoqda — bot shu vaqtda ham ishlayveradi...")
+    tunnel.start()
+    return server, tunnel
+
+
+async def apply_menu(settings: Settings, svc: TaxiService, passenger_bot: Bot, driver_bot: Bot, url: str | None) -> None:
+    """Menyu tugmasini ilova manziliga yo'naltiradi; manzil yo'q bo'lsa — oddiy buyruqlar menyusiga qaytaradi."""
+    from aiogram.types import MenuButtonCommands, MenuButtonWebApp, WebAppInfo
+
+    svc.webapp_url = url.rstrip("/") if url else None
+    base = svc.webapp_url
     try:
+        if not base:
+            for bot in {id(b): b for b in (passenger_bot, driver_bot)}.values():
+                await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+            return
         if settings.single_bot:
             await passenger_bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(text="🚕 Taksi", web_app=WebAppInfo(url=f"{svc.webapp_url}/"))
+                menu_button=MenuButtonWebApp(text="🚕 Taksi", web_app=WebAppInfo(url=f"{base}/"))
             )
         else:
             await passenger_bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(text="🚕 Taksi", web_app=WebAppInfo(url=f"{svc.webapp_url}/?app=passenger"))
+                menu_button=MenuButtonWebApp(text="🚕 Taksi", web_app=WebAppInfo(url=f"{base}/?app=passenger"))
             )
             await driver_bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(text="🚖 Ish", web_app=WebAppInfo(url=f"{svc.webapp_url}/?app=driver"))
+                menu_button=MenuButtonWebApp(text="🚖 Ish", web_app=WebAppInfo(url=f"{base}/?app=driver"))
             )
     except TelegramAPIError as exc:
         log.warning("Menyu tugmasi o'rnatilmadi: %s", exc)
-    print(f"📱 Telegram ilovasi: {svc.webapp_url}  (botdagi «🚕 Taksi» menyu tugmasi orqali ochiladi)")
-    return server, tunnel
+        return
+    print(f"📱 Telegram ilovasi: {base}  (botdagi «🚕 Taksi» menyu tugmasi orqali ochiladi)")
 
 
 async def start_admin_panel(settings: Settings, svc: TaxiService):
