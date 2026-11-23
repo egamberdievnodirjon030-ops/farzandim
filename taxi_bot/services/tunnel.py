@@ -28,7 +28,31 @@ MIN_SIZE = 5_000_000  # haqiqiy cloudflared ~30–60 MB; kichik fayl — to'liq 
 CLOUDFLARE_URL_RE = re.compile(r"https://(?!api\.)[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com")
 LOCALHOST_RUN_URL_RE = re.compile(r"https://[a-z0-9-]+\.lhr\.life")
 ERROR_RE = re.compile(r"\bERR\b|error|failed|denied|refused|timed out|could not|ssh:", re.IGNORECASE)
-TIMESTAMP_RE = re.compile(r"^\d{4}-\d\d-\d\dT\S+\s+")
+TIMESTAMP_RE = re.compile(r"^\d{4}-\d\d-\d\dT\S+\s+(?:(?:INF|ERR|WRN|DBG)\s+)?")
+DNS_ERROR_RE = re.compile(
+    r"lookup |getaddrinfo|no such host|name or service not known|could not resolve|no data of the requested type",
+    re.IGNORECASE,
+)
+BLOCKED_RE = re.compile(r"timed out|i/o timeout|refused|unreachable|connection reset", re.IGNORECASE)
+
+DNS_HINT = """\
+   ℹ️ Sabab: kompyuter ulangan tarmoq (ofis yoki provayder) DNS'i tunnel manzilini bloklayapti.
+      Muammo faqat shu kompyuter tarmog'ida (telefonlar 4G orqali bu manzillarni ochadi). Yechimlardan biri:
+      1) Windows DNS'ini 1.1.1.1 / 8.8.8.8 ga o'zgartiring: Sozlamalar > Tarmoq va Internet > (Wi-Fi yoki Ethernet)
+         > Apparat xususiyatlari > DNS-server tayinlash > O'zgartirish > Qo'lda > IPv4: 1.1.1.1 va 8.8.8.8
+      2) yoki kompyuterni boshqa internetga ulang (masalan, telefondagi hotspot / uy Wi-Fi).
+      Tarmoq tuzalgach botni qayta ishga tushirish shart emas — tunnel o'zi qayta urinadi."""
+BLOCKED_HINT = """\
+   ℹ️ Sabab: tarmoq (ko'pincha ofis firewall'i) tunnel ulanishini to'smoqda.
+      Kompyuterni boshqa internetga ulang (telefon hotspoti / uy Wi-Fi) — tunnel o'zi qayta urinadi."""
+
+
+def hint_for(reason: str) -> str | None:
+    if DNS_ERROR_RE.search(reason):
+        return DNS_HINT
+    if BLOCKED_RE.search(reason):
+        return BLOCKED_HINT
+    return None
 
 OnChange = Callable[[str | None], Awaitable[None]]
 
@@ -115,7 +139,7 @@ def detect_providers(port: int) -> list[Provider]:
 
 
 def _clean(line: str) -> str:
-    return TIMESTAMP_RE.sub("", line).strip()[:220]
+    return TIMESTAMP_RE.sub("", line.strip()).replace('\\"', '"')[:220]
 
 
 async def _kill(proc: asyncio.subprocess.Process) -> None:
@@ -141,7 +165,7 @@ class Tunnel:
         providers: list[Provider] | None = None,
         open_timeout: float = 40.0,
         retry_delay: float = 15.0,
-        max_delay: float = 600.0,
+        max_delay: float = 120.0,
     ) -> None:
         self.port = port
         self.on_change = on_change
@@ -154,6 +178,8 @@ class Tunnel:
         self.url: str | None = None
         self._task: asyncio.Task | None = None
         self._notified: object = object()  # hali hech narsa xabar qilinmagan
+        self._hints: set[str] = set()  # har bir maslahat bir marta chiqariladi
+        self._last_reason: dict[str, str] = {}  # bir xil xato har urinishda qaytarilmasin
 
     @property
     def available(self) -> bool:
@@ -178,9 +204,18 @@ class Tunnel:
             url, reason = await self._try(provider)
             if url:
                 self.provider, self.url = provider, url
+                self._last_reason.clear()
                 return url
-            log.warning("%s tunnel ochilmadi: %s", provider.name, reason)
+            if self._last_reason.get(provider.name) == reason:
+                log.debug("%s tunnel hali ham ochilmadi: %s", provider.name, reason)
+                continue
+            self._last_reason[provider.name] = reason
+            log.debug("%s tunnel ochilmadi: %s", provider.name, reason)
             print(f"⚠️ {provider.name} tunnel ochilmadi: {reason}")
+            hint = hint_for(reason)
+            if hint and hint not in self._hints:
+                self._hints.add(hint)
+                print(hint)
         return None
 
     async def _try(self, provider: Provider) -> tuple[str | None, str]:
@@ -246,6 +281,7 @@ class Tunnel:
 
     async def _run(self) -> None:
         delay = self.retry_delay
+        announced_down = False
         while True:
             url = await self.open()
             if url:
@@ -256,8 +292,18 @@ class Tunnel:
                 log.warning("HTTPS tunnel uzildi — qayta ochilmoqda")
                 print("⚠️ HTTPS tunnel uzildi — qayta ochilmoqda...")
                 self.url = None
+                announced_down = False
                 continue
             await self._notify(None)  # buzuq havola menyuda qolmasin
-            print(f"   Tunnel {delay:.0f} soniyadan keyin qayta sinab ko'riladi. Bot chat rejimida ishlayveradi.")
+            if "no-ssh" not in self._hints and not any(p.name == "localhost.run" for p in self.providers):
+                self._hints.add("no-ssh")
+                print("   ℹ️ Zaxira tunnel uchun ssh topilmadi (Windows: Sozlamalar > Tizim > Qo'shimcha imkoniyatlar"
+                      " > OpenSSH Client).")
+            if not announced_down:
+                announced_down = True
+                print(
+                    "   📵 Ilova tugmasi vaqtincha yashirildi, bot chat rejimida ishlayveradi. Tunnel fonda qayta"
+                    " sinab ko'riladi (har 15 soniya – 2 daqiqada) va ochilishi bilan tugma o'zi qaytadi."
+                )
             await asyncio.sleep(delay)
             delay = min(delay * 2, self.max_delay)

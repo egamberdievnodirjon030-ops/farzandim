@@ -44,6 +44,11 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
     (buzuq havola qolmaydi), bot **chat rejimida ishlayveradi** va sababi oynada yoziladi
     (`⚠️ Cloudflare tunnel ochilmadi: ...`).
   * Telegram'da tugma eski manzilni ochsa — bot chatini yopib qayta oching.
+  * `lookup api.trycloudflare.com ... no data of the requested type` (yoki `no such host`) — kompyuter ulangan
+    tarmoq (ko'pincha ofis tarmog'i yoki provayder DNS'i) tunnelni bloklayapti. Windows DNS'ini `1.1.1.1` / `8.8.8.8`
+    ga o'zgartiring (*Sozlamalar → Tarmoq va Internet → Wi-Fi/Ethernet → Apparat xususiyatlari → DNS-server tayinlash*)
+    yoki kompyuterni boshqa internetga (telefon hotspoti, uy Wi-Fi) ulang. Bot o'chirilmasa ham bo'ladi — tunnel
+    fonda qayta urinadi va ochilishi bilan «🚕 Taksi» tugmasi o'zi qaytadi.
   * Qo'lda o'rnatish: `winget install --id Cloudflare.cloudflared` yoki
     [GitHub'dan](https://github.com/cloudflare/cloudflared/releases/latest) `cloudflared-windows-amd64.exe` ni yuklab,
     nomini `cloudflared.exe` qilib loyiha papkasiga qo'ying (~60 MB bo'lishi kerak). Buzilgan fayl avtomatik o'chiriladi.

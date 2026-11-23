@@ -162,3 +162,16 @@ async def test_app_menu_never_points_to_cloudflare_api(make_service, tmp_path, m
     finally:
         await tunnel.stop()
         await server.stop()
+
+
+def test_user_dns_error_gets_actionable_hint():
+    """Foydalanuvchidagi haqiqiy xato: tarmoq DNS'i api.trycloudflare.com ni bermayapti."""
+    from taxi_bot.services.tunnel import BLOCKED_HINT, DNS_HINT, hint_for
+
+    reason = (
+        'failed to request quick Tunnel: Post "https://api.trycloudflare.com/tunnel": dial tcp: lookup '
+        "api.trycloudflare.com: getaddrinfow: The requested name is valid, but no data of the requested type was found."
+    )
+    assert hint_for(reason) == DNS_HINT and "1.1.1.1" in DNS_HINT
+    assert hint_for("ssh: connect to host localhost.run port 22: Connection timed out") == BLOCKED_HINT
+    assert hint_for("something else") is None
