@@ -151,3 +151,73 @@ def test_password_is_generated_once_and_reused(tmp_path, monkeypatch):
     second, created_again = resolve_password(None)
     assert created and not created_again and first == second and len(first) >= 10
     assert resolve_password("o'zim") == ("o'zim", False)
+
+
+async def test_panel_through_tunnel_at_admin_path(make_service):
+    """Cloudflare tunnel: panel ilova bilan bir xil HTTPS manzilda — /admin/ ostida."""
+    from taxi_bot.miniapp.server import MiniAppServer
+
+    svc, _ = await make_service()
+    panel = AdminPanel(svc, PASSWORD)
+    server = MiniAppServer(svc, [("1:x", None)])
+    server.mount("/admin", lambda: panel.build_app("/admin"))
+    client = TestClient(TestServer(server.build_app()))
+    await client.start_server()
+    https = {"X-Forwarded-Proto": "https", "CF-Connecting-IP": "203.0.113.7"}
+    try:
+        resp = await client.get("/admin", allow_redirects=False)
+        assert resp.status == 302 and resp.headers["Location"] == "/admin/"
+        resp = await client.get("/admin/", allow_redirects=False)
+        assert resp.status == 302 and resp.headers["Location"] == "/admin/login"
+        page = await client.get("/admin/login")
+        assert 'action="/admin/login"' in await page.text() and 'href="/admin/static/app.css"' in await page.text()
+
+        ok = await client.post("/admin/login", data={"password": PASSWORD}, headers=https, allow_redirects=False)
+        cookie = ok.cookies["taxi_admin"]
+        assert ok.status == 302 and ok.headers["Location"] == "/admin/"
+        assert cookie["secure"] and cookie["httponly"] and cookie["path"] == "/admin/" and cookie["samesite"] == "Strict"
+        client.session.cookie_jar.clear()  # Secure cookie http orqali yuborilmaydi — test uchun http'da qayta kiramiz
+        await client.post("/admin/login", data={"password": PASSWORD}, allow_redirects=False)
+        index = await client.get("/admin/")
+        html = await index.text()
+        assert index.status == 200 and 'data-tile="https://tile.openstreetmap.org/' in html
+        # Xarita: OpenStreetMap Referer talab qiladi; CSP plitkalarga ruxsat beradi
+        assert index.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        assert "img-src 'self' data: https://tile.openstreetmap.org" in index.headers["Content-Security-Policy"]
+        assert (await client.get("/admin/api/summary")).status == 200
+        assert (await client.get("/admin/static/leaflet/leaflet.js")).status == 200
+        # Ilovaning o'zi ham Referer'ni yuboradi (Mini App xaritasi)
+        assert (await client.get("/")).headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
+        await client.post("/admin/logout", headers=H, allow_redirects=False)
+        assert (await client.get("/admin/api/summary")).status == 401  # sessiya serverda o'chirildi
+    finally:
+        await client.close()
+
+
+async def test_login_bruteforce_is_limited(make_service):
+    svc, _ = await make_service()
+    client = await panel_client(svc)
+    attacker = {"CF-Connecting-IP": "198.51.100.9"}
+    try:
+        import taxi_bot.web.server as srv
+
+        original = srv.asyncio.sleep
+
+        async def fast(_s):
+            return None
+
+        srv.asyncio.sleep = fast
+        try:
+            for _ in range(5):
+                bad = await client.post("/login", data={"password": "xato"}, headers=attacker)
+                assert bad.status == 200
+            locked = await client.post("/login", data={"password": PASSWORD}, headers=attacker, allow_redirects=False)
+            assert locked.status == 429 and "Urinishlar ko'p" in await locked.text()  # to'g'ri parol ham kutadi
+        finally:
+            srv.asyncio.sleep = original
+        other = await client.post("/login", data={"password": PASSWORD}, headers={"CF-Connecting-IP": "192.0.2.1"},
+                                  allow_redirects=False)
+        assert other.status == 302  # boshqa manzildan egasi kira oladi
+    finally:
+        await client.close()

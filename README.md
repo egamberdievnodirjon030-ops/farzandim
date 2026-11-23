@@ -353,21 +353,37 @@ OSRM ishlamay qolsa, tizim avtomatik taxminiy hisobga o'tadi.
 
 ## 🖥 Admin web-panel
 
-Bot ishga tushganda konsolda manzil va parol chiqadi: **http://localhost:8080** (faqat shu kompyuterdan ochiladi).
+Ikki xil ochiladi (manzil va parol bot ishga tushganda oynada chiqadi):
+
+* **Shu kompyuterda:** http://localhost:8080
+* **Internet orqali (telefon yoki istalgan kompyuterdan):** ilova bilan bir xil Cloudflare HTTPS manzilida —
+  `https://….trycloudflare.com/admin/` (doimiy domen bo'lsa `WEBAPP_URL/admin/`). Tunnel ochilganda bu havola
+  adminlarga Telegram'da ham yuboriladi (bepul tunnel manzili har ishga tushganda o'zgaradi).
+  O'chirish: `ADMIN_PANEL_PUBLIC=false`.
 
 ![Admin panel](skrinshotlar/admin_panel.png)
 
-* **📊 Umumiy** — liniyadagi/bo'sh/band haydovchilar, faol buyurtmalar, bugungi aylanma va komissiya, arizalar;
-  **jonli xarita** (bo'sh — yashil, band — sariq, joylashuvi eskirgan — kulrang, buyurtmalar — qizil);
-  faol buyurtmalar ro'yxati va **majburan bekor qilish** (qotib qolgan holatlar uchun).
-* **📋 Buyurtmalar** — faol / bugun / hammasi, qidiruv (#raqam, telefon, davlat raqami).
-* **🚕 Haydovchilar** — arizalarni tasdiqlash/rad etish, bloklash, **balansni to'ldirish**.
-* **🙋 Yo'lovchilar** — safar va bekor qilishlar soni, bloklash (yolg'on buyurtmalarga qarshi).
-* **💰 Moliya** — 7/14/30 kunlik aylanma, komissiya, to'ldirishlar, kunlik grafik va tranzaksiyalar.
+* **🏠 Bosh sahifa** — KPI kartalar (liniyadagi/bo'sh/band, faol buyurtmalar, bugungi komissiya va aylanma, arizalar,
+  balansi kamlar), **jonli xarita**, faol buyurtmalar, yangi arizalarni bir bosishda tasdiqlash, 14 kunlik grafik.
+* **🗺 Xarita** — butun ekranli jonli xarita: bo'sh (yashil), band (sariq), joylashuvi eskirgan (kulrang) haydovchilar,
+  buyurtmalar (qizil) va haydovchidan yo'lovchigacha chiziq; filtrlar; buyurtmani bosganda xarita unga yaqinlashadi.
+  Belgilar qayta chizilmaydi — silliq siljiydi.
+* **📋 Buyurtmalar** — faol / bugun / hammasi, qidiruv (#raqam, telefon, davlat raqami, **aloqa kodi**),
+  **majburan bekor qilish** (qotib qolgan holatlar uchun).
+* **🚕 Haydovchilar** — arizalar, tasdiqlash/rad etish, bloklash, **balansni to'ldirish** (tayyor summalar bilan).
+* **🙋 Yo'lovchilar** — safar va bekor qilishlar soni, bloklash.
+* **💰 Moliya** — 7/14/30 kunlik aylanma, komissiya, to'ldirishlar, kunlik grafik (komissiya + safarlar) va tranzaksiyalar.
 
-Sozlamalar: `ADMIN_PANEL_PORT`, `ADMIN_PANEL_PASSWORD` (bo'sh bo'lsa avtomatik yaratiladi va
-`data/admin_panel_password.txt` da saqlanadi). Tarmoqdagi boshqa kompyuterdan ochish uchun
-`ADMIN_PANEL_HOST=0.0.0.0` (faqat ishonchli tarmoqda!).
+Kompyuterda — yon menyu, telefonda — pastki menyu va jadvallar kartochka ko'rinishida; kun/tun rejimi (🌙).
+Faqat ochiq turgan bo'lim yangilanadi, yashirin tabda so'rovlar to'xtaydi.
+
+**Xavfsizlik** (panel internetga ochiq): parol (`ADMIN_PANEL_PASSWORD`, bo'sh bo'lsa 16 belgili tasodifiy parol
+`data/admin_panel_password.txt` da yaratiladi), har kirishga alohida sessiya (chiqishda bekor qilinadi), HTTPS'da
+`Secure` cookie, CSRF himoyasi, bitta manzildan 15 daqiqada 5 ta noto'g'ri urinishdan keyin bloklash.
+
+**Xarita ko'rinmasa:** OpenStreetMap plitkalari brauzer `Referer` yubormasa bloklanadi — panel buni to'g'ri
+yuboradi. Tarmoq (ofis) `tile.openstreetmap.org` ni to'ssa, ogohlantirish chiqadi — boshqa xarita provayderini
+`TILE_URL` ga yozing (panel va ilova ikkalasi ham shuni ishlatadi).
 
 ## 🛠 Admin buyruqlari (istalgan botda, faqat `ADMIN_IDS` uchun)
 
@@ -389,7 +405,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-90 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+92 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**

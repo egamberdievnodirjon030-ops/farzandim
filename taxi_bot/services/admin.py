@@ -79,6 +79,7 @@ class AdminMixin:
             "active_by_status": {str(k): v for k, v in by_status.items()},
             "currency": self.settings.currency,
             "commission_percent": self.settings.commission_percent,
+            "min_driver_balance": self.settings.min_driver_balance,
             "server_time": _iso(now),
         }
 

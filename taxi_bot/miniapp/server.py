@@ -44,6 +44,7 @@ class MiniAppServer:
         self.host = host
         self.max_age = svc.settings.webapp_auth_max_age_h * 3600
         self._runner: web.AppRunner | None = None
+        self._mounts: list[tuple[str, Callable[[], web.Application]]] = []
         tile_host = urlparse(svc.settings.tile_url.replace("{s}", "a")).netloc
         tile_src = f"https://{tile_host}" if tile_host else ""
         if "{s}" in svc.settings.tile_url:
@@ -109,7 +110,8 @@ class MiniAppServer:
             return web.json_response({"error": str(exc) or "Noto'g'ri so'rov"}, status=400)
         response.headers.setdefault("Content-Security-Policy", self.csp)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        # OpenStreetMap plitkalari Referer'siz so'rovlarni bloklaydi — faqat sayt manzili (origin) yuboriladi
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         if request.path.startswith("/api/") or request.path == "/":
             response.headers.setdefault("Cache-Control", "no-store")
         return response
@@ -392,8 +394,15 @@ class MiniAppServer:
         return self.ok()
 
     # ------------------------------------------------------------------ ilova
+    def mount(self, prefix: str, factory: Callable[[], web.Application]) -> None:
+        """Boshqa ilovani shu manzil ostiga ulash (masalan admin panel → /admin/, bitta tunnel orqali)."""
+        self._mounts.append((prefix.rstrip("/"), factory))
+
     def build_app(self) -> web.Application:
         app = web.Application(middlewares=[self._middleware], client_max_size=64 * 1024)
+        for prefix, factory in self._mounts:
+            app.router.add_get(prefix, _redirect_to(prefix + "/"))
+            app.add_subapp(prefix, factory())
         app.add_routes(
             [
                 web.get("/", self.index),
@@ -435,3 +444,9 @@ class MiniAppServer:
         if self._runner:
             await self._runner.cleanup()
 
+
+def _redirect_to(location: str):
+    async def handler(_request: web.Request) -> web.Response:
+        raise web.HTTPFound(location)
+
+    return handler

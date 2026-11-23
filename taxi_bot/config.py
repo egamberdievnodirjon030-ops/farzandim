@@ -146,6 +146,8 @@ class Settings(BaseSettings):
     admin_panel_host: str = "127.0.0.1"  # faqat shu kompyuterdan; tarmoqqa ochish: 0.0.0.0
     admin_panel_port: int = 8080
     admin_panel_password: SecretStr | None = None  # bo'sh bo'lsa data/admin_panel_password.txt da yaratiladi
+    # Internet orqali ham (ilova bilan bir xil HTTPS manzilda: https://…/admin/) — telefondan boshqarish uchun
+    admin_panel_public: bool = True
 
     log_level: str = "INFO"
 

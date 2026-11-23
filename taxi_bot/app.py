@@ -121,7 +121,7 @@ async def main() -> None:
         await svc.resume()
         panel = await start_admin_panel(settings, svc)
         try:  # ilova (Mini App) ishga tushmasa ham bot chat rejimida ishlayveradi
-            miniapp, tunnel = await start_miniapp(settings, svc, passenger_bot, driver_bot)
+            miniapp, tunnel = await start_miniapp(settings, svc, passenger_bot, driver_bot, panel)
         except Exception:
             log.exception("Telegram ilovasini ishga tushirib bo'lmadi — bot chat rejimida ishlaydi")
         maintenance = asyncio.create_task(svc.run_maintenance(), name="maintenance")
@@ -145,11 +145,19 @@ async def main() -> None:
         await db.close()
 
 
-async def start_miniapp(settings: Settings, svc: TaxiService, passenger_bot: Bot, driver_bot: Bot):
-    """Telegram Mini App: server + (kerak bo'lsa) fondagi HTTPS tunnel + bot menyusidagi "🚕 Taksi" tugmasi."""
+async def start_miniapp(settings: Settings, svc: TaxiService, passenger_bot: Bot, driver_bot: Bot, panel=None):
+    """Telegram Mini App: server + (kerak bo'lsa) fondagi HTTPS tunnel + bot menyusidagi "🚕 Taksi" tugmasi.
+
+    Admin panel ham shu HTTPS manzilda ochiladi: https://…/admin/ (ADMIN_PANEL_PUBLIC).
+    """
+    public_panel = panel is not None and settings.admin_panel_public
+    announced: dict[str, str | None] = {"url": None}
 
     async def menu(url: str | None) -> None:
         await apply_menu(settings, svc, passenger_bot, driver_bot, url)
+        if public_panel and url and announced["url"] != url:
+            announced["url"] = url
+            await announce_panel(svc, url.rstrip("/") + "/admin/")
 
     if not settings.webapp_enabled:
         await menu(None)
@@ -163,6 +171,8 @@ async def start_miniapp(settings: Settings, svc: TaxiService, passenger_bot: Bot
     else:
         tokens = [(p_token, Role.PASSENGER), (settings.driver_bot_token.get_secret_value(), Role.DRIVER)]  # type: ignore[union-attr]
     server = MiniAppServer(svc, tokens, settings.webapp_port, settings.webapp_host)
+    if public_panel:
+        server.mount("/admin", lambda: panel.build_app("/admin"))
     try:
         await server.start()
     except OSError as exc:
@@ -217,6 +227,22 @@ async def apply_menu(settings: Settings, svc: TaxiService, passenger_bot: Bot, d
     print(f"📱 Telegram ilovasi: {base}  (botdagi «🚕 Taksi» menyu tugmasi orqali ochiladi)")
 
 
+async def announce_panel(svc: TaxiService, panel_url: str) -> None:
+    """Internet orqali ochiladigan admin panel manzili (tunnel manzili o'zgarganda ham)."""
+    print(f"🌐 Admin panel (internet, HTTPS): {panel_url}")
+    from .ui.kit import View
+
+    try:
+        await svc.msg.notify_admins(
+            View.plain(
+                f"🌐 <b>Admin panel</b> (telefon yoki istalgan kompyuterdan):\n{panel_url}\n\n"
+                "Kirish — panel paroli bilan. Bepul tunnel manzili bot qayta ishga tushganda o'zgaradi."
+            )
+        )
+    except Exception:  # noqa: BLE001 - xabar yuborilmasa ham panel ishlayveradi
+        log.warning("Admin panel manzili adminlarga yuborilmadi")
+
+
 async def start_admin_panel(settings: Settings, svc: TaxiService):
     """Admin web-panelni ishga tushiradi (brauzerda ochiladi). Xato bo'lsa bot baribir ishlayveradi."""
     if not settings.admin_panel_enabled:
@@ -226,11 +252,13 @@ async def start_admin_panel(settings: Settings, svc: TaxiService):
     configured = settings.admin_panel_password.get_secret_value() if settings.admin_panel_password else None
     password, created = resolve_password(configured)
     panel = AdminPanel(svc, password, settings.admin_panel_host, settings.admin_panel_port)
+    if settings.admin_panel_public and len(password) < 10:
+        print("⚠️ Admin panel internetga ochiq — ADMIN_PANEL_PASSWORD kamida 10 belgidan iborat bo'lsin.")
     try:
         await panel.start()
     except OSError as exc:
         log.warning("Admin panel ishga tushmadi (%s-port band bo'lishi mumkin): %s", settings.admin_panel_port, exc)
-        return None
+        return panel if settings.admin_panel_public else None  # internet orqali baribir ochiladi
     host = "localhost" if settings.admin_panel_host in ("127.0.0.1", "localhost") else "<kompyuter-IP>"
     print(f"\n🌐 Admin panel: http://{host}:{settings.admin_panel_port}")
     if configured:

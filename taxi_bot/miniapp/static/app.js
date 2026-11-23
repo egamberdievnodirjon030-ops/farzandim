@@ -228,7 +228,10 @@ const CAR_SVG = `<svg class="car-body" viewBox="0 0 40 40"><g transform="transla
 
 function initMap(center) {
   S.map = L.map("map", { zoomControl: false, attributionControl: true, zoomSnap: 0.5 }).setView(center, 16);
-  L.tileLayer(S.config.tile_url, { maxZoom: 19, attribution: S.config.tile_attribution, subdomains: "abc" }).addTo(S.map);
+  L.tileLayer(S.config.tile_url, {
+    maxZoom: 19, attribution: S.config.tile_attribution, subdomains: "abc",
+    referrerPolicy: "strict-origin-when-cross-origin", // OSM Referer'siz so'rovni bloklaydi
+  }).addTo(S.map);
   for (const name of ["route", "markers", "cars", "radar"]) S.layers[name] = L.layerGroup().addTo(S.map);
   S.map.on("movestart", () => $("#center-pin").classList.add("lifted"));
   S.map.on("moveend", () => {
