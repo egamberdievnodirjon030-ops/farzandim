@@ -96,6 +96,7 @@ def make_settings(**overrides) -> Settings:
         min_driver_balance=1000,
         finish_confirm_timeout_min=10,
         call_provider="operator",
+        company_phone="+998712000000",
         welcome_bonus=0,  # bonus alohida testda tekshiriladi
         route_urls=[],  # testlar internetga chiqmaydi (marshrut alohida soxta server bilan tekshiriladi)
     )

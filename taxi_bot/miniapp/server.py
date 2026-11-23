@@ -6,6 +6,7 @@ HMAC orqali tekshiriladi — foydalanuvchini soxtalashtirib bo'lmaydi.
 
 from __future__ import annotations
 
+import hmac
 import logging
 import time
 from collections.abc import Awaitable, Callable
@@ -132,6 +133,40 @@ class MiniAppServer:
     def fail(message: str, status: int = 409) -> web.Response:
         return web.json_response({"ok": False, "error": message}, status=status)
 
+    @staticmethod
+    def call_info(info) -> web.Response:
+        """Ilovaga: faqat kompaniya raqami, kod va tel: havola — shaxsiy raqamlar hech qachon."""
+        return web.json_response({
+            "ok": info.ok, "mode": info.mode, "message": info.text,
+            "phone": info.phone, "code": info.code, "tel": info.tel, "other": info.other,
+        })
+
+    # ------------------------------------------------------------------ ATS (telefoniya) uchun
+    async def pbx_route(self, request: web.Request) -> web.Response:
+        """Kompaniya raqamiga kelgan qo'ng'iroqni kimga ulash kerakligini ATS so'raydi (odamga ko'rinmaydi).
+
+        GET/POST /pbx/route?code=4821[&caller=+99890...][&format=text]
+        Himoya: CALL_WEBHOOK_SECRET — `X-Taxi-Secret` sarlavhasi yoki `secret` parametri.
+        """
+        secret = self.svc.settings.call_webhook_secret
+        if secret is None:
+            return web.json_response({"ok": False, "error": "CALL_WEBHOOK_SECRET sozlanmagan"}, status=404)
+        params = dict(request.query)
+        if request.method == "POST":
+            try:
+                params.update({k: str(v) for k, v in (await request.post()).items()})
+            except ValueError:
+                pass
+        given = request.headers.get("X-Taxi-Secret") or params.get("secret") or ""
+        if not hmac.compare_digest(given.encode(), secret.get_secret_value().encode()):
+            return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+        found = await self.svc.pbx_route(params.get("code"), params.get("caller"))
+        if params.get("format") == "text":
+            return web.Response(text=found["to"] if found else "", status=200 if found else 404)
+        if not found:
+            return web.json_response({"ok": False}, status=404)
+        return web.json_response({"ok": True, **found})
+
     def need(self, request: web.Request, role: Role) -> None:
         if request[APP] != role:
             raise web.HTTPForbidden()
@@ -246,7 +281,7 @@ class MiniAppServer:
         if action == "retry":
             return self.ok() if await svc.retry_search(tg, oid) else self.fail("Buyurtma eskirgan")
         if action == "call":
-            return self.ok(message=await svc.request_call(tg, oid, Role.PASSENGER))
+            return self.call_info(await svc.request_call(tg, oid, Role.PASSENGER))
         raise web.HTTPNotFound()
 
     async def p_place_save(self, request: web.Request) -> web.Response:
@@ -340,7 +375,7 @@ class MiniAppServer:
                 return self.fail(f"Yo'lovchini kamida {svc.settings.no_show_wait_min:g} daqiqa kuting")
             return self.ok() if result == "ok" else self.fail("Holat o'zgargan")
         if action == "call":
-            return self.ok(message=await svc.request_call(tg, oid, Role.DRIVER))
+            return self.call_info(await svc.request_call(tg, oid, Role.DRIVER))
         raise web.HTTPNotFound()
 
     async def d_settings(self, request: web.Request) -> web.Response:
@@ -363,6 +398,7 @@ class MiniAppServer:
             [
                 web.get("/", self.index),
                 web.get("/api/me", self.me),
+                web.route("*", "/pbx/route", self.pbx_route),
                 web.get("/api/role", self.role),
                 web.get("/api/geocode", self.geocode),
                 web.get("/api/reverse", self.reverse),

@@ -165,7 +165,8 @@ async function loadMap() {
 function orderItem(o) {
   const driver = o.driver ? `🚕 ${esc(o.driver.plate)} · ${esc(o.driver.name)}` : "haydovchi yo'q";
   return `<div class="item"><div class="item-top"><b>#${o.id}</b>${chip(o.status)}</div>
-    <div class="meta">${dt(o.created_at)} · 🙋 ${esc(o.passenger.phone || "—")} · ${driver}</div>
+    <div class="meta">${dt(o.created_at)} · 🙋 ${esc(o.passenger.phone || "—")} · ${driver}${o.call_codes && o.call_codes.length
+      ? ` · 📞 kod: ${o.call_codes.map(esc).join(" / ")} (yo'lovchi / haydovchi)` : ""}</div>
     <div class="item-top"><span class="meta">${o.price ? money(o.price) : "taksometr"}${o.comment ? ` · 💬 ${esc(o.comment)}` : ""}</span>
     <button class="btn small danger" data-act="cancel-order" data-id="${o.id}">Bekor qilish</button></div></div>`;
 }
@@ -181,7 +182,7 @@ async function loadOrders(refetch = true) {
   if (refetch) state.cache.orders = await api(`/api/orders?scope=${state.ordersScope}&limit=300`);
   const q = $("#orders-q").value.trim().toLowerCase().replace(/^#/, "");
   const rows = (state.cache.orders || [])
-    .filter((o) => matches(q, o.id, o.passenger.phone, o.rider_phone, o.driver?.plate, o.driver?.name, o.passenger.name))
+    .filter((o) => matches(q, o.id, o.passenger.phone, o.rider_phone, o.driver?.plate, o.driver?.name, o.passenger.name, ...(o.call_codes || [])))
     .map((o) => `<tr><td><b>#${o.id}</b></td><td>${dt(o.created_at)}</td><td>${chip(o.status)}</td>
       <td>${esc(o.passenger.name)}<br><span class="muted small">${esc(o.passenger.phone || "")}${o.rider_phone ? ` → 👤 ${esc(o.rider_phone)}` : ""}</span></td>
       <td>${o.driver ? `${esc(o.driver.plate)}<br><span class="muted small">${esc(o.driver.name)}</span>` : "—"}</td>

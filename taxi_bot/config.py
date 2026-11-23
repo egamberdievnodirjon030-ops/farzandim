@@ -102,7 +102,9 @@ class Settings(BaseSettings):
     rating_prior_weight: int = 5
 
     # --- Aloqa (kompaniya raqami orqali) -----------------------------------
-    call_provider: Literal["none", "operator", "zadarma", "webhook"] = "operator"
+    # masked — «📞 Aloqa»da faqat kompaniya raqami + buyurtma kodi; ATS /pbx/route orqali ulaydi (standart)
+    # operator — masked + dispetcherga xabar (raqamsiz); zadarma/webhook — tizimning o'zi qo'ng'iroq qilib ulaydi
+    call_provider: Literal["none", "masked", "operator", "zadarma", "webhook"] = "masked"
     call_cooldown_sec: int = 30
     calls_per_order: int = 8
     zadarma_key: str | None = None

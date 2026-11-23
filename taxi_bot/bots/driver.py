@@ -401,8 +401,14 @@ def build_driver_router() -> Router:
 
     @router.callback_query(DCb.filter(F.action == "call"))
     async def call(callback: CallbackQuery, callback_data: DCb, svc: TaxiService) -> None:
-        text = await svc.request_call(callback.from_user.id, callback_data.oid, Role.DRIVER)
-        await callback.answer(text, show_alert=True)
+        info = await svc.request_call(callback.from_user.id, callback_data.oid, Role.DRIVER)
+        if info.mode != "masked":
+            await callback.answer(info.text, show_alert=True)
+            return
+        await callback.answer("📞 Kompaniya raqami va kod quyida — bosib qo'ng'iroq qiling.")
+        await svc.msg.send(
+            Role.DRIVER, callback.from_user.id, svc.views.call_card(info.phone, info.code, info.other)  # type: ignore[arg-type]
+        )
 
     @router.callback_query(DCb.filter(F.action == "cx"))
     async def cancel_ask(callback: CallbackQuery, callback_data: DCb, svc: TaxiService) -> None:

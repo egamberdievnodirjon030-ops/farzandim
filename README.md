@@ -298,16 +298,34 @@ Bitta odam ham haydovchi, ham yo'lovchi bo'lib sinab ko'rishi mumkin: rolni alma
 
 ## 📞 Aloqa — kompaniya raqami orqali (`CALL_PROVIDER`)
 
-Haydovchi **📞 Yo'lovchi bilan aloqa** ni bosganda raqamlar oshkor qilinmaydi:
+**📞 Aloqa** bosilganda hech kim boshqasining shaxsiy raqamini ko'rmaydi — **Telegram'dagi hech bir xabarda**
+(dispetcherga ham) shaxsiy raqam yo'q. Ko'rinadigani faqat **kompaniya raqami** (`COMPANY_PHONE`) va shu buyurtmaga
+xos **qo'shimcha kod** (masalan `6675`). Yozishmalar — bot ichidagi **anonim chat** (shu chatga yozilgan xabar
+qarama-qarshi tomonga bot orqali yetkaziladi; raqam va @username avtomatik yashiriladi).
 
 | Qiymat | Qanday ishlaydi |
 |---|---|
-| `zadarma` | [Zadarma](https://zadarma.com) callback API: ATS kompaniya raqamidan avval tugmani bosganga, u javob bergach ikkinchi tomonga qo'ng'iroq qilib ulaydi. `ZADARMA_KEY`, `ZADARMA_SECRET`, `ZADARMA_SIP` (CallerID = kompaniya raqami) |
-| `webhook` | O'z ATS'ingiz (Asterisk, OnlinePBX, …): `CALL_WEBHOOK_URL` ga `{"order_id", "first", "second"}` JSON POST, `X-Taxi-Secret` sarlavhasi bilan. ATS `first` → `second` callback qiladi |
-| `operator` | Dispetcherlik guruhiga (`ADMIN_CHAT_ID`) ikkala raqam bilan so'rov boradi, operator kompaniya telefonidan ulaydi |
-| `none` | O'chirilgan (faqat `COMPANY_PHONE` ko'rsatiladi) |
+| `masked` (standart) | Ilovada **«📞 Qo'ng'iroq qilish»** kompaniya raqamini teradi va kodni o'zi qo'shadi (`tel:+998712000000,,6675`); chatda raqam bosiladigan xabar bo'lib keladi. Kompaniya ATS'i kodni so'raydi va **`/pbx/route`** ga murojaat qilib, kimga ulashni bilib oladi (pastda) |
+| `operator` | `masked` + dispetcherga xabar (**raqamsiz**: buyurtma va kod). Operator raqamlarni faqat admin web-panelda ko'radi |
+| `zadarma` | To'liq avtomatik: [Zadarma](https://zadarma.com) callback — ATS kompaniya raqamidan avval tugmani bosganga, u javob bergach ikkinchi tomonga qo'ng'iroq qilib ulaydi. `ZADARMA_KEY`, `ZADARMA_SECRET`, `ZADARMA_SIP`. Ishlamasa — `masked` ga o'tadi |
+| `webhook` | O'z ATS'ingiz callback: `CALL_WEBHOOK_URL` ga `{"order_id", "first", "second"}` JSON POST (`X-Taxi-Secret`) |
+| `none` | Qo'ng'iroq o'chirilgan — faqat anonim chat |
 
-Spamdan himoya: bir buyurtmada `CALLS_PER_ORDER` ta qo'ng'iroq, har biri orasida `CALL_COOLDOWN_SEC`.
+**ATS sozlash (`masked` / `operator`):** kompaniya raqamiga kirgan qo'ng'iroqda ATS (Asterisk, OnlinePBX, Zadarma
+ATS, …) 4 xonali kodni so'raydi (IVR) va serverga so'rov yuboradi:
+
+```
+GET https://<ilova-manzili>/pbx/route?code=6675&caller=+99893XXXXXXX
+X-Taxi-Secret: <CALL_WEBHOOK_SECRET>          (yoki &secret=...)
+→ {"ok": true, "to": "+99890XXXXXXX", "order_id": 12, "side": "driver"}   (&format=text → faqat raqam)
+```
+
+So'ng qo'ng'iroqni `to` raqamiga **kompaniya raqami bilan** ulaydi. Kod kiritilmasa — qo'ng'iroq qilgan raqam
+(`caller`) bo'yicha faol buyurtma qidiriladi. Kod faqat buyurtma faol paytida ishlaydi. Bu manzil doimiy bo'lishi
+kerak — ATS uchun serverda `WEBAPP_URL` (domen) ishlating; bepul tunnel manzili har ishga tushganda o'zgaradi.
+Telefoniya ulanmaguncha kompaniya raqamiga kelgan qo'ng'iroqqa operator javob beradi va koddan buyurtmani topadi.
+
+Spamdan himoya (`zadarma`/`webhook`): bir buyurtmada `CALLS_PER_ORDER` ta qo'ng'iroq, har biri orasida `CALL_COOLDOWN_SEC`.
 
 ## 💳 Balansni to'ldirish
 
@@ -371,7 +389,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-89 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+90 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**

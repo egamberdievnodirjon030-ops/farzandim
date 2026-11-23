@@ -261,10 +261,13 @@ async def test_end_to_end_two_bots(harness, center):
     assert "Haydovchi topildi" in h.last_text(pbot, PASSENGER.id)
     assert h.session.calls(pbot.id, "SendLocation")  # yo'lovchiga mashinaning jonli xaritasi
 
-    # Aloqa — kompaniya orqali (operator rejimi)
+    # Aloqa — faqat kompaniya raqami va kod (shaxsiy raqamlar hech kimga ko'rinmaydi)
     await h.press(dbot, DRIVER, f"d:call:{order.id}:0")
     answer = h.session.calls(dbot.id, "AnswerCallbackQuery")[-1]
-    assert "kompaniya" in answer.text and PASSENGER_PHONE not in answer.text
+    assert "kompaniya" in answer.text.lower() and PASSENGER_PHONE not in answer.text
+    card = h.last_text(dbot, DRIVER.id)
+    code = (await h.svc.get_order(order.id)).call_code_d
+    assert "Kompaniya raqami" in card and code in card and PASSENGER_PHONE.lstrip("+") not in card
 
     # Anonim chat
     await h.send(dbot, DRIVER, text="2 daqiqada yetib boraman")

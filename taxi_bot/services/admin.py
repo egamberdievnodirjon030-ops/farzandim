@@ -154,6 +154,8 @@ class AdminMixin:
                     {"id": d.id, "name": d.full_name, "phone": d.phone, "plate": d.car_plate} if d else None
                 ),
                 "has_destination": o.has_destination,
+                # «📞 Aloqa» kodlari: operator kompaniya raqamiga kelgan qo'ng'iroqni kod bo'yicha topadi
+                "call_codes": [c for c in (o.call_code_p, o.call_code_d) if c],
                 "distance_m": o.trip_distance_m or o.est_distance_m,
                 "price": o.final_price or o.est_price,
                 "commission": o.commission,

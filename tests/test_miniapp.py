@@ -353,3 +353,35 @@ async def test_written_destination_is_taximeter_and_finishes_anywhere(make_servi
         assert (await p.get("/api/me"))["config"]["finish_radius_m"] == svc.settings.finish_radius_m
     finally:
         await client.close()
+
+
+async def test_app_call_and_pbx_route_endpoint(make_service, center):
+    svc, _ = await make_service(priority_headstart_sec=0, call_webhook_secret="pbx-secret")
+    client = await start(svc, TWO_BOTS)
+    p = AppClient(client, P_TOKEN, PASSENGER, "passenger")
+    d = AppClient(client, D_TOKEN, DRIVER, "driver")
+    try:
+        await svc.ensure_passenger(PASSENGER, "Jasur")
+        await svc.set_passenger_phone(PASSENGER, "+998935556677")
+        driver = await add_driver(svc, DRIVER, *offset(*center, 300, 0))
+        order_id = (await p.post("/api/p/order", {"pickup": {"lat": center[0], "lon": center[1]}}))["order_id"]
+
+        async def has_offer():
+            return bool((await d.get("/api/d/state"))["offers"])
+        assert await wait_for(has_offer)
+        await d.post(f"/api/d/offers/{order_id}/accept")
+        call = await p.post("/api/p/call", {"order_id": order_id})
+        assert call["mode"] == "masked" and call["phone"] and call["tel"].startswith("tel:") and call["code"] in call["tel"]
+        assert driver.phone not in json.dumps(call)  # ilovaga ham faqat kompaniya raqami
+        dcall = await d.post(f"/api/d/orders/{order_id}/call")
+        assert "935556677" not in json.dumps(dcall)
+
+        # ATS so'rovi: maxfiy kalitsiz — rad
+        assert (await client.get(f"/pbx/route?code={call['code']}")).status == 403
+        ok = await client.get(f"/pbx/route?code={call['code']}", headers={"X-Taxi-Secret": "pbx-secret"})
+        assert ok.status == 200 and (await ok.json())["to"] == driver.phone
+        text = await client.get(f"/pbx/route?code={dcall['code']}&secret=pbx-secret&format=text")
+        assert await text.text() == "+998935556677"
+        assert (await client.get("/pbx/route?code=1&secret=pbx-secret")).status == 404
+    finally:
+        await client.close()

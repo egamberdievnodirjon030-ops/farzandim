@@ -393,8 +393,14 @@ def build_passenger_router() -> Router:
 
     @router.callback_query(PCb.filter(F.action == "call"))
     async def call(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
-        text = await svc.request_call(callback.from_user.id, callback_data.oid, Role.PASSENGER)
-        await callback.answer(text, show_alert=True)
+        info = await svc.request_call(callback.from_user.id, callback_data.oid, Role.PASSENGER)
+        if info.mode != "masked":
+            await callback.answer(info.text, show_alert=True)
+            return
+        await callback.answer("📞 Kompaniya raqami va kod quyida — bosib qo'ng'iroq qiling.")
+        await svc.msg.send(
+            Role.PASSENGER, callback.from_user.id, svc.views.call_card(info.phone, info.code, info.other)  # type: ignore[arg-type]
+        )
 
     @router.callback_query(PCb.filter(F.action == "ok"))
     async def arrived(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:

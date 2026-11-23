@@ -931,10 +931,50 @@ async function cancelOrder(o, silent = false) {
 }
 
 async function call(o) {
-  try {
-    const r = await api("/api/p/call", { order_id: o.id });
-    if (tg && tg.showAlert) tg.showAlert(r.message); else toast(r.message);
-  } catch (e) { toast(e.message, true); }
+  await openCall("/api/p/call", { order_id: o.id });
+}
+
+function fmtPhone(p) {
+  const m = /^\+998(\d{2})(\d{3})(\d{2})(\d{2})$/.exec(p || "");
+  return m ? `+998 ${m[1]} ${m[2]} ${m[3]} ${m[4]}` : p || "";
+}
+
+/**
+ * «📞 Aloqa»: faqat kompaniya raqami va shu buyurtma kodi ko'rinadi — ikkala tomonning raqami ham yashirin.
+ * «Qo'ng'iroq qilish» raqamni teradi, kodni esa avtomatik qo'shadi; kompaniya ATS'i kod bo'yicha ulaydi.
+ */
+async function openCall(path, body) {
+  let r;
+  try { r = await api(path, body); } catch (e) { return toast(e.message, true); }
+  if (r.mode !== "masked") {
+    if (tg && tg.showAlert) tg.showAlert(r.message); else toast(r.message, !r.ok);
+    return;
+  }
+  const box = $("#callbox");
+  const who = r.other ? r.other[0].toUpperCase() + r.other.slice(1) : "Suhbatdosh";
+  box.innerHTML = `<div class="callcard">
+      <div class="row between"><h3>📞 ${esc(who)} bilan bog'lanish</h3><button class="chip-btn" id="call-close">✕</button></div>
+      <div class="muted small">Kompaniya raqami — ikkala tomonning shaxsiy raqami ham yashirin</div>
+      <div class="callnum">${esc(fmtPhone(r.phone))}</div>
+      ${r.code ? `<div class="callcode">Qo'shimcha kod: <b>${esc(r.code)}</b></div>` : ""}
+      <a class="btn accent callbtn" id="call-dial" href="${esc(r.tel)}">📞 Qo'ng'iroq qilish</a>
+      <div class="muted small">Kod avtomatik teriladi. So'ralsa — o'zingiz kiriting, sizni ${esc(r.other || "suhbatdosh")} bilan ulaymiz.</div>
+      <div class="btns"><button class="btn" id="call-copy">📋 Raqamni nusxalash</button><button class="btn" id="call-chat">💬 Bot chatida yozish</button></div>
+    </div>`;
+  box.hidden = false;
+  haptic("light");
+  const close = () => { box.hidden = true; };
+  on("call-close", close);
+  box.onclick = (e) => { if (e.target === box) close(); };
+  $("#call-dial").addEventListener("click", () => haptic("medium"));
+  on("call-copy", async () => {
+    try { await navigator.clipboard.writeText(r.phone); toast("📋 Raqam nusxalandi"); } catch { toast(fmtPhone(r.phone)); }
+  });
+  on("call-chat", () => {
+    close();
+    toast(`💬 Bot chatiga yozing — xabaringiz ${r.other || "suhbatdosh"}ga bot orqali yetkaziladi`);
+    setTimeout(() => { try { tg.close(); } catch { /* brauzerda */ } }, 1500);
+  });
 }
 
 function renderRate(o) {
@@ -1200,10 +1240,7 @@ function renderDriverOrder(o, d) {
     Second.hide();
   }
   on("nav", () => openLink(navUrl(d.navigator, target[0], target[1])));
-  on("call", async () => {
-    try { const r = await api(`/api/d/orders/${o.id}/call`, {}); if (tg && tg.showAlert) tg.showAlert(r.message); else toast(r.message); }
-    catch (e) { toast(e.message, true); }
-  });
+  on("call", () => openCall(`/api/d/orders/${o.id}/call`, {}));
   on("dcancel", async () => { if (await confirmBox("Buyurtmani bekor qilasizmi? Yo'lovchiga boshqa haydovchi qidiriladi.")) dAct("cancel", o.id); });
   on("noshow", async () => { if (await confirmBox("Yo'lovchi chiqmadimi? Buyurtma yopiladi.")) dAct("noshow", o.id); });
 }

@@ -145,11 +145,13 @@ async def test_order_for_someone_else_routes_calls_to_rider(make_service, center
     assert await wait_for(lambda: _has_offer(svc, order.id, d.id))
     assert "Boshqa odam" in fake.to(Role.DRIVER, 3801)[-1].view.text
     assert (await svc.accept_offer(3801, order.id)).ok
-    await svc.request_call(3801, order.id, Role.DRIVER)
-    alert = fake.admin[-1].text
-    assert "+998901117788" in alert and "buyurtmachi" in alert
-    driver_texts = " ".join(m.view.text for m in fake.to(Role.DRIVER, 3801))
-    assert "+998901117788" not in driver_texts
+    info = await svc.request_call(3801, order.id, Role.DRIVER)
+    route = await svc.pbx_route(code=info.code)  # ATS kod bo'yicha aynan o'sha odamga ulaydi
+    assert route["to"] == "+998901117788" and route["side"] == "passenger"
+    telegram = " ".join(v.text for v in fake.admin if "Aloqa" in v.text) + " ".join(
+        m.view.text for m in fake.to(Role.DRIVER, 3801)
+    )
+    assert "+998901117788" not in telegram + info.text  # Telegram'da hech kimga ko'rinmaydi
 
 
 async def test_offer_shows_trip_direction_and_no_penalty(make_service, center):

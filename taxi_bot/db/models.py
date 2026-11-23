@@ -165,6 +165,9 @@ class Order(Base):
     call_count: Mapped[int] = mapped_column(Integer, default=0)
     near_notified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     rider_phone: Mapped[str | None] = mapped_column(String(32))  # boshqa odam uchun buyurtma
+    # «📞 Aloqa»: kompaniya raqamiga qo'ng'iroqdagi qo'shimcha kodlar (yo'lovchi → haydovchi, haydovchi → yo'lovchi)
+    call_code_p: Mapped[str | None] = mapped_column(String(8), index=True)
+    call_code_d: Mapped[str | None] = mapped_column(String(8), index=True)
     # Yo'lovchining jonli joylashuvi (faqat shu buyurtma davomida, haydovchi uni topishi uchun)
     pax_lat: Mapped[float | None] = mapped_column(Float)
     pax_lon: Mapped[float | None] = mapped_column(Float)

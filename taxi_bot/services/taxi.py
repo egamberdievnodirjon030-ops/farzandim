@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import secrets
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -45,7 +46,7 @@ from .miniapp import MiniAppMixin
 from .pricing import Tariff
 from .privacy import mask_contacts
 from .routing import RoutingService
-from .telephony import TelephonyService, normalize_phone
+from .telephony import CallInfo, TelephonyService, normalize_phone
 
 log = logging.getLogger(__name__)
 
@@ -1482,56 +1483,170 @@ class TaxiService(FeaturesMixin, AdminMixin, MiniAppMixin):
             order.passenger_live_msg_id = None
 
     # -------------------------------------------------------------- aloqa
-    async def request_call(self, requester_tg: int, order_id: int, side: Role) -> str:
+    async def request_call(self, requester_tg: int, order_id: int, side: Role) -> CallInfo:
+        """«📞 Aloqa»: hech kim boshqasining raqamini ko'rmaydi — faqat kompaniya raqami (va kod) ko'rinadi.
+
+        * masked/operator: kompaniya raqami + shu buyurtmaga xos qo'shimcha kod. Raqam bosilsa qo'ng'iroq
+          boshlanadi (kod avtomatik teriladi); ATS kodni /pbx/route ga yuborib, kimga ulashni bilib oladi.
+        * zadarma/webhook: tizimning o'zi kompaniya raqamidan qo'ng'iroq qilib, ikki tomonni ulaydi.
+        """
         bundle = await self._order_bundle(order_id)
         if bundle is None:
-            return "❌ Buyurtma topilmadi."
+            return CallInfo(False, "❌ Buyurtma topilmadi.")
         order, passenger, driver = bundle
         if driver is None or order.status not in DRIVER_ACTIVE_STATUSES:
-            return "❌ Bu buyurtma faol emas."
+            return CallInfo(False, "❌ Bu buyurtma faol emas.")
         if side == Role.DRIVER and driver.tg_id != requester_tg:
-            return "❌ Buyurtma topilmadi."
+            return CallInfo(False, "❌ Buyurtma topilmadi.")
         if side == Role.PASSENGER and passenger.tg_id != requester_tg:
-            return "❌ Buyurtma topilmadi."
-        key = (order_id, side.value)
-        now = time.monotonic()
-        last = self._call_at.get(key, 0.0)
-        if now - last < self.settings.call_cooldown_sec:
-            wait = int(self.settings.call_cooldown_sec - (now - last)) + 1
-            return f"⏳ Qo'ng'iroq ulanmoqda. Qayta urinish uchun {wait} soniya kuting."
-        if order.call_count >= self.settings.calls_per_order:
-            return "⚠️ Bu buyurtma uchun qo'ng'iroqlar soni tugadi. Chat orqali yozing."
-        rider = order.rider_phone or passenger.phone  # boshqa odam uchun buyurtmada — aynan o'sha odam
-        first, second = (driver.phone, rider) if side == Role.DRIVER else (passenger.phone, driver.phone)
+            return CallInfo(False, "❌ Buyurtma topilmadi.")
         other = "yo'lovchi" if side == Role.DRIVER else "haydovchi"
-        if not first or not second:
-            return "⚠️ Telefon raqami topilmadi. Chat orqali yozing — xabaringiz yetkaziladi."
+        provider = self.settings.call_provider
+        if provider in ("zadarma", "webhook"):
+            rider = order.rider_phone or passenger.phone  # boshqa odam uchun buyurtmada — aynan o'sha odam
+            first, second = (driver.phone, rider) if side == Role.DRIVER else (passenger.phone, driver.phone)
+            key = (order_id, side.value)
+            now = time.monotonic()
+            last = self._call_at.get(key, 0.0)
+            if now - last < self.settings.call_cooldown_sec:
+                wait = int(self.settings.call_cooldown_sec - (now - last)) + 1
+                return CallInfo(False, f"⏳ Qo'ng'iroq ulanmoqda. Qayta urinish uchun {wait} soniya kuting.")
+            if order.call_count >= self.settings.calls_per_order:
+                return CallInfo(False, "⚠️ Bu buyurtma uchun qo'ng'iroqlar soni tugadi. Chat orqali yozing.")
+            if first and second:
+                self._call_at[key] = now
+                await self._set_order_fields(order_id, call_count=Order.call_count + 1)
+                result = await self.telephony.connect(first, second, order_id)
+                if result.ok:
+                    return CallInfo(
+                        True,
+                        f"📞 Hozir kompaniya raqamidan sizga qo'ng'iroq keladi — javob bering, so'ng {other} "
+                        "bilan ulanasiz. Ikkala tomonning raqami ham yashirin.",
+                        mode="callback",
+                    )
+                log.warning("Avtomatik ulash ishlamadi (%s): %s", provider, result.detail)
+            # ishlamasa — kompaniya raqami va kod bilan davom etamiz
+        if provider == "none" or not self.settings.company_phone:
+            return CallInfo(False, "💬 Qo'ng'iroq hozircha yo'q. Shu chatga yozing — xabaringiz yetkaziladi.")
+        codes = await self._call_codes(order_id)
+        code = codes[0] if side == Role.PASSENGER else codes[1]
+        phone = normalize_phone(self.settings.company_phone) or self.settings.company_phone
+        if provider == "operator":
+            await self._notify_call_operator(order_id, side, code)
+        return CallInfo(
+            True,
+            f"📞 Kompaniya raqami: {phone}, kod: {code}. Qo'ng'iroq qiling va kodni kiriting — sizni {other} "
+            "bilan ulaymiz. Ikkala tomonning raqami ham yashirin.",
+            mode="masked",
+            phone=phone,
+            code=code,
+            other=other,
+        )
+
+    async def _notify_call_operator(self, order_id: int, side: Role, code: str) -> None:
+        """Dispetcherga — RAQAMSIZ (raqamlar faqat admin panelda va ATS'da)."""
+        key = (order_id, f"op-{side.value}")
+        now = time.monotonic()
+        if now - self._call_at.get(key, 0.0) < self.settings.call_cooldown_sec:
+            return
         self._call_at[key] = now
-        await self._set_order_fields(order_id, call_count=Order.call_count + 1)
-        result = await self.telephony.connect(first, second, order_id)
-        if result.ok and result.mode == "callback":
-            return (
-                f"📞 Hozir kompaniya raqamidan sizga qo'ng'iroq keladi — javob bering, "
-                f"so'ng {other} bilan ulanasiz. Raqamlar yashirin."
+        who, other = ("Haydovchi", "yo'lovchi") if side == Role.DRIVER else ("Yo'lovchi", "haydovchi")
+        await self.msg.notify_admins(
+            View.plain(
+                f"📞 <b>Aloqa so'rovi — buyurtma #{order_id}</b>\n"
+                f"{who} {other} bilan bog'lanmoqchi. Kompaniya raqamiga qo'ng'iroq qilib, <b>{code}</b> kodini aytadi.\n"
+                "Ulash uchun raqamlar: admin panel → Buyurtmalar (Telegram'da raqamlar ko'rsatilmaydi)."
             )
-        if result.ok and result.mode == "operator":
-            who = "Haydovchi" if side == Role.DRIVER else "Yo'lovchi"
-            await self.msg.notify_admins(
-                View.plain(
-                    f"📞 <b>Aloqa so'rovi — buyurtma #{order_id}</b>\n"
-                    f"{who} {other} bilan bog'lanishni so'radi.\n\n"
-                    f"Haydovchi: <code>{h(driver.phone)}</code>\n"
-                    f"Yo'lovchi: <code>{h(rider)}</code>"
-                    + (f" (buyurtmachi: <code>{h(passenger.phone)}</code>)" if order.rider_phone else "")
-                    + "\n\n"
-                    "Kompaniya raqamidan ikkala tomonni ulang."
+        )
+
+    async def _call_codes(self, order_id: int) -> tuple[str, str]:
+        """Buyurtmaning aloqa kodlari (yo'lovchiniki, haydovchiniki) — faol buyurtmalar orasida takrorlanmaydi."""
+        order = await self.get_order(order_id)
+        assert order is not None
+        if order.call_code_p and order.call_code_d:
+            return order.call_code_p, order.call_code_d
+        async with self.db.session() as s:
+            used = set(
+                (
+                    await s.scalars(
+                        select(Order.call_code_p).where(
+                            Order.status.in_(DRIVER_ACTIVE_STATUSES), Order.call_code_p.is_not(None)
+                        )
+                    )
+                ).all()
+            ) | set(
+                (
+                    await s.scalars(
+                        select(Order.call_code_d).where(
+                            Order.status.in_(DRIVER_ACTIVE_STATUSES), Order.call_code_d.is_not(None)
+                        )
+                    )
+                ).all()
+            )
+            digits = 4 if len(used) < 2000 else 6
+            codes: list[str] = []
+            while len(codes) < 2:
+                code = "".join(secrets.choice("0123456789") for _ in range(digits))
+                if code[0] != "0" and code not in used and code not in codes:
+                    codes.append(code)
+            res = await s.execute(
+                _upd(Order)
+                .where(Order.id == order_id, Order.call_code_p.is_(None))
+                .values(call_code_p=codes[0], call_code_d=codes[1])
+            )
+        if res.rowcount != 1:  # parallel so'rov allaqachon yaratgan
+            order = await self.get_order(order_id)
+            return order.call_code_p, order.call_code_d  # type: ignore[union-attr,return-value]
+        return codes[0], codes[1]
+
+    async def pbx_route(self, code: str | None = None, caller: str | None = None) -> dict | None:
+        """ATS uchun (odamga ko'rsatilmaydi): kompaniya raqamiga qo'ng'iroq qilgan kishini kim bilan ulash kerak.
+
+        Avval qo'shimcha kod bo'yicha, bo'lmasa qo'ng'iroq qilgan raqam bo'yicha faol buyurtma qidiriladi.
+        """
+        code = (code or "").strip()
+        caller_n = normalize_phone(caller) if caller else None
+        async with self.db.session() as s:
+            order = None
+            to_driver = True
+            if code:
+                order = await s.scalar(
+                    select(Order).where(Order.status.in_(DRIVER_ACTIVE_STATUSES), Order.call_code_p == code)
                 )
-            )
-            phone = f"\nYoki o'zingiz qo'ng'iroq qiling: {self.settings.company_phone}" if self.settings.company_phone else ""
-            return f"📞 Operator sizni hozir kompaniya raqami orqali {other} bilan bog'laydi.{phone}"
-        if self.settings.company_phone:
-            return f"📞 Kompaniya raqamiga qo'ng'iroq qiling: {self.settings.company_phone}"
-        return "⚠️ Hozircha qo'ng'iroq imkoni yo'q. Chat orqali yozing — xabaringiz yetkaziladi."
+                if order is None:
+                    order = await s.scalar(
+                        select(Order).where(Order.status.in_(DRIVER_ACTIVE_STATUSES), Order.call_code_d == code)
+                    )
+                    to_driver = False
+            if order is None and caller_n:
+                p = await s.scalar(select(Passenger).where(Passenger.phone == caller_n))
+                if p is not None:
+                    order = await s.scalar(
+                        select(Order)
+                        .where(Order.passenger_id == p.id, Order.status.in_(DRIVER_ACTIVE_STATUSES))
+                        .order_by(Order.id.desc())
+                    )
+                    to_driver = True
+                if order is None:
+                    order = await s.scalar(
+                        select(Order)
+                        .where(Order.rider_phone == caller_n, Order.status.in_(DRIVER_ACTIVE_STATUSES))
+                        .order_by(Order.id.desc())
+                    )
+                    to_driver = True
+                if order is None:
+                    d = await s.scalar(select(Driver).where(Driver.phone == caller_n))
+                    if d is not None and d.current_order_id:
+                        order = await s.get(Order, d.current_order_id)
+                        to_driver = False
+            if order is None or order.status not in DRIVER_ACTIVE_STATUSES or order.driver_id is None:
+                return None
+            driver = await s.get(Driver, order.driver_id)
+            passenger = await s.get(Passenger, order.passenger_id)
+        target = driver.phone if to_driver else (order.rider_phone or passenger.phone)  # type: ignore[union-attr]
+        if not target:
+            return None
+        return {"to": target, "order_id": order.id, "side": "driver" if to_driver else "passenger"}
 
     # -------------------------------------------------------------- anonim chat
     async def relay_from(self, role: Role, tg_id: int) -> tuple[Order, Passenger, Driver] | None:

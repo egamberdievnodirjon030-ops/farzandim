@@ -8,7 +8,9 @@ Natijada hech kim boshqasining shaxsiy raqamini ko'rmaydi.
 Provayderlar:
   * zadarma  — Zadarma API (/v1/request/callback/)
   * webhook  — o'zingizning ATS (Asterisk, OnlinePBX, ...) uchun JSON POST
-  * operator — dispetcherga xabar boradi, u kompaniya telefonidan ulab beradi
+  * masked   — (standart) «📞 Aloqa»da faqat kompaniya raqami + buyurtma kodi; foydalanuvchi qo'ng'iroq
+               qiladi, ATS kodni /pbx/route ga yuborib, kimga ulashni bilib oladi
+  * operator — masked + dispetcherga xabar (RAQAMSIZ — raqamlar faqat admin panelda)
   * none     — o'chirilgan
 """
 
@@ -39,6 +41,25 @@ def normalize_phone(raw: str | None) -> str | None:
     if len(digits) < 10:
         return None
     return "+" + digits
+
+
+@dataclass(frozen=True, slots=True)
+class CallInfo:
+    """«📞 Aloqa» natijasi foydalanuvchiga: faqat kompaniya raqami va kod (shaxsiy raqamlar hech qachon)."""
+
+    ok: bool
+    text: str
+    mode: str = "error"  # masked | callback | error
+    phone: str | None = None  # kompaniya raqami
+    code: str | None = None  # qo'shimcha kod (ATS kodni so'raganda kiritiladi)
+    other: str = ""
+
+    @property
+    def tel(self) -> str | None:
+        """Bir bosishda qo'ng'iroq: raqam, so'ng pauza va kod (DTMF) avtomatik teriladi."""
+        if not self.phone:
+            return None
+        return f"tel:{self.phone}" + (f",,{self.code}" if self.code else "")
 
 
 @dataclass(frozen=True, slots=True)

@@ -265,6 +265,25 @@ class Views:
         )
         return View.of(card, inline(stop, btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY)))
 
+    def call_card(self, phone: str, code: str | None, other: str) -> View:
+        """«📞 Aloqa»: faqat kompaniya raqami va kod. Raqam matnda — Telegram uni bosiladigan qiladi."""
+        lines = [
+            f"📞 <b>{other.capitalize()} bilan bog'lanish</b>",
+            "",
+            f"Kompaniya raqami: {phone}",
+        ]
+        if code:
+            lines.append(f"Qo'shimcha kod: <b>{code}</b>")
+        lines += [
+            "",
+            "Raqamni bosing → qo'ng'iroq qiling"
+            + (" → so'ralganda kodni kiriting." if code else ".")
+            + f" Sizni {other} bilan ulaymiz — ikkala tomonning raqami ham yashirin.",
+            "",
+            f"💬 Yoki shu yerga yozing — xabaringiz {other}ga bot orqali yetkaziladi.",
+        ]
+        return View.plain("\n".join(lines))
+
     def stop_here_confirm(self, o: Order) -> View:
         card = Card("🛑 Shu yerda tushasizmi?")
         card.para(

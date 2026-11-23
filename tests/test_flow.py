@@ -335,18 +335,41 @@ async def test_require_live_location_rejects_static_points(make_service, center)
     assert res.went_online
 
 
-async def test_call_masking_operator_mode_hides_numbers(make_service, center):
-    svc, fake = await make_service(priority_headstart_sec=0, company_phone="+998712000000")
-    await add_driver(svc, 1201, *center)
+async def test_calls_show_only_company_number_and_pbx_connects_by_code(make_service, center):
+    """«📞 Aloqa»: faqat kompaniya raqami + kod; ATS kod (yoki qo'ng'iroq qilgan raqam) bo'yicha ulaydi."""
+    svc, fake = await make_service(priority_headstart_sec=0, company_phone="+998 71 200-00-00")
+    d = await add_driver(svc, 1201, *center)
     await add_passenger(svc)
     order = await order_now(svc, center)
     assert await wait_for(lambda: _all_offered(svc, order.id, 1))
+    assert (await svc.pbx_route(caller="+998935556677")) is None  # haydovchi yo'q — ulanmaydi
     assert (await svc.accept_offer(1201, order.id)).ok
-    reply = await svc.request_call(1201, order.id, Role.DRIVER)
-    assert "Operator" in reply and "+998935556677" not in reply
-    assert "+998935556677" in fake.admin[-1].text  # raqamlarni faqat dispetcher ko'radi
-    assert "kuting" in await svc.request_call(1201, order.id, Role.DRIVER)  # cooldown
-    assert "topilmadi" in await svc.request_call(9999, order.id, Role.DRIVER)
+
+    by_driver = await svc.request_call(1201, order.id, Role.DRIVER)
+    by_passenger = await svc.request_call(PASSENGER_TG, order.id, Role.PASSENGER)
+    assert by_driver.mode == by_passenger.mode == "masked"
+    assert by_driver.phone == by_passenger.phone == "+998712000000"
+    assert by_driver.code != by_passenger.code and len(by_driver.code) == 4
+    assert by_driver.tel == f"tel:+998712000000,,{by_driver.code}"  # bir bosishda qo'ng'iroq + kod
+    assert (await svc.request_call(1201, order.id, Role.DRIVER)).code == by_driver.code  # kod o'zgarmaydi
+    # Telegram'da hech kimga shaxsiy raqam ko'rinmaydi (dispetcherga ham)
+    calls = [v.text for v in fake.admin if "Aloqa so'rovi" in v.text]
+    shown = by_driver.text + by_passenger.text + " ".join(calls)
+    assert "+998935556677" not in shown and "+998901234567" not in shown
+    assert "Aloqa so'rovi" in fake.admin[-1].text and by_passenger.code in fake.admin[-1].text
+
+    # ATS: kod bo'yicha — qarama-qarshi tomonga
+    assert (await svc.pbx_route(code=by_passenger.code))["to"] == d.phone
+    assert (await svc.pbx_route(code=by_driver.code))["to"] == "+998935556677"
+    # kod kiritilmasa — qo'ng'iroq qilgan raqam bo'yicha
+    assert (await svc.pbx_route(caller="935556677"))["to"] == d.phone
+    assert (await svc.pbx_route(caller=d.phone))["to"] == "+998935556677"
+    assert await svc.pbx_route(code="0000") is None
+    assert not (await svc.request_call(9999, order.id, Role.DRIVER)).ok
+
+    # buyurtma tugagach kod ishlamaydi
+    await svc.passenger_cancel(PASSENGER_TG, order.id, confirmed=True)
+    assert await svc.pbx_route(code=by_passenger.code) is None
 
 
 async def test_relay_chat_is_anonymous(make_service, center):
