@@ -38,17 +38,20 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
 * **Kompyuterda (Windows):** `start.bat` (`run.py`) rasmiy `cloudflared.exe` ni o'zi yuklab oladi va bepul
   `https://….trycloudflare.com` tunnelini **fonda** ochadi. Bot darhol ishlay boshlaydi, tunnel ochilgach menyudagi
   «🚕 Taksi» tugmasi o'zi yangilanadi (manzil har ishga tushganda o'zgaradi — bu normal).
-  * Cloudflare ishlamasa, **zaxira tunnel** — [localhost.run](https://localhost.run) — Windows 10/11 dagi o'rnatilgan
+  * Tarmoq DNS'i Cloudflare manzillarini bloklasa (ofis/provayder), **DNS'siz usul** o'zi ishga tushadi: tunnel
+    manzili DNS-over-HTTPS (to'g'ridan-to'g'ri 1.1.1.1 / 8.8.8.8) orqali olinadi, `cloudflared` esa Cloudflare
+    hujjatidagi doimiy server IP'lariga (`198.41.192.x`, `198.41.200.x`, port 7844) ulanadi.
+  * Bu ham ishlamasa, **zaxira tunnel** — [localhost.run](https://localhost.run) — Windows 10/11 dagi o'rnatilgan
     `ssh` orqali o'zi sinab ko'riladi (`https://….lhr.life`).
   * Tunnel uzilsa — qayta ochiladi va tugma yangi manzilga o'tadi. Umuman ochilmasa — tugma olib tashlanadi
     (buzuq havola qolmaydi), bot **chat rejimida ishlayveradi** va sababi oynada yoziladi
     (`⚠️ Cloudflare tunnel ochilmadi: ...`).
   * Telegram'da tugma eski manzilni ochsa — bot chatini yopib qayta oching.
   * `lookup api.trycloudflare.com ... no data of the requested type` (yoki `no such host`) — kompyuter ulangan
-    tarmoq (ko'pincha ofis tarmog'i yoki provayder DNS'i) tunnelni bloklayapti. Windows DNS'ini `1.1.1.1` / `8.8.8.8`
-    ga o'zgartiring (*Sozlamalar → Tarmoq va Internet → Wi-Fi/Ethernet → Apparat xususiyatlari → DNS-server tayinlash*)
-    yoki kompyuterni boshqa internetga (telefon hotspoti, uy Wi-Fi) ulang. Bot o'chirilmasa ham bo'ladi — tunnel
-    fonda qayta urinadi va ochilishi bilan «🚕 Taksi» tugmasi o'zi qaytadi.
+    tarmoq DNS'i tunnelni bloklayapti; bot shundan keyin **DNS'siz usulni o'zi sinaydi** (`Cloudflare (DNS'siz)`).
+    U ham ochilmasa (`no recent network activity`, `timeout`) — tarmoq firewall'i 7844-portni ham to'smoqda:
+    kompyuterni boshqa internetga (telefon hotspoti, uy Wi-Fi) ulang yoki Windows DNS'ini `1.1.1.1` / `8.8.8.8` ga
+    o'zgartiring. Bot o'chirilmasa ham bo'ladi — tunnel fonda qayta urinadi va «🚕 Taksi» tugmasi o'zi qaytadi.
   * Qo'lda o'rnatish: `winget install --id Cloudflare.cloudflared` yoki
     [GitHub'dan](https://github.com/cloudflare/cloudflared/releases/latest) `cloudflared-windows-amd64.exe` ni yuklab,
     nomini `cloudflared.exe` qilib loyiha papkasiga qo'ying (~60 MB bo'lishi kerak). Buzilgan fayl avtomatik o'chiriladi.
@@ -335,7 +338,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-68 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+74 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**

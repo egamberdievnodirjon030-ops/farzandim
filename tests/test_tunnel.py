@@ -175,3 +175,96 @@ def test_user_dns_error_gets_actionable_hint():
     assert hint_for(reason) == DNS_HINT and "1.1.1.1" in DNS_HINT
     assert hint_for("ssh: connect to host localhost.run port 22: Connection timed out") == BLOCKED_HINT
     assert hint_for("something else") is None
+
+
+async def test_quick_tunnel_is_requested_without_system_dns(monkeypatch):
+    """Foydalanuvchi holati: tarmoq DNS'i api.trycloudflare.com ni bermaydi — DoH + IP orqali olinadi."""
+    import base64
+    import json
+    import socket
+
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    async def doh(request):
+        assert request.query["name"] == "api.trycloudflare.com"
+        return web.json_response({"Status": 0, "Answer": [{"name": "api.trycloudflare.com", "type": 1, "data": "127.0.0.1"}]})
+
+    async def api(request):
+        assert request.method == "POST" and request.host.startswith("api.trycloudflare.com")
+        assert request.headers["User-Agent"] == "cloudflared/2026.11.1"
+        return web.json_response({"success": True, "result": {
+            "id": "9ce6e75d-1bd9-4608-8347-64cd76958233", "name": "qt", "hostname": "calm-sea-tree.trycloudflare.com",
+            "account_tag": "acc123", "secret": "c2VjcmV0",
+        }})
+
+    app = web.Application()
+    app.router.add_get("/dns-query", doh)
+    app.router.add_post("/tunnel", api)
+    server = TestServer(app, host="127.0.0.1")
+    await server.start_server()
+    monkeypatch.setattr(tunnel_mod, "DOH_SERVERS", (f"http://127.0.0.1:{server.port}/dns-query",))
+    monkeypatch.setattr(tunnel_mod, "QUICK_TUNNEL_API", f"http://api.trycloudflare.com:{server.port}/tunnel")
+
+    real_getaddrinfo = socket.getaddrinfo
+
+    def blocked_dns(host, *args, **kwargs):  # ofis tarmog'idagi kabi: bu nom DNS'da topilmaydi
+        if "trycloudflare" in str(host):
+            raise socket.gaierror(11004, "The requested name is valid, but no data of the requested type was found")
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", blocked_dns)
+    try:
+        url, token = await tunnel_mod.request_quick_tunnel("cloudflared/2026.11.1")
+    finally:
+        await server.close()
+    assert url == "https://calm-sea-tree.trycloudflare.com"
+    # cloudflared `tunnel run` kutadigan TUNNEL_TOKEN formati: base64(JSON {a, s, t})
+    assert json.loads(base64.b64decode(token)) == {
+        "a": "acc123", "s": "c2VjcmV0", "t": "9ce6e75d-1bd9-4608-8347-64cd76958233"
+    }
+
+
+async def test_doh_unreachable_gives_clear_reason(monkeypatch):
+    monkeypatch.setattr(tunnel_mod, "DOH_SERVERS", ("http://127.0.0.1:9/dns-query",))  # yopiq port
+    try:
+        await tunnel_mod.request_quick_tunnel()
+    except OSError as exc:
+        assert "javob bermadi" in str(exc)
+        assert tunnel_mod.hint_for(str(exc)) == tunnel_mod.BLOCKED_HINT
+    else:
+        raise AssertionError("xato kutilgan edi")
+
+
+async def test_dns_free_provider_waits_for_registration_and_passes_token(tmp_path, capsys):
+    async def prepare():
+        return "https://calm-sea-tree.trycloudflare.com", {"TUNNEL_TOKEN": "tok-123"}
+
+    code = (
+        "import os,sys,time; print('INF Starting tunnel token=' + os.environ['TUNNEL_TOKEN'], flush=True); "
+        "time.sleep(0.2); print('INF Registered tunnel connection connIndex=0 protocol=quic', flush=True); time.sleep(30)"
+    )
+    providers = [
+        Provider("Cloudflare", fake(tmp_path, "cf", CLOUDFLARED_FAILURE, "sys.exit(1)"), CLOUDFLARE_URL_RE),
+        Provider(
+            "Cloudflare (DNS'siz)", (sys.executable, "-c", code), CLOUDFLARE_URL_RE,
+            prepare=prepare, ready_re=tunnel_mod.CLOUDFLARE_READY_RE, timeout=5,
+        ),
+    ]
+    t = Tunnel(8081, providers=providers, open_timeout=5)
+    assert await t.open() == "https://calm-sea-tree.trycloudflare.com"
+    out = capsys.readouterr().out
+    assert "Cloudflare tunnel ochilmadi" in out
+    assert "1.1.1.1 / 8.8.8.8" not in out  # boshqa usul ishladi — "DNS'ni o'zgartiring" maslahati keraksiz
+    await t.stop()
+
+
+def test_dns_free_provider_uses_static_edge_and_token_run(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(tunnel_mod, "find_cloudflared", lambda: "/opt/cloudflared")
+    monkeypatch.setattr(tunnel_mod.shutil, "which", lambda _name: None)
+    providers = tunnel_mod.detect_providers(8081)
+    assert [p.name for p in providers] == ["Cloudflare", "Cloudflare (DNS'siz)"]
+    argv = providers[1].argv
+    assert argv[-1] == "run" and "--edge" in argv and "198.41.192.167:7844" in argv and "198.41.200.13:7844" in argv
+    assert not any("TUNNEL_TOKEN" in a or "token" in a for a in argv)  # token faqat muhit orqali
