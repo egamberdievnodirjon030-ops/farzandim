@@ -47,9 +47,13 @@ class MiniAppServer:
         tile_src = f"https://{tile_host}" if tile_host else ""
         if "{s}" in svc.settings.tile_url:
             tile_src += " " + f"https://*.{tile_host.split('.', 1)[-1]}"
+        # Marshrut serverlari: server ularga yeta olmasa, ilova telefon interneti orqali to'g'ridan-to'g'ri so'raydi
+        routers = " ".join(
+            sorted({f"https://{urlparse(u).netloc}" for u in svc.settings.route_urls if u.startswith("https://")})
+        )
         self.csp = (
             "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; "
-            f"img-src 'self' data: {tile_src}; connect-src 'self'; base-uri 'none'; "
+            f"img-src 'self' data: {tile_src}; connect-src 'self' {routers}; base-uri 'none'; "
             "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org"
         )
 
@@ -151,7 +155,17 @@ class MiniAppServer:
                 await self.svc.set_user_role(tg_id, role)
         if role == Role.PASSENGER:
             await self.svc.ensure_passenger(tg_id, request[FIRST_NAME])
-        return web.json_response({"config": self.svc.app_config(), "role": role.value, "first_name": request[FIRST_NAME]})
+        return web.json_response({
+            "config": self.svc.app_config(), "role": role.value, "first_name": request[FIRST_NAME],
+            "live": await self.svc.live_share(tg_id),
+        })
+
+    async def live(self, request: web.Request) -> web.Response:
+        """«📡 Jonli joylashuv» — yoqilgan bo'lsa, ilova ochilishi bilan avtomatik ishlaydi, o'zi o'chirmaguncha."""
+        b = await self.body(request)
+        on = bool(b.get("on"))
+        await self.svc.set_live_share(request[TG_ID], on)
+        return self.ok(live=on)
 
     async def geocode(self, request: web.Request) -> web.Response:
         q = request.query.get("q", "")[:120]
@@ -168,7 +182,9 @@ class MiniAppServer:
         b = await self.body(request)
         (alat, alon), (blat, blon) = b["a"], b["b"]
         est, geometry = await self.svc.routing.route_geometry(Point(alat, alon), Point(blat, blon))
-        return web.json_response({"distance_m": est.distance_m, "duration_s": est.duration_s, "route": geometry})
+        return web.json_response(
+            {"distance_m": est.distance_m, "duration_s": est.duration_s, "route": geometry, "precise": est.precise}
+        )
 
     async def contact(self, request: web.Request) -> web.Response:
         b = await self.body(request)
@@ -271,6 +287,15 @@ class MiniAppServer:
         }
         return self.ok(online=True) if result == "online" else self.fail(messages.get(result, result))
 
+    async def p_location(self, request: web.Request) -> web.Response:
+        self.need(request, Role.PASSENGER)
+        b = await self.body(request)
+        acc = b.get("accuracy")
+        shared = await self.svc.passenger_live_location(
+            request[TG_ID], float(b["lat"]), float(b["lon"]), float(acc) if isinstance(acc, int | float) else None
+        )
+        return self.ok(shared=shared)
+
     async def d_location(self, request: web.Request) -> web.Response:
         self.need(request, Role.DRIVER)
         b = await self.body(request)
@@ -337,12 +362,14 @@ class MiniAppServer:
                 web.get("/api/reverse", self.reverse),
                 web.post("/api/route", self.route),
                 web.post("/api/contact", self.contact),
+                web.post("/api/live", self.live),
                 web.get("/api/p/state", self.p_state),
                 web.get("/api/p/nearby", self.p_nearby),
                 web.post("/api/p/quote", self.p_quote),
                 web.post("/api/p/order", self.p_order),
                 web.post("/api/p/places", self.p_place_save),
                 web.post(r"/api/p/places/{id:\d+}/delete", self.p_place_delete),
+                web.post("/api/p/location", self.p_location),
                 web.post("/api/p/{action}", self.p_action),
                 web.get("/api/d/state", self.d_state),
                 web.post("/api/d/register", self.d_register),

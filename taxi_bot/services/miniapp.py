@@ -37,6 +37,11 @@ ACTIVE = [
 ]
 
 
+# Yo'lovchi joylashuvi haydovchiga faqat shu bosqichlarda ko'rsatiladi (safar boshlangach — kerak emas)
+PAX_LIVE_STATUSES = [OrderStatus.SEARCHING, OrderStatus.ACCEPTED, OrderStatus.ARRIVED]
+PAX_LIVE_FRESH = timedelta(minutes=3)
+
+
 def _iso(dt: datetime | None) -> str | None:
     return dt.replace(tzinfo=UTC).isoformat() if dt else None
 
@@ -71,6 +76,43 @@ class MiniAppMixin:
         self.__dict__.setdefault("_roles", {})[tg_id] = role
         if role == Role.PASSENGER:
             await self.driver_offline(tg_id)
+
+    async def live_share(self: TaxiService, tg_id: int) -> bool:
+        async with self.db.session() as s:
+            row = await s.get(BotUser, tg_id)
+        return True if row is None else bool(row.live_share)
+
+    async def set_live_share(self: TaxiService, tg_id: int, on: bool) -> None:
+        """Ilovadagi «📡 Jonli joylashuv» tugmasi: foydalanuvchi o'zi o'chirmaguncha yoqilgan turadi."""
+        async with self.db.session() as s:
+            row = await s.get(BotUser, tg_id)
+            if row is None:
+                s.add(BotUser(tg_id=tg_id, live_share=on))
+            else:
+                row.live_share = on
+
+    async def passenger_live_location(
+        self: TaxiService, tg_id: int, lat: float, lon: float, accuracy: float | None = None
+    ) -> bool:
+        """Yo'lovchining joriy joylashuvi — faqat faol buyurtma (qidiruv / haydovchi yo'lda / kutmoqda) davomida."""
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return False
+        async with self.db.session() as s:
+            p = await s.scalar(select(Passenger).where(Passenger.tg_id == tg_id))
+            if p is None:
+                return False
+            order = await s.scalar(
+                select(Order)
+                .where(Order.passenger_id == p.id, Order.status.in_(PAX_LIVE_STATUSES))
+                .order_by(Order.id.desc())
+                .limit(1)
+            )
+            if order is None:
+                return False
+            order.pax_lat, order.pax_lon = lat, lon
+            order.pax_accuracy = accuracy if accuracy is None or math.isfinite(accuracy) else None
+            order.pax_at = utcnow()
+        return True
 
     async def driver_busy(self: TaxiService, tg_id: int) -> bool:
         """Haydovchida hozir faol safar bormi (rolni almashtirishdan oldin tekshiriladi)."""
@@ -116,6 +158,7 @@ class MiniAppMixin:
             "min_driver_balance": s.min_driver_balance,
             "welcome_bonus": s.welcome_bonus,
             "single_bot": s.single_bot,
+            "router_urls": [u for u in s.route_urls if u.startswith("https://")],
             "geocoder": bool(s.geocoder_url),
         }
 
@@ -255,9 +298,10 @@ class MiniAppMixin:
             lat, lon, accuracy,
             dest["lat"] if dest else None, dest["lon"] if dest else None, dest.get("title") if dest else None,
         )
-        geometry = None
+        geometry, precise = None, False
         if dest:
-            _, geometry = await self.routing.route_geometry(Point(lat, lon), Point(dest["lat"], dest["lon"]))
+            est, geometry = await self.routing.route_geometry(Point(lat, lon), Point(dest["lat"], dest["lon"]))
+            precise = est.precise
         return {
             "price": q.price,
             "distance_m": q.distance_m,
@@ -265,6 +309,7 @@ class MiniAppMixin:
             "nearby": q.nearby_count,
             "nearest_eta_s": q.nearest_eta_s,
             "route": geometry,
+            "route_precise": precise,
         }
 
     async def app_create_order(self: TaxiService, tg_id: int, body: dict) -> tuple[Order | None, str]:
@@ -379,7 +424,18 @@ class MiniAppMixin:
                 "free_wait_min": self.settings.free_wait_min,
                 "no_show_wait_min": self.settings.no_show_wait_min,
                 "taximeter": None,
+                "passenger_live": None,
             }
+            if (
+                order.status in (OrderStatus.ACCEPTED, OrderStatus.ARRIVED)
+                and order.pax_at is not None
+                and order.pax_lat is not None
+                and now - order.pax_at <= PAX_LIVE_FRESH
+            ):
+                order_data["passenger_live"] = {
+                    "lat": order.pax_lat, "lon": order.pax_lon, "accuracy": order.pax_accuracy,
+                    "age_s": int((now - order.pax_at).total_seconds()),
+                }
             if order.status == OrderStatus.IN_PROGRESS:
                 price, wait, distance, _ = self._final_price(order, d)
                 order_data["taximeter"] = {

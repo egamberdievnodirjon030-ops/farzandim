@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     road_factor: float = 1.3  # to'g'ri chiziq -> yo'l masofasi koeffitsienti
     city_speed_kmh: float = 25.0
     osrm_url: str | None = None  # masalan: http://osrm:5000 (aniq yo'l masofasi uchun)
+    # Marshrut chizig'i va narx uchun ommaviy OSRM serverlari (navbat bilan). O'chirish: ROUTE_URLS=none
+    route_urls: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["https://routing.openstreetmap.de/routed-car", "https://router.project-osrm.org"]
+    )
     max_offer_concurrency: int = 20
 
     # ❤️ Sevimli haydovchilar avval ko'radi (shu radius ichida bo'lsa)
@@ -144,6 +148,13 @@ class Settings(BaseSettings):
     @field_validator("admin_ids", "wave_radii_km", "topup_amounts", mode="before")
     @classmethod
     def _csv(cls, value: object) -> object:
+        return _split_csv(value)
+
+    @field_validator("route_urls", mode="before")
+    @classmethod
+    def _route_urls(cls, value: object) -> object:
+        if isinstance(value, str) and value.strip().lower() in ("none", "off", "0", "false"):
+            return []
         return _split_csv(value)
 
     @field_validator("wave_radii_km")

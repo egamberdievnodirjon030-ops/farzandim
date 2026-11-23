@@ -27,9 +27,18 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
   marshrut va ETA yangilanib turadi; davlat raqami, rangi, reytingi; bepul kutish taymeri;
 * izoh, boshqa odam uchun buyurtma, baholash, sevimli haydovchi, manzilni saqlash.
 
+**Ikkalasi uchun:**
+* **📡 Jonli joylashuv** — ilova ochilishi bilan **avtomatik yoqiladi** va **o'zingiz o'chirmaguningizcha** ishlaydi
+  (yuqoridagi «📡» tugmasi; tanlov saqlanadi). Har ~3 soniyada yangilanadi. Yo'lovchining joylashuvi faqat faol
+  buyurtma paytida (qidiruv → haydovchi yo'lda → kutmoqda) yuboriladi va haydovchi xaritasida **«🙋»** bo'lib ko'rinadi;
+  safar boshlangach ko'rsatilmaydi.
+* **Marshrut ko'chalar bo'yicha** — eng qisqa yo'l burilishlari bilan chiziladi (OSRM), yo'ldan aniq nuqtagacha bo'lgan
+  qism («kirish») punktir bilan. Mashina yurganda bosib o'tilgan qismi kesiladi; boshqa ko'chaga burilsa — marshrut
+  qayta hisoblanadi. Narx ham shu yo'l uzunligi bo'yicha.
+
 **Haydovchi:**
 * ilovada ro'yxatdan o'tish (raqam Telegram orqali tasdiqlanadi), 🎁 tasdiqlangach **30 000 so'm bonus**;
-* katta **«Liniyaga chiqish»** tugmasi — joylashuv avtomatik yoqiladi va ilova ochiq paytida har 4 soniyada yuboriladi;
+* katta **«Liniyaga chiqish»** tugmasi — joylashuv avtomatik yoqiladi va ilova ochiq paytida uzluksiz yuboriladi;
 * **taklif kartasi**: masofa, yetib borish vaqti, yo'nalish, safar uzunligi va yo'nalishi, narx, izoh,
   taxminiy hudud (aniq manzil qabul qilingach ochiladi);
 * safar bosqichlari, **🧭 Navigator** (Google/Yandex/Waze), **📞 Aloqa**, **jonli taksometr**, balans va bugungi tushum.
@@ -66,8 +75,13 @@ Ilovaning o'zida ham almashtirish mumkin: yo'lovchida yuqoridagi **«🚕 Haydov
   domenni reverse-proxy (masalan Caddy) orqali `8081`-portga yo'naltiring.
 
 **Cheklovlar (halol):**
-* Telegram ilovasi haydovchi joylashuvini **faqat ilova ochiq paytida** yuboradi. Ilova yopiq bo'lsa ham buyurtma
-  olish uchun haydovchi chatda «Jonli joylashuv»ni ulashadi (bot buni allaqachon qo'llab-quvvatlaydi).
+* Telegram ilovasi joylashuvni **faqat ilova ochiq (yoki yig'ilgan) paytida** yuboradi. Ilova yopiq bo'lsa ham ishlashi
+  uchun chatda jonli joylashuv ulashiladi: 📎 → Joylashuv → Jonli joylashuv → **«Men o'chirmagunimcha»**.
+  Telegram qoidasiga ko'ra bot buni **o'zi yoqa olmaydi** (chatdagi tugma faqat bir martalik joylashuv so'raydi) —
+  bir marta o'zingiz tanlaysiz, keyin u siz o'chirmaguningizcha ishlaydi. Haydovchi ham, yo'lovchi ham ulasha oladi.
+* Marshrut chizig'i bepul ommaviy OSRM serverlaridan olinadi (OpenStreetMap jamoasining FOSSGIS serveri, zaxira —
+  OSRM demo): natijalar keshlanadi, so'rovlar sekundiga ko'pi bilan 1 ta. Kompyuter ularga yeta olmasa, ilova
+  marshrutni telefon interneti orqali o'zi oladi. Yuklama oshsa — o'z OSRM serveringiz (pastda, `OSRM_URL`).
 * Xarita tayllari va manzil qidiruvi — OpenStreetMap (bepul, adolatli foydalanish cheklovi bilan). Yuklama oshsa
   `TILE_URL` ga tijoriy provayder (masalan MapTiler) va o'z Nominatim/Photon serveringizni ulang.
 
@@ -292,6 +306,9 @@ Spamdan himoya: bir buyurtmada `CALLS_PER_ORDER` ta qo'ng'iroq, har biri orasida
 
 ## 🗺 OSRM — haqiqiy yo'llar bo'yicha aniq masofa (ixtiyoriy, tavsiya etiladi)
 
+Standart holatda marshrut chizig'i va narx ommaviy OSRM serverlaridan olinadi (`ROUTE_URLS`, o'chirish:
+`ROUTE_URLS=none`). O'z serveringiz bilan esa hamma hisob (haydovchilarni saralash ham) cheklovsiz va tez ishlaydi:
+
 ```bash
 mkdir osrm && cd osrm
 wget https://download.geofabrik.de/asia/uzbekistan-latest.osm.pbf
@@ -342,7 +359,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-78 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+85 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**

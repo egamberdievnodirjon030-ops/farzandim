@@ -123,10 +123,22 @@ def build_passenger_router() -> Router:
             return
         active = await svc.active_order(p.id)
         if active:
-            await message.answer(
-                f"ℹ️ Sizda faol buyurtma bor: <b>#{active.id}</b> — {STATUS_UZ[OrderStatus(active.status)]}.\n"
-                "Yangi buyurtma uchun avval uni yakunlang yoki bekor qiling."
+            loc = message.location
+            shared = await svc.passenger_live_location(
+                user.id, loc.latitude, loc.longitude, loc.horizontal_accuracy  # type: ignore[union-attr]
             )
+            if shared and loc.live_period:
+                await message.answer(
+                    "📡 <b>Jonli joylashuvingiz haydovchiga ko'rinib turadi</b> — u sizni oson topadi.\n"
+                    "Siz o'chirmaguningizcha ishlaydi; safar boshlangach haydovchiga ko'rsatilmaydi."
+                )
+            elif shared:
+                await message.answer("📍 Joriy joylashuvingiz haydovchiga yuborildi.")
+            else:
+                await message.answer(
+                    f"ℹ️ Sizda faol buyurtma bor: <b>#{active.id}</b> — {STATUS_UZ[OrderStatus(active.status)]}.\n"
+                    "Yangi buyurtma uchun avval uni yakunlang yoki bekor qiling."
+                )
             return
         loc = message.location
         await state.set_state(Draft.destination)
@@ -183,6 +195,14 @@ def build_passenger_router() -> Router:
             await svc.msg.delete(Role.PASSENGER, message.chat.id, old)
         msg_id = await svc.msg.send(Role.PASSENGER, message.chat.id, view)
         await state.update_data(quote_msg=msg_id)
+
+    @router.edited_message(F.location)
+    async def live_update(message: Message, svc: TaxiService) -> None:
+        """Yo'lovchining jonli joylashuvi yangilanishi (faol buyurtma davomida haydovchiga ko'rinadi)."""
+        loc = message.location
+        await svc.passenger_live_location(
+            message.from_user.id, loc.latitude, loc.longitude, loc.horizontal_accuracy  # type: ignore[union-attr]
+        )
 
     @router.message(F.location | F.venue, StateFilter(Draft.destination, Draft.confirm))
     async def destination(message: Message, svc: TaxiService, state: FSMContext) -> None:

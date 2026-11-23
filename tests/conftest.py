@@ -97,6 +97,7 @@ def make_settings(**overrides) -> Settings:
         finish_confirm_timeout_min=10,
         call_provider="operator",
         welcome_bonus=0,  # bonus alohida testda tekshiriladi
+        route_urls=[],  # testlar internetga chiqmaydi (marshrut alohida soxta server bilan tekshiriladi)
     )
     base.update(overrides)
     return Settings(_env_file=None, **base)  # type: ignore[call-arg]

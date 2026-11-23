@@ -95,7 +95,7 @@ class TaxiService(FeaturesMixin, AdminMixin, MiniAppMixin):
         self.tariff = Tariff.from_settings(settings)
         self.views = Views(settings, self.tariff)
         self.routing = routing or RoutingService(
-            settings.osrm_url, settings.road_factor, settings.city_speed_kmh
+            settings.osrm_url, settings.road_factor, settings.city_speed_kmh, public_urls=settings.route_urls
         )
         self.telephony = telephony or TelephonyService(settings)
         self.geocoder = Geocoder(settings.geocoder_url, settings.geocoder_country)
@@ -1086,7 +1086,7 @@ class TaxiService(FeaturesMixin, AdminMixin, MiniAppMixin):
             assert driver is not None
             # Aniq yetib kelish vaqti (haydovchining joriy joylashuvidan)
             if self._driver_location_fresh(driver):
-                route = await self.routing.route(
+                route = await self.routing.route_quick(
                     Point(driver.lat, driver.lon), Point(order.pickup_lat, order.pickup_lon)  # type: ignore[arg-type]
                 )
                 order.pickup_eta_s = int(route.duration_s)

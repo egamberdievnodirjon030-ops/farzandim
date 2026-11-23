@@ -212,7 +212,10 @@ class Views:
         if o.pickup_eta_s:
             card.row("⏱ Yetib keladi", f"~{format_duration(o.pickup_eta_s)}")
         card.row("💰 Narx", self.m(o.est_price) if o.est_price else "taksometr")
-        card.foot("Mashina harakatini quyidagi jonli xaritada kuzatishingiz mumkin.")
+        card.foot(
+            "Mashina harakatini quyidagi jonli xaritada kuzatishingiz mumkin.\n"
+            "📡 Haydovchi sizni oson topishi uchun: 📎 → Joylashuv → Jonli joylashuv → «Men o'chirmagunimcha»."
+        )
         return View.of(
             card,
             inline(

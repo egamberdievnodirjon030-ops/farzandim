@@ -270,6 +270,15 @@ async def test_end_to_end_two_bots(harness, center):
     await h.send(dbot, DRIVER, text="2 daqiqada yetib boraman")
     assert "2 daqiqada" in h.last_text(pbot, PASSENGER.id)
 
+    # 📡 Yo'lovchi chatda jonli joylashuvni ulashadi («Men o'chirmagunimcha») — haydovchiga ko'rinadi
+    here = offset(*center, 40, -30)
+    await h.send(pbot, PASSENGER, location=Location(latitude=here[0], longitude=here[1], live_period=0x7FFFFFFF))
+    assert "haydovchiga ko'rinib turadi" in h.last_text(pbot, PASSENGER.id)
+    moved = offset(*center, 20, -10)
+    await h.edit(pbot, PASSENGER, location=Location(latitude=moved[0], longitude=moved[1], live_period=0x7FFFFFFF))
+    shared = await h.svc.get_order(order.id)
+    assert (shared.pax_lat, shared.pax_lon) == moved
+
     # Haydovchi harakati -> yo'lovchidagi xarita yangilanadi
     await h.edit(
         dbot,

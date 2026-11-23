@@ -17,6 +17,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     false,
+    true,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -164,6 +165,11 @@ class Order(Base):
     call_count: Mapped[int] = mapped_column(Integer, default=0)
     near_notified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     rider_phone: Mapped[str | None] = mapped_column(String(32))  # boshqa odam uchun buyurtma
+    # Yo'lovchining jonli joylashuvi (faqat shu buyurtma davomida, haydovchi uni topishi uchun)
+    pax_lat: Mapped[float | None] = mapped_column(Float)
+    pax_lon: Mapped[float | None] = mapped_column(Float)
+    pax_accuracy: Mapped[float | None] = mapped_column(Float)
+    pax_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Telegram xabarlari (kartalar)
     passenger_msg_id: Mapped[int | None] = mapped_column(BigInteger)
@@ -250,4 +256,6 @@ class BotUser(Base):
     tg_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     role: Mapped[str | None] = mapped_column(String(16))
     phone: Mapped[str | None] = mapped_column(String(32))  # ilovadan ro'yxatdan o'tish uchun tasdiqlangan raqam
+    # Ilovada jonli joylashuv: standart yoqilgan, foydalanuvchi o'zi o'chirmaguncha ishlaydi
+    live_share: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

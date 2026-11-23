@@ -11,8 +11,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const S = {
   app: null, config: null, map: null, layers: {}, car: null, me: null,
   pickup: null, dest: null, quote: null, mode: "boot", order: null, offerIdx: 0,
-  pollBusy: false, lastRouteKey: "", lastRouteAt: 0, pinHandler: null, location: null,
-  driver: null, online: false,
+  pollBusy: false, route: null, routeBusy: false, pinHandler: null, location: null,
+  driver: null, online: false, live: true, liveBusy: false, paxMarker: null,
 };
 
 // ====================================================================== Telegram
@@ -122,7 +122,7 @@ function lmReady() {
 }
 
 /** Telefon joylashuvini so'raydi (Telegram LocationManager → brauzer geolocation). */
-async function locate() {
+async function locate(quiet = false) {
   const lm = await lmReady();
   if (lm && lm.isLocationAvailable) {
     const viaTelegram = await new Promise((resolve) => {
@@ -132,6 +132,7 @@ async function locate() {
     });
     if (viaTelegram) return viaTelegram;
     if (lm.isAccessRequested && !lm.isAccessGranted) {
+      if (quiet) return null;
       toast("Joylashuvga ruxsat bering — sozlamalar ochilmoqda", true);
       try { lm.openSettings(); } catch { /* eski klient */ }
       return null;
@@ -145,6 +146,78 @@ async function locate() {
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 3000 }
     );
   });
+}
+
+// ====================================================================== jonli joylashuv
+/*
+ * «📡 Jonli joylashuv»: ilova ochilishi bilan avtomatik yoqiladi va foydalanuvchi o'zi o'chirmaguncha
+ * ishlaydi (tanlov serverda saqlanadi). Har ~3 soniyada joylashuv yangilanadi:
+ *  - haydovchi: liniyada yoki safarda bo'lsa serverga yuboriladi (buyurtmalar va taksometr uchun);
+ *  - yo'lovchi: faqat faol buyurtma paytida yuboriladi — haydovchi uni xaritada ko'rib, oson topadi.
+ */
+let liveTimer = null;
+
+function startLive() {
+  if (liveTimer || !S.live) return;
+  liveTimer = setInterval(liveTick, 3000);
+  liveTick();
+}
+
+function stopLive() {
+  clearInterval(liveTimer);
+  liveTimer = null;
+}
+
+async function liveTick() {
+  if (!S.live || S.liveBusy || !S.map) return;
+  S.liveBusy = true;
+  try {
+    const loc = await locate(true);
+    if (!loc) return;
+    S.location = loc;
+    updateMe(loc);
+    if (S.app === "driver") {
+      const st = S.dstate;
+      if (st && st.driver && (st.driver.online || st.order)) await api("/api/d/location", loc).catch(() => {});
+    } else {
+      const o = S.state && S.state.order;
+      if (o && ["searching", "accepted", "arrived"].includes(o.status)) await api("/api/p/location", loc).catch(() => {});
+    }
+  } finally {
+    S.liveBusy = false;
+  }
+}
+
+async function setLive(on, silent = false) {
+  try {
+    await api("/api/live", { on });
+  } catch (e) {
+    return toast(e.message, true);
+  }
+  S.live = on;
+  if (on) startLive();
+  else stopLive();
+  document.querySelectorAll(".live-chip").forEach((el) => {
+    el.classList.toggle("on", on);
+    el.querySelector(".dot").classList.toggle("on", on);
+  });
+  if (!silent) {
+    haptic(on ? "success" : "light");
+    toast(on ? "📡 Jonli joylashuv yoqildi — o'zingiz o'chirmaguningizcha ishlaydi" : "📡 Jonli joylashuv o'chirildi");
+  }
+}
+
+async function toggleLive() {
+  if (S.live && S.app === "driver" && S.dstate && S.dstate.driver && S.dstate.driver.online) {
+    const ok = await confirmBox("Jonli joylashuv o'chirilsa, ~2 daqiqada liniyadan chiqasiz va buyurtmalar kelmaydi. O'chirasizmi?");
+    if (!ok) return;
+  }
+  await setLive(!S.live);
+}
+
+function liveChip(compact = false) {
+  return `<button class="chip-btn live-chip ${S.live ? "on" : ""}" id="live-toggle" aria-label="Jonli joylashuv">
+    📡${compact ? "" : " Jonli"} <i class="dot ${S.live ? "on" : ""}"></i></button>`;
 }
 
 // ====================================================================== xarita
@@ -222,11 +295,75 @@ function fitCircle(lat, lon, radius, extra = []) {
   fitTo([[b.getNorth(), b.getWest()], [b.getSouth(), b.getEast()], ...extra]);
 }
 
-function drawRoute(coords) {
+/** Ikki nuqta orasidagi masofa (metr), [lat, lon]. */
+function dist(a, b) {
+  const dy = (a[0] - b[0]) * 111320;
+  const dx = (a[1] - b[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
+  return Math.hypot(dx, dy);
+}
+
+/** Marshrut: ko'chalar bo'yicha chiziq (burilishlari bilan) + yo'ldan aniq nuqtagacha «kirish» punktiri. */
+function drawRoute(coords, from = null, to = null) {
   S.layers.route.clearLayers();
-  if (!coords || coords.length < 2) return;
-  L.polyline(coords, { color: "#ffffff", weight: 9, opacity: 0.9 }).addTo(S.layers.route);
-  L.polyline(coords, { color: "#2f6fed", weight: 5, opacity: 0.95 }).addTo(S.layers.route);
+  if (!coords || coords.length < 2) { S.route = null; return; }
+  const style = { lineJoin: "round", lineCap: "round" };
+  L.polyline(coords, { ...style, color: "#ffffff", weight: 9, opacity: 0.9 }).addTo(S.layers.route);
+  L.polyline(coords, { ...style, color: "#2f6fed", weight: 5, opacity: 0.95 }).addTo(S.layers.route);
+  for (const [p, q] of [[from, coords[0]], [to, coords[coords.length - 1]]]) {
+    if (p && dist(p, q) > 4) {
+      L.polyline([p, q], { ...style, color: "#2f6fed", weight: 3, opacity: 0.85, dashArray: "1 7" }).addTo(S.layers.route);
+    }
+  }
+}
+
+/** Server yo'l topa olmasa — telefon interneti orqali to'g'ridan-to'g'ri ommaviy OSRM serveridan. */
+async function fetchRouteDirect(a, b) {
+  for (const base of (S.config && S.config.router_urls) || []) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    try {
+      const url = `${base}/route/v1/driving/${a[1].toFixed(6)},${a[0].toFixed(6)};${b[1].toFixed(6)},${b[0].toFixed(6)}`
+        + "?overview=full&geometries=geojson&alternatives=false&steps=false";
+      const d = await (await fetch(url, { signal: ctrl.signal })).json();
+      if (d.code === "Ok" && d.routes && d.routes[0]) return d.routes[0].geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+    } catch { /* keyingi server */ } finally { clearTimeout(timer); }
+  }
+  return null;
+}
+
+async function getRoute(a, b) {
+  let coords = null;
+  let precise = false;
+  try {
+    const r = await api("/api/route", { a, b });
+    coords = r.route;
+    precise = !!r.precise;
+  } catch { /* tarmoq vaqtincha yo'q */ }
+  if (!precise) {
+    const direct = await fetchRouteDirect(a, b);
+    if (direct) { coords = direct; precise = true; }
+  }
+  return { coords: coords || [a, b], precise };
+}
+
+/** Nuqtaga eng yaqin marshrut bo'lagi: [bo'lak indeksi, masofa (m)] — uzun to'g'ri ko'chalarda ham aniq. */
+function nearestSegment(coords, p) {
+  const k = Math.cos((p[0] * Math.PI) / 180);
+  const px = p[1] * k;
+  const py = p[0];
+  let best = -1;
+  let bestD = Infinity;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const ax = coords[i][1] * k;
+    const ay = coords[i][0];
+    const dx = coords[i + 1][1] * k - ax;
+    const dy = coords[i + 1][0] - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
+    const d = Math.hypot(px - (ax + t * dx), py - (ay + t * dy)) * 111320;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return [best, bestD];
 }
 
 function abMarker(lat, lon, label, cls = "") {
@@ -306,15 +443,27 @@ function radar(on, lat, lon) {
   }
 }
 
+/**
+ * Mashinadan manzilgacha marshrut. Mashina yurganda qayta so'ralmaydi — bosib o'tilgan qismi kesiladi;
+ * yo'ldan 60 m dan ko'p chetga chiqsa (boshqa ko'chaga burilsa) — marshrut qayta hisoblanadi.
+ */
 async function routeBetween(a, b, force = false) {
-  const key = `${a[0].toFixed(4)},${a[1].toFixed(4)}>${b[0].toFixed(4)},${b[1].toFixed(4)}`;
-  if (!force && key === S.lastRouteKey && Date.now() - S.lastRouteAt < 20000) return;
-  S.lastRouteKey = key;
-  S.lastRouteAt = Date.now();
+  const R = S.route;
+  if (!force && R && dist(R.b, b) < 30) {
+    const [idx, off] = nearestSegment(R.coords, a);
+    if (R.precise && off < 60) {
+      const keep = R.coords.slice(idx + 1);
+      if (keep.length) { drawRoute([a, ...keep], null, b); return; }
+    }
+    if (Date.now() - R.at < 10000) return; // tez-tez so'ramaymiz
+  }
+  if (S.routeBusy) return;
+  S.routeBusy = true;
   try {
-    const r = await api("/api/route", { a, b });
-    drawRoute(r.route);
-  } catch { drawRoute([a, b]); }
+    const r = await getRoute(a, b);
+    drawRoute(r.coords, a, b);
+    S.route = { coords: r.coords, precise: r.precise, b, at: Date.now() };
+  } finally { S.routeBusy = false; }
 }
 
 // ====================================================================== bottom sheet
@@ -367,7 +516,8 @@ async function switchRole() {
 }
 
 function passengerTop() {
-  $("#top").innerHTML = roleChip();
+  $("#top").innerHTML = liveChip() + roleChip();
+  on("live-toggle", toggleLive);
   on("switch-role", switchRole);
 }
 
@@ -563,7 +713,12 @@ async function setDest(dest) {
     const q = await api("/api/p/quote", { pickup: S.pickup, dest });
     if (S.mode !== "quote") return;
     S.quote = q;
-    drawRoute(q.route);
+    const a = [S.pickup.lat, S.pickup.lon];
+    const b = [dest.lat, dest.lon];
+    drawRoute(q.route, a, b);
+    if (!q.route_precise) {
+      fetchRouteDirect(a, b).then((c) => { if (c && S.mode === "quote" && S.quote === q) drawRoute(c, a, b); });
+    }
     fitTo([[S.pickup.lat, S.pickup.lon], [dest.lat, dest.lon]]);
     renderQuote();
   } catch (e) { toast(e.message, true); enterHome(); }
@@ -751,26 +906,12 @@ function renderPhoneShare(app) {
 }
 
 // ====================================================================== HAYDOVCHI
-let locTimer = null;
-
 async function driverStart() {
   S.location = await locate();
   if (S.location) { S.map.setView([S.location.lat, S.location.lon], 16, { animate: false }); updateMe(S.location); }
   else toast("Joylashuvga ruxsat bering — buyurtmalar joylashuv bo'yicha keladi", true);
   await driverRefresh();
   setInterval(driverRefresh, 2500);
-  locTimer = setInterval(driverLocationTick, 4000);
-}
-
-async function driverLocationTick() {
-  if (document.hidden || !S.dstate || !S.dstate.driver) return;
-  const d = S.dstate.driver;
-  if (!d.online && !S.dstate.order) return;
-  const loc = await locate();
-  if (!loc) return;
-  S.location = loc;
-  updateMe(loc);
-  try { await api("/api/d/location", loc); } catch { /* keyingi safar */ }
 }
 
 async function driverRefresh() {
@@ -786,8 +927,9 @@ async function driverRefresh() {
 
 function driverTop(d) {
   $("#top").innerHTML = d ? `<button class="chip-btn" id="bal">💳 ${money(d.balance)}</button>
-    <button class="chip-btn"><span class="status-pill"><i class="dot ${d.online ? "on" : ""}"></i>${d.online ? "Liniyada" : "Oflayn"}</span></button>
-    <button class="chip-btn" id="settings">⚙️</button>` : roleChip();
+    <button class="chip-btn"><span class="status-pill"><i class="dot ${d.online ? "on" : ""}"></i><span class="st-text">${d.online ? "Liniyada" : "Oflayn"}</span></span></button>
+    ${liveChip(true)}<button class="chip-btn" id="settings">⚙️</button>` : roleChip();
+  on("live-toggle", toggleLive);
   on("settings", renderDriverSettings);
   on("switch-role", switchRole);
   on("bal", () => toast(`Balans: ${money(d.balance)} · minimal: ${money(S.config.min_driver_balance)}`));
@@ -817,7 +959,7 @@ function renderDriver(st) {
 }
 
 function renderDriverIdle(st, d) {
-  if (S.mode !== "idle") { S.layers.markers.clearLayers(); drawRoute(null); S.car = null; }
+  if (S.mode !== "idle") { S.layers.markers.clearLayers(); drawRoute(null); S.car = null; showPassengerLive(null); }
   S.mode = "idle";
   Second.hide();
   const s = st.stats || {};
@@ -829,7 +971,7 @@ function renderDriverIdle(st, d) {
     <div class="kv"><div><b>${s.today_trips || 0}</b><span>bugungi safar</span></div><div><b>${num(s.today_income || 0)}</b><span>bugungi tushum</span></div>
       <div><b>${S.config.commission_percent}%</b><span>xizmat haqi</span></div></div>
     <button class="big-toggle ${d.online ? "on" : "off"}" id="toggle">${d.online ? "🔴 Liniyadan chiqish" : "🟢 Liniyaga chiqish"}</button>
-    ${d.online ? '<div class="muted small mt">Ilova yopilsa ham buyurtma olish uchun Telegram\'da «Jonli joylashuv» ni ulashing.</div>' : ""}`);
+    ${d.online ? '<div class="muted small mt">📡 Ilova ochiq turganda joylashuv o\'zi yangilanadi. Ilova yopilganda ham buyurtma olish uchun chatda: 📎 → Joylashuv → Jonli joylashuv → «Men o\'chirmagunimcha».</div>' : ""}`);
   Main.hide();
   on("toggle", toggleOnline);
 }
@@ -846,6 +988,7 @@ async function toggleOnline() {
       updateMe(loc);
       centerOn(loc.lat, loc.lon, 16);
       await api("/api/d/online", { online: true, ...loc });
+      if (!S.live) await setLive(true, true);
       haptic("success");
     }
   } catch (e) { toast(e.message, true); }
@@ -892,6 +1035,22 @@ function navUrl(nav, lat, lon) {
   return `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=driving&dir_action=navigate`;
 }
 
+/** Yo'lovchi jonli joylashuvini ulashsa — haydovchi xaritasida «🙋» belgisi (u turgan aniq joy). */
+function showPassengerLive(p) {
+  if (!p) {
+    if (S.paxMarker) { S.paxMarker.remove(); S.paxMarker = null; }
+    return;
+  }
+  if (!S.paxMarker) {
+    S.paxMarker = L.marker([p.lat, p.lon], {
+      icon: L.divIcon({ className: "", html: '<div class="pax-live"><i></i><span>🙋</span></div>', iconSize: [44, 44], iconAnchor: [22, 22] }),
+      interactive: false, zIndexOffset: 500,
+    }).addTo(S.map);
+  } else {
+    S.paxMarker.setLatLng([p.lat, p.lon]);
+  }
+}
+
 function renderDriverOrder(o, d) {
   const first = S.mode !== "dorder" || !S.order || S.order.id !== o.id || S.order.status !== o.status;
   S.mode = "dorder";
@@ -908,6 +1067,7 @@ function renderDriverOrder(o, d) {
   const steps = ["accepted", "arrived", "in_progress", "finishing"];
   const idx = steps.indexOf(o.status);
   const stepper = `<div class="steps">${steps.map((_, i) => `<i class="${i <= idx ? "done" : ""}"></i>`).join("")}</div>`;
+  showPassengerLive(o.passenger_live);
   const target = o.status === "in_progress" && dest ? dest : pickup;
   if (me && o.status !== "finishing") { routeBetween(me, target); if (first) fitTo([me, target]); }
   else if (first) fitTo([target]);
@@ -1065,6 +1225,7 @@ async function launch() {
   try {
     const me = await api("/api/me");
     S.config = me.config;
+    S.live = me.live !== false;
   } catch (e) {
     $("#boot").querySelector(".boot-text").textContent = e.message;
     $("#boot .spinner").hidden = true;
@@ -1088,6 +1249,7 @@ async function launch() {
   $("#boot").hidden = true;
   if (S.app === "driver") await driverStart();
   else await passengerStart();
+  startLive(); // «📡 Jonli joylashuv» — ilova ochilishi bilan, o'zi o'chirmaguncha
 }
 
 boot();

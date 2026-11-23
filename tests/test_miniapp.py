@@ -278,3 +278,60 @@ async def test_two_bots_role_comes_from_bot(make_service):
         await AppClient(client, D_TOKEN, 8203, "passenger").get("/api/me", status=403)  # boshqa bot roli — rad
     finally:
         await client.close()
+
+
+async def test_live_location_is_on_by_default_until_user_turns_it_off(make_service):
+    svc, _ = await make_service(driver_bot_token="")
+    client = await start(svc, [(P_TOKEN, None)])
+    try:
+        app = AppClient(client, P_TOKEN, 8301, "passenger")
+        assert (await app.get("/api/me"))["live"] is True  # boshidanoq yoqilgan
+        await app.post("/api/live", {"on": False})
+        assert (await app.get("/api/me"))["live"] is False  # o'zi o'chirdi — keyingi safar ham o'chiq
+        await app.post("/api/live", {"on": True})
+        assert (await app.get("/api/me"))["live"] is True
+    finally:
+        await client.close()
+
+
+async def test_passenger_live_location_reaches_driver_only_during_pickup(make_service, center):
+    from datetime import timedelta
+
+    svc, _ = await make_service(priority_headstart_sec=0, auto_arrive_radius_m=0)
+    client = await start(svc, TWO_BOTS)
+    p = AppClient(client, P_TOKEN, PASSENGER, "passenger")
+    d = AppClient(client, D_TOKEN, DRIVER, "driver")
+    try:
+        await svc.ensure_passenger(PASSENGER, "Jasur")
+        await svc.set_passenger_phone(PASSENGER, "+998935556677")
+        here = offset(*center, 30, 20)
+        assert (await p.post("/api/p/location", {"lat": here[0], "lon": here[1]}))["shared"] is False  # buyurtmasiz — saqlanmaydi
+        await add_driver(svc, DRIVER, *offset(*center, 400, 0))
+        order_id = (await p.post("/api/p/order", {"pickup": {"lat": center[0], "lon": center[1]}}))["order_id"]
+
+        async def has_offer():
+            return bool((await d.get("/api/d/state"))["offers"])
+        assert await wait_for(has_offer)
+        await d.post(f"/api/d/offers/{order_id}/accept")
+        assert (await d.get("/api/d/state"))["order"]["passenger_live"] is None
+
+        # yo'lovchi ilovasi har ~3 soniyada joylashuvini yuboradi → haydovchi xaritasida «🙋»
+        assert (await p.post("/api/p/location", {"lat": here[0], "lon": here[1], "accuracy": 7}))["shared"] is True
+        live = (await d.get("/api/d/state"))["order"]["passenger_live"]
+        assert live["lat"] == here[0] and live["lon"] == here[1] and live["accuracy"] == 7
+
+        async with svc.db.session() as s:  # eskirgan joylashuv ko'rsatilmaydi
+            from taxi_bot.db.models import Order
+
+            o = await s.get(Order, order_id)
+            o.pax_at = o.pax_at - timedelta(minutes=5)
+        assert (await d.get("/api/d/state"))["order"]["passenger_live"] is None
+
+        await p.post("/api/p/location", {"lat": here[0], "lon": here[1]})
+        await d.post(f"/api/d/orders/{order_id}/arrived")
+        assert (await d.get("/api/d/state"))["order"]["passenger_live"] is not None
+        await d.post(f"/api/d/orders/{order_id}/start")  # safar boshlandi — endi ko'rsatilmaydi va saqlanmaydi
+        assert (await d.get("/api/d/state"))["order"]["passenger_live"] is None
+        assert (await p.post("/api/p/location", {"lat": here[0], "lon": here[1]}))["shared"] is False
+    finally:
+        await client.close()
