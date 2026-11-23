@@ -116,7 +116,7 @@ class Driver(Base):
     rating: Mapped[float] = mapped_column(Float, default=4.7, index=True)
     trips_count: Mapped[int] = mapped_column(Integer, default=0)
     cancel_count: Mapped[int] = mapped_column(Integer, default=0)
-    navigator: Mapped[str] = mapped_column(String(16), default="google")
+    navigator: Mapped[str] = mapped_column(String(16), default="yandex")  # safar boshlanganda ochiladi
     # 🏡 "Uyga" rejimi: faqat uy tomonga ketayotgan buyurtmalar
     home_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     home_lat: Mapped[float | None] = mapped_column(Float)

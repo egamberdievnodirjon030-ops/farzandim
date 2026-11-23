@@ -21,10 +21,15 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
 **Yo'lovchi:**
 * ilova ochilishi bilan **telefon joylashuvi avtomatik so'raladi** (Telegram LocationManager), olish joyi — xarita
   markazidagi nina, manzil nomi avtomatik aniqlanadi (ninani surib aniqlashtirish mumkin);
-* **1 bosishda chaqirish** — pastdagi tugma bilan taksometr bo'yicha; yoki 🏠 Uy / 🏢 Ish / oxirgi manzil / qidiruv /
-  «xaritada belgilash» → **marshrut chizig'i va qat'iy narx darhol** → «Buyurtma berish»;
+* **Manzilning ikki alohida usuli:**
+  * **🏁 Xaritada** (🏠 Uy / 🏢 Ish / oxirgi manzil / qidiruv / «xaritada belgilash») → **marshrut chizig'i va qat'iy
+    narx darhol**; safar faqat shu nuqtada yakunlanadi;
+  * **✍️ Manzil nomini yozish** (xaritasiz, mahalliy nom: «Chorsu bozori, 5-maktab yonida») → haydovchiga aytiladi,
+    narx safar oxirida **taksometr bo'yicha (km)**;
 * qidiruvda **radar** va atrofdagi bo'sh mashinalar; haydovchi topilgach mashina xaritada **silliq harakatlanadi**,
-  marshrut va ETA yangilanib turadi; davlat raqami, rangi, reytingi; bepul kutish taymeri;
+  **mashina boradigan yo'l bo'yicha** qolgan vaqt va km ko'rinadi; davlat raqami, rangi, reytingi; bepul kutish taymeri;
+* safar davomida: manzilgacha yo'l bo'yicha vaqt; oldinroq tushmoqchi bo'lsangiz — **«🛑 Shu yerda tushaman»**
+  (manzil mashinaning joriy joyiga o'zgaradi, narx bosib o'tilgan yo'l bo'yicha);
 * izoh, boshqa odam uchun buyurtma, baholash, sevimli haydovchi, manzilni saqlash.
 
 **Ikkalasi uchun:**
@@ -39,13 +44,20 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
 **Haydovchi:**
 * ilovada ro'yxatdan o'tish (raqam Telegram orqali tasdiqlanadi), 🎁 tasdiqlangach **30 000 so'm bonus**;
 * katta **«Liniyaga chiqish»** tugmasi — joylashuv avtomatik yoqiladi va ilova ochiq paytida uzluksiz yuboriladi;
-* **taklif kartasi**: masofa, yetib borish vaqti, yo'nalish, safar uzunligi va yo'nalishi, narx, izoh,
+* **taklif kartasi**: yo'lovchigacha **mashinada boriladigan yo'l bo'yicha** masofa va vaqt (yo'lning narigi tomoni
+  to'g'ri chiziqda 150 m bo'lsa ham, aylanib o'tish hisobga olinadi), safar uzunligi va yo'nalishi, narx, izoh,
   taxminiy hudud (aniq manzil qabul qilingach ochiladi);
-* safar bosqichlari, **🧭 Navigator** (Google/Yandex/Waze), **📞 Aloqa**, **jonli taksometr**, balans va bugungi tushum.
+* **«🚀 Safarni boshlash»** bosilishi bilan **navigator o'zi ochiladi** (standart — Yandex; ⚙️ da Google/Waze),
+  manzilgacha yo'l bilan;
+* **safarni faqat yo'lovchi belgilagan manzilga yetib kelganda yakunlaydi** (Yandex Go kabi, `FINISH_RADIUS_M`,
+  standart 200 m): ungacha tugma «🏁 Manzilgacha 2.3 km» bo'lib nofaol turadi. Yo'lovchi tasdig'i kutilmaydi —
+  10% xizmat haqi darhol yechiladi. Manzil yozma (xaritasiz) yoki ko'rsatilmagan bo'lsa — istalgan joyda, taksometr;
+* **📞 Aloqa**, **jonli taksometr**, balans va bugungi tushum.
+* **Bekor qilish** — faqat safar boshlanmasdan oldin (yo'lovchi ham, haydovchi ham); boshlangach — faqat yakunlash.
 
-**Bitta bot rejimida rol:** ilova chatda tanlangan rolda ochiladi (`/role` → «🙋 Yo'lovchi» / «🚕 Haydovchi»).
-Ilovaning o'zida ham almashtirish mumkin: yo'lovchida yuqoridagi **«🚕 Haydovchi rejimi»**, haydovchida
-**⚙️ → «🙋 Yo'lovchi rejimiga o'tish»**. Tanlov saqlanadi; faol safardagi haydovchi safarni yakunlamaguncha yo'lovchiga o'tolmaydi.
+**Bitta bot rejimida rol** birinchi ro'yxatdan o'tishda bir marta tanlanadi («🙋 Yo'lovchi» / «🚕 Haydovchi») va
+ilova doim shu rejimda ochiladi — ilovada rolni almashtirish yo'q. (Admin yoki foydalanuvchi zarur bo'lsa chatda
+`/role` bilan o'zgartirishi mumkin; safardagi haydovchi buni safar tugaguncha qila olmaydi.)
 
 **Ishga tushirish:** Telegram ilovani faqat **HTTPS** manzildan ochadi.
 * **Kompyuterda (Windows):** `start.bat` (`run.py`) rasmiy `cloudflared.exe` ni o'zi yuklab oladi va bepul
@@ -93,7 +105,7 @@ Ilovaning o'zida ham almashtirish mumkin: yo'lovchida yuqoridagi **«🚕 Haydov
 | 🚕 **Haydovchi** | Buyurtmada 2 asosiy tugma: **📍 Yo'lovchini olish manzili** (navigatorda yo'l darhol ochiladi) va **📞 Yo'lovchi bilan aloqa** (kompaniya raqami orqali) |
 | 🔒 **Maxfiylik** | Telefon raqamlari, ismlar, profillar bir-biriga **hech qachon** ko'rinmaydi. Yo'lovchi faqat mashina modeli, rangi, davlat raqami va reytingni ko'radi. Izoh va chatda yozilgan telefon raqam / @username avtomatik yashiriladi (`•••`) — kompaniyani chetlab o'tib kelishishning oldi olinadi |
 | 🎯 **Aniq qidiruv** | Faqat bo'sh haydovchilar; masofa diapazonlari bo'yicha to'lqinlar; har bir to'lqin **1 daqiqa**; **reytingi yuqorilar birinchi** ko'radi |
-| 💳 **Balans** | Yo'lovchi manzilga yetganini **tasdiqlagandan so'ng** haydovchi balansidan xizmat narxining **10%** yechiladi |
+| 💳 **Balans** | Haydovchi safarni **yo'lovchi manzilida** yakunlagach balansidan xizmat narxining **10%** yechiladi |
 | 🗺 **Jonli xarita** | Yo'lovchi mashina yaqinlashishini Telegram jonli xaritasida kuzatadi |
 | 🧮 **Taksometr** | Manzil ko'rsatilmasa, narx haydovchining jonli joylashuvi bo'yicha bosib o'tilgan yo'ldan hisoblanadi (GPS shovqini va sakrashlar filtrlanadi) |
 | 💬 **Anonim chat** | Safar davomida yozilgan matn/ovozli xabarlar ikkinchi tomonga muallifi ko'rinmasdan yetkaziladi |
@@ -117,8 +129,8 @@ Kuchli tomonimiz — Telegram ichida ishlash, mahalliy odatlarga moslik va haydo
 ### Haydovchi uchun (haydovchi ko'p bo'lsa — mashina tez keladi)
 | Imkoniyat | Nima beradi |
 |---|---|
-| 💸 **Past komissiya (10%)** | Faqat yakunlangan va yo'lovchi tasdiqlagan safardan |
-| 🟢 **Safar tugashi bilan bo'sh** | «Safarni yakunlash» bosilgach darhol yangi buyurtma oladi — yo'lovchi tasdig'ini kutib turmaydi (10% baribir faqat tasdiqdan keyin yechiladi) |
+| 💸 **Past komissiya (10%)** | Faqat manzilda yakunlangan safardan |
+| 🟢 **Safar tugashi bilan bo'sh** | Manzilda «Safarni yakunlash» bosilgach darhol yangi buyurtma oladi — tasdiq kutilmaydi |
 | 🏡 **"Uyga" rejimi** | Ish oxirida faqat uy tomonga ketayotgan buyurtmalar (bo'sh qaytishning oldi olinadi) |
 | 🧭 **Shaffof taklif** | Qabul qilishdan oldin masofa, safar uzunligi, **yo'nalishi** va narxi ko'rinadi |
 | 🚫 **Jarimasiz** | Taklifni o'tkazib yuborish reyting yoki balansga ta'sir qilmaydi |
@@ -170,11 +182,11 @@ Yo'lovchi                      Tizim                                  Haydovchi
 
 ### Narx
 
-* Manzil ko'rsatilgan — **belgilangan narx**: `BASE_FARE` (`BASE_KM` gacha) + `PER_KM` × qolgan km.
-* Manzilsiz — **taksometr**: jonli joylashuv bo'yicha haqiqiy yo'l.
+* Manzil xaritada — **belgilangan narx**: `BASE_FARE` (`BASE_KM` gacha) + `PER_KM` × qolgan km (yo'l bo'yicha).
+* Manzil yozma (xaritasiz) yoki ko'rsatilmagan — **taksometr**: jonli joylashuv bo'yicha bosib o'tilgan haqiqiy yo'l (km).
+* «🛑 Shu yerda tushaman» — qat'iy narx o'rniga bosib o'tilgan yo'l bo'yicha.
 * Kutish: `FREE_WAIT_MIN` daqiqa bepul, keyin har to'liq daqiqa uchun `PER_WAIT_MIN`.
-* Xizmat haqi: yakuniy narxning `COMMISSION_PERCENT` (10%) — **faqat yo'lovchi tasdig'idan keyin** yechiladi
-  (yo'lovchi `FINISH_CONFIRM_TIMEOUT_MIN` ichida javob bermasa — avtomatik yakunlanadi, `0` — o'chirish).
+* Xizmat haqi: yakuniy narxning `COMMISSION_PERCENT` (10%) — haydovchi safarni manzilda yakunlashi bilan yechiladi.
   Har bir harakat `transactions` jadvalida (ledger) saqlanadi.
 
 ---
@@ -359,7 +371,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-85 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+89 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**

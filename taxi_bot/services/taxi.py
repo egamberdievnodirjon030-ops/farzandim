@@ -38,7 +38,7 @@ from ..ui.views import Quote, Views
 from .admin import AdminMixin
 from .dispatch import DispatchEngine
 from .features import FeaturesMixin
-from .geo import Point, bearing_deg, bounding_box, haversine_m
+from .geo import Point, bearing_deg, bounding_box, format_distance, haversine_m
 from .geocoding import Geocoder
 from .matching import Candidate, bayesian_rating, home_gain
 from .miniapp import MiniAppMixin
@@ -453,56 +453,11 @@ class TaxiService(FeaturesMixin, AdminMixin, MiniAppMixin):
         if bundle is None or bundle[1].tg_id != passenger_tg:
             return False
         order, _, driver = bundle
-        if driver is None or order.status not in (OrderStatus.IN_PROGRESS, OrderStatus.FINISHING):
+        # Yangi tartibda safarni haydovchi manzilda yakunlaydi; bu faqat eski versiyadan qolgan
+        # "tasdiq kutilmoqda" safarlar uchun.
+        if driver is None or order.status != OrderStatus.FINISHING:
             return False
         return await self._complete(order_id, auto=False)
-
-    async def passenger_not_yet(self, passenger_tg: int, order_id: int) -> str:
-        """Natija: ok | driver_busy | not_found."""
-        bundle = await self._order_bundle(order_id)
-        if bundle is None or bundle[1].tg_id != passenger_tg or bundle[2] is None:
-            return "not_found"
-        _order, _passenger, driver = bundle
-        async with self._lock(order_id):
-            try:
-                async with self.db.session() as s:
-                    # Haydovchini safarga qaytaramiz — agar u hali yangi buyurtma olmagan bo'lsa
-                    claimed = await s.execute(
-                        _upd(Driver)
-                        .where(Driver.id == driver.id, Driver.current_order_id.is_(None))
-                        .values(current_order_id=order_id)
-                    )
-                    if claimed.rowcount != 1:
-                        return "driver_busy"
-                    res = await s.execute(
-                        _upd(Order)
-                        .where(Order.id == order_id, Order.status == OrderStatus.FINISHING)
-                        .values(
-                            status=OrderStatus.IN_PROGRESS,
-                            finish_requested_at=None,
-                            final_price=None,
-                            wait_charge=None,
-                        )
-                    )
-                    if res.rowcount != 1:
-                        raise _Abort("not_found")  # rollback: haydovchi bog'lanishi ham bekor
-            except _Abort:
-                return "not_found"
-            order = await self.get_order(order_id)
-            await self.msg.edit(
-                Role.PASSENGER, passenger_tg, order.passenger_msg_id, self.views.trip_started(order, driver)
-            )
-            new_id = await self.msg.replace(
-                Role.DRIVER, driver.tg_id, order.driver_msg_id, self.views.driver_order(order, driver)
-            )
-            await self._set_order_fields(order_id, driver_msg_id=new_id)
-            await self.msg.send(
-                Role.DRIVER,
-                driver.tg_id,
-                View.plain("ℹ️ Yo'lovchi hali manzilga yetmaganini bildirdi. Safar davom etmoqda."),
-                silent=True,
-            )
-        return "ok"
 
     async def rate(self, passenger_tg: int, order_id: int, stars: int) -> Order | None:
         stars = max(1, min(5, stars))
@@ -1245,43 +1200,97 @@ class TaxiService(FeaturesMixin, AdminMixin, MiniAppMixin):
         extra["trip_distance_m"] = distance
         return ride + wait, wait, distance, extra
 
-    async def driver_finish(self, driver_tg: int, order_id: int) -> bool:
+    def finish_gap_m(self, order: Order, driver: Driver) -> float | None:
+        """Haydovchidan yo'lovchi manziligacha masofa. None — manzil belgilanmagan (taksometr: istalgan joyda)."""
+        if not order.has_destination:
+            return None
+        if not self._driver_location_fresh(driver):
+            return float("inf")
+        return haversine_m(driver.lat, driver.lon, order.dest_lat, order.dest_lon)  # type: ignore[arg-type]
+
+    def finish_radius_for(self, driver: Driver) -> float:
+        """Yakunlash radiusi: sozlama + GPS xatoligi (ko'pi bilan 100 m)."""
+        return self.settings.finish_radius_m + min(float(driver.loc_accuracy or 0), 100.0)
+
+    async def driver_finish(self, driver_tg: int, order_id: int) -> str:
+        """Yandex Go kabi: safar faqat yo'lovchi belgilagan manzilga yetib kelganda yakunlanadi.
+
+        Natija: ok | far | no_location | not_found. Tasdiq kutilmaydi — xizmat haqi darhol yechiladi.
+        """
         bundle = await self._driver_order(driver_tg, order_id)
         if bundle is None:
-            return False
-        order, passenger, driver = bundle
+            return "not_found"
+        order, _passenger, driver = bundle
         if order.status != OrderStatus.IN_PROGRESS:
-            return False
-        price, wait, _distance, extra = self._final_price(order, driver)
+            return "not_found"
+        gap = self.finish_gap_m(order, driver)
+        if gap is not None:
+            if gap == float("inf"):
+                return "no_location"
+            if gap > self.finish_radius_for(driver):
+                return "far"
+        return "ok" if await self._complete(order_id, auto=False) else "not_found"
+
+    async def finish_message(self, driver_tg: int, order_id: int, result: str) -> str:
+        """Haydovchiga «Safarni yakunlash» natijasi (chat va ilova uchun bir xil matn)."""
+        if result == "ok":
+            return "🏁 Safar yakunlandi! Yo'lovchidan to'lovni oling."
+        if result == "no_location":
+            return "📡 Joylashuvingiz aniqlanmadi — jonli joylashuvni yoqing va qayta urinib ko'ring."
+        if result == "far":
+            order, driver = await self.get_order(order_id), await self.get_driver_by_tg(driver_tg)
+            gap = self.finish_gap_m(order, driver) if order and driver else None
+            left = f"Manzilgacha {format_distance(gap)} qoldi. " if gap and gap != float("inf") else ""
+            return f"🏁 {left}Safarni faqat yo'lovchi belgilagan manzilga yetib kelganda yakunlay olasiz."
+        return "Holat o'zgargan."
+
+    async def passenger_stop_here(self, passenger_tg: int, order_id: int) -> str:
+        """Yo'lovchi manzilga yetmasdan tushmoqchi: manzil mashinaning joriy joyiga o'zgaradi,
+        narx bosib o'tilgan yo'l (taksometr) bo'yicha hisoblanadi — haydovchi shu yerda yakunlay oladi.
+
+        Natija: ok | no_location | not_found.
+        """
+        bundle = await self._order_bundle(order_id)
+        if bundle is None or bundle[1].tg_id != passenger_tg or bundle[2] is None:
+            return "not_found"
+        order, _passenger, driver = bundle
+        assert driver is not None
+        if order.status != OrderStatus.IN_PROGRESS or not order.has_destination:
+            return "not_found"
+        if not self._driver_location_fresh(driver):
+            return "no_location"
         async with self._lock(order_id):
             async with self.db.session() as s:
                 res = await s.execute(
                     _upd(Order)
                     .where(Order.id == order_id, Order.status == OrderStatus.IN_PROGRESS)
                     .values(
-                        status=OrderStatus.FINISHING,
-                        finish_requested_at=utcnow(),
-                        final_price=price,
-                        wait_charge=wait,
-                        **extra,
+                        dest_lat=driver.lat,
+                        dest_lon=driver.lon,
+                        dest_title="Yo'lovchi to'xtatgan joy",
+                        est_price=None,  # qat'iy narx o'rniga — bosib o'tilgan yo'l bo'yicha
+                        est_distance_m=None,
                     )
                 )
                 if res.rowcount != 1:
-                    return False
-                # Haydovchi darhol bo'shaydi — yo'lovchi tasdig'ini kutib turmaydi.
-                # Xizmat haqi baribir faqat tasdiqdan (yoki muddat tugagach) keyin yechiladi.
-                await s.execute(
-                    _upd(Driver)
-                    .where(Driver.id == driver.id, Driver.current_order_id == order_id)
-                    .values(current_order_id=None)
-                )
+                    return "not_found"
             order = await self.get_order(order_id)
-            await self.msg.edit(Role.DRIVER, driver_tg, order.driver_msg_id, self.views.driver_order(order, driver))
-            new_id = await self.msg.replace(
-                Role.PASSENGER, passenger.tg_id, order.passenger_msg_id, self.views.confirm_arrival(order)
+            assert order is not None
+            await self.msg.edit(
+                Role.DRIVER, driver.tg_id, order.driver_msg_id, self.views.driver_order(order, driver)
             )
-            await self._set_order_fields(order_id, passenger_msg_id=new_id)
-        return True
+            await self.msg.send(
+                Role.DRIVER,
+                driver.tg_id,
+                View.plain(
+                    "🛑 <b>Yo'lovchi shu yerda tushmoqchi.</b> Safarni yakunlashingiz mumkin — "
+                    "narx bosib o'tilgan yo'l bo'yicha hisoblanadi."
+                ),
+            )
+            await self.msg.edit(
+                Role.PASSENGER, passenger_tg, order.passenger_msg_id, self.views.trip_started(order, driver)
+            )
+        return "ok"
 
     async def _complete(self, order_id: int, *, auto: bool) -> bool:
         """Safarni yakunlaydi: yo'lovchi tasdig'i (yoki muddat o'tgani) — 10% komissiya yechiladi."""

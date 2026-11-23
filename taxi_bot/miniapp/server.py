@@ -148,11 +148,12 @@ class MiniAppServer:
     async def me(self, request: web.Request) -> web.Response:
         tg_id, role = request[TG_ID], request[APP]
         if self.svc.settings.single_bot:
+            # Rol faqat birinchi ro'yxatdan o'tishda tanlanadi; ilovada almashtirib bo'lmaydi
             current = await self.svc.get_user_role(tg_id)
-            if current != role:
-                if current == Role.DRIVER and await self.svc.driver_busy(tg_id):
-                    return self.fail("Avval joriy safarni yakunlang — so'ng yo'lovchi rejimiga o'tasiz")
+            if current is None:
                 await self.svc.set_user_role(tg_id, role)
+            elif current != role:
+                return web.json_response({"error": "Rol allaqachon tanlangan"}, status=403)
         if role == Role.PASSENGER:
             await self.svc.ensure_passenger(tg_id, request[FIRST_NAME])
         return web.json_response({
@@ -228,14 +229,15 @@ class MiniAppServer:
         if action == "cancel":
             result = await svc.passenger_cancel(tg, oid, confirmed=bool(b.get("confirmed")))
             return self.ok(result=result) if result in ("cancelled", "confirm") else self.fail(
-                "Safar boshlangan — manzilga yetgach tasdiqlang" if result == "too_late" else "Buyurtma topilmadi"
+                "Safar boshlangan — endi bekor qilib bo'lmaydi" if result == "too_late" else "Buyurtma topilmadi"
             )
-        if action == "arrived":
+        if action == "arrived":  # eski versiyadan qolgan "tasdiq kutilmoqda" safarlar uchun
             return self.ok() if await svc.passenger_confirm_arrival(tg, oid) else self.fail("Buyurtma yakunlangan")
-        if action == "notyet":
-            result = await svc.passenger_not_yet(tg, oid)
+        if action == "stop":
+            result = await svc.passenger_stop_here(tg, oid)
             return self.ok() if result == "ok" else self.fail(
-                "Haydovchi boshqa buyurtmaga o'tgan" if result == "driver_busy" else "Buyurtma topilmadi"
+                "Mashina joylashuvi aniqlanmadi — biroz kutib qayta urinib ko'ring"
+                if result == "no_location" else "Safar allaqachon yakunlangan"
             )
         if action == "rate":
             return self.ok() if await svc.rate(tg, oid, int(b.get("stars", 5))) else self.fail("Baho qo'yilgan")
@@ -325,9 +327,13 @@ class MiniAppServer:
         self.need(request, Role.DRIVER)
         tg, oid, action = request[TG_ID], int(request.match_info["id"]), request.match_info["action"]
         svc = self.svc
-        simple = {"arrived": svc.driver_arrived, "start": svc.driver_start, "finish": svc.driver_finish}
+        simple = {"arrived": svc.driver_arrived, "start": svc.driver_start}
         if action in simple:
             return self.ok() if await simple[action](tg, oid) else self.fail("Holat o'zgargan")
+        if action == "finish":
+            result = await svc.driver_finish(tg, oid)
+            message = await svc.finish_message(tg, oid, result)
+            return self.ok(message=message) if result == "ok" else self.fail(message)
         if action in ("cancel", "noshow"):
             result = await svc.driver_cancel(tg, oid, no_show=action == "noshow")
             if result == "too_early":

@@ -318,6 +318,11 @@ function drawRoute(coords, from = null, to = null) {
 
 /** Server yo'l topa olmasa — telefon interneti orqali to'g'ridan-to'g'ri ommaviy OSRM serveridan. */
 async function fetchRouteDirect(a, b) {
+  const r = await fetchRouteDirectFull(a, b);
+  return r ? r.coords : null;
+}
+
+async function fetchRouteDirectFull(a, b) {
   for (const base of (S.config && S.config.router_urls) || []) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 5000);
@@ -325,7 +330,10 @@ async function fetchRouteDirect(a, b) {
       const url = `${base}/route/v1/driving/${a[1].toFixed(6)},${a[0].toFixed(6)};${b[1].toFixed(6)},${b[0].toFixed(6)}`
         + "?overview=full&geometries=geojson&alternatives=false&steps=false";
       const d = await (await fetch(url, { signal: ctrl.signal })).json();
-      if (d.code === "Ok" && d.routes && d.routes[0]) return d.routes[0].geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+      if (d.code === "Ok" && d.routes && d.routes[0]) {
+        const r = d.routes[0];
+        return { coords: r.geometry.coordinates.map(([lon, lat]) => [lat, lon]), dist: r.distance, dur: r.duration };
+      }
     } catch { /* keyingi server */ } finally { clearTimeout(timer); }
   }
   return null;
@@ -334,16 +342,48 @@ async function fetchRouteDirect(a, b) {
 async function getRoute(a, b) {
   let coords = null;
   let precise = false;
+  let distM = null;
+  let durS = null;
   try {
     const r = await api("/api/route", { a, b });
     coords = r.route;
     precise = !!r.precise;
+    distM = r.distance_m;
+    durS = r.duration_s;
   } catch { /* tarmoq vaqtincha yo'q */ }
   if (!precise) {
-    const direct = await fetchRouteDirect(a, b);
-    if (direct) { coords = direct; precise = true; }
+    const direct = await fetchRouteDirectFull(a, b);
+    if (direct) { coords = direct.coords; precise = true; distM = direct.dist; durS = direct.dur; }
   }
-  return { coords: coords || [a, b], precise };
+  return { coords: coords || [a, b], precise, dist: distM, dur: durS };
+}
+
+function lineLength(coords) {
+  let m = 0;
+  for (let i = 1; i < coords.length; i++) m += dist(coords[i - 1], coords[i]);
+  return m;
+}
+
+/**
+ * Mashina boradigan YO'L bo'yicha qolgan masofa va vaqt (to'g'ri chiziq emas): yo'lning narigi tomoni
+ * 150 m bo'lsa ham, aylanib o'tish kerak bo'lsa — haqiqiy km va daqiqa ko'rsatiladi.
+ */
+function setRouteLeft(b, coords, R) {
+  if (!R || !R.precise || !R.dist) { S.routeLeft = null; return; }
+  const left = lineLength(coords);
+  S.routeLeft = { b, dist: left, dur: R.dur ? (R.dur * left) / R.dist : null };
+  const el = document.getElementById("route-left");
+  if (el) el.innerHTML = routeLeftInner();
+}
+
+function routeLeftFor(b) {
+  return S.routeLeft && b && dist(S.routeLeft.b, b) < 30 ? S.routeLeft : null;
+}
+
+function routeLeftInner(b = null, fallbackEta = null) {
+  const L_ = b ? routeLeftFor(b) : S.routeLeft;
+  if (L_) return `<b>${mins(L_.dur)}</b><span>${km(L_.dist)} · yo'l bo'yicha</span>`;
+  return fallbackEta != null ? `<b>${mins(fallbackEta)}</b><span>taxminan</span>` : "";
 }
 
 /** Nuqtaga eng yaqin marshrut bo'lagi: [bo'lak indeksi, masofa (m)] — uzun to'g'ri ko'chalarda ham aniq. */
@@ -453,7 +493,12 @@ async function routeBetween(a, b, force = false) {
     const [idx, off] = nearestSegment(R.coords, a);
     if (R.precise && off < 60) {
       const keep = R.coords.slice(idx + 1);
-      if (keep.length) { drawRoute([a, ...keep], null, b); return; }
+      if (keep.length) {
+        const rest = [a, ...keep];
+        drawRoute(rest, null, b);
+        setRouteLeft(b, rest, R);
+        return;
+      }
     }
     if (Date.now() - R.at < 10000) return; // tez-tez so'ramaymiz
   }
@@ -462,7 +507,8 @@ async function routeBetween(a, b, force = false) {
   try {
     const r = await getRoute(a, b);
     drawRoute(r.coords, a, b);
-    S.route = { coords: r.coords, precise: r.precise, b, at: Date.now() };
+    S.route = { coords: r.coords, precise: r.precise, b, at: Date.now(), dist: r.dist, dur: r.dur };
+    setRouteLeft(b, r.coords, S.route);
   } finally { S.routeBusy = false; }
 }
 
@@ -488,37 +534,9 @@ async function reverse(lat, lon) {
 // ====================================================================== YO'LOVCHI
 let reverseTimer = null;
 
-// ---------------------------------------------------------------- rolni almashtirish (bitta bot rejimi)
-function roleChip() {
-  if (!S.config || !S.config.single_bot) return "";
-  return S.app === "driver"
-    ? `<button class="chip-btn role" id="switch-role">🙋 Yo'lovchi rejimi</button>`
-    : `<button class="chip-btn role" id="switch-role">🚕 Haydovchi rejimi</button>`;
-}
-
-async function switchRole() {
-  const next = S.app === "driver" ? "passenger" : "driver";
-  const ok = await confirmBox(next === "driver"
-    ? "Haydovchi rejimiga o'tasizmi?"
-    : "Yo'lovchi rejimiga o'tasizmi? Liniyadan chiqasiz — buyurtmalar kelmaydi.");
-  if (!ok) return;
-  const prev = S.app;
-  S.app = next;
-  try {
-    await api("/api/me"); // tanlov saqlanadi: keyingi safar ilova shu rejimda ochiladi
-  } catch (e) {
-    S.app = prev;
-    return toast(e.message, true);
-  }
-  haptic("success");
-  // #tgWebAppData (hash) saqlanadi — Telegram ma'lumotlari qayta yuklashda yo'qolmaydi
-  location.replace(`${location.pathname}?app=${next}${location.hash}`);
-}
-
 function passengerTop() {
-  $("#top").innerHTML = liveChip() + roleChip();
+  $("#top").innerHTML = liveChip();
   on("live-toggle", toggleLive);
-  on("switch-role", switchRole);
 }
 
 async function passengerStart() {
@@ -617,10 +635,13 @@ function renderHome() {
     <button class="field" id="pickup-field"><span class="icon">🟡</span><span class="txt">
       <div class="t1">${esc(p.title || "Olish joyi aniqlanmoqda…")}</div>
       <div class="t2">${esc(p.subtitle || "Xaritani surib aniq nuqtani tanlang")}</div></span></button>
-    <button class="field" id="dest-field"><span class="icon">🏁</span><span class="txt"><div class="t1 muted">Qayerga boramiz?</div></span><span>›</span></button>
-    <div class="chips" id="chips">${placeChips()}</div>
-    <div class="muted small mt">Manzilni tanlang — narx darhol chiqadi. Yoki pastdagi tugma bilan taksometrda chaqiring.</div>`);
+    <button class="field" id="dest-field"><span class="icon">🏁</span><span class="txt"><div class="t1 muted">Qayerga boramiz? (xaritada)</div>
+      <div class="t2">Narx darhol va qat'iy</div></span><span>›</span></button>
+    <button class="field" id="dest-text"><span class="icon">✍️</span><span class="txt"><div class="t1 muted">Manzil nomini yozish</div>
+      <div class="t2">Masalan «Chorsu bozori» — narx taksometr bo'yicha (km)</div></span><span>›</span></button>
+    <div class="chips" id="chips">${placeChips()}</div>`);
   on("dest-field", openSearch);
+  on("dest-text", writeDest);
   on("pickup-field", () => toast("Xaritani surib olish joyini aniqlang"));
   $("#chips").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-lat]");
@@ -697,6 +718,43 @@ function enterPickDest() {
   Back.show(() => { hidePin(); enterHome(); });
 }
 
+/** ✍️ Manzil nomi (xaritasiz): haydovchiga aytiladi, safar oxirida taksometr km bo'yicha hisoblaydi. */
+function writeDest() {
+  S.mode = "writedest";
+  hidePin();
+  sheet(`<h3>Qayerga boramiz?</h3><div class="muted small">Mahalliy nomini yozing — haydovchi yo'lovchini oladi,
+      narx safar oxirida bosib o'tilgan kilometr bo'yicha hisoblanadi.</div>
+    <div class="field"><span class="icon">✍️</span><span class="txt"><input id="dest-name" maxlength="120"
+      placeholder="Masalan: Chorsu bozori, 5-maktab yonida"></span></div>`);
+  const input = $("#dest-name");
+  setTimeout(() => input && input.focus(), 50);
+  Main.set("Davom etish", () => {
+    const name = (input.value || "").trim();
+    if (name.length < 2) return toast("Manzil nomini yozing", true);
+    return setTextDest(name);
+  });
+  Second.hide();
+  Back.show(() => enterHome());
+}
+
+async function setTextDest(name) {
+  S.mode = "quote";
+  S.dest = { title: name, text: true };
+  S.layers.cars.clearLayers();
+  S.layers.markers.clearLayers();
+  drawRoute(null);
+  abMarker(S.pickup.lat, S.pickup.lon, "A").addTo(S.layers.markers);
+  sheet(`<div class="row between"><h2>Hisoblanmoqda…</h2></div><div class="searching-line"><i></i></div>`);
+  Back.show(() => enterHome());
+  try {
+    const q = await api("/api/p/quote", { pickup: S.pickup, dest: { title: name } });
+    if (S.mode !== "quote") return;
+    S.quote = q;
+    centerOn(S.pickup.lat, S.pickup.lon, 16);
+    renderQuote();
+  } catch (e) { toast(e.message, true); enterHome(); }
+}
+
 // ---------- narx
 async function setDest(dest) {
   S.mode = "quote";
@@ -727,6 +785,19 @@ async function setDest(dest) {
 function renderQuote() {
   const q = S.quote;
   const t = S.config.tariff;
+  if (S.dest && S.dest.text) {
+    sheet(`
+      <div class="row between"><div><div class="muted small">✍️ ${esc(S.dest.title)}</div><div class="price">Taksometr</div></div>
+        <div class="muted small right">km bo'yicha</div></div>
+      <div class="kv"><div><b>${num(t.base_fare)}</b><span>o'tirish (${t.base_km} km gacha)</span></div>
+        <div><b>${num(t.per_km)}</b><span>${esc(S.config.currency)} / km</span></div>
+        <div><b>${q.nearby ? mins(q.nearest_eta_s) : "—"}</b><span>${q.nearby ? `${q.nearby} ta mashina yaqin` : "yaqinda yo'q"}</span></div></div>
+      <div class="field"><span class="icon">💬</span><span class="txt"><input id="comment" maxlength="200" placeholder="Haydovchiga izoh (masalan: 3-podyezd)"></span></div>
+      <div class="field"><span class="icon">👤</span><span class="txt"><input id="rider" inputmode="tel" maxlength="20" placeholder="Boshqa odam uchun? Raqamini yozing"></span></div>
+      <div class="muted small mt">Narx safar yakunida bosib o'tilgan yo'l bo'yicha hisoblanadi. Kutish: ${t.free_wait_min} daq bepul.</div>`);
+    Main.set("Buyurtma berish · taksometr", () => placeOrder({ title: S.dest.title }), {});
+    return;
+  }
   sheet(`
     <div class="row between"><div><div class="muted small">${esc(S.dest.title || "Manzil")}</div><div class="price">${money(q.price)}</div></div>
       <div class="muted small right">🔒 Qat'iy narx</div></div>
@@ -800,7 +871,7 @@ function renderPassengerOrder(state) {
       <div class="muted small">⭐ ${Number(d.rating).toFixed(2)}</div></div><span class="plate">${esc(d.plate)}</span></div>` : "";
   if (o.status === "accepted") {
     if (carPos) { routeBetween(carPos, pickup); if (first) fitTo([carPos, pickup]); } else if (first) fitTo([pickup]);
-    sheet(`<div class="row between"><h2>Haydovchi yo'lda</h2><div class="eta-big">${o.eta_s != null ? mins(o.eta_s) : ""}</div></div>
+    sheet(`<div class="row between"><h2>Haydovchi yo'lda</h2><div class="route-left" id="route-left">${routeLeftInner(pickup, o.eta_s)}</div></div>
       ${carHtml}<div class="btns"><button class="btn" id="call">📞 Aloqa</button><button class="btn red" id="cancel">Bekor qilish</button></div>`);
   } else if (o.status === "arrived") {
     drawRoute(null);
@@ -811,11 +882,19 @@ function renderPassengerOrder(state) {
       <div class="btns"><button class="btn" id="call">📞 Aloqa</button><button class="btn red" id="cancel">Bekor qilish</button></div>`);
   } else if (o.status === "in_progress") {
     if (carPos && dest) { routeBetween(carPos, dest); if (first) fitTo([carPos, dest]); } else if (first && carPos) fitTo([carPos]);
-    sheet(`<div class="row between"><h2>Safardamiz</h2><div class="eta-big">${o.eta_s != null ? mins(o.eta_s) : ""}</div></div>
-      ${carHtml}<div class="muted small">${o.fixed_price ? `Narx: ${money(o.price)}` : "Narx taksometr bo'yicha hisoblanadi"}</div>
+    const stopped = o.dest && o.dest.title === "Yo'lovchi to'xtatgan joy";
+    sheet(`<div class="row between"><h2>Safardamiz</h2><div class="route-left" id="route-left">${dest ? routeLeftInner(dest, o.eta_s) : ""}</div></div>
+      ${carHtml}${o.dest_text ? `<div class="note">✍️ Manzil: ${esc(o.dest_text)}</div>` : ""}
+      <div class="muted small">${o.fixed_price ? `Narx: ${money(o.price)}` : "Narx bosib o'tilgan km bo'yicha (taksometr)"}</div>
+      <div class="muted small">🏁 Haydovchi manzilingizga yetib kelganda safarni yakunlaydi.</div>
       <div class="btns"><button class="btn" id="call">📞 Aloqa</button><button class="btn" id="noop" disabled>🛣 ${km(o.trip_distance_m)}</button></div>`);
-    Main.set("🏁 Manzilga yetib keldim", () => act("arrived", o.id), { color: "#22a447", textColor: "#ffffff" });
-    Second.hide();
+    Main.hide();
+    if (dest && !stopped) {
+      Second.set("🛑 Shu yerda tushaman", async () => {
+        if (!(await confirmBox("Shu yerda tushasizmi? Haydovchi safarni shu yerda yakunlaydi, narx bosib o'tilgan yo'l bo'yicha."))) return;
+        await act("stop", o.id);
+      }, { color: "#f2f3f5", textColor: "#e5453b" });
+    } else Second.hide();
     on("call", () => call(o));
     return;
   } else if (o.status === "finishing") {
@@ -928,10 +1007,9 @@ async function driverRefresh() {
 function driverTop(d) {
   $("#top").innerHTML = d ? `<button class="chip-btn" id="bal">💳 ${money(d.balance)}</button>
     <button class="chip-btn"><span class="status-pill"><i class="dot ${d.online ? "on" : ""}"></i><span class="st-text">${d.online ? "Liniyada" : "Oflayn"}</span></span></button>
-    ${liveChip(true)}<button class="chip-btn" id="settings">⚙️</button>` : roleChip();
+    ${liveChip(true)}<button class="chip-btn" id="settings">⚙️</button>` : "";
   on("live-toggle", toggleLive);
   on("settings", renderDriverSettings);
-  on("switch-role", switchRole);
   on("bal", () => toast(`Balans: ${money(d.balance)} · minimal: ${money(S.config.min_driver_balance)}`));
 }
 
@@ -1010,8 +1088,8 @@ function renderOffer(offers, d) {
   const left = Math.max(0, 1 - age / 60);
   sheet(`<div class="row between"><h2>Yangi buyurtma</h2><span class="muted small">${offers.length > 1 ? `+${offers.length - 1} ta yana` : ""}</span></div>
     <div class="offer-timer"><i></i></div>
-    <div class="kv"><div><b>${km(o.distance_m)}</b><span>${mins(o.eta_s)} · ${esc(o.direction)}</span></div>
-      <div><b>${o.trip_distance_m ? km(o.trip_distance_m) : "—"}</b><span>${o.trip_direction ? esc(o.trip_direction) : "manzil ko'rsatilmagan"}</span></div>
+    <div class="kv"><div><b>${km(o.distance_m)}</b><span>yo'lovchigacha · ${mins(o.eta_s)}</span></div>
+      <div><b>${o.trip_distance_m ? km(o.trip_distance_m) : o.dest_text ? "✍️" : "—"}</b><span>${o.trip_direction ? esc(o.trip_direction) : o.dest_text ? esc(o.dest_text) : "manzil ko'rsatilmagan"}</span></div>
       <div><b>${o.price ? num(o.price) : "taksometr"}</b><span>${o.price ? S.config.currency : "narx"}</span></div></div>
     ${o.comment ? `<div class="note">💬 ${esc(o.comment)}</div>` : ""}
     ${o.rider ? '<span class="badge">👤 Boshqa odam uchun</span>' : ""}
@@ -1027,6 +1105,8 @@ function renderOffer(offers, d) {
     await driverRefresh();
   }, { color: "#f2f3f5", textColor: "#111111" });
 }
+
+const NAV_NAMES = { yandex: "Yandex Navigator", google: "Google Maps", waze: "Waze" };
 
 function navUrl(nav, lat, lon) {
   const ll = `${lat.toFixed(6)}%2C${lon.toFixed(6)}`;
@@ -1073,8 +1153,10 @@ function renderDriverOrder(o, d) {
   else if (first) fitTo([target]);
   const navBtn = `<button class="btn" id="nav">🧭 Navigator</button>`;
   const callBtn = `<button class="btn" id="call">📞 Aloqa</button>`;
+  const destNote = o.dest_text ? `<div class="note">✍️ Manzil (yo'lovchi yozgan): ${esc(o.dest_text)} · taksometr</div>` : "";
   if (o.status === "accepted") {
-    sheet(`${stepper}<h2>Yo'lovchi oldiga</h2><div class="muted" id="addr">Manzil aniqlanmoqda…</div>
+    sheet(`${stepper}<div class="row between"><h2>Yo'lovchi oldiga</h2><div class="route-left" id="route-left">${routeLeftInner(pickup)}</div></div>
+      <div class="muted" id="addr">Manzil aniqlanmoqda…</div>${destNote}
       ${o.comment ? `<div class="note">💬 ${esc(o.comment)}</div>` : ""}${o.rider ? '<span class="badge">👤 Boshqa odam uchun</span>' : ""}
       <div class="btns">${navBtn}${callBtn}</div><button class="btn red mt" id="dcancel">Bekor qilish</button>`);
     reverse(pickup[0], pickup[1]).then((r) => { const el = $("#addr"); if (el && r) el.textContent = `📍 ${r.title}${r.subtitle ? ", " + r.subtitle : ""}`; });
@@ -1085,16 +1167,31 @@ function renderDriverOrder(o, d) {
     sheet(`${stepper}<h2>Yo'lovchi kutilmoqda</h2>
       <div class="note">⏳ ${Math.floor(waited)} daq kutildi · ${o.free_wait_min} daq bepul</div>
       ${o.comment ? `<div class="note">💬 ${esc(o.comment)}</div>` : ""}
-      <div class="btns">${callBtn}<button class="btn red" id="noshow" ${waited < o.no_show_wait_min ? "disabled" : ""}>🚫 Chiqmadi</button></div>`);
-    Main.set("🚀 Safarni boshlash", () => dAct("start", o.id), { color: "#22a447", textColor: "#ffffff" });
+      <div class="btns">${callBtn}<button class="btn red" id="noshow" ${waited < o.no_show_wait_min ? "disabled" : ""}>🚫 Chiqmadi</button></div>
+      ${dest ? `<div class="muted small mt">🧭 Boshlaganingizda ${esc(NAV_NAMES[d.navigator] || "navigator")} manzilgacha yo'lni o'zi ochadi.</div>` : destNote}`);
+    Main.set("🚀 Safarni boshlash", () => {
+      // Navigator foydalanuvchi bosgan zahoti ochiladi (Telegram faqat shunda ruxsat beradi)
+      if (dest) openLink(navUrl(d.navigator, dest[0], dest[1]));
+      return dAct("start", o.id);
+    }, { color: "#22a447", textColor: "#ffffff" });
     Second.hide();
   } else if (o.status === "in_progress") {
     const t = o.taximeter || {};
-    sheet(`${stepper}<h2>Safar davom etmoqda</h2>
+    // Yandex Go kabi: xaritada belgilangan manzilga yetib kelmaguncha yakunlab bo'lmaydi
+    const gap = dest && me ? dist(me, dest) : dest ? Infinity : 0;
+    const radius = (S.config.finish_radius_m || 200) + Math.min((S.location && S.location.accuracy) || 0, 100);
+    const canFinish = gap <= radius;
+    sheet(`${stepper}<div class="row between"><h2>Safar davom etmoqda</h2><div class="route-left" id="route-left">${dest ? routeLeftInner(dest) : ""}</div></div>
       <div class="kv"><div><b>${km(t.distance_m)}</b><span>bosib o'tildi</span></div><div><b>${t.minutes || 0} daq</b><span>yo'lda</span></div>
-        <div><b>${num(o.fixed_price ? o.price : t.price)}</b><span>${o.fixed_price ? "qat'iy narx" : "taksometr"}</span></div></div>
+        <div><b>${num(o.fixed_price ? o.price : t.price)}</b><span>${o.fixed_price ? "qat'iy narx" : "taksometr (km)"}</span></div></div>
+      ${destNote}${dest && !canFinish ? `<div class="muted small">🏁 Safarni yo'lovchi belgilagan manzilga yetib kelganda yakunlaysiz.</div>` : ""}
       <div class="btns">${dest ? navBtn : ""}${callBtn}</div>`);
-    Main.set("🏁 Safarni yakunlash", () => dAct("finish", o.id), { color: "#e5453b", textColor: "#ffffff" });
+    if (canFinish) Main.set("🏁 Safarni yakunlash", () => finishTrip(o), { color: "#e5453b", textColor: "#ffffff" });
+    else {
+      const road = routeLeftFor(dest); // yo'l bo'yicha (to'g'ri chiziq emas)
+      const left = road ? road.dist : gap;
+      Main.set(`🏁 Manzilgacha ${left === Infinity ? "—" : km(left)}`, () => finishTrip(o), { active: false, color: "#c9ccd1", textColor: "#ffffff" });
+    }
     Second.hide();
   } else {
     sheet(`${stepper}<h2>Yo'lovchi tasdig'i kutilmoqda</h2><div class="price">${money(o.price)}</div>
@@ -1109,6 +1206,15 @@ function renderDriverOrder(o, d) {
   });
   on("dcancel", async () => { if (await confirmBox("Buyurtmani bekor qilasizmi? Yo'lovchiga boshqa haydovchi qidiriladi.")) dAct("cancel", o.id); });
   on("noshow", async () => { if (await confirmBox("Yo'lovchi chiqmadimi? Buyurtma yopiladi.")) dAct("noshow", o.id); });
+}
+
+async function finishTrip(o) {
+  try {
+    const r = await api(`/api/d/orders/${o.id}/finish`, {});
+    haptic("success");
+    toast(r.message || "🏁 Safar yakunlandi");
+  } catch (e) { toast(e.message, true); }
+  await driverRefresh();
 }
 
 async function dAct(action, orderId) {
@@ -1147,8 +1253,7 @@ function renderDriverSettings() {
       <div class="t2">Faqat uy tomonga ketayotgan buyurtmalar</div></span></div>
     <div class="btns"><button class="btn" id="set-home">📍 Uy = hozirgi joy</button>
       <button class="btn ${d.home_mode ? "red" : ""}" id="home-mode" ${d.home_set ? "" : "disabled"}>${d.home_mode ? "O'chirish" : "Yoqish"}</button></div>
-    ${S.config.single_bot ? `<div class="btns"><button class="btn" id="switch-role">🙋 Yo'lovchi rejimiga o'tish</button></div>` : ""}`);
-  on("switch-role", switchRole);
+`);
   Main.hide();
   Second.hide();
   Back.show(() => { Back.hide(); S.mode = "idle"; driverRefresh(); });
@@ -1175,10 +1280,12 @@ function renderDriverSettings() {
 }
 
 // ====================================================================== ishga tushirish
+/** Birinchi ro'yxatdan o'tish: rol bir marta tanlanadi (keyin ilovada almashtirilmaydi). */
 function chooseRole() {
   document.getElementById("boot").hidden = true;
-  sheet(`<h2>Xush kelibsiz! 🚕</h2><div class="muted">Kim sifatida davom etasiz?</div>
-    <div class="btns"><button class="btn accent" id="as-passenger">🙋 Yo'lovchi</button><button class="btn" id="as-driver">🚕 Haydovchi</button></div>`);
+  sheet(`<h2>Xush kelibsiz! 🚕</h2><div class="muted">Ro'yxatdan o'tish — kim sifatida foydalanasiz?</div>
+    <div class="btns"><button class="btn accent" id="as-passenger">🙋 Yo'lovchi</button><button class="btn" id="as-driver">🚕 Haydovchi</button></div>
+    <div class="muted small mt">Tanlov saqlanadi — keyingi safar ilova shu rejimda ochiladi.</div>`);
   const pick = (role) => {
     S.app = role;
     sheet("");
@@ -1189,12 +1296,12 @@ function chooseRole() {
   on("as-driver", () => pick("driver"));
 }
 
-/** Ilova rejimi: havoladagi ?app= → botda tanlangan rol (bazadan) → so'raladi. */
+/** Ilova rejimi: ro'yxatdan o'tishda tanlangan rol (server) → yangi foydalanuvchiga so'raladi. */
 async function resolveApp() {
-  const param = new URLSearchParams(location.search).get("app");
-  if (param === "driver" || param === "passenger") return param;
   const r = await api("/api/role");
-  return r.role;
+  if (r.role) return r.role;
+  const param = new URLSearchParams(location.search).get("app");
+  return param === "driver" || param === "passenger" ? param : null;
 }
 
 async function boot() {

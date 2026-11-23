@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 
 from sqlalchemy import func, select
 
-from taxi_bot.db.models import Order, OrderStatus
+from taxi_bot.db.models import Order, OrderStatus, utcnow
 from taxi_bot.services.privacy import mask_contacts
 from taxi_bot.ui.messenger import Role
 
@@ -44,54 +45,68 @@ async def _status(svc, order_id, status):
     return (await svc.get_order(order_id)).status == status
 
 
-async def _ride_to_finish(svc, center, tg):
+async def _ride_started(svc, center, tg, dest=True):
     d = await add_driver(svc, tg, *offset(*center, 200, 0))
     await add_passenger(svc)
-    order = await order_now(svc, center, dest=offset(*center, 2000, 0))
+    order = await order_now(svc, center, dest=offset(*center, 2000, 0) if dest else None)
     assert await wait_for(lambda: _has_offer(svc, order.id, d.id))
     assert (await svc.accept_offer(tg, order.id)).ok
     assert await svc.driver_start(tg, order.id)
-    assert await svc.driver_finish(tg, order.id)
     return d, order
 
 
-async def test_driver_is_free_right_after_finish_commission_still_on_confirm(make_service, center):
+async def test_finish_only_at_destination_then_commission_immediately(make_service, center):
+    """Yandex Go kabi: safar faqat yo'lovchi belgilagan manzilda yakunlanadi; tasdiq kutilmaydi."""
     svc, fake = await make_service(priority_headstart_sec=0)
-    d, first = await _ride_to_finish(svc, center, 4001)
-    assert (await svc.get_driver(d.id)).current_order_id is None  # 10 daqiqa kutib turmaydi
-    assert (await svc.get_driver(d.id)).balance == 50_000  # komissiya hali yechilmagan
-    assert "bo'shsiz" in [v.text for r, c, _, v in fake.edits if c == 4001][-1]
-
-    # Haydovchi darhol boshqa yo'lovchining buyurtmasini oladi
-    await svc.ensure_passenger(5002, "Boshqa")
-    await svc.set_passenger_phone(5002, "+998931234567")
-    q = await svc.build_quote(*center, 10)
-    second = await svc.create_order(5002, q)
-    assert await wait_for(lambda: _has_offer(svc, second.id, d.id))
-    assert (await svc.accept_offer(4001, second.id)).ok
-
-    # Birinchi yo'lovchi endi tasdiqlaydi: komissiya yechiladi, yangi buyurtma bog'lanishi saqlanadi
-    assert await svc.passenger_confirm_arrival(PASSENGER_TG, first.id)
-    after = await svc.get_driver(d.id)
-    done = await svc.get_order(first.id)
-    assert done.status == OrderStatus.COMPLETED
-    assert after.balance == 50_000 - done.commission
-    assert after.current_order_id == second.id
-
-
-async def test_not_yet_relinks_free_driver_or_reports_busy(make_service, center):
-    svc, _ = await make_service(priority_headstart_sec=0)
-    d, order = await _ride_to_finish(svc, center, 4101)
-    assert await svc.passenger_not_yet(PASSENGER_TG, order.id) == "ok"
+    d, order = await _ride_started(svc, center, 4001)
+    assert await svc.driver_finish(4001, order.id) == "far"  # hali olish joyida
+    msg = await svc.finish_message(4001, order.id, "far")
+    assert "Manzilgacha 1.8 km qoldi" in msg
+    await svc.update_driver_location(4001, *offset(*center, 1000, 0), accuracy=5, is_live=True)
+    assert await svc.driver_finish(4001, order.id) == "far"  # yo'lning yarmi
     assert (await svc.get_order(order.id)).status == OrderStatus.IN_PROGRESS
-    assert (await svc.get_driver(d.id)).current_order_id == order.id
+    await svc.update_driver_location(4001, *offset(*center, 1850, 0), accuracy=10, is_live=True)  # 150 m qoldi
+    assert await svc.driver_finish(4001, order.id) == "ok"
+    done, after = await svc.get_order(order.id), await svc.get_driver(d.id)
+    assert done.status == OrderStatus.COMPLETED and done.commission == round(done.final_price * 0.1)
+    assert after.balance == 50_000 - done.commission and after.current_order_id is None
+    assert "Safar yakunlandi" in fake.to(Role.PASSENGER, PASSENGER_TG)[-1].view.text
 
-    assert await svc.driver_finish(4101, order.id)
-    async with svc.db.session() as s:  # haydovchi allaqachon boshqa buyurtmada
-        (await s.get(type(d), d.id)).current_order_id = 999
-    assert await svc.passenger_not_yet(PASSENGER_TG, order.id) == "driver_busy"
-    assert (await svc.get_order(order.id)).status == OrderStatus.FINISHING
-    assert (await svc.get_driver(d.id)).current_order_id == 999
+
+async def test_finish_needs_fresh_location_and_taximeter_finishes_anywhere(make_service, center):
+    svc, _ = await make_service(priority_headstart_sec=0)
+    d, order = await _ride_started(svc, center, 4101)
+    async with svc.db.session() as s:  # joylashuv eskirgan
+        (await s.get(type(d), d.id)).loc_valid_until = utcnow() - timedelta(minutes=1)
+    assert await svc.driver_finish(4101, order.id) == "no_location"
+
+    svc2, _ = await make_service(priority_headstart_sec=0)
+    _, free = await _ride_started(svc2, center, 4102, dest=False)  # manzilsiz — taksometr
+    assert await svc2.driver_finish(4102, free.id) == "ok"
+
+
+async def test_passenger_can_stop_early_then_taximeter_price(make_service, center):
+    svc, fake = await make_service(priority_headstart_sec=0)
+    _, order = await _ride_started(svc, center, 4201)
+    here = offset(*center, 700, 0)
+    await svc.update_driver_location(4201, *here, accuracy=5, is_live=True)
+    assert await svc.driver_finish(4201, order.id) == "far"
+    assert await svc.passenger_stop_here(PASSENGER_TG, order.id) == "ok"  # «🛑 Shu yerda tushaman»
+    stopped = await svc.get_order(order.id)
+    assert (stopped.dest_lat, stopped.dest_lon) == here and stopped.est_price is None
+    assert any("shu yerda tushmoqchi" in m.view.text for m in fake.to(Role.DRIVER, 4201))
+    assert await svc.driver_finish(4201, order.id) == "ok"
+    done = await svc.get_order(order.id)
+    assert done.final_price == svc.tariff.ride_price(done.trip_distance_m) + (done.wait_charge or 0)
+    assert await svc.passenger_stop_here(PASSENGER_TG, order.id) == "not_found"
+
+
+async def test_no_cancellation_after_trip_started(make_service, center):
+    svc, _ = await make_service(priority_headstart_sec=0)
+    _, order = await _ride_started(svc, center, 4301)
+    assert await svc.passenger_cancel(PASSENGER_TG, order.id, confirmed=True) == "too_late"
+    assert await svc.driver_cancel(4301, order.id, no_show=False) == "not_found"
+    assert (await svc.get_order(order.id)).status == OrderStatus.IN_PROGRESS
 
 
 async def test_redispatch_resets_near_alert(make_service, center):

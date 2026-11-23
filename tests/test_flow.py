@@ -12,6 +12,7 @@ from taxi_bot.db.models import (
     OrderOffer,
     OrderStatus,
     Transaction,
+    utcnow,
 )
 from taxi_bot.ui.messenger import Role
 
@@ -30,6 +31,12 @@ async def add_driver(svc, tg_id, lat, lon, *, rating=4.7, balance=50_000, live=T
     res = await svc.update_driver_location(tg_id, lat, lon, accuracy=8, is_live=live)
     assert res.went_online or balance < svc.settings.min_driver_balance, res
     return d
+
+
+async def at_destination(svc, driver_tg, order_id):
+    """Haydovchi yo'lovchi belgilagan manzilga yetib keldi (jonli joylashuv)."""
+    o = await svc.get_order(order_id)
+    await svc.update_driver_location(driver_tg, o.dest_lat, o.dest_lon, accuracy=5, is_live=True)
 
 
 async def add_passenger(svc, tg_id=PASSENGER_TG):
@@ -96,7 +103,7 @@ async def test_full_ride_with_priority_and_commission(make_service, center):
     # Haydovchi kartasi: manzil (navigatsiya) va aloqa tugmalari
     card = [v for r, c, _, v in fake.edits if r == Role.DRIVER and c == 102][-1]
     buttons = [btn for row in card.markup.inline_keyboard for btn in row]
-    assert buttons[0].url and "dir_action=navigate" in buttons[0].url
+    assert buttons[0].url and "rtext=" in buttons[0].url and "rtt=auto" in buttons[0].url  # standart: Yandex
     assert buttons[1].callback_data.startswith("d:call")
     assert "+998" not in card.text
 
@@ -107,22 +114,18 @@ async def test_full_ride_with_priority_and_commission(make_service, center):
     for step in range(1, 9):
         await _age_track(svc, order.id)
         await svc.update_driver_location(102, *offset(lat, lon, step * 500, 0), accuracy=5, is_live=True)
-    assert await svc.driver_finish(102, order.id)
-    o = await svc.get_order(order.id)
-    assert o.status == OrderStatus.FINISHING
-    assert o.final_price == o.est_price  # belgilangan narx (kutish bepul)
-    assert 3500 < o.trip_distance_m < 4500
-    assert "Manzilga yetib keldingizmi" in fake.to(Role.PASSENGER, PASSENGER_TG)[-1].view.text
-
-    # 4) Faqat yo'lovchi tasdig'idan so'ng 10% yechiladi
+    # 4) Yandex Go kabi: haydovchi faqat manzilda yakunlaydi, yo'lovchi tasdig'i kutilmaydi — 10% darhol
     d_before = await svc.get_driver(b.id)
     assert d_before.balance == 50_000
-    assert await svc.passenger_confirm_arrival(PASSENGER_TG, order.id)
+    assert await svc.driver_finish(102, order.id) == "ok"
     o = await svc.get_order(order.id)
     d_after = await svc.get_driver(b.id)
-    assert o.status == OrderStatus.COMPLETED
+    assert o.status == OrderStatus.COMPLETED and not o.auto_completed
+    assert o.final_price == o.est_price  # belgilangan narx (kutish bepul)
+    assert 3500 < o.trip_distance_m < 4500
     assert o.commission == round(o.final_price * 0.10)
-    assert d_after.balance == 50_000 - o.commission
+    assert d_after.balance == 50_000 - o.commission and d_after.current_order_id is None
+    assert "Safar yakunlandi" in fake.to(Role.PASSENGER, PASSENGER_TG)[-1].view.text
     assert d_after.current_order_id is None and d_after.trips_count == 1
     async with svc.db.session() as s:
         tx = (await s.scalars(select(Transaction).where(Transaction.driver_id == b.id))).all()
@@ -292,7 +295,7 @@ async def test_taximeter_without_destination_and_waiting(make_service, center):
     # GPS sakrashi (shahar tashqarisiga) hisoblanmaydi
     await svc.update_driver_location(901, *offset(*center, 80_000, 0), accuracy=5, is_live=True)
     await svc.update_driver_location(901, *offset(*center, 6000, 0), accuracy=5, is_live=True)
-    assert await svc.driver_finish(901, order.id)
+    assert await svc.driver_finish(901, order.id) == "ok"  # manzilsiz (taksometr) — istalgan joyda
     o = await svc.get_order(order.id)
     assert 5800 < o.trip_distance_m < 6300
     expected_ride = svc.tariff.ride_price(o.trip_distance_m)
@@ -300,7 +303,8 @@ async def test_taximeter_without_destination_and_waiting(make_service, center):
     assert o.final_price == expected_ride + o.wait_charge
 
 
-async def test_auto_complete_when_passenger_silent(make_service, center):
+async def test_legacy_finishing_order_still_auto_completes(make_service, center):
+    """Eski versiyada «yo'lovchi tasdig'i kutilmoqda» bo'lib qolgan safar yangilanishdan keyin ham yopiladi."""
     svc, _ = await make_service(priority_headstart_sec=0, finish_confirm_timeout_min=0.001)
     d = await add_driver(svc, 1001, *center)
     await add_passenger(svc)
@@ -308,7 +312,10 @@ async def test_auto_complete_when_passenger_silent(make_service, center):
     assert await wait_for(lambda: _all_offered(svc, order.id, 1))
     assert (await svc.accept_offer(1001, order.id)).ok
     assert await svc.driver_start(1001, order.id)
-    assert await svc.driver_finish(1001, order.id)
+    async with svc.db.session() as s:
+        o = await s.get(Order, order.id)
+        o.status, o.final_price, o.finish_requested_at = OrderStatus.FINISHING, 12_000, utcnow()
+        (await s.get(Driver, d.id)).current_order_id = None
     await asyncio.sleep(0.1)
     await svc.maintenance_tick()
     o = await svc.get_order(order.id)

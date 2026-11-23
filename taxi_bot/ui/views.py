@@ -115,8 +115,10 @@ class Views:
             )
         text = (
             "✅ <b>Olish joyi qabul qilindi.</b>" + acc + "\n\n"
-            "🏁 <b>Qayerga borasiz?</b> Pastdan tanlang yoki 📎 → <b>Joylashuv</b> orqali "
-            "xaritada belgilang."
+            "🏁 <b>Qayerga borasiz?</b>\n"
+            "📍 <b>Xaritada belgilang</b> (pastdan tanlang yoki 📎 → Joylashuv) — narx darhol va qat'iy.\n"
+            "✍️ yoki <b>manzil nomini yozing</b> (masalan: «Chorsu bozori», «5-maktab yonida») — haydovchiga "
+            "aytiladi, narx safar oxirida taksometr bo'yicha (km)."
         )
 
         def dist(lat: float, lon: float) -> str:
@@ -151,12 +153,13 @@ class Views:
         card.map(q.pickup_lat, q.pickup_lon, "📍 Olish joyi")
         acc = f" (±{int(q.pickup_accuracy)} m)" if q.pickup_accuracy else ""
         card.row("📍 Olish joyi", "aniqlandi" + acc)
-        if q.dest_lat is not None and q.distance_m is not None:
+        fixed = q.dest_lat is not None and q.distance_m is not None
+        if fixed:
             dest = q.dest_title + " · " if q.dest_title else ""
             card.row("🏁 Manzil", f"{dest}{format_distance(q.distance_m)} · ~{format_duration(q.duration_s or 0)}")
             card.row("💰 Narx", self.m(q.price))
         else:
-            card.row("🏁 Manzil", "ko'rsatilmagan")
+            card.row("🏁 Manzil", f"✍️ {q.dest_title}" if q.dest_title else "ko'rsatilmagan")
             card.row("💰 Narx", self.taximeter_text())
         if q.nearby_count:
             eta = f" · eng yaqini ~{format_duration(q.nearest_eta_s or 60)}" if q.nearest_eta_s else ""
@@ -167,7 +170,11 @@ class Views:
         if q.rider_phone:
             card.row("👤 Yo'lovchi", f"boshqa odam · {mask_phone(q.rider_phone)}")
         card.para("💬 Haydovchi uchun izoh qoldirish uchun shunchaki yozing (masalan: 3-podyezd oldida).")
-        card.foot("🔒 Narx qat'iy — tirbandlik yoki talab oshganda ham o'zgarmaydi.")
+        card.foot(
+            "🔒 Narx qat'iy — tirbandlik yoki talab oshganda ham o'zgarmaydi."
+            if fixed
+            else "🧾 Narx safar yakunida bosib o'tilgan kilometr bo'yicha hisoblanadi."
+        )
         markup = inline(
             btn("🚕 Buyurtma berish", cb=PCb(action="confirm"), style=SUCCESS, emoji="taxi"),
             btn(
@@ -240,29 +247,35 @@ class Views:
     def trip_started(self, o: Order, d: Driver) -> View:
         card = Card("🚀 Safar boshlandi — oq yo'l!")
         card.row("🚘 Avtomobil", f"{car_line(d)} · {d.car_plate}")
+        if o.has_destination:
+            card.row("🏁 Manzil", o.dest_title or "xaritada belgilangan nuqta")
+        elif o.dest_title:
+            card.row("🏁 Manzil", f"✍️ {o.dest_title}")
         card.row("💰 Narx", self.m(o.est_price) if o.est_price else self.taximeter_text())
-        card.foot("Manzilga yetgach, quyidagi tugmani bosing.")
-        return View.of(
-            card,
-            inline(
-                btn("🏁 Manzilga yetib keldim", cb=PCb(action="arrive", oid=o.id), style=SUCCESS),
-                btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY),
-            ),
+        stopped = o.dest_title == "Yo'lovchi to'xtatgan joy"
+        if o.has_destination and not stopped:
+            card.foot("Haydovchi manzilingizga yetib kelganda safarni yakunlaydi. Oldinroq tushmoqchi bo'lsangiz — "
+                      "«🛑 Shu yerda tushaman».")
+        else:
+            card.foot("Haydovchi safarni yakunlagach, to'lov summasi shu yerda chiqadi.")
+        stop = (
+            btn("🛑 Shu yerda tushaman", cb=PCb(action="stop", oid=o.id), style=DANGER)
+            if o.has_destination and not stopped
+            else None
         )
+        return View.of(card, inline(stop, btn("📞 Haydovchi bilan aloqa", cb=PCb(action="call", oid=o.id), style=PRIMARY)))
 
-    def confirm_arrival(self, o: Order) -> View:
-        card = Card("🏁 Manzilga yetib keldingizmi?")
-        if o.trip_distance_m:
-            card.row("🛣 Bosib o'tilgan yo'l", format_distance(o.trip_distance_m))
-        if o.wait_charge:
-            card.row("⏳ Kutish", self.m(o.wait_charge))
-        card.row("💰 To'lov", self.m(o.final_price))
-        card.para("Tasdiqlaganingizdan so'ng safar yakunlanadi. To'lovni haydovchiga bering.")
+    def stop_here_confirm(self, o: Order) -> View:
+        card = Card("🛑 Shu yerda tushasizmi?")
+        card.para(
+            "Manzil mashinaning hozirgi joyiga o'zgaradi va haydovchi safarni yakunlaydi. "
+            "Narx bosib o'tilgan yo'l bo'yicha hisoblanadi."
+        )
         return View.of(
             card,
             inline(
-                btn("✅ Ha, yetib keldim", cb=PCb(action="ok", oid=o.id), style=SUCCESS),
-                btn("❌ Yo'q, hali emas", cb=PCb(action="notyet", oid=o.id), style=DANGER),
+                btn("✅ Ha, shu yerda", cb=PCb(action="stopok", oid=o.id), style=DANGER),
+                btn("Yo'q, davom etamiz", cb=PCb(action="keep", oid=o.id), style=SUCCESS),
             ),
         )
 
@@ -392,8 +405,8 @@ class Views:
             card.row("🏁 Safar", f"{format_distance(o.est_distance_m)} · {direction}")
             card.row("💰 Narx", self.m(o.est_price))
         else:
-            card.row("🏁 Safar", "manzil ko'rsatilmagan")
-            card.row("💰 Narx", "taksometr")
+            card.row("🏁 Manzil", f"✍️ {o.dest_title} (yo'lovchi yozgan)" if o.dest_title else "ko'rsatilmagan")
+            card.row("💰 Narx", "taksometr (km bo'yicha)")
         card.row("💬 Izoh", o.comment)
         badges = []
         if c.favorite:
@@ -427,6 +440,8 @@ class Views:
             card.row("💰 Narx", self.m(o.est_price) if o.est_price else "taksometr")
             if o.has_destination and o.est_distance_m:
                 card.row("🏁 Safar", format_distance(o.est_distance_m))
+            elif o.dest_title:
+                card.row("🏁 Manzil", f"✍️ {o.dest_title} (yo'lovchi yozgan)")
             card.row("💬 Izoh", o.comment)
             if o.rider_phone:
                 card.para("👤 Buyurtma boshqa odam uchun — «Aloqa» sizni aynan o'sha yo'lovchi bilan bog'laydi.")
@@ -455,9 +470,15 @@ class Views:
             card = Card(f"🚀 Buyurtma #{o.id} — safar davom etmoqda")
             if o.has_destination:
                 card.map(o.dest_lat, o.dest_lon, "🏁 Manzil")  # type: ignore[arg-type]
-                card.row("💰 Narx", self.m(o.est_price))
+                card.row("💰 Narx", self.m(o.est_price) if o.est_price else self.taximeter_text())
+                card.foot(
+                    f"🏁 Safarni yo'lovchi manziliga yetib kelganda (~{int(self.s.finish_radius_m)} m) yakunlaysiz."
+                )
             else:
+                if o.dest_title:
+                    card.row("🏁 Manzil", f"✍️ {o.dest_title} (yo'lovchi yozgan)")
                 card.row("💰 Narx", self.taximeter_text())
+                card.foot("🧾 Narx bosib o'tilgan kilometr bo'yicha — yo'lovchini manzilga yetkazgach yakunlang.")
             nav = (
                 btn(
                     "🏁 Manzilga yo'l",

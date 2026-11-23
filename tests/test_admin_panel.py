@@ -9,7 +9,15 @@ from taxi_bot.ui.messenger import Role
 from taxi_bot.web.server import AdminPanel, resolve_password
 
 from .conftest import offset
-from .test_flow import PASSENGER_TG, _has_offer, add_driver, add_passenger, order_now, wait_for
+from .test_flow import (
+    PASSENGER_TG,
+    _has_offer,
+    add_driver,
+    add_passenger,
+    at_destination,
+    order_now,
+    wait_for,
+)
 
 PASSWORD = "maxfiy-parol"
 H = {"X-Panel": "1"}
@@ -92,7 +100,8 @@ async def test_cancel_stuck_order_map_and_finance(make_service, center):
         assert await wait_for(lambda: _has_offer(svc, done.id, d.id))
         assert (await svc.accept_offer(6101, done.id)).ok
         assert await svc.driver_start(6101, done.id)
-        assert await svc.passenger_confirm_arrival(PASSENGER_TG, done.id)
+        await at_destination(svc, 6101, done.id)
+        assert await svc.driver_finish(6101, done.id) == "ok"
         fin = await (await client.get("/api/finance?days=7")).json()
         commission = (await svc.get_order(done.id)).commission
         assert fin["totals"]["trips"] == 1 and fin["totals"]["commission"] == commission

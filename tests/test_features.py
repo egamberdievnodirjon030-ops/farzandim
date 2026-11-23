@@ -8,7 +8,16 @@ from taxi_bot.db.models import Driver, OrderStatus
 from taxi_bot.ui.messenger import Role
 
 from .conftest import offset
-from .test_flow import PASSENGER_TG, _has_offer, add_driver, add_passenger, offers, order_now, wait_for
+from .test_flow import (
+    PASSENGER_TG,
+    _has_offer,
+    add_driver,
+    add_passenger,
+    at_destination,
+    offers,
+    order_now,
+    wait_for,
+)
 
 
 async def _set(svc, driver_id, **values):
@@ -34,7 +43,8 @@ async def test_favorite_driver_sees_order_first(make_service, center):
     fav, order = await _accepted(svc, center, tg=3202, north=2500)
     # 1-safarni yakunlab, haydovchini sevimlilarga qo'shamiz
     assert await svc.driver_start(3202, order.id)
-    assert await svc.passenger_confirm_arrival(PASSENGER_TG, order.id)
+    await at_destination(svc, 3202, order.id)
+    assert await svc.driver_finish(3202, order.id) == "ok"
     assert await svc.rate(PASSENGER_TG, order.id, 5)
     assert await svc.add_favorite(PASSENGER_TG, order.id)
     await svc.update_driver_location(3202, *offset(*center, 2500, 0), accuracy=5, is_live=True)

@@ -39,7 +39,6 @@ button { font: inherit; color: inherit; }
 .chip-btn { background: var(--bg); color: var(--text); border: 0; border-radius: 16px; padding: 9px 13px; font-weight: 600;
   box-shadow: 0 2px 10px rgba(0,0,0,.14); display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
 .chip-btn.wide { flex: 1; min-width: 0; justify-content: flex-start; text-align: left; }
-.chip-btn.role { margin-left: auto; }
 .live-chip { color: var(--hint); }
 @media (max-width: 340px) { .st-text { display: none; } }
 @media (max-width: 380px) { .top { gap: 6px; padding-left: 8px; padding-right: 8px; } .top .chip-btn { padding: 8px 10px; font-size: 14px; } }
@@ -168,3 +167,8 @@ button { font: inherit; color: inherit; }
 .center { text-align: center; }
 .flex1 { flex: 1; min-width: 0; }
 .offer-timer i { transform: scaleX(1); transition: transform 2.4s linear; }
+
+/* yo'l bo'yicha qolgan vaqt / masofa */
+.route-left { text-align: right; line-height: 1.15; }
+.route-left b { display: block; font-size: 20px; font-weight: 800; }
+.route-left span { font-size: 12px; color: var(--hint); }

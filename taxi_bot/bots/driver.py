@@ -394,9 +394,9 @@ def build_driver_router() -> Router:
 
     @router.callback_query(DCb.filter(F.action == "fin"))
     async def finish(callback: CallbackQuery, callback_data: DCb, svc: TaxiService) -> None:
-        ok = await svc.driver_finish(callback.from_user.id, callback_data.oid)
+        result = await svc.driver_finish(callback.from_user.id, callback_data.oid)
         await callback.answer(
-            "🏁 Yo'lovchidan tasdiq so'raldi. Tasdiqlangach safar yakunlanadi." if ok else "Holat o'zgargan."
+            await svc.finish_message(callback.from_user.id, callback_data.oid, result), show_alert=result != "ok"
         )
 
     @router.callback_query(DCb.filter(F.action == "call"))

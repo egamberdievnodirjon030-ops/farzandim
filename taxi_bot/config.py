@@ -92,7 +92,9 @@ class Settings(BaseSettings):
     bad_accuracy_m: float = 150.0
 
     # --- Safar --------------------------------------------------------------
-    finish_confirm_timeout_min: float = 10.0  # 0 = faqat yo'lovchi tasdig'i
+    finish_confirm_timeout_min: float = 10.0  # eski versiyadan qolgan "tasdiq kutilmoqda" safarlar uchun
+    # Haydovchi safarni faqat yo'lovchi manziliga shu masofada (metr) yetib kelganda yakunlay oladi
+    finish_radius_m: float = 200.0
     no_show_wait_min: float = 5.0
     near_notify_radius_m: float = 400.0  # "Haydovchi yaqinlashmoqda" xabari
     auto_arrive_radius_m: float = 70.0  # GPS bo'yicha avtomatik "Yetib keldim" (0 = o'chirilgan)

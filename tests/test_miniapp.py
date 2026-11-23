@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 
 from aiohttp.test_utils import TestClient, TestServer
 
-from taxi_bot.db.models import Driver, DriverStatus, OrderStatus
+from taxi_bot.db.models import DriverStatus, OrderStatus
 from taxi_bot.miniapp.server import MiniAppServer
 from taxi_bot.ui.messenger import Role
 
@@ -152,10 +152,12 @@ async def test_full_ride_through_the_app(make_service, center):
         await d.post(f"/api/d/orders/{order_id}/start")
         taximeter = (await d.get("/api/d/state"))["order"]["taximeter"]
         assert taximeter is not None and taximeter["price"] >= quote["price"]
-        await d.post(f"/api/d/orders/{order_id}/finish")
-        assert (await d.get("/api/d/state"))["order"]["status"] == "finishing"  # haydovchi bo'sh, tasdiq kutilmoqda
-        assert (await p.get("/api/p/state"))["order"]["status"] == "finishing"
-        await p.post("/api/p/arrived", {"order_id": order_id})
+        refused = await d.post(f"/api/d/orders/{order_id}/finish", status=409)  # manzilga hali yetmagan
+        assert "Manzilgacha" in refused["error"]
+        await d.post("/api/d/location", {"lat": dest[0], "lon": dest[1], "accuracy": 5})
+        done = await d.post(f"/api/d/orders/{order_id}/finish")
+        assert "yakunlandi" in done["message"]
+        assert (await d.get("/api/d/state"))["order"] is None  # haydovchi darhol bo'sh
         rate = (await p.get("/api/p/state"))["rate_order"]
         assert rate["id"] == order_id and rate["status"] == "completed"
         await p.post("/api/p/favorite", {"order_id": order_id})
@@ -206,14 +208,15 @@ async def test_driver_registers_from_app_and_goes_online(make_service, center):
         await client.close()
 
 
-async def test_single_bot_app_sets_role(make_service):
+async def test_single_bot_role_is_chosen_once_at_registration(make_service):
     svc, _ = await make_service(driver_bot_token="")
     client = await start(svc, [(P_TOKEN, None)])
     try:
-        await AppClient(client, P_TOKEN, 8101, "driver").get("/api/me")
+        await AppClient(client, P_TOKEN, 8101, "driver").get("/api/me")  # birinchi ro'yxatdan o'tish
         assert await svc.get_user_role(8101) == Role.DRIVER
-        await AppClient(client, P_TOKEN, 8101, "passenger").get("/api/me")
-        assert await svc.get_user_role(8101) == Role.PASSENGER
+        await AppClient(client, P_TOKEN, 8101, "passenger").get("/api/me", status=403)  # ilovada almashtirilmaydi
+        assert await svc.get_user_role(8101) == Role.DRIVER
+        assert (await AppClient(client, P_TOKEN, 8101, None).get("/api/role"))["role"] == "driver"
     finally:
         await client.close()
 
@@ -245,26 +248,6 @@ async def test_app_opens_in_role_chosen_in_chat(make_service):
         # ilova shu rolda ochiladi va rolni qayta yozib yubormaydi
         await AppClient(client, P_TOKEN, 8201, "driver").get("/api/me")
         assert await svc.get_user_role(8201) == Role.DRIVER
-    finally:
-        await client.close()
-
-
-async def test_role_switch_in_app_and_busy_driver_guard(make_service, center):
-    svc, _ = await make_service(driver_bot_token="")
-    client = await start(svc, [(P_TOKEN, None)])
-    try:
-        d = await add_driver(svc, 8202, *center)
-        await svc.set_user_role(8202, Role.DRIVER)
-        async with svc.db.session() as s:
-            (await s.get(Driver, d.id)).current_order_id = 999  # faol safar
-        busy = await AppClient(client, P_TOKEN, 8202, "passenger").get("/api/me", status=409)
-        assert "safarni yakunlang" in busy["error"]
-        assert await svc.get_user_role(8202) == Role.DRIVER
-        async with svc.db.session() as s:
-            (await s.get(Driver, d.id)).current_order_id = None
-        await AppClient(client, P_TOKEN, 8202, "passenger").get("/api/me")
-        assert await svc.get_user_role(8202) == Role.PASSENGER
-        assert (await AppClient(client, P_TOKEN, 8202, None).get("/api/role"))["role"] == "passenger"
     finally:
         await client.close()
 
@@ -333,5 +316,40 @@ async def test_passenger_live_location_reaches_driver_only_during_pickup(make_se
         await d.post(f"/api/d/orders/{order_id}/start")  # safar boshlandi — endi ko'rsatilmaydi va saqlanmaydi
         assert (await d.get("/api/d/state"))["order"]["passenger_live"] is None
         assert (await p.post("/api/p/location", {"lat": here[0], "lon": here[1]}))["shared"] is False
+    finally:
+        await client.close()
+
+
+async def test_written_destination_is_taximeter_and_finishes_anywhere(make_service, center):
+    """✍️ Manzil nomi (xaritasiz): haydovchiga ko'rinadi, narx safar oxirida km bo'yicha."""
+    svc, _ = await make_service(priority_headstart_sec=0, auto_arrive_radius_m=0)
+    client = await start(svc, TWO_BOTS)
+    p = AppClient(client, P_TOKEN, PASSENGER, "passenger")
+    d = AppClient(client, D_TOKEN, DRIVER, "driver")
+    try:
+        await svc.ensure_passenger(PASSENGER, "Jasur")
+        await svc.set_passenger_phone(PASSENGER, "+998935556677")
+        await add_driver(svc, DRIVER, *offset(*center, 300, 0))
+        written = {"title": "Chorsu bozori, 5-maktab yonida"}
+        quote = await p.post("/api/p/quote", {"pickup": {"lat": center[0], "lon": center[1]}, "dest": written})
+        assert quote["price"] is None and quote["route"] is None  # qat'iy narx yo'q — taksometr
+        order_id = (await p.post("/api/p/order", {"pickup": {"lat": center[0], "lon": center[1]}, "dest": written}))["order_id"]
+        o = await svc.get_order(order_id)
+        assert o.dest_title == written["title"] and not o.has_destination and o.est_price is None
+        assert (await p.get("/api/p/state"))["order"]["dest_text"] == written["title"]
+
+        async def has_offer():
+            return bool((await d.get("/api/d/state"))["offers"])
+        assert await wait_for(has_offer)
+        assert (await d.get("/api/d/state"))["offers"][0]["dest_text"] == written["title"]
+        await d.post(f"/api/d/offers/{order_id}/accept")
+        await d.post(f"/api/d/orders/{order_id}/start")
+        assert (await d.get("/api/d/state"))["order"]["dest_text"] == written["title"]
+        await d.post("/api/d/location", {"lat": offset(*center, 2500, 0)[0], "lon": center[1], "accuracy": 5})
+        await d.post(f"/api/d/orders/{order_id}/finish")  # manzil xaritada yo'q — istalgan joyda yakunlanadi
+        done = await svc.get_order(order_id)
+        assert done.status == OrderStatus.COMPLETED
+        assert done.final_price == svc.tariff.ride_price(done.trip_distance_m) + (done.wait_charge or 0)
+        assert (await p.get("/api/me"))["config"]["finish_radius_m"] == svc.settings.finish_radius_m
     finally:
         await client.close()

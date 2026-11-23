@@ -226,9 +226,17 @@ def build_passenger_router() -> Router:
 
     @router.message(F.text, ~F.text.in_(MENU_TEXTS), StateFilter(Draft.destination, Draft.confirm))
     async def draft_comment(message: Message, svc: TaxiService, state: FSMContext) -> None:
+        current = await state.get_state()
+        if current == Draft.destination.state:
+            # ✍️ Manzil nomi (xaritasiz): haydovchiga aytiladi, narx taksometr bo'yicha
+            name = " ".join((message.text or "").split())[:120]
+            if len(name) < 2:
+                await message.answer("Manzil nomini to'liqroq yozing yoki xaritada belgilang.")
+                return
+            await show_quote(message, svc, state, None, name)
+            return
         comment = (message.text or "").strip()[:300]
         await state.update_data(comment=comment)
-        current = await state.get_state()
         data = await state.get_data()
         if current == Draft.confirm.state and data.get("quote"):
             q = Quote(**{**data["quote"], "comment": comment})
@@ -388,21 +396,33 @@ def build_passenger_router() -> Router:
         text = await svc.request_call(callback.from_user.id, callback_data.oid, Role.PASSENGER)
         await callback.answer(text, show_alert=True)
 
-    @router.callback_query(PCb.filter(F.action.in_({"arrive", "ok"})))
+    @router.callback_query(PCb.filter(F.action == "ok"))
     async def arrived(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
+        """Eski versiyadan qolgan «Ha, yetib keldim» tugmasi (tasdiq kutilayotgan safarlar)."""
         ok = await svc.passenger_confirm_arrival(callback.from_user.id, callback_data.oid)
         await callback.answer("✅ Safar yakunlandi. Rahmat!" if ok else "Buyurtma allaqachon yakunlangan.")
 
-    @router.callback_query(PCb.filter(F.action == "notyet"))
-    async def not_yet(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
-        result = await svc.passenger_not_yet(callback.from_user.id, callback_data.oid)
-        phone = f" Operator: {svc.settings.company_phone}" if svc.settings.company_phone else ""
+    @router.callback_query(PCb.filter(F.action.in_({"arrive", "notyet"})))
+    async def old_arrive(callback: CallbackQuery) -> None:
+        await callback.answer("Safarni haydovchi manzilingizga yetib kelganda yakunlaydi.", show_alert=True)
+
+    @router.callback_query(PCb.filter(F.action == "stop"))
+    async def stop_ask(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
+        order = await svc.get_order(callback_data.oid)
+        await callback.answer()
+        if order:
+            await svc.msg.send(Role.PASSENGER, callback.from_user.id, svc.views.stop_here_confirm(order))
+
+    @router.callback_query(PCb.filter(F.action == "stopok"))
+    async def stop_ok(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:
+        result = await svc.passenger_stop_here(callback.from_user.id, callback_data.oid)
         texts = {
-            "ok": "Haydovchiga xabar berildi. Safar davom etmoqda.",
-            "driver_busy": "Haydovchi safarni yakunlab, boshqa buyurtmaga o'tgan. Muammo bo'lsa, operatorga "
-            "murojaat qiling." + phone,
+            "ok": "🛑 Haydovchiga xabar berildi — u shu yerda safarni yakunlaydi.",
+            "no_location": "Mashina joylashuvi aniqlanmadi. Haydovchiga ayting yoki biroz kutib qayta urinib ko'ring.",
         }
-        await callback.answer(texts.get(result, "Buyurtma topilmadi."), show_alert=result == "driver_busy")
+        await callback.answer(texts.get(result, "Safar allaqachon yakunlangan."), show_alert=result != "ok")
+        if isinstance(callback.message, Message):
+            await callback.message.delete()
 
     @router.callback_query(PCb.filter(F.action == "rate"))
     async def rate(callback: CallbackQuery, callback_data: PCb, svc: TaxiService) -> None:

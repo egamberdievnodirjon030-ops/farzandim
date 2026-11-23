@@ -15,7 +15,7 @@ A, B = Point(40.9983, 71.6726), Point(41.0100, 71.6900)
 TURNS = [[71.6727, 40.9984], [71.6727, 41.0040], [71.6890, 41.0040], [71.6890, 41.0099]]
 
 
-async def fake_osrm(hits: list[str], fail: bool = False) -> TestServer:
+async def fake_osrm(hits: list[str], fail: bool = False, table_ok: bool = False) -> TestServer:
     async def route(request: web.Request) -> web.Response:
         hits.append(request.path)
         if fail:
@@ -30,7 +30,11 @@ async def fake_osrm(hits: list[str], fail: bool = False) -> TestServer:
 
     async def table(request: web.Request) -> web.Response:
         hits.append(request.path)
-        return web.Response(status=500)
+        if not table_ok:
+            return web.Response(status=500)
+        n = len(request.query["sources"].split(";"))
+        # Yo'lning narigi tomoni: to'g'ri chiziqda yaqin, lekin aylanib o'tish kerak
+        return web.json_response({"code": "Ok", "distances": [[2100.0]] * n, "durations": [[330.0]] * n})
 
     app = web.Application()
     app.router.add_get("/route/v1/driving/{coords}", route)
@@ -88,16 +92,33 @@ async def test_public_servers_get_at_most_one_request_per_second():
         await server.close()
 
 
-async def test_fallback_and_dispatch_never_hit_public_servers():
+async def test_driver_distance_is_by_road_not_straight_line():
+    """Foydalanuvchi holati: yo'lovchi yo'lning narigi tomonida, 150 m — lekin mashinada aylanib 2.1 km."""
+    from taxi_bot.services.geo import haversine_m
+
+    hits: list[str] = []
+    server = await fake_osrm(hits, table_ok=True)
+    routing = RoutingService(None, public_urls=[str(server.make_url(""))])
+    across = Point(A.lat + 0.00135, A.lon)  # ~150 m
+    try:
+        assert haversine_m(A.lat, A.lon, across.lat, across.lon) < 160
+        many = await routing.many_to_one([A, B, A], across)
+        assert len(hits) == 1 and hits[0].startswith("/table/")  # bitta to'lqin — bitta so'rov
+        assert all(r.precise and r.distance_m == 2100.0 and r.duration_s == 330.0 for r in many)
+    finally:
+        await routing.close()
+        await server.close()
+
+
+async def test_fallback_when_router_is_down():
     hits: list[str] = []
     server = await fake_osrm(hits, fail=True)
     routing = RoutingService(None, public_urls=[str(server.make_url(""))])
     try:
         est, coords = await routing.route_geometry(A, B)
         assert not est.precise and coords == [[A.lat, A.lon], [B.lat, B.lon]]
-        hits.clear()
-        many = await routing.many_to_one([A, B], B)  # haydovchilarni saralash — ommaviy serverga yuborilmaydi
-        assert len(many) == 2 and not hits
+        many = await routing.many_to_one([A, B], B)  # table ham ishlamasa — taxminiy hisob
+        assert len(many) == 2 and not any(r.precise for r in many)
     finally:
         await routing.close()
         await server.close()

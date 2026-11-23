@@ -42,6 +42,21 @@ PAX_LIVE_STATUSES = [OrderStatus.SEARCHING, OrderStatus.ACCEPTED, OrderStatus.AR
 PAX_LIVE_FRESH = timedelta(minutes=3)
 
 
+def _split_dest(dest: dict | None) -> tuple[dict | None, str | None]:
+    """Manzil: xaritadagi nuqta ({lat, lon, title}) yoki faqat yozma nom ({title}) — taksometr bo'yicha."""
+    if not isinstance(dest, dict):
+        return None, None
+    if dest.get("lat") is not None and dest.get("lon") is not None:
+        return dest, None
+    text = str(dest.get("title") or "").strip()[:120]
+    return None, text or None
+
+
+def _dest_text(o: Order) -> str | None:
+    """Yozma (xaritasiz) manzil — haydovchiga aytiladi, narx taksometr bo'yicha."""
+    return o.dest_title if not o.has_destination and o.dest_title else None
+
+
 def _iso(dt: datetime | None) -> str | None:
     return dt.replace(tzinfo=UTC).isoformat() if dt else None
 
@@ -159,6 +174,7 @@ class MiniAppMixin:
             "welcome_bonus": s.welcome_bonus,
             "single_bot": s.single_bot,
             "router_urls": [u for u in s.route_urls if u.startswith("https://")],
+            "finish_radius_m": s.finish_radius_m,
             "geocoder": bool(s.geocoder_url),
         }
 
@@ -204,6 +220,7 @@ class MiniAppMixin:
             "status": o.status,
             "pickup": {"lat": o.pickup_lat, "lon": o.pickup_lon},
             "dest": {"lat": o.dest_lat, "lon": o.dest_lon, "title": o.dest_title} if o.has_destination else None,
+            "dest_text": _dest_text(o),
             "price": o.final_price or o.est_price,
             "fixed_price": bool(o.has_destination and o.est_price),
             "final_price": o.final_price,
@@ -294,9 +311,11 @@ class MiniAppMixin:
     async def app_quote(
         self: TaxiService, lat: float, lon: float, accuracy: float | None, dest: dict | None
     ) -> dict:
+        dest, dest_text = _split_dest(dest)
         q = await self.build_quote(
             lat, lon, accuracy,
-            dest["lat"] if dest else None, dest["lon"] if dest else None, dest.get("title") if dest else None,
+            dest["lat"] if dest else None, dest["lon"] if dest else None,
+            dest.get("title") if dest else dest_text,
         )
         geometry, precise = None, False
         if dest:
@@ -319,11 +338,11 @@ class MiniAppMixin:
         if p.is_blocked:
             return None, "Hisobingiz cheklangan. Operatorga murojaat qiling"
         pickup = body.get("pickup") or {}
-        dest = body.get("dest")
+        dest, dest_text = _split_dest(body.get("dest"))
         q = await self.build_quote(
             float(pickup["lat"]), float(pickup["lon"]), pickup.get("accuracy"),
             float(dest["lat"]) if dest else None, float(dest["lon"]) if dest else None,
-            (dest.get("title") or None) if dest else None,
+            (dest.get("title") or None) if dest else dest_text,
             (body.get("comment") or "").strip()[:300] or None,
         )
         if body.get("rider_phone"):
@@ -389,6 +408,7 @@ class MiniAppMixin:
                         bearing_deg(o.pickup_lat, o.pickup_lon, o.dest_lat, o.dest_lon)  # type: ignore[arg-type]
                     ) if o.has_destination else None,
                     "price": o.est_price,
+                    "dest_text": _dest_text(o),
                     "comment": o.comment,
                     "rider": bool(o.rider_phone),
                     "sent_at": _iso(offer.created_at),
@@ -415,6 +435,7 @@ class MiniAppMixin:
                     {"lat": order.dest_lat, "lon": order.dest_lon, "title": order.dest_title}
                     if order.has_destination else None
                 ),
+                "dest_text": _dest_text(order),
                 "price": order.final_price or order.est_price,
                 "fixed_price": bool(order.has_destination and order.est_price),
                 "comment": order.comment,
@@ -438,6 +459,9 @@ class MiniAppMixin:
                 }
             if order.status == OrderStatus.IN_PROGRESS:
                 price, wait, distance, _ = self._final_price(order, d)
+                if order.has_destination and order.est_price:
+                    # qat'iy narxda _final_price rejadagi masofani qaytaradi — ekranda haqiqiy bosib o'tilgani
+                    distance = order.trip_distance_m or 0.0
                 order_data["taximeter"] = {
                     "distance_m": distance,
                     "wait_charge": wait,

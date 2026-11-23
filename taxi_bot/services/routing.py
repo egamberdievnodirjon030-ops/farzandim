@@ -2,9 +2,9 @@
 
 * `OSRM_URL` — o'zingizning OSRM serveringiz (README): hamma hisob-kitoblar shu orqali, cheklovsiz.
 * `ROUTE_URLS` — ommaviy OSRM serverlari (standart: OpenStreetMap jamoasining FOSSGIS serveri va OSRM demo).
-  Ular faqat marshrut chizig'i va narx hisobi uchun ishlatiladi: natijalar keshlanadi, so'rovlar sekundiga
-  ko'pi bilan bitta (ularning foydalanish qoidasi), ishlamay qolgan server bir daqiqaga chetlab o'tiladi.
-  Haydovchilarni saralashdagi ko'p sonli hisob (table) ommaviy serverlarga yuborilmaydi.
+  Marshrut chizig'i, narx va haydovchidan yo'lovchigacha bo'lgan YO'L bo'yicha masofa/vaqt (bir to'lqindagi
+  barcha haydovchilar uchun bitta `table` so'rovi): natijalar keshlanadi, so'rovlar sekundiga ko'pi bilan bitta
+  (ularning foydalanish qoidasi), ishlamay qolgan server bir daqiqaga chetlab o'tiladi.
 * Hech biri ishlamasa — to'g'ri chiziqli masofa * yo'l koeffitsienti (taxminiy).
 """
 
@@ -89,10 +89,11 @@ class RoutingService:
             return None
         return await self._fetch(self.osrm_url, path, params, self._timeout)
 
-    async def _get_public(self, path: str, params: dict[str, str]) -> dict | None:
+    async def _get_public(self, path: str, params: dict[str, str], kind: str = "route") -> dict | None:
         """Ommaviy serverlar: navbat bilan, sekundiga 1 tadan, ishlamaganini vaqtincha chetlab."""
         for base in self.public_urls:
-            if self._down_until.get(base, 0) > time.monotonic():
+            down_key = f"{base}|{kind}"  # masalan table ishlamasa ham route ishlashi mumkin
+            if self._down_until.get(down_key, 0) > time.monotonic():
                 continue
             try:
                 await asyncio.wait_for(self._public_lock.acquire(), _PUBLIC_MAX_WAIT)
@@ -108,7 +109,7 @@ class RoutingService:
                 self._public_lock.release()
             if data is not None:
                 return data
-            self._down_until[base] = time.monotonic() + _DOWN_FOR
+            self._down_until[down_key] = time.monotonic() + _DOWN_FOR
         return None
 
     # -- marshrut ---------------------------------------------------------
@@ -154,10 +155,14 @@ class RoutingService:
         return self.estimate(a, b), [[a.lat, a.lon], [b.lat, b.lon]]
 
     async def many_to_one(self, sources: list[Point], dest: Point) -> list[RouteEstimate]:
-        """Ko'p haydovchidan bitta nuqtagacha (yo'lovchi) yo'l masofasi — faqat o'z OSRM serveringiz bilan."""
+        """Ko'p haydovchidan bitta nuqtagacha (yo'lovchi) YO'L bo'yicha masofa va vaqt.
+
+        Yo'lning narigi tomonidagi yo'lovchi to'g'ri chiziqda 150 m, mashinada esa aylanib 2 km bo'lishi mumkin —
+        shuning uchun saralash va takliflarda haqiqiy yo'l ishlatiladi (bitta to'lqin — bitta so'rov).
+        """
         if not sources:
             return []
-        if not self.osrm_url:
+        if not self.osrm_url and not self.public_urls:
             return [self.estimate(s, dest) for s in sources]
         results: list[RouteEstimate] = []
         for start in range(0, len(sources), _TABLE_CHUNK):
@@ -165,14 +170,13 @@ class RoutingService:
             coords = ";".join(
                 [f"{dest.lon:.6f},{dest.lat:.6f}"] + [f"{p.lon:.6f},{p.lat:.6f}" for p in chunk]
             )
-            data = await self._get(
-                f"/table/v1/driving/{coords}",
-                {
-                    "sources": ";".join(str(i) for i in range(1, len(chunk) + 1)),
-                    "destinations": "0",
-                    "annotations": "distance,duration",
-                },
-            )
+            path = f"/table/v1/driving/{coords}"
+            params = {
+                "sources": ";".join(str(i) for i in range(1, len(chunk) + 1)),
+                "destinations": "0",
+                "annotations": "distance,duration",
+            }
+            data = await self._get(path, params) if self.osrm_url else await self._get_public(path, params, "table")
             for idx, src in enumerate(chunk):
                 try:
                     dist = data["distances"][idx][0] if data else None

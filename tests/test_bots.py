@@ -256,7 +256,7 @@ async def test_end_to_end_two_bots(harness, center):
     assert order.status == OrderStatus.ACCEPTED
     card = [m for m in h.session.calls(dbot.id, "EditMessageText") if m.chat_id == DRIVER.id][-1]
     first, second = card.reply_markup.inline_keyboard[0][0], card.reply_markup.inline_keyboard[1][0]
-    assert "manzili" in first.text and "dir_action=navigate" in first.url
+    assert "manzili" in first.text and "yandex" in first.url and "rtt=auto" in first.url  # Yandex navigatsiya
     assert "aloqa" in second.text and second.callback_data == f"d:call:{order.id}:0"
     assert "Haydovchi topildi" in h.last_text(pbot, PASSENGER.id)
     assert h.session.calls(pbot.id, "SendLocation")  # yo'lovchiga mashinaning jonli xaritasi
@@ -290,11 +290,19 @@ async def test_end_to_end_two_bots(harness, center):
     await h.press(dbot, DRIVER, f"d:arr:{order.id}:0")
     assert "yetib keldi" in h.last_text(pbot, PASSENGER.id)
     await h.press(dbot, DRIVER, f"d:start:{order.id}:0")
-    await h.press(dbot, DRIVER, f"d:fin:{order.id}:0")
-    assert "Manzilga yetib keldingizmi" in h.last_text(pbot, PASSENGER.id)
     before = (await h.svc.get_driver(driver.id)).balance
-
-    await h.press(pbot, PASSENGER, f"p:ok:{order.id}:0")
+    # Manzilga yetmasdan yakunlab bo'lmaydi
+    await h.press(dbot, DRIVER, f"d:fin:{order.id}:0")
+    refused = h.session.calls(dbot.id, "AnswerCallbackQuery")[-1]
+    assert refused.show_alert and "Manzilgacha" in refused.text
+    assert (await h.svc.get_order(order.id)).status == OrderStatus.IN_PROGRESS
+    # Manzilga yetib keldi → yakunlash (yo'lovchi tasdig'i kutilmaydi)
+    await h.edit(
+        dbot, DRIVER,
+        location=Location(latitude=dest[0], longitude=dest[1], live_period=0x7FFFFFFF, horizontal_accuracy=5),
+    )
+    await h.press(dbot, DRIVER, f"d:fin:{order.id}:0")
+    assert "Safar yakunlandi" in h.last_text(pbot, PASSENGER.id)
     order = await h.svc.get_order(order.id)
     after = (await h.svc.get_driver(driver.id)).balance
     assert order.status == OrderStatus.COMPLETED
@@ -328,6 +336,22 @@ async def offer_message_id(h: Harness, order_id: int) -> int:
             return mid
         await asyncio.sleep(0.01)
     raise AssertionError("taklif xabari topilmadi")
+
+
+async def test_chat_written_destination_goes_to_taximeter(harness, center):
+    h = await harness()
+    pbot = h.pbot
+    await h.send(pbot, PASSENGER, text="/start")
+    await h.send(pbot, PASSENGER, contact=Contact(phone_number=PASSENGER_PHONE, first_name="J", user_id=PASSENGER.id))
+    await h.send(pbot, PASSENGER, location=Location(latitude=center[0], longitude=center[1], horizontal_accuracy=10))
+    assert "manzil nomini yozing" in h.last_text(pbot, PASSENGER.id)
+    await h.send(pbot, PASSENGER, text="Chorsu bozori")  # ✍️ xaritasiz manzil
+    quote = h.last_text(pbot, PASSENGER.id)
+    assert "Chorsu bozori" in quote and "taksometr" in quote.lower()
+    await h.send(pbot, PASSENGER, text="Oq darvoza")  # endi — izoh
+    await h.press(pbot, PASSENGER, "p:confirm:0:0")
+    order = await h.svc.active_order((await h.svc.get_passenger_by_tg(PASSENGER.id)).id)
+    assert order.dest_title == "Chorsu bozori" and not order.has_destination and order.comment == "Oq darvoza"
 
 
 async def test_single_bot_asks_role_first(harness, center):
@@ -422,8 +446,11 @@ async def test_competitive_features_end_to_end(harness, center):
     assert d.home_mode and abs(d.home_lat - home[0]) < 1e-9
 
     await h.press(dbot, DRIVER, f"d:start:{order.id}:0")
+    await h.edit(
+        dbot, DRIVER,
+        location=Location(latitude=home[0], longitude=home[1], live_period=0x7FFFFFFF, horizontal_accuracy=5),
+    )
     await h.press(dbot, DRIVER, f"d:fin:{order.id}:0")
-    await h.press(pbot, PASSENGER, f"p:ok:{order.id}:0")
 
     # ⭐ baho → ❤️ sevimli → 💾 Ish manzili
     await h.press(pbot, PASSENGER, f"p:rate:{order.id}:5")
