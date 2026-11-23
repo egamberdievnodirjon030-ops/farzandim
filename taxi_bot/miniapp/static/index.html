@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Taksi</title>
+  <link rel="stylesheet" href="/static/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Xarita markazidagi nina (olish joyi / manzilni tanlash) -->
+  <div id="center-pin" class="center-pin" hidden>
+    <div class="pin-bubble" id="pin-bubble"></div>
+    <div class="pin-head"></div>
+    <div class="pin-leg"></div>
+    <div class="pin-shadow"></div>
+  </div>
+
+  <!-- Yuqori panel -->
+  <div class="top" id="top"></div>
+
+  <!-- Joylashuvni topish tugmasi -->
+  <button class="fab" id="locate" type="button" aria-label="Mening joylashuvim">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 3h-2.07A7 7 0 0 0 13 5.07V3h-2v2.07A7 7 0 0 0 5.07 11H3v2h2.07A7 7 0 0 0 11 18.93V21h2v-2.07A7 7 0 0 0 18.93 13H21v-2Zm-9 6a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg>
+  </button>
+
+  <!-- Pastki panel (bottom sheet) -->
+  <section class="sheet" id="sheet"><div class="grip"></div><div id="sheet-body"></div></section>
+
+  <!-- To'liq ekranli qidiruv -->
+  <section class="search" id="search" hidden>
+    <div class="search-head">
+      <input id="search-input" type="search" placeholder="Manzil yoki joy nomi" autocomplete="off">
+    </div>
+    <div id="search-results" class="search-results"></div>
+  </section>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="boot" class="boot"><div class="spinner"></div><div class="boot-text">Yuklanmoqda…</div></div>
+
+  <script src="/static/leaflet/leaflet.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

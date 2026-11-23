@@ -38,6 +38,16 @@ if not exist ".env" (
     if errorlevel 1 goto :end
 )
 
+rem --- Telegram ilovasi uchun HTTPS tunnel dasturi (bir marta yuklab olinadi, ~60 MB) ---
+if not exist "cloudflared.exe" (
+    where cloudflared >nul 2>nul
+    if errorlevel 1 (
+        echo Telegram ilovasi uchun cloudflared yuklab olinmoqda - rasmiy Cloudflare GitHub sahifasidan...
+        powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing -Uri https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe } catch { exit 1 }"
+        if errorlevel 1 echo [!] cloudflared yuklanmadi - bot chat rejimida ishlaydi, ilova ochilmaydi.
+    )
+)
+
 echo [3/3] Bot ishga tushmoqda... To'xtatish uchun Ctrl+C bosing.
 echo.
 "%VPY%" -m taxi_bot

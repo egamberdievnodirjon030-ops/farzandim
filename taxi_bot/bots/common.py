@@ -11,7 +11,6 @@ from aiogram.filters import Command, CommandStart, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, ErrorEvent, Message, TelegramObject
 
-from ..db.models import BotUser
 from ..services.taxi import TaxiService
 from ..ui.kit import PRIMARY, SUCCESS, RoleCb, btn, inline
 from ..ui.messenger import Role
@@ -44,25 +43,12 @@ class RoleMiddleware(BaseMiddleware):
     def __init__(self, svc: TaxiService, bot_roles: dict[int, Role] | None) -> None:
         self.svc = svc
         self.bot_roles = bot_roles
-        self._cache: dict[int, Role | None] = {}
 
     async def get_role(self, tg_id: int) -> Role | None:
-        if tg_id in self._cache:
-            return self._cache[tg_id]
-        async with self.svc.db.session() as s:
-            row = await s.get(BotUser, tg_id)
-        role = Role(row.role) if row and row.role else None
-        self._cache[tg_id] = role
-        return role
+        return await self.svc.get_user_role(tg_id)
 
     async def set_role(self, tg_id: int, role: Role) -> None:
-        async with self.svc.db.session() as s:
-            row = await s.get(BotUser, tg_id)
-            if row is None:
-                s.add(BotUser(tg_id=tg_id, role=role.value))
-            else:
-                row.role = role.value
-        self._cache[tg_id] = role
+        await self.svc.set_user_role(tg_id, role)
 
     async def __call__(
         self,

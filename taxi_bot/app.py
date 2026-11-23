@@ -118,6 +118,7 @@ async def main() -> None:
     await setup_commands(settings, passenger_bot, driver_bot)
     await svc.resume()
     panel = await start_admin_panel(settings, svc)
+    miniapp, tunnel = await start_miniapp(settings, svc, passenger_bot, driver_bot)
     maintenance = asyncio.create_task(svc.run_maintenance(), name="maintenance")
     log.info(
         "Taksi bot ishga tushdi: %s",
@@ -129,8 +130,64 @@ async def main() -> None:
         maintenance.cancel()
         if panel:
             await panel.stop()
+        if tunnel:
+            await tunnel.stop()
+        if miniapp:
+            await miniapp.stop()
         await svc.close()
         await db.close()
+
+
+async def start_miniapp(settings: Settings, svc: TaxiService, passenger_bot: Bot, driver_bot: Bot):
+    """Telegram Mini App: server + (kerak bo'lsa) Cloudflare tunnel + bot menyusidagi "🚕 Taksi" tugmasi."""
+    if not settings.webapp_enabled:
+        return None, None
+    from aiogram.types import MenuButtonWebApp, WebAppInfo
+
+    from .miniapp.server import MiniAppServer
+    from .services.tunnel import QuickTunnel, find_cloudflared
+
+    p_token = settings.passenger_bot_token.get_secret_value()
+    if settings.single_bot:
+        tokens = [(p_token, None)]
+    else:
+        tokens = [(p_token, Role.PASSENGER), (settings.driver_bot_token.get_secret_value(), Role.DRIVER)]  # type: ignore[union-attr]
+    server = MiniAppServer(svc, tokens, settings.webapp_port, settings.webapp_host)
+    try:
+        await server.start()
+    except OSError as exc:
+        log.warning("Mini App serveri ishga tushmadi (%s-port band?): %s", settings.webapp_port, exc)
+        return None, None
+    url, tunnel = settings.webapp_url, None
+    if not url and settings.webapp_tunnel == "auto":
+        if find_cloudflared():
+            print("⏳ Ilova uchun HTTPS tunnel ochilmoqda (cloudflared)...")
+            tunnel = QuickTunnel(settings.webapp_port)
+            url = await tunnel.start()
+        else:
+            print(
+                "ℹ️ Telegram ilovasi (Mini App) uchun HTTPS manzil kerak. cloudflared o'rnating — README:"
+                " «Telegram ilovasi» bo'limi. Hozircha bot oddiy chat rejimida ishlaydi."
+            )
+    if not url:
+        return server, tunnel
+    svc.webapp_url = url.rstrip("/")
+    try:
+        if settings.single_bot:
+            await passenger_bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(text="🚕 Taksi", web_app=WebAppInfo(url=f"{svc.webapp_url}/"))
+            )
+        else:
+            await passenger_bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(text="🚕 Taksi", web_app=WebAppInfo(url=f"{svc.webapp_url}/?app=passenger"))
+            )
+            await driver_bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(text="🚖 Ish", web_app=WebAppInfo(url=f"{svc.webapp_url}/?app=driver"))
+            )
+    except TelegramAPIError as exc:
+        log.warning("Menyu tugmasi o'rnatilmadi: %s", exc)
+    print(f"📱 Telegram ilovasi: {svc.webapp_url}  (botdagi «🚕 Taksi» menyu tugmasi orqali ochiladi)")
+    return server, tunnel
 
 
 async def start_admin_panel(settings: Settings, svc: TaxiService):

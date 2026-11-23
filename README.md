@@ -11,6 +11,43 @@ xabar effektlari, bosilmaydigan va nusxa oluvchi tugmalar.
 
 ---
 
+## 📱 Telegram ilovasi (Mini App) — yo'lovchi va haydovchi uchun
+
+![Telegram ilovasi](skrinshotlar/ilova_umumiy.png)
+
+Botdagi **«🚕 Taksi»** menyu tugmasi (yoki «Ilovani ochish») Telegram ichida to'liq ekranli xarita ilovasini ochadi.
+Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va h.k.).
+
+**Yo'lovchi:**
+* ilova ochilishi bilan **telefon joylashuvi avtomatik so'raladi** (Telegram LocationManager), olish joyi — xarita
+  markazidagi nina, manzil nomi avtomatik aniqlanadi (ninani surib aniqlashtirish mumkin);
+* **1 bosishda chaqirish** — pastdagi tugma bilan taksometr bo'yicha; yoki 🏠 Uy / 🏢 Ish / oxirgi manzil / qidiruv /
+  «xaritada belgilash» → **marshrut chizig'i va qat'iy narx darhol** → «Buyurtma berish»;
+* qidiruvda **radar** va atrofdagi bo'sh mashinalar; haydovchi topilgach mashina xaritada **silliq harakatlanadi**,
+  marshrut va ETA yangilanib turadi; davlat raqami, rangi, reytingi; bepul kutish taymeri;
+* izoh, boshqa odam uchun buyurtma, baholash, sevimli haydovchi, manzilni saqlash.
+
+**Haydovchi:**
+* ilovada ro'yxatdan o'tish (raqam Telegram orqali tasdiqlanadi), 🎁 tasdiqlangach **30 000 so'm bonus**;
+* katta **«Liniyaga chiqish»** tugmasi — joylashuv avtomatik yoqiladi va ilova ochiq paytida har 4 soniyada yuboriladi;
+* **taklif kartasi**: masofa, yetib borish vaqti, yo'nalish, safar uzunligi va yo'nalishi, narx, izoh,
+  taxminiy hudud (aniq manzil qabul qilingach ochiladi);
+* safar bosqichlari, **🧭 Navigator** (Google/Yandex/Waze), **📞 Aloqa**, **jonli taksometr**, balans va bugungi tushum.
+
+**Ishga tushirish:** Telegram ilovani faqat **HTTPS** manzildan ochadi.
+* **Kompyuterda (Windows):** `start.bat` rasmiy `cloudflared.exe` ni o'zi yuklab oladi va bepul
+  `https://….trycloudflare.com` tunnelini ochadi; bot menyusidagi tugma avtomatik yangilanadi
+  (manzil har ishga tushganda o'zgaradi — bu normal). Mac/Linux: `brew install cloudflared` yoki
+  [cloudflared'ni o'rnating](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
+* **Serverda (doimiy domen):** `.env` da `WEBAPP_URL=https://taxi.sizning-domen.uz`, `WEBAPP_HOST=0.0.0.0` va
+  domenni reverse-proxy (masalan Caddy) orqali `8081`-portga yo'naltiring.
+
+**Cheklovlar (halol):**
+* Telegram ilovasi haydovchi joylashuvini **faqat ilova ochiq paytida** yuboradi. Ilova yopiq bo'lsa ham buyurtma
+  olish uchun haydovchi chatda «Jonli joylashuv»ni ulashadi (bot buni allaqachon qo'llab-quvvatlaydi).
+* Xarita tayllari va manzil qidiruvi — OpenStreetMap (bepul, adolatli foydalanish cheklovi bilan). Yuklama oshsa
+  `TILE_URL` ga tijoriy provayder (masalan MapTiler) va o'z Nominatim/Photon serveringizni ulang.
+
 ## ✨ Asosiy imkoniyatlar
 
 | | |
@@ -276,7 +313,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-46 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+61 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**
@@ -286,7 +323,9 @@ end-to-end sinovi**
 
 ```
 taxi_bot/
-├── app.py                 # yig'ish va ishga tushirish (ikki bot / bitta bot)
+├── app.py                 # yig'ish va ishga tushirish (botlar, admin panel, Mini App, tunnel)
+├── miniapp/               # Telegram ilovasi: server (initData tekshiruvi, API) + static (xarita UI)
+├── web/                   # admin web-panel (localhost:8080)
 ├── config.py              # .env sozlamalari
 ├── db/models.py           # Passenger, Driver, Order, OrderOffer, Transaction
 ├── services/

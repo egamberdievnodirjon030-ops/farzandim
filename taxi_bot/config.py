@@ -120,6 +120,19 @@ class Settings(BaseSettings):
     # Tugmalarda custom emoji (bot egasida Telegram Premium bo'lishi kerak). Masalan: {"taxi": "5368..."}
     button_emoji_ids: dict[str, str] = Field(default_factory=dict)
 
+    # --- Telegram Mini App (yo'lovchi va haydovchi ilovasi) ----------------
+    webapp_enabled: bool = True
+    webapp_port: int = 8081
+    webapp_host: str = "127.0.0.1"  # serverda reverse-proxy ortida: 0.0.0.0
+    # Doimiy HTTPS manzil (domen bo'lsa). Bo'sh bo'lsa va cloudflared o'rnatilgan bo'lsa — tunnel o'zi ochiladi
+    webapp_url: str | None = None
+    webapp_tunnel: Literal["auto", "none"] = "auto"
+    webapp_auth_max_age_h: int = 48
+    tile_url: str = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    tile_attribution: str = "© OpenStreetMap"
+    geocoder_url: str | None = "https://nominatim.openstreetmap.org"
+    geocoder_country: str = "uz"
+
     # --- Admin web-panel (brauzerda: http://localhost:8080) -----------------
     admin_panel_enabled: bool = True
     admin_panel_host: str = "127.0.0.1"  # faqat shu kompyuterdan; tarmoqqa ochish: 0.0.0.0

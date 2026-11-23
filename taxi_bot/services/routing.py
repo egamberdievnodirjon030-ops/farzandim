@@ -71,6 +71,18 @@ class RoutingService:
             return RouteEstimate(float(r["distance"]), float(r["duration"]), precise=True)
         return self.estimate(a, b)
 
+    async def route_geometry(self, a: Point, b: Point) -> tuple[RouteEstimate, list[list[float]]]:
+        """Marshrut chizig'i [[lat, lon], ...] (xaritada chizish uchun)."""
+        data = await self._get(
+            f"/route/v1/driving/{a.lon:.6f},{a.lat:.6f};{b.lon:.6f},{b.lat:.6f}",
+            {"overview": "full", "geometries": "geojson", "alternatives": "false", "steps": "false"},
+        )
+        if data and data.get("routes"):
+            r = data["routes"][0]
+            coords = [[lat, lon] for lon, lat in r["geometry"]["coordinates"]]
+            return RouteEstimate(float(r["distance"]), float(r["duration"]), precise=True), coords
+        return self.estimate(a, b), [[a.lat, a.lon], [b.lat, b.lon]]
+
     async def many_to_one(self, sources: list[Point], dest: Point) -> list[RouteEstimate]:
         """Ko'p haydovchidan bitta nuqtagacha (yo'lovchi) yo'l masofasi."""
         if not sources:

@@ -39,7 +39,9 @@ from .admin import AdminMixin
 from .dispatch import DispatchEngine
 from .features import FeaturesMixin
 from .geo import Point, bearing_deg, bounding_box, haversine_m
+from .geocoding import Geocoder
 from .matching import Candidate, bayesian_rating, home_gain
+from .miniapp import MiniAppMixin
 from .pricing import Tariff
 from .privacy import mask_contacts
 from .routing import RoutingService
@@ -78,7 +80,7 @@ def _upd(model):
     return update(model).execution_options(synchronize_session=False)
 
 
-class TaxiService(FeaturesMixin, AdminMixin):
+class TaxiService(FeaturesMixin, AdminMixin, MiniAppMixin):
     def __init__(
         self,
         settings: Settings,
@@ -96,6 +98,8 @@ class TaxiService(FeaturesMixin, AdminMixin):
             settings.osrm_url, settings.road_factor, settings.city_speed_kmh
         )
         self.telephony = telephony or TelephonyService(settings)
+        self.geocoder = Geocoder(settings.geocoder_url, settings.geocoder_country)
+        self.webapp_url: str | None = None
         self.dispatch = DispatchEngine(self)
         self.tz = ZoneInfo("Asia/Tashkent")
         self._locks: dict[int, asyncio.Lock] = {}
@@ -1785,6 +1789,7 @@ class TaxiService(FeaturesMixin, AdminMixin):
     async def close(self) -> None:
         await self.dispatch.stop_all()
         await self.routing.close()
+        await self.geocoder.close()
 
 
 __all__ = ["ActionResult", "LocationResult", "TaxiService"]

@@ -8,3 +8,5 @@ data/
 *.db-shm
 .pytest_cache/
 .ruff_cache/
+cloudflared
+cloudflared.exe

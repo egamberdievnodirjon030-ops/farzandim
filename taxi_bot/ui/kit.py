@@ -31,6 +31,7 @@ from aiogram.types import (
     RichBlockCaption,
     RichBlockTableCell,
     RichTextBold,
+    WebAppInfo,
 )
 
 SUCCESS = ButtonStyle.SUCCESS.value
@@ -93,6 +94,7 @@ def btn(
     copy: str | None = None,
     disabled: bool = False,
     emoji: str | None = None,
+    web_app: str | None = None,
 ) -> InlineKeyboardButton:
     kwargs: dict = {"text": text}
     if style:
@@ -101,6 +103,8 @@ def btn(
         kwargs["icon_custom_emoji_id"] = _EMOJI_IDS[emoji]
     if disabled:
         kwargs["disabled"] = DisabledButton()
+    elif web_app:
+        kwargs["web_app"] = WebAppInfo(url=web_app)
     elif url:
         kwargs["url"] = url
     elif copy is not None:

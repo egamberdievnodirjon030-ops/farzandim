@@ -249,4 +249,5 @@ class BotUser(Base):
 
     tg_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     role: Mapped[str | None] = mapped_column(String(16))
+    phone: Mapped[str | None] = mapped_column(String(32))  # ilovadan ro'yxatdan o'tish uchun tasdiqlangan raqam
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

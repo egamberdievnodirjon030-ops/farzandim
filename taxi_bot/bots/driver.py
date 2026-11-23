@@ -89,6 +89,13 @@ async def driver_start(message: Message, user: User, svc: TaxiService, state: FS
         phone = f" Operator: {h(svc.settings.company_phone)}" if svc.settings.company_phone else ""
         await message.answer("⛔️ Hisobingiz bloklangan." + phone)
         return
+    if svc.webapp_url:
+        from ..ui.kit import btn, inline
+
+        await message.answer(
+            "🗺 Buyurtmalar, xarita va taksometr — ilovada:",
+            reply_markup=inline(btn("🚖 Ilovani ochish", web_app=f"{svc.webapp_url}/?app=driver", style="success")),
+        )
     status = "🟢 liniyadasiz" if d.is_online else "🔴 liniyada emassiz"
     await message.answer(
         f"Assalomu alaykum, <b>{h(d.full_name)}</b>! 🚕\n\n"
@@ -144,6 +151,15 @@ def build_driver_router() -> Router:
             "👤 Ism va familiyangizni yozing (faqat kompaniya ko'radi):",
             reply_markup=_choices([default]) if default else None,
         )
+
+    @router.message(F.contact, StateFilter(None))
+    async def contact_for_app(message: Message, svc: TaxiService) -> None:
+        """Ilovadagi «Raqamni ulashish» — Telegram kontaktni chatga ham yuboradi."""
+        if message.contact.user_id != message.from_user.id:  # type: ignore[union-attr]
+            await message.answer("Iltimos, o'zingizning raqamingizni yuboring.")
+            return
+        await svc.save_verified_phone(message.from_user.id, message.contact.phone_number)  # type: ignore[union-attr]
+        await message.answer("✅ Raqamingiz saqlandi.")
 
     @router.message(Reg.phone)
     async def reg_phone_wrong(message: Message) -> None:

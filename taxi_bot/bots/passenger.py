@@ -69,6 +69,13 @@ async def passenger_start(message: Message, user: User, svc: TaxiService) -> Non
         )
         return
     await message.answer(v.passenger_welcome(user.first_name or ""), reply_markup=v.passenger_menu())
+    if svc.webapp_url:
+        from ..ui.kit import btn, inline
+
+        await message.answer(
+            "🗺 <b>Yangi:</b> taksini xaritadan chaqiring — manzil qidiruvi, narx va mashina harakati bir joyda.",
+            reply_markup=inline(btn("🚕 Ilovani ochish", web_app=f"{svc.webapp_url}/?app=passenger", style="success")),
+        )
     active = await svc.active_order(p.id)
     if active:
         await message.answer(
@@ -97,6 +104,7 @@ def build_passenger_router() -> Router:
             return
         await svc.ensure_passenger(message.from_user.id, message.from_user.first_name or "")  # type: ignore[union-attr]
         await svc.set_passenger_phone(message.from_user.id, c.phone_number)  # type: ignore[union-attr]
+        await svc.save_verified_phone(message.from_user.id, c.phone_number)  # type: ignore[union-attr]
         await message.answer(
             "✅ Rahmat! Endi <b>🚕 Taksi chaqirish</b> tugmasini bosing.",
             reply_markup=svc.views.passenger_menu(),
