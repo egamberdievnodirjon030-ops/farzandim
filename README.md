@@ -123,23 +123,58 @@ yuboriladi — foydalanuvchi hech narsani sezmaydi (`RICH_MESSAGES=false` bilan 
 
 ---
 
-## 🚀 O'rnatish
+## 💻 Kompyuterda ishga tushirish (eng oson yo'l)
+
+### Windows
+1. **Python o'rnating** (3.11 yoki yangiroq): [python.org/downloads](https://www.python.org/downloads/).
+   O'rnatish oynasida **"Add python.exe to PATH"** belgisini albatta qo'ying.
+2. **Loyihani yuklab oling:** GitHub'da shu branchni oching → **Code → Download ZIP** → arxivni
+   masalan `C:\taxi` papkasiga oching (yoki `git clone`).
+3. Papkadagi **`start.bat`** faylini ikki marta bosing. Birinchi marta:
+   * kerakli kutubxonalar o'zi o'rnatiladi (internet kerak, 1–2 daqiqa);
+   * **sozlash yordamchisi** bot tokenini so'raydi va Telegram orqali tekshiradi;
+   * admin ID'ingizni **o'zi aniqlaydi** — botingizga istalgan xabar yuborasiz, xolos;
+   * hammasi `.env` fayliga yoziladi va bot ishga tushadi.
+4. Keyingi safar shunchaki `start.bat` ni bosing. To'xtatish — `Ctrl+C` yoki oynani yopish.
+
+### Mac / Linux
+```bash
+bash start.sh
+```
+
+### Qo'lda (har qanday tizim)
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # Windows   |   source .venv/bin/activate  — Mac/Linux
+pip install -r requirements.txt
+python -m taxi_bot setup          # sozlash yordamchisi (.env yaratadi)
+python -m taxi_bot                # ishga tushirish
+```
+
+### Bilish kerak
+* Bot **kompyuter yoniq va dastur ochiq turgan paytda** ishlaydi. Windows'da uyqu rejimini o'chiring:
+  *Sozlamalar → Tizim → Quvvat → Uyqu: Hech qachon*. Doimiy ishlashi uchun keyinchalik serverga (VPS) o'tkazing — pastda Docker bo'limi.
+* Bitta token bilan **faqat bitta nusxa** ishlashi mumkin. Loglarda `TelegramConflictError` chiqsa — bot boshqa joyda ham ishlab turibdi.
+* Ma'lumotlar `data\taxi.db` faylida, loglar `data\bot.log` da. Zaxira uchun `data` papkasini nusxalang.
+* Sozlamalarni o'zgartirish: `.env` faylini Bloknot bilan oching (tarif, komissiya, radiuslar), so'ng botni qayta ishga tushiring.
+  Tokenni almashtirish: `python -m taxi_bot setup` (yoki `.env` ni o'chirib `start.bat` ni bosing).
+
+---
+
+## 🖥 Serverda (Docker bilan) ishga tushirish
 
 ### 1. Botlar
 1. [@BotFather](https://t.me/BotFather) → `/newbot` — **yo'lovchilar boti** (masalan `ShaharTaksiBot`).
-2. Yana `/newbot` — **haydovchilar boti** (masalan `ShaharTaksiDriverBot`).
-   *Bitta bot xohlasangiz — `DRIVER_BOT_TOKEN` ni bo'sh qoldiring.*
-3. O'z Telegram ID'ingizni bilib oling (masalan [@userinfobot](https://t.me/userinfobot)) — `ADMIN_IDS` ga yozing.
+2. Xohlasangiz yana `/newbot` — **haydovchilar boti**. Bitta bot bo'lsa — `DRIVER_BOT_TOKEN` bo'sh qoladi
+   va bot kirishda "Yo'lovchi / Haydovchi" deb so'raydi.
 
 ### 2. Sozlash
 ```bash
 cp .env.example .env
-nano .env    # tokenlar, ADMIN_IDS, tarif, COMPANY_PHONE ...
+nano .env    # PASSENGER_BOT_TOKEN, ADMIN_IDS, tarif, COMPANY_PHONE ...
 ```
 
 ### 3. Ishga tushirish
-
-**Docker (tavsiya):**
 ```bash
 docker compose up -d --build     # yig'ish va fonda ishga tushirish
 docker compose logs -f bot       # loglar ("Run polling for bot @..." — bot ishlayapti)
@@ -155,21 +190,17 @@ docker compose logs -f bot       # loglar ("Run polling for bot @..." — bot is
 Baza `taxi-data` nomli Docker volume'da saqlanadi — konteyner qayta yaratilsa ham o'chmaydi
 (`docker compose down -v` esa uni **o'chiradi**). Server qayta yoqilsa, bot o'zi ishga tushadi.
 
-**Oddiy usul (Python 3.11+):**
-```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-python -m taxi_bot
-```
-
-### 4. Birinchi qadamlar
-1. Haydovchi botida `/start` → ro'yxatdan o'tish (raqam, ism, mashina, rang, davlat raqami).
-2. Admin (siz) arizani **✅ Tasdiqlash** tugmasi bilan tasdiqlaysiz.
-   *Muhim:* arizalar admin'ga **haydovchi boti** orqali keladi — avval haydovchi botida `/start` bosing
-   (yoki `ADMIN_CHAT_ID` guruhiga haydovchi botini qo'shing), aks holda bot sizga yoza olmaydi.
-3. Haydovchi balansini to'ldiring: `/topup ID 50000`.
+## 🏁 Birinchi qadamlar
+1. **Haydovchi:** botda `/start` → **🚕 Haydovchi** (ikki bot rejimida — haydovchilar botida `/start`) →
+   ro'yxatdan o'tish: raqam, ism, mashina, rang, davlat raqami.
+2. **Admin (siz)** arizani **✅ Tasdiqlash** tugmasi bilan tasdiqlaysiz. Ariza kelishi uchun o'zingiz avval
+   botda `/start` bosgan bo'lishingiz kerak (sozlash yordamchisi bu qadamni o'zi qildiradi).
+3. Haydovchi balansini to'ldiring: `/topup ID 50000` (ID — arizadagi raqam).
 4. Haydovchi **🟢 Liniyaga chiqish** → jonli joylashuvni ulashadi («Men o'chirmagunimcha»).
-5. Yo'lovchi botida **🚕 Taksi chaqirish** — tayyor!
+5. **Yo'lovchi:** `/start` → **🙋 Yo'lovchi** → **🚕 Taksi chaqirish** — tayyor!
+
+Bitta odam ham haydovchi, ham yo'lovchi bo'lib sinab ko'rishi mumkin: rolni almashtirish — `/role`.
+(O'zingizning buyurtmangiz o'zingizga haydovchi sifatida kelmaydi — sinash uchun ikkinchi telefon kerak.)
 
 ---
 

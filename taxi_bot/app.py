@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -83,10 +86,7 @@ async def setup_commands(settings: Settings, passenger: Bot, driver: Bot) -> Non
 
 async def main() -> None:
     settings = get_settings()
-    logging.basicConfig(
-        level=settings.log_level.upper(),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    setup_logging(settings.log_level)
     db = Database(settings.database_url)
     await db.create_all()
 
@@ -110,6 +110,11 @@ async def main() -> None:
     dp = build_dispatcher(svc, build_storage(settings), bot_roles)
     bots = [passenger_bot] if settings.single_bot else [passenger_bot, driver_bot]
 
+    for bot in bots:  # avval webhook o'rnatilgan bo'lsa, polling ishlamaydi — o'chiramiz
+        try:
+            await bot.delete_webhook(drop_pending_updates=False)
+        except TelegramAPIError as exc:
+            log.warning("Webhook o'chirilmadi: %s", exc)
     await setup_commands(settings, passenger_bot, driver_bot)
     await svc.resume()
     maintenance = asyncio.create_task(svc.run_maintenance(), name="maintenance")
@@ -125,5 +130,38 @@ async def main() -> None:
         await db.close()
 
 
+def setup_logging(level: str) -> None:
+    """Konsol + `data/bot.log` (1 MB x 3 fayl) — muammo bo'lsa log faylini ko'rish mumkin."""
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stderr)]
+    try:
+        Path("data").mkdir(exist_ok=True)
+        handlers.append(RotatingFileHandler("data/bot.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"))
+    except OSError:
+        pass
+    for handler in handlers:
+        handler.setFormatter(fmt)
+    logging.basicConfig(level=level.upper(), handlers=handlers, force=True)
+
+
 def run() -> None:
-    asyncio.run(main())
+    from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
+    from pydantic import ValidationError
+
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n🛑 Bot to'xtatildi.")
+    except TelegramUnauthorizedError:
+        print("\n❌ Telegram tokenni qabul qilmadi. Tokenni tekshiring: python -m taxi_bot setup")
+        sys.exit(1)
+    except TelegramNetworkError as exc:
+        print(f"\n❌ Telegram'ga ulanib bo'lmadi: {exc}")
+        print("   Internet ulanishini tekshiring va botni qayta ishga tushiring.")
+        sys.exit(1)
+    except ValidationError as exc:
+        print("\n❌ .env faylida xato bor:")
+        for err in exc.errors():
+            print(f"   {'.'.join(str(x) for x in err['loc']).upper()}: {err['msg']}")
+        print("   Qayta sozlash: python -m taxi_bot setup")
+        sys.exit(1)

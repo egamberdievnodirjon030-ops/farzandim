@@ -1,0 +1,3 @@
+# Windows .bat fayllari CRLF bilan saqlanadi (aks holda cmd goto/label xato ishlashi mumkin)
+*.bat -text
+*.sh text eol=lf
