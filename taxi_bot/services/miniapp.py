@@ -37,6 +37,8 @@ ACTIVE = [
 ]
 
 
+THEMES = ("auto", "light", "dark")
+
 # Yo'lovchi joylashuvi haydovchiga faqat shu bosqichlarda ko'rsatiladi (safar boshlangach — kerak emas)
 PAX_LIVE_STATUSES = [OrderStatus.SEARCHING, OrderStatus.ACCEPTED, OrderStatus.ARRIVED]
 PAX_LIVE_FRESH = timedelta(minutes=3)
@@ -96,6 +98,22 @@ class MiniAppMixin:
         async with self.db.session() as s:
             row = await s.get(BotUser, tg_id)
         return True if row is None else bool(row.live_share)
+
+    async def app_theme(self: TaxiService, tg_id: int) -> str:
+        async with self.db.session() as s:
+            row = await s.get(BotUser, tg_id)
+        return (row.theme if row is not None else None) or "auto"
+
+    async def set_app_theme(self: TaxiService, tg_id: int, theme: str) -> None:
+        """Ilovadagi ☀️/🌙 tanlovi — tunnel manzili o'zgarsa ham saqlanib qoladi."""
+        if theme not in THEMES:
+            raise ValueError("Noto'g'ri rejim")
+        async with self.db.session() as s:
+            row = await s.get(BotUser, tg_id)
+            if row is None:
+                s.add(BotUser(tg_id=tg_id, theme=theme))
+            else:
+                row.theme = theme
 
     async def set_live_share(self: TaxiService, tg_id: int, on: bool) -> None:
         """Ilovadagi «📡 Jonli joylashuv» tugmasi: foydalanuvchi o'zi o'chirmaguncha yoqilgan turadi."""

@@ -608,8 +608,73 @@ async function reverse(lat, lon) {
 let reverseTimer = null;
 
 function passengerTop() {
-  $("#top").innerHTML = liveChip();
+  $("#top").innerHTML = liveChip() + themeChip();
   on("live-toggle", toggleLive);
+  on("theme-chip", chooseTheme);
+}
+
+// ---------------------------------------------------------------- ko'rinish: avtomatik / ☀️ kun / 🌙 tun
+const THEME_NAMES = { auto: "Avtomatik (Telegram)", light: "☀️ Kun", dark: "🌙 Tun" };
+const isDark = () => document.body.classList.contains("dark");
+
+function themeChip() {
+  return `<button class="chip-btn theme-chip" id="theme-chip" aria-label="Kun / tun rejimi">${isDark() ? "🌙" : "☀️"}</button>`;
+}
+
+/** Rejimni qo'llaydi: ranglar, xarita (tunda qorong'i), Telegram sarlavha va fon ranglari. */
+function applyTheme(mode) {
+  S.theme = THEME_NAMES[mode] ? mode : "auto";
+  const dark = S.theme === "dark" || (S.theme === "auto" && tg && tg.colorScheme === "dark");
+  document.body.classList.toggle("theme-light", S.theme === "light");
+  document.body.classList.toggle("theme-dark", S.theme === "dark");
+  document.body.classList.toggle("dark", dark);
+  try {
+    if (S.theme === "auto") {
+      tg.setHeaderColor("bg_color");
+      tg.setBackgroundColor("bg_color");
+      if (tg.setBottomBarColor) tg.setBottomBarColor("bottom_bar_bg_color");
+    } else {
+      const bg = dark ? "#17212b" : "#ffffff";
+      tg.setHeaderColor(bg);
+      tg.setBackgroundColor(bg);
+      if (tg.setBottomBarColor) tg.setBottomBarColor(bg);
+    }
+  } catch { /* eski klient */ }
+  const chip = $("#theme-chip");
+  if (chip) chip.textContent = dark ? "🌙" : "☀️";
+}
+
+function setTheme(mode) {
+  applyTheme(mode);
+  haptic("light");
+  toast(`Ko'rinish: ${THEME_NAMES[S.theme]}`);
+  api("/api/theme", { theme: S.theme }).catch(() => { /* keyingi safar */ });
+  if (S.app === "driver" && S.mode === "settings") renderDriverSettings();
+}
+
+function chooseTheme() {
+  if (tg && tg.showPopup) {
+    try {
+      tg.showPopup({
+        title: "Ko'rinish",
+        message: `Hozir: ${THEME_NAMES[S.theme || "auto"]}`,
+        buttons: [
+          { id: "light", type: "default", text: THEME_NAMES.light },
+          { id: "dark", type: "default", text: THEME_NAMES.dark },
+          { id: "auto", type: "default", text: "Avtomatik" },
+        ],
+      }, (id) => { if (id) setTheme(id); });
+      return;
+    } catch { /* eski klient — navbat bilan almashtiramiz */ }
+  }
+  const order = ["auto", "light", "dark"];
+  setTheme(order[(order.indexOf(S.theme || "auto") + 1) % order.length]);
+}
+
+/** Telegram pastki ikkinchi tugmasi uchun mavzuga mos «yumshoq» ranglar. */
+function soft(textColor) {
+  const dark = isDark();
+  return { color: dark ? "#2b3542" : "#f2f3f5", textColor: textColor === "#111111" && dark ? "#f5f5f5" : textColor };
 }
 
 async function passengerStart() {
@@ -961,13 +1026,13 @@ function renderPassengerOrder(state) {
       <div><b>${o.price ? num(o.price) : "—"}</b><span>${o.price ? `${esc(S.config.currency)} · qat'iy` : "taksometr"}</span></div></div>
       ${route}`);
     Main.hide();
-    Second.set("Bekor qilish", () => cancelOrder(o), { color: "#f2f3f5", textColor: "#e5453b" });
+    Second.set("Bekor qilish", () => cancelOrder(o), soft("#e5453b"));
     return;
   }
   if (o.status === "no_drivers") {
     sheet(`<h2>Hozircha bo'sh mashina yo'q</h2><div class="muted">Bir ozdan so'ng qayta urinib ko'ring — haydovchilar doimiy bo'shab turadi.</div>`);
     Main.set("🔄 Qayta qidirish", () => act("retry", o.id));
-    Second.set("Yopish", () => cancelOrder(o, true), { color: "#f2f3f5", textColor: "#111111" });
+    Second.set("Yopish", () => cancelOrder(o, true), soft("#111111"));
     return;
   }
   const carHtml = d ? `<div class="car"><div class="flex1"><div class="t1"><b>${esc(d.car)}</b></div>
@@ -997,7 +1062,7 @@ function renderPassengerOrder(state) {
       Second.set("🛑 Shu yerda tushaman", async () => {
         if (!(await confirmBox("Shu yerda tushasizmi? Haydovchi safarni shu yerda yakunlaydi, narx bosib o'tilgan yo'l bo'yicha."))) return;
         await act("stop", o.id);
-      }, { color: "#f2f3f5", textColor: "#e5453b" });
+      }, soft("#e5453b"));
     } else Second.hide();
     on("call", () => call(o));
     return;
@@ -1247,7 +1312,7 @@ function renderOffer(offers, d) {
   Second.set("O'tkazib yuborish", async () => {
     try { await api(`/api/d/offers/${o.order_id}/decline`, {}); } catch { /* eskirgan */ }
     await driverRefresh();
-  }, { color: "#f2f3f5", textColor: "#111111" });
+  }, soft("#111111"));
 }
 
 const NAV_NAMES = { yandex: "Yandex Navigator", google: "Google Maps", waze: "Waze" };
@@ -1339,7 +1404,7 @@ function renderDriverOrder(o, d) {
     else {
       const road = routeLeftFor(dest); // yo'l bo'yicha (to'g'ri chiziq emas)
       const left = road ? road.dist : gap;
-      Main.set(`🏁 Manzilgacha ${left === Infinity ? "—" : km(left)}`, () => finishTrip(o), { active: false, color: "#c9ccd1", textColor: "#ffffff" });
+      Main.set(`🏁 Manzilgacha ${left === Infinity ? "—" : km(left)}`, () => finishTrip(o), { active: false, color: isDark() ? "#3a4452" : "#c9ccd1", textColor: "#ffffff" });
     }
     Second.hide();
   } else {
@@ -1393,8 +1458,12 @@ function renderDriverSettings() {
   const d = S.dstate.driver;
   S.mode = "settings";
   const navs = { google: "Google Maps", yandex: "Yandex Maps", waze: "Waze" };
-  sheet(`<h2>Sozlamalar</h2><div class="muted small">Navigator — «🧭 Navigator» bosilganda yo'l shu ilovada ochiladi</div>
-    <div class="chips">${Object.entries(navs).map(([k, v]) => `<button class="chip ${k === d.navigator ? "home" : ""}" data-nav="${k}">${k === d.navigator ? "✅ " : ""}${v}</button>`).join("")}</div>
+  const cur = S.theme || "auto";
+  sheet(`<h2>Sozlamalar</h2>
+    <div class="muted small">Ko'rinish</div>
+    <div class="chips" id="theme-chips">${Object.entries(THEME_NAMES).map(([k, v]) => `<button class="chip ${k === cur ? "home" : ""}" data-theme="${k}">${k === cur ? "✅ " : ""}${k === "auto" ? "Avtomatik" : v}</button>`).join("")}</div>
+    <div class="muted small mt">Navigator — «🧭 Navigator» bosilganda yo'l shu ilovada ochiladi</div>
+    <div class="chips" id="nav-chips">${Object.entries(navs).map(([k, v]) => `<button class="chip ${k === d.navigator ? "home" : ""}" data-nav="${k}">${k === d.navigator ? "✅ " : ""}${v}</button>`).join("")}</div>
     <div class="field"><span class="icon">🏡</span><span class="txt"><div class="t1">«Uyga» rejimi: ${d.home_mode ? "yoqilgan" : "o'chiq"}</div>
       <div class="t2">Faqat uy tomonga ketayotgan buyurtmalar</div></span></div>
     <div class="btns"><button class="btn" id="set-home">📍 Uy = hozirgi joy</button>
@@ -1405,7 +1474,11 @@ function renderDriverSettings() {
   Main.hide();
   Second.hide();
   Back.show(() => { Back.hide(); S.mode = "idle"; driverRefresh(); });
-  $(".chips").addEventListener("click", async (e) => {
+  $("#theme-chips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-theme]");
+    if (b) setTheme(b.dataset.theme);
+  });
+  $("#nav-chips").addEventListener("click", async (e) => {
     const b = e.target.closest("[data-nav]");
     if (!b) return;
     await api("/api/d/settings", { navigator: b.dataset.nav });
@@ -1461,10 +1534,8 @@ async function boot() {
   tg.ready();
   tg.expand();
   try { tg.disableVerticalSwipes(); } catch { /* eski klient */ }
-  try { tg.setHeaderColor("bg_color"); } catch { /* eski klient */ }
-  const applyScheme = () => document.body.classList.toggle("dark", tg.colorScheme === "dark");
-  applyScheme();
-  try { tg.onEvent("themeChanged", applyScheme); } catch { /* eski klient */ }
+  applyTheme("auto"); // serverdagi tanlov /api/me dan keyin qo'llanadi
+  try { tg.onEvent("themeChanged", () => applyTheme(S.theme)); } catch { /* eski klient */ }
   try {
     S.app = await resolveApp();
   } catch (e) {
@@ -1484,6 +1555,7 @@ async function launch() {
     const me = await api("/api/me");
     S.config = me.config;
     S.live = me.live !== false;
+    applyTheme(me.theme);
   } catch (e) {
     $("#boot").querySelector(".boot-text").textContent = e.message;
     $("#boot .spinner").hidden = true;

@@ -261,4 +261,6 @@ class BotUser(Base):
     phone: Mapped[str | None] = mapped_column(String(32))  # ilovadan ro'yxatdan o'tish uchun tasdiqlangan raqam
     # Ilovada jonli joylashuv: standart yoqilgan, foydalanuvchi o'zi o'chirmaguncha ishlaydi
     live_share: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    # Ilova ko'rinishi: None/auto — Telegram mavzusi bo'yicha, light — kun, dark — tun
+    theme: Mapped[str | None] = mapped_column(String(8))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

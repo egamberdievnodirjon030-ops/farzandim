@@ -196,7 +196,15 @@ class MiniAppServer:
         return web.json_response({
             "config": self.svc.app_config(), "role": role.value, "first_name": request[FIRST_NAME],
             "live": await self.svc.live_share(tg_id),
+            "theme": await self.svc.app_theme(tg_id),
         })
+
+    async def theme(self, request: web.Request) -> web.Response:
+        """☀️ Kun / 🌙 Tun / Avtomatik (Telegram mavzusi bo'yicha)."""
+        b = await self.body(request)
+        theme = str(b.get("theme", ""))
+        await self.svc.set_app_theme(request[TG_ID], theme)  # noto'g'ri qiymat — ValueError → 400
+        return self.ok(theme=theme)
 
     async def live(self, request: web.Request) -> web.Response:
         """«📡 Jonli joylashuv» — yoqilgan bo'lsa, ilova ochilishi bilan avtomatik ishlaydi, o'zi o'chirmaguncha."""
@@ -414,6 +422,7 @@ class MiniAppServer:
                 web.post("/api/route", self.route),
                 web.post("/api/contact", self.contact),
                 web.post("/api/live", self.live),
+                web.post("/api/theme", self.theme),
                 web.get("/api/p/state", self.p_state),
                 web.get("/api/p/nearby", self.p_nearby),
                 web.post("/api/p/quote", self.p_quote),

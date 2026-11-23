@@ -234,3 +234,8 @@ body.dark .plate { border-color: #e6e6e6; }
 body.dark .pin-head.dest { border-color: #fff; background: #111; }
 body.dark .pin-leg { background: #e9e9e9; }
 body.dark .pin-bubble { background: #fff; color: #111; }
+
+/* ---------- ko'rinish: ilovada tanlangan rejim Telegram mavzusidan ustun ---------- */
+body.theme-light { --bg: #ffffff; --bg2: #f2f3f5; --text: #111111; --hint: #8a8f98; --link: #2481cc; }
+body.theme-dark { --bg: #17212b; --bg2: #232e3c; --text: #f5f5f5; --hint: #7d8b99; --link: #6ab3f3; }
+.theme-chip { margin-left: auto; padding: 9px 11px; font-size: 16px; }

@@ -39,7 +39,9 @@ Bot esa bildirishnomalar uchun qoladi (yangi buyurtma, haydovchi yetib keldi va 
   buyurtma holatida, yo'lovchida ham, haydovchida ham;
 * **kamera kuzatuvi** — xaritani o'zingiz surmagan bo'lsangiz, mashina va maqsad nuqta doim ekranda (pastki panel va
   yuqori tugmalar ostida qolmaydi);
-* **tungi rejim** — Telegram mavzusi qorong'i bo'lsa, xarita ham qorong'i, belgilar unga moslashadi.
+* **kun / tun rejimi** — yo'lovchida yuqori o'ng burchakdagi **☀️/🌙** tugmasi, haydovchida **⚙️ → Ko'rinish**:
+  *Avtomatik* (Telegram mavzusi bo'yicha), *☀️ Kun*, *🌙 Tun*. Tunda xarita ham qorong'i, belgilar unga moslashadi.
+  Tanlov serverda saqlanadi (tunnel manzili o'zgarsa ham yo'qolmaydi).
 
 **Ikkalasi uchun:**
 * **📡 Jonli joylashuv** — ilova ochilishi bilan **avtomatik yoqiladi** va **o'zingiz o'chirmaguningizcha** ishlaydi
@@ -414,7 +416,7 @@ pytest -q
 # PostgreSQL'da tekshirish (servis testlari):
 TEST_DATABASE_URL=postgresql+asyncpg://taxi:taxi@localhost:5432/taxi pytest -q tests/test_flow.py tests/test_features.py tests/test_review_fixes.py
 ```
-92 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
+93 ta test: geolokatsiya, tarif, to'lqinlar va reyting ustuvorligi, bir vaqtda qabul qilish poygasi, taksometr,
 avtomatik yakunlash, qayta qidiruv, to'lovlar idempotentligi, sevimli haydovchi, "Uyga" rejimi, saqlangan
 manzillar, ikki marta bosishdan himoya, kontaktlarni yashirish, eski bazani yangilash va **ikkala botning to'liq
 end-to-end sinovi**

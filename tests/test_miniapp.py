@@ -385,3 +385,20 @@ async def test_app_call_and_pbx_route_endpoint(make_service, center):
         assert (await client.get("/pbx/route?code=1&secret=pbx-secret")).status == 404
     finally:
         await client.close()
+
+
+async def test_theme_choice_is_saved_on_server(make_service):
+    """☀️/🌙 tanlovi serverda saqlanadi — tunnel manzili o'zgarsa ham yo'qolmaydi."""
+    svc, _ = await make_service(driver_bot_token="")
+    client = await start(svc, [(P_TOKEN, None)])
+    try:
+        app = AppClient(client, P_TOKEN, 8401, "passenger")
+        assert (await app.get("/api/me"))["theme"] == "auto"  # standart: Telegram mavzusi bo'yicha
+        await app.post("/api/theme", {"theme": "dark"})
+        assert (await app.get("/api/me"))["theme"] == "dark"
+        await app.post("/api/theme", {"theme": "light"})
+        assert (await app.get("/api/me"))["theme"] == "light"
+        await app.post("/api/theme", {"theme": "neon"}, status=400)
+        assert (await app.get("/api/me"))["theme"] == "light"
+    finally:
+        await client.close()
