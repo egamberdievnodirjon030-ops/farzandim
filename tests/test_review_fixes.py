@@ -130,3 +130,21 @@ async def test_contacts_hidden_in_chat_and_comment(make_service, center):
     await svc.relay_text(Role.DRIVER, 4301, "Mening raqamim +998901112233, keyingi safar to'g'ridan-to'g'ri")
     msg = fake.to(Role.PASSENGER, PASSENGER_TG)[-1].view.text
     assert "901112233" not in msg and "•••" in msg
+
+
+async def test_welcome_bonus_once_and_limit(make_service):
+    from taxi_bot.db.models import DriverStatus
+
+    svc, fake = await make_service(welcome_bonus=30000, welcome_bonus_limit=2)
+    ids = []
+    for tg in (7101, 7102, 7103):
+        d = await svc.register_driver(tg, "Ism", "+998901234567", "Cobalt", "Oq", f"01A{tg}")
+        ids.append(d.id)
+        await svc.set_driver_status(d.id, DriverStatus.APPROVED)
+    balances = [(await svc.get_driver(i)).balance for i in ids]
+    assert balances == [30000, 30000, 0]  # faqat birinchi 2 tasiga
+    # Bloklab, qayta faollashtirilsa yoki qayta tasdiqlansa — bonus ikkinchi marta berilmaydi
+    await svc.set_driver_status(ids[0], DriverStatus.BLOCKED)
+    await svc.set_driver_status(ids[0], DriverStatus.APPROVED)
+    assert (await svc.get_driver(ids[0])).balance == 30000
+    assert any("30 000" in m.view.text for m in fake.to(Role.DRIVER, 7101))

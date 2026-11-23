@@ -96,6 +96,7 @@ def make_settings(**overrides) -> Settings:
         min_driver_balance=1000,
         finish_confirm_timeout_min=10,
         call_provider="operator",
+        welcome_bonus=0,  # bonus alohida testda tekshiriladi
     )
     base.update(overrides)
     return Settings(_env_file=None, **base)  # type: ignore[call-arg]

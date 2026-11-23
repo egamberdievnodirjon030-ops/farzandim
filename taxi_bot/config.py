@@ -58,7 +58,8 @@ class Settings(BaseSettings):
     price_round: int = 500
     commission_percent: float = 10.0
     min_driver_balance: int = 1000  # shundan kam balansda buyurtma kelmaydi
-    welcome_bonus: int = 0
+    welcome_bonus: int = 30000  # yangi haydovchiga (tasdiqlanganda) bir martalik bonus
+    welcome_bonus_limit: int = 0  # 0 — barcha yangi haydovchilarga; N — faqat birinchi N tasiga
 
     # --- Qidiruv (dispetcherlik) -------------------------------------------
     wave_radii_km: Annotated[list[float], NoDecode] = Field(
@@ -118,6 +119,12 @@ class Settings(BaseSettings):
     message_effects: bool = True
     # Tugmalarda custom emoji (bot egasida Telegram Premium bo'lishi kerak). Masalan: {"taxi": "5368..."}
     button_emoji_ids: dict[str, str] = Field(default_factory=dict)
+
+    # --- Admin web-panel (brauzerda: http://localhost:8080) -----------------
+    admin_panel_enabled: bool = True
+    admin_panel_host: str = "127.0.0.1"  # faqat shu kompyuterdan; tarmoqqa ochish: 0.0.0.0
+    admin_panel_port: int = 8080
+    admin_panel_password: SecretStr | None = None  # bo'sh bo'lsa data/admin_panel_password.txt da yaratiladi
 
     log_level: str = "INFO"
 

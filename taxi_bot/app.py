@@ -117,6 +117,7 @@ async def main() -> None:
             log.warning("Webhook o'chirilmadi: %s", exc)
     await setup_commands(settings, passenger_bot, driver_bot)
     await svc.resume()
+    panel = await start_admin_panel(settings, svc)
     maintenance = asyncio.create_task(svc.run_maintenance(), name="maintenance")
     log.info(
         "Taksi bot ishga tushdi: %s",
@@ -126,8 +127,34 @@ async def main() -> None:
         await dp.start_polling(*bots, allowed_updates=dp.resolve_used_update_types())
     finally:
         maintenance.cancel()
+        if panel:
+            await panel.stop()
         await svc.close()
         await db.close()
+
+
+async def start_admin_panel(settings: Settings, svc: TaxiService):
+    """Admin web-panelni ishga tushiradi (brauzerda ochiladi). Xato bo'lsa bot baribir ishlayveradi."""
+    if not settings.admin_panel_enabled:
+        return None
+    from .web.server import AdminPanel, resolve_password
+
+    configured = settings.admin_panel_password.get_secret_value() if settings.admin_panel_password else None
+    password, created = resolve_password(configured)
+    panel = AdminPanel(svc, password, settings.admin_panel_host, settings.admin_panel_port)
+    try:
+        await panel.start()
+    except OSError as exc:
+        log.warning("Admin panel ishga tushmadi (%s-port band bo'lishi mumkin): %s", settings.admin_panel_port, exc)
+        return None
+    host = "localhost" if settings.admin_panel_host in ("127.0.0.1", "localhost") else "<kompyuter-IP>"
+    print(f"\n🌐 Admin panel: http://{host}:{settings.admin_panel_port}")
+    if configured:
+        print("   Parol: .env dagi ADMIN_PANEL_PASSWORD")
+    else:
+        print(f"   Parol: {password}" + ("  (yangi yaratildi — data/admin_panel_password.txt)" if created else ""))
+    print()
+    return panel
 
 
 def setup_logging(level: str) -> None:

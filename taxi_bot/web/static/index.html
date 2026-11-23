@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Boshqaruv paneli — {{COMPANY}}</title>
+  <link rel="stylesheet" href="/static/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">🚕</span><div><b>{{COMPANY}}</b><span class="muted small">Boshqaruv paneli</span></div></div>
+  <div class="top-right">
+    <span class="live" id="live"><i></i><span id="live-text">ulanmoqda…</span></span>
+    <form method="post" action="/logout" id="logout-form"><button class="btn ghost small" type="submit">Chiqish</button></form>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="overview" class="active">📊 Umumiy</button>
+  <button data-tab="orders">📋 Buyurtmalar</button>
+  <button data-tab="drivers">🚕 Haydovchilar <span class="badge" id="pending-badge" hidden></span></button>
+  <button data-tab="passengers">🙋 Yo'lovchilar</button>
+  <button data-tab="finance">💰 Moliya</button>
+</nav>
+
+<main>
+  <!-- ================= UMUMIY ================= -->
+  <section id="tab-overview" class="tab active">
+    <div class="kpis" id="kpis"></div>
+    <div class="overview-grid">
+      <div class="card map-card">
+        <div class="card-head">
+          <h2>Jonli xarita</h2>
+          <div class="legend">
+            <span><i class="dot free"></i>Bo'sh</span><span><i class="dot busy"></i>Band</span>
+            <span><i class="dot stale"></i>Joylashuv eski</span><span><i class="dot order"></i>Buyurtma</span>
+          </div>
+        </div>
+        <div id="map"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Faol buyurtmalar</h2><span class="muted small" id="active-count"></span></div>
+        <div id="active-list" class="list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= BUYURTMALAR ================= -->
+  <section id="tab-orders" class="tab">
+    <div class="toolbar">
+      <div class="seg" id="orders-scope">
+        <button data-v="active" class="active">Faol</button><button data-v="today">Bugun</button><button data-v="all">Hammasi</button>
+      </div>
+      <input type="search" id="orders-q" placeholder="Qidirish: #raqam, telefon, davlat raqami…">
+    </div>
+    <div class="card table-card"><table class="table" id="orders-table"></table></div>
+  </section>
+
+  <!-- ================= HAYDOVCHILAR ================= -->
+  <section id="tab-drivers" class="tab">
+    <div class="toolbar">
+      <div class="seg" id="drivers-status">
+        <button data-v="" class="active">Hammasi</button><button data-v="pending">Arizalar</button>
+        <button data-v="approved">Tasdiqlangan</button><button data-v="blocked">Bloklangan</button>
+      </div>
+      <input type="search" id="drivers-q" placeholder="Qidirish: ism, telefon, davlat raqami…">
+    </div>
+    <div class="card table-card"><table class="table" id="drivers-table"></table></div>
+  </section>
+
+  <!-- ================= YO'LOVCHILAR ================= -->
+  <section id="tab-passengers" class="tab">
+    <div class="toolbar"><input type="search" id="passengers-q" placeholder="Qidirish: ism yoki telefon…"></div>
+    <div class="card table-card"><table class="table" id="passengers-table"></table></div>
+  </section>
+
+  <!-- ================= MOLIYA ================= -->
+  <section id="tab-finance" class="tab">
+    <div class="toolbar">
+      <div class="seg" id="finance-days">
+        <button data-v="7">7 kun</button><button data-v="14" class="active">14 kun</button><button data-v="30">30 kun</button>
+      </div>
+    </div>
+    <div class="kpis" id="finance-kpis"></div>
+    <div class="card">
+      <div class="card-head"><h2>Kunlik komissiya</h2></div>
+      <div class="bars" id="finance-bars"></div>
+    </div>
+    <div class="finance-grid">
+      <div class="card table-card"><div class="card-head"><h2>Kunlar bo'yicha</h2></div><table class="table" id="finance-table"></table></div>
+      <div class="card table-card"><div class="card-head"><h2>Oxirgi tranzaksiyalar</h2></div><table class="table" id="tx-table"></table></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="dialog">
+  <form method="dialog" id="dialog-form">
+    <h3 id="dialog-title"></h3>
+    <p id="dialog-text" class="muted"></p>
+    <input id="dialog-input" type="number" step="1000" hidden>
+    <div class="dialog-actions">
+      <button value="cancel" class="btn ghost">Bekor</button>
+      <button value="ok" id="dialog-ok" class="btn primary">Tasdiqlash</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" class="toast" hidden></div>
+
+<script src="/static/leaflet/leaflet.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

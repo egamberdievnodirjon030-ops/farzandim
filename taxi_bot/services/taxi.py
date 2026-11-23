@@ -35,6 +35,7 @@ from ..db.models import (
 from ..ui.kit import DANGER, SUCCESS, ACb, Card, View, btn, h, inline
 from ..ui.messenger import EFFECT_PARTY, Messenger, Role
 from ..ui.views import Quote, Views
+from .admin import AdminMixin
 from .dispatch import DispatchEngine
 from .features import FeaturesMixin
 from .geo import Point, bearing_deg, bounding_box, haversine_m
@@ -77,7 +78,7 @@ def _upd(model):
     return update(model).execution_options(synchronize_session=False)
 
 
-class TaxiService(FeaturesMixin):
+class TaxiService(FeaturesMixin, AdminMixin):
     def __init__(
         self,
         settings: Settings,
@@ -580,18 +581,31 @@ class TaxiService(FeaturesMixin):
             d.status = status
             if status != DriverStatus.APPROVED:
                 d.is_online = False
-            bonus = (
-                status == DriverStatus.APPROVED
-                and previous == DriverStatus.PENDING
-                and self.settings.welcome_bonus > 0
-                and d.trips_count == 0
-                and d.balance == 0
-            )
-        if bonus:
-            d = await self.adjust_balance(driver_id, self.settings.welcome_bonus, "bonus", "Xush kelibsiz bonusi") or d
+        if status == DriverStatus.APPROVED and previous == DriverStatus.PENDING:
+            d = await self._welcome_bonus(driver_id) or d
         if status != DriverStatus.APPROVED:
             await self._withdraw_driver_offers(driver_id)
         return d
+
+    async def _welcome_bonus(self, driver_id: int) -> Driver | None:
+        """Yangi haydovchiga bir martalik bonus (masalan 30 000 so'm) — ikkinchi marta berilmaydi."""
+        amount, limit = self.settings.welcome_bonus, self.settings.welcome_bonus_limit
+        if amount <= 0:
+            return None
+        async with self.db.session() as s:
+            if await s.scalar(
+                select(Transaction.id).where(Transaction.driver_id == driver_id, Transaction.kind == "bonus")
+            ):
+                return None
+            if limit > 0:
+                given = await s.scalar(
+                    select(func.count(func.distinct(Transaction.driver_id))).where(Transaction.kind == "bonus")
+                )
+                if (given or 0) >= limit:
+                    return None
+        return await self.adjust_balance(
+            driver_id, amount, "bonus", "Xush kelibsiz bonusi", external_id=f"welcome-{driver_id}"
+        )
 
     async def set_navigator(self, tg_id: int, navigator: str) -> None:
         async with self.db.session() as s:

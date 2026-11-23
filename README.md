@@ -238,6 +238,24 @@ OSRM ishlamay qolsa, tizim avtomatik taxminiy hisobga o'tadi.
 
 ---
 
+## 🖥 Admin web-panel
+
+Bot ishga tushganda konsolda manzil va parol chiqadi: **http://localhost:8080** (faqat shu kompyuterdan ochiladi).
+
+![Admin panel](skrinshotlar/admin_panel.png)
+
+* **📊 Umumiy** — liniyadagi/bo'sh/band haydovchilar, faol buyurtmalar, bugungi aylanma va komissiya, arizalar;
+  **jonli xarita** (bo'sh — yashil, band — sariq, joylashuvi eskirgan — kulrang, buyurtmalar — qizil);
+  faol buyurtmalar ro'yxati va **majburan bekor qilish** (qotib qolgan holatlar uchun).
+* **📋 Buyurtmalar** — faol / bugun / hammasi, qidiruv (#raqam, telefon, davlat raqami).
+* **🚕 Haydovchilar** — arizalarni tasdiqlash/rad etish, bloklash, **balansni to'ldirish**.
+* **🙋 Yo'lovchilar** — safar va bekor qilishlar soni, bloklash (yolg'on buyurtmalarga qarshi).
+* **💰 Moliya** — 7/14/30 kunlik aylanma, komissiya, to'ldirishlar, kunlik grafik va tranzaksiyalar.
+
+Sozlamalar: `ADMIN_PANEL_PORT`, `ADMIN_PANEL_PASSWORD` (bo'sh bo'lsa avtomatik yaratiladi va
+`data/admin_panel_password.txt` da saqlanadi). Tarmoqdagi boshqa kompyuterdan ochish uchun
+`ADMIN_PANEL_HOST=0.0.0.0` (faqat ishonchli tarmoqda!).
+
 ## 🛠 Admin buyruqlari (istalgan botda, faqat `ADMIN_IDS` uchun)
 
 | Buyruq | |
