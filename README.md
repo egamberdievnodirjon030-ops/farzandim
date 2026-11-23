@@ -195,6 +195,8 @@ python -m taxi_bot                # ishga tushirish
 ### Bilish kerak
 * Bot **kompyuter yoniq va dastur ochiq turgan paytda** ishlaydi. Windows'da uyqu rejimini o'chiring:
   *Sozlamalar → Tizim → Quvvat → Uyqu: Hech qachon*. Doimiy ishlashi uchun keyinchalik serverga (VPS) o'tkazing — pastda Docker bo'limi.
+* Diskda kamida **~300 MB bo'sh joy** kerak (kutubxonalar ~70 MB, cloudflared ~60 MB). `start.bat` buni o'zi tekshiradi;
+  `No space left on device` xatosi — disk to'lgan: vaqtinchalik fayllar, Savat, loyihaning eski nusxasini tozalang.
 * Bitta token bilan **faqat bitta nusxa** ishlashi mumkin. Loglarda `TelegramConflictError` chiqsa — bot boshqa joyda ham ishlab turibdi.
 * Ma'lumotlar `data\taxi.db` faylida, loglar `data\bot.log` da. Zaxira uchun `data` papkasini nusxalang.
 * Sozlamalarni o'zgartirish: `.env` faylini Bloknot bilan oching (tarif, komissiya, radiuslar), so'ng botni qayta ishga tushiring.
